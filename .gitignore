@@ -9,3 +9,7 @@ next-env.d.ts
 
 # Local-only Claude settings (keep .claude/launch.json shared)
 .claude/settings.local.json
+
+# Local data files
+*.xlsx
+~$*
