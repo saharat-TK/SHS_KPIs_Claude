@@ -1,5 +1,5 @@
 import type {
-  Department,
+  Committee,
   FacultyMember,
   Formula,
   FormulaVersion,
@@ -16,15 +16,15 @@ import { delay, getDB, uid } from "./store";
 // Every function is async and returns plain data. Phase 2 reimplements the
 // bodies against Firebase/Supabase/Postgres; hooks and components are untouched.
 
-// Departments ----------------------------------------------------------------
-export const departmentsRepo = {
-  list: () => delay(getDB().departments),
+// Committees ----------------------------------------------------------------
+export const committeesRepo = {
+  list: () => delay(getDB().committees),
   get: (id: string) =>
-    delay(getDB().departments.find((d) => d.id === id) ?? null),
-  create: async (input: Omit<Department, "id">) => {
-    const dept: Department = { ...input, id: uid("dept") };
-    getDB().departments.push(dept);
-    return delay(dept);
+    delay(getDB().committees.find((d) => d.id === id) ?? null),
+  create: async (input: Omit<Committee, "id">) => {
+    const committee: Committee = { ...input, id: uid("cmt") };
+    getDB().committees.push(committee);
+    return delay(committee);
   },
 };
 
@@ -194,7 +194,7 @@ export const validationsRepo = {
 };
 
 export type {
-  Department,
+  Committee,
   FacultyMember,
   Formula,
   FormulaVersion,

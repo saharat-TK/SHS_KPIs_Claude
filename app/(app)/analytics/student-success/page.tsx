@@ -19,7 +19,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { TrendLineChart, CategoryBarChart } from "@/components/ui/Charts";
-import { useKpis, useDepartments, useMeasurements } from "@/lib/data/hooks";
+import { useKpis, useCommittees, useMeasurements } from "@/lib/data/hooks";
 import { PERIODS } from "@/lib/data/seed";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { formatNumber } from "@/lib/utils";
@@ -33,40 +33,40 @@ const SHORT: Record<string, string> = {
 
 export default function StudentSuccessPage() {
   const kpis = useKpis();
-  const departments = useDepartments();
+  const committees = useCommittees();
   const measurements = useMeasurements();
   const [period, setPeriod] = useState<string>(PERIODS[PERIODS.length - 1]);
 
-  const loading = kpis.isLoading || departments.isLoading || measurements.isLoading;
+  const loading = kpis.isLoading || committees.isLoading || measurements.isLoading;
 
   const val = useCallback(
-    (kpiId: string, deptId: string, p: string) =>
+    (kpiId: string, committeeId: string, p: string) =>
       measurements.data?.find(
-        (m) => m.targetId === kpiId && m.departmentId === deptId && m.period === p,
+        (m) => m.targetId === kpiId && m.committeeId === committeeId && m.period === p,
       )?.value ?? null,
     [measurements.data],
   );
 
-  // Overall (mean across departments) per KPI for the selected period.
+  // Overall (mean across committees) per KPI for the selected period.
   const overall = useMemo(() => {
     const out: Record<string, number> = {};
-    const activeDepts = (departments.data ?? []).filter((d) => d.status === "active");
+    const activeCommittees = (committees.data ?? []).filter((d) => d.status === "active");
     for (const k of SS_KPIS) {
-      const vals = activeDepts
+      const vals = activeCommittees
         .map((d) => val(k, d.id, period))
         .filter((v): v is number => v != null);
       out[k] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
     }
     return out;
-  }, [departments.data, period, val]);
+  }, [committees.data, period, val]);
 
   // Trend across all periods (overall mean) for the line chart.
   const trend = useMemo(() => {
-    const activeDepts = (departments.data ?? []).filter((d) => d.status === "active");
+    const activeCommittees = (committees.data ?? []).filter((d) => d.status === "active");
     return PERIODS.map((p) => {
       const row: Record<string, string | number> = { period: p };
       for (const k of SS_KPIS) {
-        const vals = activeDepts
+        const vals = activeCommittees
           .map((d) => val(k, d.id, p))
           .filter((v): v is number => v != null);
         row[k] = vals.length
@@ -75,27 +75,27 @@ export default function StudentSuccessPage() {
       }
       return row;
     });
-  }, [departments.data, val]);
+  }, [committees.data, val]);
 
-  // Departmental breakdown for the selected period.
+  // Committee breakdown for the selected period.
   const breakdown = useMemo(() => {
-    const activeDepts = (departments.data ?? []).filter((d) => d.status === "active");
-    return activeDepts.map((d) => ({
-      dept: d.name,
-      deptId: d.id,
+    const activeCommittees = (committees.data ?? []).filter((d) => d.status === "active");
+    return activeCommittees.map((d) => ({
+      committee: d.name,
+      committeeId: d.id,
       grad: val("kpi-grad-rate", d.id, period),
       lic: val("kpi-licensure", d.id, period),
       emp: val("kpi-employment", d.id, period),
     }));
-  }, [departments.data, period, val]);
+  }, [committees.data, period, val]);
 
-  const barData = breakdown.map((b) => ({ dept: b.dept, value: b.grad ?? 0 }));
+  const barData = breakdown.map((b) => ({ committee: b.committee, value: b.grad ?? 0 }));
 
   const kpiOf = (id: string) => kpis.data?.find((k) => k.id === id);
 
   const exportCsv = () => {
-    const headers = ["Department", "Graduation", "Licensure", "Employment"];
-    const rows = breakdown.map((b) => [b.dept, b.grad ?? "", b.lic ?? "", b.emp ?? ""]);
+    const headers = ["Committee", "Graduation", "Licensure", "Employment"];
+    const rows = breakdown.map((b) => [b.committee, b.grad ?? "", b.lic ?? "", b.emp ?? ""]);
     downloadCsv(`student-success-${period}.csv`, toCsv(headers, rows));
   };
 
@@ -103,7 +103,7 @@ export default function StudentSuccessPage() {
     <>
       <PageHeader
         title="Student Success Deep-Dive"
-        description="Graduation, licensure and post-graduation employment across departments."
+        description="Graduation, licensure and post-graduation employment across committees."
         actions={
           <Button variant="outline" icon="download" onClick={exportCsv}>
             Export Data CSV
@@ -153,7 +153,7 @@ export default function StudentSuccessPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
           <Card>
-            <CardHeader title="Overall Trend" subtitle="Mean across departments by quarter" />
+            <CardHeader title="Overall Trend" subtitle="Mean across committees by quarter" />
             <CardBody>
               <TrendLineChart
                 data={trend}
@@ -163,19 +163,19 @@ export default function StudentSuccessPage() {
             </CardBody>
           </Card>
           <Card>
-            <CardHeader title={`Graduation by Department · ${period.replace("2024-", "")} 2024`} />
+            <CardHeader title={`Graduation by Committee · ${period.replace("2024-", "")} 2024`} />
             <CardBody>
-              <CategoryBarChart data={barData} xKey="dept" barKey="value" label="Graduation %" />
+              <CategoryBarChart data={barData} xKey="committee" barKey="value" label="Graduation %" />
             </CardBody>
           </Card>
         </div>
 
         <Card className="overflow-hidden">
-          <CardHeader title="Departmental Breakdown" subtitle={`Sub-KPI detail for ${period.replace("2024-", "")} 2024`} />
+          <CardHeader title="Committee Breakdown" subtitle={`Sub-KPI detail for ${period.replace("2024-", "")} 2024`} />
           <Table>
             <thead>
               <tr>
-                <Th>Department</Th>
+                <Th>Committee</Th>
                 <Th align="right">Graduation Rate</Th>
                 <Th align="right">Licensure Pass Rate</Th>
                 <Th align="right">Post-Grad Emp.</Th>
@@ -186,8 +186,8 @@ export default function StudentSuccessPage() {
               {breakdown.map((b) => {
                 const gradKpi = kpiOf("kpi-grad-rate");
                 return (
-                  <Tr key={b.deptId}>
-                    <Td className="font-medium">{b.dept}</Td>
+                  <Tr key={b.committeeId}>
+                    <Td className="font-medium">{b.committee}</Td>
                     <Td align="right">{b.grad != null ? formatNumber(b.grad, 1) + "%" : "—"}</Td>
                     <Td align="right">{b.lic != null ? formatNumber(b.lic, 1) + "%" : "—"}</Td>
                     <Td align="right">{b.emp != null ? formatNumber(b.emp, 1) + "%" : "—"}</Td>

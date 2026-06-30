@@ -216,7 +216,7 @@ function MetricModal({
                 target,
                 unit,
                 dataSource: dataSource || "Manual",
-                assignedDepartmentIds: existing?.assignedDepartmentIds ?? [],
+                assignedCommitteeIds: existing?.assignedCommitteeIds ?? [],
               };
               onSave(existing ? { ...base, id: existing.id } : base);
             }}

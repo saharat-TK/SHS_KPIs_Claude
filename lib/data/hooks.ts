@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type {
-  Department,
+  Committee,
   FacultyMember,
   Kpi,
   Metric,
@@ -14,7 +14,7 @@ import type {
   ValidationStatus,
 } from "@/lib/types";
 import {
-  departmentsRepo,
+  committeesRepo,
   facultyRepo,
   formulasRepo,
   kpisRepo,
@@ -35,7 +35,7 @@ declare module "@tanstack/react-query" {
 }
 
 export const qk = {
-  departments: ["departments"] as const,
+  committees: ["committees"] as const,
   faculty: ["faculty"] as const,
   kpis: ["kpis"] as const,
   kpi: (id: string) => ["kpis", id] as const,
@@ -49,8 +49,8 @@ export const qk = {
 };
 
 // Queries --------------------------------------------------------------------
-export const useDepartments = () =>
-  useQuery({ queryKey: qk.departments, queryFn: departmentsRepo.list });
+export const useCommittees = () =>
+  useQuery({ queryKey: qk.committees, queryFn: committeesRepo.list });
 
 export const useFaculty = () =>
   useQuery({ queryKey: qk.faculty, queryFn: facultyRepo.list });
@@ -91,12 +91,12 @@ export const useValidations = () =>
   useQuery({ queryKey: qk.validations, queryFn: validationsRepo.list });
 
 // Mutations ------------------------------------------------------------------
-export function useCreateDepartment() {
+export function useCreateCommittee() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Omit<Department, "id">) => departmentsRepo.create(input),
-    meta: { toast: (d) => `Committee "${(d as Department).name}" added` },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.departments }),
+    mutationFn: (input: Omit<Committee, "id">) => committeesRepo.create(input),
+    meta: { toast: (d) => `Committee "${(d as Committee).name}" added` },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.committees }),
   });
 }
 

@@ -23,7 +23,7 @@ import { RequirePermission } from "@/components/shell/Guard";
 import {
   useValidations,
   useMetrics,
-  useDepartments,
+  useCommittees,
   useDecideValidation,
 } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -50,7 +50,7 @@ function ValidationQueue() {
   const { user } = useAuth();
   const validations = useValidations();
   const metrics = useMetrics();
-  const departments = useDepartments();
+  const committees = useCommittees();
   const decide = useDecideValidation();
 
   const [tab, setTab] = useState("pending");
@@ -58,7 +58,7 @@ function ValidationQueue() {
   const [detail, setDetail] = useState<ValidationSubmission | null>(null);
 
   const metricName = (id: string) => metrics.data?.find((m) => m.id === id)?.name ?? id;
-  const deptName = (id: string) => departments.data?.find((d) => d.id === id)?.name ?? id;
+  const committeeName = (id: string) => committees.data?.find((d) => d.id === id)?.name ?? id;
   const metricUnit = (id: string) => metrics.data?.find((m) => m.id === id)?.unit ?? "";
 
   const counts = useMemo(() => {
@@ -100,7 +100,7 @@ function ValidationQueue() {
     <>
       <PageHeader
         title="Validation Workflow"
-        description="Review department-submitted metric values. Approve, reject, or request clarification."
+        description="Review committee-submitted metric values. Approve, reject, or request clarification."
         actions={<Button variant="outline" icon="summarize">Generate Report</Button>}
       />
 
@@ -118,7 +118,7 @@ function ValidationQueue() {
               <thead>
                 <tr>
                   <Th>Metric Name</Th>
-                  <Th>Department</Th>
+                  <Th>Committee</Th>
                   <Th align="right">Value</Th>
                   <Th>Submitted</Th>
                   <Th>Status</Th>
@@ -129,7 +129,7 @@ function ValidationQueue() {
                 {rows.map((v) => (
                   <Tr key={v.id} onClick={() => setDetail(v)}>
                     <Td className="font-medium">{metricName(v.metricId)}</Td>
-                    <Td className="text-mute">{deptName(v.departmentId)}</Td>
+                    <Td className="text-mute">{committeeName(v.committeeId)}</Td>
                     <Td align="right" className="font-medium">
                       {v.value} {metricUnit(v.metricId)}
                     </Td>
@@ -202,7 +202,7 @@ function ValidationQueue() {
           open
           onClose={() => setDetail(null)}
           title={metricName(detail.metricId)}
-          subtitle={`${deptName(detail.departmentId)} · ${detail.period}`}
+          subtitle={`${committeeName(detail.committeeId)} · ${detail.period}`}
           size="lg"
         >
           <div className="flex flex-col gap-lg">

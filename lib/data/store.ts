@@ -1,5 +1,5 @@
 import type {
-  Department,
+  Committee,
   FacultyMember,
   Formula,
   FormulaVersion,
@@ -15,7 +15,7 @@ import * as seed from "./seed";
 // stays immutable. Phase 2 deletes this file and points the repositories at a
 // real backend — the repository signatures do not change.
 interface DB {
-  departments: Department[];
+  committees: Committee[];
   faculty: FacultyMember[];
   kpis: Kpi[];
   metrics: Metric[];
@@ -34,7 +34,7 @@ let db: DB | null = null;
 export function getDB(): DB {
   if (!db) {
     db = {
-      departments: clone(seed.departments),
+      committees: clone(seed.committees),
       faculty: clone(seed.faculty),
       kpis: clone(seed.kpis),
       metrics: clone(seed.metrics),

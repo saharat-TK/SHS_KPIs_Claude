@@ -28,7 +28,7 @@ import {
   useKpi,
   useMetricsByKpi,
   useUpdateKpi,
-  useDepartments,
+  useCommittees,
   useFormulas,
 } from "@/lib/data/hooks";
 import { KPI_CATEGORIES, type Kpi } from "@/lib/types";
@@ -47,7 +47,7 @@ function KpiDetail() {
   const router = useRouter();
   const kpiQ = useKpi(id);
   const metricsQ = useMetricsByKpi(id);
-  const departments = useDepartments();
+  const committees = useCommittees();
   const formulas = useFormulas();
   const update = useUpdateKpi();
 
@@ -61,20 +61,20 @@ function KpiDetail() {
 
   const catLabel = (c: string) =>
     KPI_CATEGORIES.find((x) => x.id === c)?.label ?? c;
-  const deptName = (d: string) =>
-    departments.data?.find((x) => x.id === d)?.name ?? d;
+  const committeeName = (d: string) =>
+    committees.data?.find((x) => x.id === d)?.name ?? d;
 
   const set = (patch: Partial<Kpi>) =>
     setDraft((d) => (d ? { ...d, ...patch } : d));
-  const toggleDept = (deptId: string) =>
+  const toggleCommittee = (committeeId: string) =>
     setDraft((d) => {
       if (!d) return d;
-      const has = d.departmentIds.includes(deptId);
+      const has = d.committeeIds.includes(committeeId);
       return {
         ...d,
-        departmentIds: has
-          ? d.departmentIds.filter((x) => x !== deptId)
-          : [...d.departmentIds, deptId],
+        committeeIds: has
+          ? d.committeeIds.filter((x) => x !== committeeId)
+          : [...d.committeeIds, committeeId],
       };
     });
 
@@ -264,19 +264,19 @@ function KpiDetail() {
 
               <Card>
                 <CardHeader
-                  title="Departmental Mapping"
-                  subtitle={`${draft.departmentIds.length} of ${departments.data?.length ?? 0} tracked`}
+                  title="Committee Mapping"
+                  subtitle={`${draft.committeeIds.length} of ${committees.data?.length ?? 0} tracked`}
                 />
                 <CardBody className="flex flex-col gap-xs max-h-[320px] overflow-y-auto scroll-thin">
-                  {departments.data?.map((d) => {
-                    const on = draft.departmentIds.includes(d.id);
+                  {committees.data?.map((d) => {
+                    const on = draft.committeeIds.includes(d.id);
                     return (
                       <button
                         key={d.id}
-                        onClick={() => toggleDept(d.id)}
+                        onClick={() => toggleCommittee(d.id)}
                         className="flex items-center justify-between gap-sm rounded-DEFAULT px-md py-sm hover:bg-surface-soft transition-colors text-left"
                       >
-                        <span className="text-body-sm">{deptName(d.id)}</span>
+                        <span className="text-body-sm">{committeeName(d.id)}</span>
                         <Icon
                           name={on ? "check_box" : "check_box_outline_blank"}
                           size={20}

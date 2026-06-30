@@ -7,7 +7,7 @@ import type { Role } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
 
-const ROLES: Role[] = ["admin", "reviewer", "department", "viewer"];
+const ROLES: Role[] = ["admin", "reviewer", "committee", "viewer"];
 
 export function RoleSwitcher() {
   const { user, role, setRole } = useAuth();
