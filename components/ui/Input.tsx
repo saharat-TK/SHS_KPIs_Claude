@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Icon } from "./Icon";
 
 const base =
-  "w-full h-[40px] px-md bg-surface-lowest rounded-DEFAULT border border-hairline focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none text-body-sm text-on-surface placeholder:text-stone transition-colors disabled:bg-surface-soft disabled:text-mute";
+  "w-full h-[36px] px-md bg-surface-lowest rounded-DEFAULT border border-hairline focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none text-body-sm text-on-surface placeholder:text-stone transition-colors disabled:bg-surface-soft disabled:text-mute";
 
 export const Input = forwardRef<
   HTMLInputElement,
@@ -24,7 +24,7 @@ export function SearchInput({
         size={20}
         className="absolute left-md top-1/2 -translate-y-1/2 text-mute pointer-events-none"
       />
-      <input className={cn(base, "h-[36px] pl-[36px]", className)} {...rest} />
+      <input className={cn(base, "h-[34px] pl-[36px]", className)} {...rest} />
     </div>
   );
 }

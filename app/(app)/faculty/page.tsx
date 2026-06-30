@@ -86,7 +86,7 @@ export default function FacultyPage() {
     <>
       <PageHeader
         title="Faculty Roster"
-        description="Global faculty directory across all Health Sciences departments."
+        description="Global faculty directory across all Health Sciences Committees."
         actions={
           can("manage_faculty") && (
             <>
@@ -133,7 +133,7 @@ export default function FacultyPage() {
             }}
             className="w-auto min-w-[170px]"
           >
-            <option value="all">All Departments</option>
+            <option value="all">All Committees</option>
             {departments.data?.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
