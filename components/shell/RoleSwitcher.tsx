@@ -26,7 +26,7 @@ export function RoleSwitcher() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-sm rounded-DEFAULT border border-hairline bg-surface-lowest px-md h-[40px] hover:border-hairline-strong transition-colors"
+        className="flex h-[36px] items-center gap-sm rounded-DEFAULT border border-hairline bg-surface-lowest px-md hover:border-hairline-strong transition-colors"
         title="Switch role (demo)"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-container text-on-tertiary text-caption-sm font-medium">
