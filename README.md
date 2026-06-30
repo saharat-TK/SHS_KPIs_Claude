@@ -27,7 +27,7 @@ Other scripts: `npm run build`, `npm run start`, `npm run lint`, `npm run typech
 |---|---|
 | `/` | Overview dashboard (KPI health by category, at-risk KPIs, review queue) |
 | `/analytics/student-success` | Deep-dive: quarter filters, trend + bar charts, departmental breakdown |
-| `/departments` | Departments & their faculty rosters |
+| `/committee` | Committees & their faculty rosters |
 | `/faculty` | Global faculty roster — search / filter / sort / paginate / add |
 | `/faculty/export` | Roster export workflow — row + column selection → CSV download |
 | `/kpis`, `/kpis/[id]` | KPI management by category; per-KPI config, calc logic, thresholds, departmental mapping |

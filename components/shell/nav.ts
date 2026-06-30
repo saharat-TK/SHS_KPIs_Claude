@@ -29,7 +29,7 @@ export const NAV: NavGroup[] = [
   {
     label: "Faculty Data",
     items: [
-      { label: "Departments", href: "/departments", icon: "account_tree" },
+      { label: "Committees", href: "/committee", icon: "account_tree" },
       { label: "Faculty Roster", href: "/faculty", icon: "groups" },
       {
         label: "Roster Export",

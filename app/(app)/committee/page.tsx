@@ -20,7 +20,7 @@ import { useDepartments, useFaculty } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { cn, formatNumber } from "@/lib/utils";
 
-export default function DepartmentsPage() {
+export default function CommitteePage() {
   const { can } = useAuth();
   const departments = useDepartments();
   const faculty = useFaculty();
@@ -42,12 +42,12 @@ export default function DepartmentsPage() {
   return (
     <>
       <PageHeader
-        title="Departments & Faculties"
+        title="Committees"
         description="Organizational structure of the School of Health Sciences."
         actions={
           can("manage_faculty") && (
             <Button icon="add" variant="outline">
-              Add Department
+              Add Committee
             </Button>
           )
         }
@@ -100,7 +100,7 @@ export default function DepartmentsPage() {
 
           <Card className="overflow-hidden h-fit">
             {!activeDept ? (
-              <EmptyState title="Select a department" />
+              <EmptyState title="Select a committee" />
             ) : (
               <>
                 <CardHeader

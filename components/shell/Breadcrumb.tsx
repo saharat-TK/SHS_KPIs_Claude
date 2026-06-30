@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 
 const LABELS: Record<string, string> = {
   "": "Dashboard",
-  departments: "Departments",
+  committee: "Committees",
   faculty: "Faculty Roster",
   export: "Roster Export",
   kpis: "KPI Management",
