@@ -7,7 +7,7 @@ export type Action =
   | "configure_kpis" // KPIs, metrics, formulas
   | "submit_metrics"
   | "review_submissions" // approve / reject / request clarification
-  | "manage_faculty" // departments, faculty, roster export
+  | "manage_faculty" // committees, faculty, roster export
   | "view_faculty";
 
 const MATRIX: Record<Role, Action[]> = {
@@ -20,13 +20,13 @@ const MATRIX: Record<Role, Action[]> = {
     "view_faculty",
   ],
   reviewer: ["view_dashboards", "review_submissions", "view_faculty"],
-  department: ["view_dashboards", "submit_metrics", "view_faculty"],
+  committee: ["view_dashboards", "submit_metrics", "view_faculty"],
   viewer: ["view_dashboards", "view_faculty"],
 };
 
 export interface ResourceCtx {
-  // Optional resource scoping (e.g. department users only act on their dept)
-  departmentId?: string;
+  // Optional resource scoping (e.g. committee users only act on their committee)
+  committeeId?: string;
 }
 
 export function can(
@@ -38,12 +38,12 @@ export function can(
   const allowed = MATRIX[user.role]?.includes(action) ?? false;
   if (!allowed) return false;
 
-  // Department users are scoped to their own department for write actions.
+  // Committee users are scoped to their own committee for write actions.
   if (
-    user.role === "department" &&
+    user.role === "committee" &&
     (action === "submit_metrics") &&
-    resource?.departmentId &&
-    resource.departmentId !== user.departmentId
+    resource?.committeeId &&
+    resource.committeeId !== user.committeeId
   ) {
     return false;
   }
@@ -53,6 +53,6 @@ export function can(
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrator",
   reviewer: "Reviewer",
-  department: "Department Lead",
+  committee: "Committee Lead",
   viewer: "Viewer",
 };

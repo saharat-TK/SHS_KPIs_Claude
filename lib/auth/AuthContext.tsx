@@ -19,12 +19,12 @@ export const MOCK_USERS: Record<Role, User> = {
     email: "reviewer@mfu.ac.th",
     role: "reviewer",
   },
-  department: {
-    id: "u-dept",
+  committee: {
+    id: "u-committee",
     name: "Dr. Nida Phuwadol",
     email: "committee.lead@mfu.ac.th",
-    role: "department",
-    departmentId: "dept-curriculum",
+    role: "committee",
+    committeeId: "cmt-curriculum",
   },
   viewer: {
     id: "u-viewer",

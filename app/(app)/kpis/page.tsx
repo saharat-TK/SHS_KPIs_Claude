@@ -206,7 +206,7 @@ function CreateKpiModal({
                 calculationMethod: "Manual entry",
                 currentValue: 0,
                 thresholds: { green: 80, amber: 60 },
-                departmentIds: [],
+                committeeIds: [],
               })
             }
           >

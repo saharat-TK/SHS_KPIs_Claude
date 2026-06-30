@@ -21,7 +21,7 @@ import {
   Field,
   Input,
 } from "@/components/ui";
-import { useFaculty, useDepartments, useCreateFaculty } from "@/lib/data/hooks";
+import { useFaculty, useCommittees, useCreateFaculty } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
 import type { FacultyMember, Rank, TenureStatus } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
@@ -31,11 +31,11 @@ type SortKey = "name" | "researchScore" | "rank";
 export default function FacultyPage() {
   const { can } = useAuth();
   const faculty = useFaculty();
-  const departments = useDepartments();
+  const committees = useCommittees();
   const create = useCreateFaculty();
 
   const [q, setQ] = useState("");
-  const [dept, setDept] = useState("all");
+  const [committee, setCommittee] = useState("all");
   const [tenure, setTenure] = useState("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "name",
@@ -45,8 +45,8 @@ export default function FacultyPage() {
   const [showAdd, setShowAdd] = useState(false);
 
   const pageSize = 8;
-  const deptName = (id: string) =>
-    departments.data?.find((d) => d.id === id)?.name ?? "—";
+  const committeeName = (id: string) =>
+    committees.data?.find((d) => d.id === id)?.name ?? "—";
 
   const filtered = useMemo(() => {
     let list = faculty.data ?? [];
@@ -54,7 +54,7 @@ export default function FacultyPage() {
       list = list.filter((f) =>
         f.name.toLowerCase().includes(q.trim().toLowerCase()),
       );
-    if (dept !== "all") list = list.filter((f) => f.departmentId === dept);
+    if (committee !== "all") list = list.filter((f) => f.committeeId === committee);
     if (tenure !== "all") list = list.filter((f) => f.tenureStatus === tenure);
     list = [...list].sort((a, b) => {
       const dir = sort.dir === "asc" ? 1 : -1;
@@ -63,7 +63,7 @@ export default function FacultyPage() {
       return a[sort.key].localeCompare(b[sort.key]) * dir;
     });
     return list;
-  }, [faculty.data, q, dept, tenure, sort]);
+  }, [faculty.data, q, committee, tenure, sort]);
 
   const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -126,15 +126,15 @@ export default function FacultyPage() {
             />
           </div>
           <Select
-            value={dept}
+            value={committee}
             onChange={(e) => {
-              setDept(e.target.value);
+              setCommittee(e.target.value);
               setPage(0);
             }}
             className="w-auto min-w-[170px]"
           >
             <option value="all">All Committees</option>
-            {departments.data?.map((d) => (
+            {committees.data?.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>
@@ -158,7 +158,7 @@ export default function FacultyPage() {
         </div>
 
         <QueryBoundary
-          isLoading={faculty.isLoading || departments.isLoading}
+          isLoading={faculty.isLoading || committees.isLoading}
           isError={faculty.isError}
         >
           {filtered.length === 0 ? (
@@ -174,7 +174,7 @@ export default function FacultyPage() {
                     <Th sortable sortDir={sort.key === "name" ? sort.dir : null} onSort={() => toggleSort("name")}>
                       Faculty Member
                     </Th>
-                    <Th>Department</Th>
+                    <Th>Committee</Th>
                     <Th sortable sortDir={sort.key === "rank" ? sort.dir : null} onSort={() => toggleSort("rank")}>
                       Rank / Tenure
                     </Th>
@@ -189,7 +189,7 @@ export default function FacultyPage() {
                   {paged.map((f) => (
                     <Tr key={f.id}>
                       <Td className="font-medium">{f.name}</Td>
-                      <Td className="text-mute">{deptName(f.departmentId)}</Td>
+                      <Td className="text-mute">{committeeName(f.committeeId)}</Td>
                       <Td>
                         <div className="flex flex-col">
                           <span>{f.rank}</span>
@@ -248,7 +248,7 @@ export default function FacultyPage() {
       <AddFacultyModal
         open={showAdd}
         onClose={() => setShowAdd(false)}
-        departments={(departments.data ?? []).map((d) => ({ id: d.id, name: d.name }))}
+        committees={(committees.data ?? []).map((d) => ({ id: d.id, name: d.name }))}
         submitting={create.isPending}
         onSubmit={(input) => create.mutate(input, { onSuccess: () => setShowAdd(false) })}
       />
@@ -259,22 +259,22 @@ export default function FacultyPage() {
 function AddFacultyModal({
   open,
   onClose,
-  departments,
+  committees,
   onSubmit,
   submitting,
 }: {
   open: boolean;
   onClose: () => void;
-  departments: { id: string; name: string }[];
+  committees: { id: string; name: string }[];
   onSubmit: (input: Omit<FacultyMember, "id">) => void;
   submitting: boolean;
 }) {
   const [name, setName] = useState("");
-  const [departmentId, setDepartmentId] = useState(departments[0]?.id ?? "");
+  const [committeeId, setCommitteeId] = useState(committees[0]?.id ?? "");
   const [rank, setRank] = useState<Rank>("Lecturer");
   const [tenureStatus, setTenureStatus] = useState<TenureStatus>("Tenure-Track");
 
-  const valid = name.trim().length > 1 && departmentId;
+  const valid = name.trim().length > 1 && committeeId;
 
   return (
     <Modal
@@ -292,7 +292,7 @@ function AddFacultyModal({
             onClick={() =>
               onSubmit({
                 name: name.startsWith("Dr.") ? name : `Dr. ${name}`,
-                departmentId,
+                committeeId,
                 rank,
                 tenureStatus,
                 kpiFocus: "Student Success",
@@ -311,9 +311,9 @@ function AddFacultyModal({
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Pim Srisai" />
         </Field>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
-          <Field label="Department">
-            <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-              {departments.map((d) => (
+          <Field label="Committee">
+            <Select value={committeeId} onChange={(e) => setCommitteeId(e.target.value)}>
+              {committees.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>

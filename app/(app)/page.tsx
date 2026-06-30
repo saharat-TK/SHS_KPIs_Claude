@@ -22,7 +22,7 @@ import {
 import { Icon } from "@/components/ui/Icon";
 import {
   useKpis,
-  useDepartments,
+  useCommittees,
   useFaculty,
   useValidations,
 } from "@/lib/data/hooks";
@@ -33,12 +33,12 @@ import { formatNumber } from "@/lib/utils";
 export default function DashboardPage() {
   const { user, can } = useAuth();
   const kpis = useKpis();
-  const departments = useDepartments();
+  const committees = useCommittees();
   const faculty = useFaculty();
   const validations = useValidations();
 
   const loading =
-    kpis.isLoading || departments.isLoading || faculty.isLoading || validations.isLoading;
+    kpis.isLoading || committees.isLoading || faculty.isLoading || validations.isLoading;
 
   const atRisk = useMemo(
     () =>
@@ -71,8 +71,8 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-lg">
           <StatCard label="Tracked KPIs" value={kpis.data?.length ?? 0} icon="tune" />
           <StatCard
-            label="Departments"
-            value={(departments.data ?? []).filter((d) => d.status === "active").length}
+            label="Committees"
+            value={(committees.data ?? []).filter((d) => d.status === "active").length}
             icon="account_tree"
           />
           <StatCard label="Faculty" value={faculty.data?.length ?? 0} icon="groups" />

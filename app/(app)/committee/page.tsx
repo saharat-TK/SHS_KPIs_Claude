@@ -21,36 +21,36 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import {
-  useDepartments,
+  useCommittees,
   useFaculty,
-  useCreateDepartment,
+  useCreateCommittee,
 } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
-import type { Department } from "@/lib/types";
+import type { Committee } from "@/lib/types";
 import { cn, formatNumber } from "@/lib/utils";
 
 export default function CommitteePage() {
   const { can } = useAuth();
-  const departments = useDepartments();
+  const committees = useCommittees();
   const faculty = useFaculty();
-  const create = useCreateDepartment();
+  const create = useCreateCommittee();
   const [selected, setSelected] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const f of faculty.data ?? [])
-      m.set(f.departmentId, (m.get(f.departmentId) ?? 0) + 1);
+      m.set(f.committeeId, (m.get(f.committeeId) ?? 0) + 1);
     return m;
   }, [faculty.data]);
 
-  const activeId = selected ?? departments.data?.[0]?.id ?? null;
-  const activeDept = departments.data?.find((d) => d.id === activeId);
-  const deptFaculty = (faculty.data ?? []).filter(
-    (f) => f.departmentId === activeId,
+  const activeId = selected ?? committees.data?.[0]?.id ?? null;
+  const activeCommittee = committees.data?.find((d) => d.id === activeId);
+  const committeeFaculty = (faculty.data ?? []).filter(
+    (f) => f.committeeId === activeId,
   );
-  const leadName = activeDept?.headId
-    ? faculty.data?.find((f) => f.id === activeDept.headId)?.name
+  const leadName = activeCommittee?.headId
+    ? faculty.data?.find((f) => f.id === activeCommittee.headId)?.name
     : undefined;
 
   return (
@@ -68,12 +68,12 @@ export default function CommitteePage() {
       />
 
       <QueryBoundary
-        isLoading={departments.isLoading || faculty.isLoading}
-        isError={departments.isError}
+        isLoading={committees.isLoading || faculty.isLoading}
+        isError={committees.isError}
       >
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-lg">
           <div className="flex flex-col gap-sm">
-            {departments.data?.map((d) => {
+            {committees.data?.map((d) => {
               const on = d.id === activeId;
               return (
                 <button
@@ -113,22 +113,22 @@ export default function CommitteePage() {
           </div>
 
           <Card className="overflow-hidden h-fit">
-            {!activeDept ? (
+            {!activeCommittee ? (
               <EmptyState title="Select a committee" />
             ) : (
               <>
                 <CardHeader
-                  title={activeDept.name}
-                  subtitle={`${activeDept.faculty} · Key metric: ${activeDept.keyMetric}${
+                  title={activeCommittee.name}
+                  subtitle={`${activeCommittee.faculty} · Key metric: ${activeCommittee.keyMetric}${
                     leadName ? ` · Lead: ${leadName}` : ""
                   }`}
                   actions={
                     <Badge tone="primary">
-                      {deptFaculty.length} members
+                      {committeeFaculty.length} members
                     </Badge>
                   }
                 />
-                {deptFaculty.length === 0 ? (
+                {committeeFaculty.length === 0 ? (
                   <EmptyState title="No faculty assigned" />
                 ) : (
                   <Table>
@@ -141,7 +141,7 @@ export default function CommitteePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {deptFaculty.map((f) => (
+                      {committeeFaculty.map((f) => (
                         <Tr key={f.id}>
                           <Td className="font-medium">{f.name}</Td>
                           <Td className="text-mute">{f.rank}</Td>
@@ -190,7 +190,7 @@ function AddCommitteeModal({
   open: boolean;
   onClose: () => void;
   faculty: { id: string; name: string }[];
-  onSubmit: (input: Omit<Department, "id">) => void;
+  onSubmit: (input: Omit<Committee, "id">) => void;
   submitting: boolean;
 }) {
   const [name, setName] = useState("");

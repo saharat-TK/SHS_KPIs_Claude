@@ -17,12 +17,12 @@ import {
   Field,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
-import { useFaculty, useDepartments } from "@/lib/data/hooks";
+import { useFaculty, useCommittees } from "@/lib/data/hooks";
 import { toCsv, downloadCsv } from "@/lib/csv";
 
 const COLUMNS = [
   { id: "name", label: "Name" },
-  { id: "department", label: "Department" },
+  { id: "committee", label: "Committee" },
   { id: "rank", label: "Rank" },
   { id: "tenureStatus", label: "Tenure" },
   { id: "kpiFocus", label: "KPI Focus" },
@@ -40,27 +40,27 @@ export default function ExportPage() {
 
 function ExportWorkflow() {
   const faculty = useFaculty();
-  const departments = useDepartments();
+  const committees = useCommittees();
 
-  const [dept, setDept] = useState("all");
+  const [committee, setCommittee] = useState("all");
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [cols, setCols] = useState<Set<string>>(
     new Set(COLUMNS.map((c) => c.id)),
   );
 
-  const deptName = (id: string) =>
-    departments.data?.find((d) => d.id === id)?.name ?? "—";
+  const committeeName = (id: string) =>
+    committees.data?.find((d) => d.id === id)?.name ?? "—";
 
   const rows = useMemo(() => {
     let list = faculty.data ?? [];
-    if (dept !== "all") list = list.filter((f) => f.departmentId === dept);
+    if (committee !== "all") list = list.filter((f) => f.committeeId === committee);
     if (q.trim())
       list = list.filter((f) =>
         f.name.toLowerCase().includes(q.trim().toLowerCase()),
       );
     return list;
-  }, [faculty.data, dept, q]);
+  }, [faculty.data, committee, q]);
 
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
   const toggleAll = () =>
@@ -91,7 +91,7 @@ function ExportWorkflow() {
     const headers = activeCols.map((c) => c.label);
     const data = chosen.map((f) =>
       activeCols.map((c) =>
-        c.id === "department" ? deptName(f.departmentId) : (f as any)[c.id],
+        c.id === "committee" ? committeeName(f.committeeId) : (f as any)[c.id],
       ),
     );
     downloadCsv(`faculty-roster-${Date.now()}.csv`, toCsv(headers, data));
@@ -105,7 +105,7 @@ function ExportWorkflow() {
       />
 
       <QueryBoundary
-        isLoading={faculty.isLoading || departments.isLoading}
+        isLoading={faculty.isLoading || committees.isLoading}
         isError={faculty.isError}
       >
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-lg">
@@ -119,12 +119,12 @@ function ExportWorkflow() {
                 />
               </div>
               <Select
-                value={dept}
-                onChange={(e) => setDept(e.target.value)}
+                value={committee}
+                onChange={(e) => setCommittee(e.target.value)}
                 className="w-auto min-w-[170px]"
               >
-                <option value="all">All Departments</option>
-                {departments.data?.map((d) => (
+                <option value="all">All Committees</option>
+                {committees.data?.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
                   </option>
@@ -148,7 +148,7 @@ function ExportWorkflow() {
                     />
                   </Th>
                   <Th>Name / ID</Th>
-                  <Th>Department</Th>
+                  <Th>Committee</Th>
                   <Th>Tenure</Th>
                   <Th align="right">Score</Th>
                 </tr>
@@ -172,7 +172,7 @@ function ExportWorkflow() {
                         <span className="text-caption-sm text-mute">{f.id}</span>
                       </div>
                     </Td>
-                    <Td className="text-mute">{deptName(f.departmentId)}</Td>
+                    <Td className="text-mute">{committeeName(f.committeeId)}</Td>
                     <Td>{f.tenureStatus}</Td>
                     <Td align="right" className="font-medium">
                       {f.researchScore}

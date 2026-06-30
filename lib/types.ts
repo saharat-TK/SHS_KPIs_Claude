@@ -1,6 +1,6 @@
 // ── Shared domain types for the Health Sciences KPI system ──────────────────
 
-export type Role = "admin" | "reviewer" | "department" | "viewer";
+export type Role = "admin" | "reviewer" | "committee" | "viewer";
 
 export type KpiCategory =
   | "student_success"
@@ -19,7 +19,7 @@ export const KPI_CATEGORIES: { id: KpiCategory; label: string }[] = [
 
 export type EntityStatus = "active" | "inactive" | "draft";
 
-export interface Department {
+export interface Committee {
   id: string;
   name: string;
   faculty: string;
@@ -40,7 +40,7 @@ export type TenureStatus = "Tenured" | "Tenure-Track" | "Non-Tenure" | "Contract
 export interface FacultyMember {
   id: string;
   name: string;
-  departmentId: string;
+  committeeId: string;
   rank: Rank;
   tenureStatus: TenureStatus;
   kpiFocus: string;
@@ -63,7 +63,7 @@ export interface Kpi {
   unit: string; // e.g. "%", "score", "ratio"
   thresholds: Thresholds;
   formulaId?: string;
-  departmentIds: string[];
+  committeeIds: string[];
 }
 
 export interface Metric {
@@ -77,7 +77,7 @@ export interface Metric {
   target: number;
   unit: string;
   dataSource: string;
-  assignedDepartmentIds: string[];
+  assignedCommitteeIds: string[];
 }
 
 export interface FormulaVariable {
@@ -110,7 +110,7 @@ export interface Measurement {
   id: string;
   targetId: string;
   targetType: MeasurementTarget;
-  departmentId: string;
+  committeeId: string;
   period: string; // e.g. "2024-Q4"
   value: number;
 }
@@ -131,7 +131,7 @@ export interface ValidationComment {
 export interface ValidationSubmission {
   id: string;
   metricId: string;
-  departmentId: string;
+  committeeId: string;
   submittedById: string;
   submittedDate: string; // ISO
   period: string;
@@ -146,5 +146,5 @@ export interface User {
   name: string;
   email: string;
   role: Role;
-  departmentId?: string;
+  committeeId?: string;
 }
