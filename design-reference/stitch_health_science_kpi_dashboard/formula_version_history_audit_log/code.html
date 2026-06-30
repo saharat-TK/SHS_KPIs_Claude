@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Formula Version History - Health Sciences Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-surface": "#1a1c1c",
+                      "inverse-surface": "#2f3131",
+                      "tertiary-fixed-dim": "#c6c6c7",
+                      "surface-container-high": "#e8e8e8",
+                      "on-error-container": "#93000a",
+                      "tertiary-fixed": "#e2e2e2",
+                      "on-primary-container": "#284400",
+                      "on-secondary-fixed-variant": "#474747",
+                      "warning": "#df6500",
+                      "surface-container-highest": "#e2e2e2",
+                      "primary-container": "#76b900",
+                      "primary-dark": "#5a8d00",
+                      "primary-fixed-dim": "#94da32",
+                      "hairline-strong": "#5e5e5e",
+                      "success": "#3f8500",
+                      "error": "#e52020",
+                      "primary": "#416900",
+                      "stone": "#898989",
+                      "on-background": "#1a1c1c",
+                      "tertiary": "#5d5f5f",
+                      "secondary-fixed-dim": "#c6c6c6",
+                      "on-secondary-container": "#646464",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary": "#5e5e5e",
+                      "link-blue": "#0046a4",
+                      "secondary-fixed": "#e2e2e2",
+                      "background": "#f9f9f9",
+                      "tertiary-container": "#a6a7a7",
+                      "on-tertiary-container": "#3b3d3d",
+                      "on-primary-fixed": "#102000",
+                      "on-secondary": "#ffffff",
+                      "surface-container": "#eeeeee",
+                      "inverse-on-surface": "#f0f1f1",
+                      "surface-soft": "#f7f7f7",
+                      "ink": "#000000",
+                      "on-tertiary-fixed-variant": "#454747",
+                      "error-container": "#ffdad6",
+                      "hairline": "#cccccc",
+                      "on-error": "#ffffff",
+                      "on-primary-fixed-variant": "#304f00",
+                      "primary-fixed": "#aff74e",
+                      "on-tertiary": "#ffffff",
+                      "outline-variant": "#c1cab1",
+                      "outline": "#727a64",
+                      "surface-dim": "#dadada",
+                      "surface-bright": "#f9f9f9",
+                      "surface-variant": "#e2e2e2",
+                      "on-tertiary-fixed": "#1a1c1c",
+                      "surface": "#f9f9f9",
+                      "on-secondary-fixed": "#1b1b1b",
+                      "surface-tint": "#416900",
+                      "surface-container-low": "#f3f3f4",
+                      "inverse-primary": "#94da32",
+                      "mute": "#757575",
+                      "on-surface-variant": "#424936",
+                      "secondary-container": "#e2e2e2",
+                      "on-primary": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "section": "64px",
+                      "xxl": "32px",
+                      "xs": "4px",
+                      "xl": "24px",
+                      "base": "8px",
+                      "sm": "8px",
+                      "md": "12px",
+                      "lg": "16px",
+                      "tiny": "2px"
+              },
+              "fontFamily": {
+                      "heading-xl": [
+                              "Hanken Grotesk"
+                      ],
+                      "caption-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "heading-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "display-xl": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-strong": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "utility-xs": [
+                              "Hanken Grotesk"
+                      ],
+                      "display-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "heading-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "heading-xl": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "caption-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "heading-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "display-xl": [
+                              "48px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-strong": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.43",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "utility-xs": [
+                              "10px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "display-lg": [
+                              "36px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "heading-lg": [
+                              "22px",
+                              {
+                                      "lineHeight": "1.75",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "15px",
+                              {
+                                      "lineHeight": "1.67",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .code-font { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+        .diff-add { background-color: rgba(63, 133, 0, 0.1); border-left: 2px solid #3f8500; }
+        .diff-remove { background-color: rgba(229, 32, 32, 0.1); border-left: 2px solid #e52020; text-decoration: line-through; color: #e52020;}
+      </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body-md antialiased overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-ink dark:bg-ink docked full-width top-0 border-b border-hairline-strong shadow-[0_0_5px_0_rgba(0,0,0,0.1)] flex justify-between items-center px-xxl h-[64px] w-full z-50">
+<div class="flex items-center gap-xl">
+<span class="font-heading-md text-heading-md text-on-primary">Health Sciences Analytics</span>
+<nav class="hidden md:flex gap-lg ml-xl">
+<a class="font-label-md text-label-md text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-sm py-xs" href="#">Dashboard</a>
+<a class="font-label-md text-label-md text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-sm py-xs" href="#">Departments</a>
+<a class="font-label-md text-label-md text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-sm py-xs" href="#">Reports</a>
+<a class="font-label-md text-label-md text-primary-container border-b-2 border-primary-container pb-1 transition-all duration-200 active:opacity-80 px-sm py-xs" href="#">Administration</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<button class="text-on-primary hover:text-primary-container p-xs hover:bg-surface-container-highest/10 rounded-DEFAULT">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</button>
+<button class="text-on-primary hover:text-primary-container p-xs hover:bg-surface-container-highest/10 rounded-DEFAULT">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-primary hover:text-primary-container p-xs hover:bg-surface-container-highest/10 rounded-DEFAULT">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<img alt="User profile" class="w-8 h-8 rounded-full border border-hairline ml-sm object-cover" data-alt="A small, circular avatar portrait of a professional in a white lab coat, standing against a neutral grey laboratory background, high-resolution, sharp focus, modern institutional aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBY3yqXe1JrsQfhgC0ovFoxEKlbIA6x7JKH_E5y_NReK6-yIex_oBod6rAJaJ-yC9BRs2tdTWfmWv09YcyxTVBRhA2Vlq7wghp0M7neZWVwLnFMteKy4fnthydRJQmHP7DYtKQ1Rjk232mDP5itAvrs0ZXAI4FaFbmrrCYEj6FggLopBqndEVBgyVFuCHXQBKi_cm0HCJeOhL-8rIDOex6uajFg_QTAGT2Arhg7wbeMHbc4AOjgJ1unSMr03rytXVQklh1waN63ZQ"/>
+</div>
+</header>
+<div class="flex h-[calc(100vh-64px)] w-full overflow-hidden">
+<!-- SideNavBar -->
+<nav class="bg-ink dark:bg-ink border-r border-hairline-strong flex flex-col h-full w-[280px] p-md space-y-base flex-shrink-0">
+<div class="mb-lg px-sm">
+<div class="flex items-center gap-md mb-md">
+<img alt="School Logo" class="w-10 h-10 rounded-DEFAULT object-cover" data-alt="A minimalist, geometric shield logo in bright green and stark white, representing a modern health sciences institution, high contrast, clean vector style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJBSWOYWQidKchAkzkweIBByY637El7oK8pLjfIHbg1d-K6I1-LnyInveYUXN6wJ-LBkZb03-CJTQkmybvhghGf9WlWVCZCGfhYAD676ko7Z-pqhVPjKECWWYnLTJqH6aGD3LHhBoGhri58utXukIj_gEUJz2jwI6nnFmxzQBJyyKTW_L_HReePqAA2zzp_sQ97rDzuifDzbA3Er-Nwl1BTnrxmnIt9woYzJw9wItPJ2AcbynJ7VjPHRpE3H_DQp7cKFx8OqBy3w"/>
+<div>
+<div class="font-heading-xl text-heading-xl text-on-primary leading-tight">Health Sciences</div>
+<div class="font-caption-sm text-caption-sm text-stone mt-xs">KPI Monitor v2.1</div>
+</div>
+</div>
+</div>
+<div class="flex-1 space-y-xs overflow-y-auto">
+<a class="flex items-center gap-md px-md py-sm font-label-md text-label-md text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                    Overview
+                </a>
+<a class="flex items-center gap-md px-md py-sm font-label-md text-label-md text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="insights">insights</span>
+                    Performance
+                </a>
+<a class="flex items-center gap-md px-md py-sm font-label-md text-label-md bg-primary text-on-primary rounded-lg transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="trending_up">trending_up</span>
+                    Forecasting
+                </a>
+<a class="flex items-center gap-md px-md py-sm font-label-md text-label-md text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+                    Faculty Data
+                </a>
+<a class="flex items-center gap-md px-md py-sm font-label-md text-label-md text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+                    Audit Log
+                </a>
+</div>
+<div class="mt-auto space-y-xs pt-md border-t border-hairline-strong">
+<a class="flex items-center gap-md px-md py-sm font-label-md text-label-md text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+                    Support
+                </a>
+<a class="flex items-center gap-md px-md py-sm font-label-md text-label-md text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded-DEFAULT" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+                    Sign Out
+                </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col min-w-0 bg-background overflow-hidden relative">
+
+<!-- Page Header -->
+<div class="px-xxl py-xl border-b border-hairline bg-surface-container-lowest shrink-0 z-10 relative">
+<div class="flex items-center text-stone font-caption-sm text-caption-sm mb-xs gap-xs">
+<span>Administration</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span>Formulas</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface font-body-strong">Student Success Composite (SSC)</span>
+</div>
+<div class="flex justify-between items-end">
+<div>
+<h1 class="font-display-lg text-display-lg text-on-surface">Formula Version History</h1>
+<p class="font-body-sm text-body-sm text-secondary mt-xs max-w-2xl">Compare historical formula logic and track performance impact across versions.</p>
+</div>
+</div>
+</div>
+<!-- Content Grid Layout -->
+<div class="flex-1 flex overflow-hidden z-10 relative">
+<!-- Secondary Sidebar: Version List -->
+<div class="w-72 bg-surface-soft border-r border-hairline flex flex-col shrink-0">
+<div class="px-md py-md border-b border-hairline font-label-md text-label-md text-on-surface flex justify-between items-center bg-surface-container-lowest">
+                        Version History
+                        <span class="material-symbols-outlined text-stone" data-icon="filter_list">filter_list</span>
+</div>
+<div class="flex-1 overflow-y-auto p-sm space-y-xs">
+<!-- Active Version Item -->
+<div class="group flex flex-col p-md rounded-DEFAULT border border-primary bg-surface-container-lowest cursor-pointer relative">
+<div class="absolute top-2 right-2 w-3 h-3 bg-primary-container"></div>
+<div class="flex justify-between items-start mb-xs pr-lg">
+<span class="font-body-strong text-body-strong text-on-surface">v2.4</span>
+<span class="font-utility-xs text-utility-xs bg-surface-container-high text-on-surface px-sm py-[2px] rounded-DEFAULT">Active</span>
+</div>
+<span class="font-caption-sm text-caption-sm text-secondary">Oct 24, 2024 • 14:32</span>
+<span class="font-caption-sm text-caption-sm text-on-surface mt-sm truncate">Updated weighting for clinical hrs</span>
+<div class="flex items-center gap-xs mt-sm">
+<img alt="Author" class="w-5 h-5 rounded-full object-cover" data-alt="Tiny headshot avatar of a female data scientist with glasses, neutral expression, white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjDATvnP-Rql3xK5zaw4RRL91BCcDTnhQJUG2Kdx9L2FdizuxNrxsVBb43M24vV5Ebs_OJMMDHU9tOXVrSaxqPaNanJimq5LrXjPWX_qlGxxbnWT2nwe3z5TTdWU7M5WoWdA44Z6Sgs6A3xpIsVtmhH2jCv7-dEc1bZd8oxNetvC9mrIz5OM9BAWP0EWJb1s8i3ocqkWlY_OsVhoPnrwV5kLnJWt5j5Ae8_UR1iYqFjiqFKJLr27ghGX4VwSDq4tXevTZRHmoxWA"/>
+<span class="font-utility-xs text-utility-xs text-secondary">Dr. S. Chen</span>
+</div>
+</div>
+<!-- Previous Version Item (Selected) -->
+<div class="group flex flex-col p-md rounded-DEFAULT border border-hairline bg-surface-container-highest cursor-pointer relative">
+<div class="flex justify-between items-start mb-xs">
+<span class="font-body-strong text-body-strong text-on-surface">v2.3</span>
+<span class="font-utility-xs text-utility-xs text-stone">Archived</span>
+</div>
+<span class="font-caption-sm text-caption-sm text-secondary">Sep 12, 2024 • 09:15</span>
+<span class="font-caption-sm text-caption-sm text-on-surface mt-sm truncate">Baseline Q3 calculation</span>
+<div class="flex items-center gap-xs mt-sm">
+<img alt="Author" class="w-5 h-5 rounded-full object-cover" data-alt="Tiny headshot avatar of a male administrator, grey suit, light background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjWfJdpSTOKey6AkWPTt-9r1j9pZy96Ls97VQUkklWmkSY2oy41-JlOY37cvLk9NcvNUo8M82hLW00q_U5R9b8cUhhd2sZJOTpaC-nCkyxmB2aUhFG5gzqHNF-x5IsKoOhgoED5S4h35Op7U3E-WIHlXIhyRr1nPXAC6B41T9kulx24yAWZvPUZjKbsTUkW89EZloeDaQ8DV0H4RPRqvD8cMvg00VvisrsGr0FH2TKUL2nyMiqGrFBqYxtK3FAEy0ge7I8z8ImJw"/>
+<span class="font-utility-xs text-utility-xs text-secondary">M. Robertson</span>
+</div>
+</div>
+<!-- Older Version Item -->
+<div class="group flex flex-col p-md rounded-DEFAULT border border-transparent hover:bg-surface-container-high cursor-pointer transition-colors">
+<div class="flex justify-between items-start mb-xs">
+<span class="font-body-strong text-body-strong text-on-surface">v2.2</span>
+<span class="font-utility-xs text-utility-xs text-stone">Archived</span>
+</div>
+<span class="font-caption-sm text-caption-sm text-secondary">Jul 01, 2024 • 11:00</span>
+<span class="font-caption-sm text-caption-sm text-on-surface mt-sm truncate">Minor coefficient adjustment</span>
+</div>
+</div>
+</div>
+<!-- Main Diff Area -->
+<div class="flex-1 flex flex-col overflow-hidden bg-surface-container-lowest p-xl space-y-xl overflow-y-auto">
+<!-- Metadata & Actions Panel -->
+<div class="flex flex-col xl:flex-row gap-lg justify-between items-start bg-surface-soft p-lg border border-hairline rounded-DEFAULT">
+<div class="flex gap-lg items-start">
+<img alt="Author" class="w-12 h-12 rounded-DEFAULT object-cover border border-hairline-strong" data-alt="Small, square professional headshot of a female data scientist, bright lighting, tech office environment in background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDS7Cjgw1mAaQaUmmpwv5x8kv-33GddQdvhcqddAeMiHPmtGb8Mq3IVE8m4din7B1UlWH-FreGWYBYpWuS67PxyyH_HtR9dbBNhuZKh-2NEepk-s6gs9XxwbJRi_2KZAL5Lxn3ZmNZk4BQ4N03sD02nIE2iYOBnKpZiKCAstyTYs200aonSMMi_AMYIf4neImNjgJ30x78_Yu6lJ0fMeuzV7YFeoYIpcgo6-PWrotMrxONRhkPxK8nj5sHK530y9yqS84gvahNvWA"/>
+<div>
+<h3 class="font-heading-md text-heading-md text-on-surface">Version 2.3 <span class="text-stone font-body-md">vs</span> Current (v2.4)</h3>
+<p class="font-body-sm text-body-sm text-secondary mt-xs">Modified by <span class="text-on-surface font-body-strong">Dr. S. Chen</span> on Oct 24, 2024 at 14:32</p>
+<div class="mt-sm p-sm bg-surface-container-lowest border border-hairline rounded-DEFAULT">
+<span class="font-utility-xs text-utility-xs text-stone uppercase block mb-[2px]">Change Reason</span>
+<p class="font-caption-sm text-caption-sm text-on-surface">"Updated weighting for clinical hours per Q4 audit compliance requirements. Adjusted threshold logic for practicum scores."</p>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-sm items-end shrink-0 w-full xl:w-auto mt-lg xl:mt-0">
+<!-- Performance Impact Card -->
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT p-md w-full relative">
+<div class="absolute top-0 right-0 w-3 h-3 bg-primary-container"></div>
+<span class="font-utility-xs text-utility-xs text-secondary uppercase block mb-xs">Performance Impact (SSC)</span>
+<div class="flex items-center gap-sm">
+<span class="font-heading-md text-heading-md text-success">+1.2%</span>
+<span class="material-symbols-outlined text-success text-[18px]" data-icon="arrow_upward">arrow_upward</span>
+</div>
+<span class="font-caption-sm text-caption-sm text-stone block mt-xs">Variance across current cohort</span>
+</div>
+<button class="w-full bg-primary-container text-on-primary-container font-label-md text-label-md py-md px-lg rounded-DEFAULT hover:bg-primary-dark transition-colors flex items-center justify-center gap-xs">
+<span class="material-symbols-outlined text-[18px]" data-icon="restore">restore</span>
+                                Revert to v2.3
+                            </button>
+</div>
+</div>
+<!-- Diff Editor View -->
+<div class="flex-1 flex flex-col border border-hairline rounded-DEFAULT bg-surface-container-lowest overflow-hidden">
+<div class="flex justify-between items-center bg-inverse-surface text-on-secondary px-md py-sm border-b border-hairline-strong">
+<div class="flex gap-md font-caption-sm text-caption-sm">
+<span class="flex items-center gap-xs"><div class="w-3 h-3 bg-[#e52020] opacity-80 border border-[#e52020]"></div> v2.3 (Previous)</span>
+<span class="flex items-center gap-xs"><div class="w-3 h-3 bg-[#3f8500] opacity-80 border border-[#3f8500]"></div> v2.4 (Current Active)</span>
+</div>
+<div class="flex gap-sm">
+<button class="text-on-secondary hover:text-primary-fixed transition-colors font-utility-xs text-utility-xs uppercase tracking-wider">Expand All</button>
+</div>
+</div>
+<!-- Mock Code Diff -->
+<div class="flex-1 overflow-auto bg-[#fafafa] code-font text-sm">
+<table class="w-full text-left border-collapse">
+<tbody>
+<tr class="text-stone">
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">1</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">1</td>
+<td class="pl-md py-xs whitespace-pre">def calculate_ssc(student_data):</td>
+</tr>
+<tr class="text-stone">
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">2</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">2</td>
+<td class="pl-md py-xs whitespace-pre">    base_score = student_data.get('gpa') * 0.4</td>
+</tr>
+<!-- Removed Line -->
+<tr class="diff-remove text-on-surface">
+<td class="w-10 text-right pr-sm py-xs border-r border-[#e52020]/30 select-none bg-[#e52020]/10">3</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-[#e52020]/30 select-none bg-surface-container-highest"></td>
+<td class="pl-md py-xs whitespace-pre">    clinical_score = student_data.get('clinical_hrs') * <span class="bg-[#e52020]/20 px-1 rounded-sm">0.25</span></td>
+</tr>
+<!-- Added Line -->
+<tr class="diff-add text-on-surface">
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-surface-container-highest"></td>
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-[#3f8500]/10">3</td>
+<td class="pl-md py-xs whitespace-pre">    clinical_score = student_data.get('clinical_hrs') * <span class="bg-[#3f8500]/20 px-1 rounded-sm">0.35</span></td>
+</tr>
+<tr class="text-stone">
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">4</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">4</td>
+<td class="pl-md py-xs whitespace-pre"> </td>
+</tr>
+<!-- Removed Lines Block -->
+<tr class="diff-remove text-on-surface">
+<td class="w-10 text-right pr-sm py-xs border-r border-[#e52020]/30 select-none bg-[#e52020]/10">5</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-[#e52020]/30 select-none bg-surface-container-highest"></td>
+<td class="pl-md py-xs whitespace-pre">    if student_data.get('practicum_eval') &gt; <span class="bg-[#e52020]/20 px-1 rounded-sm">80</span>:</td>
+</tr>
+<tr class="diff-remove text-on-surface">
+<td class="w-10 text-right pr-sm py-xs border-r border-[#e52020]/30 select-none bg-[#e52020]/10">6</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-[#e52020]/30 select-none bg-surface-container-highest"></td>
+<td class="pl-md py-xs whitespace-pre">        practicum_bonus = 5</td>
+</tr>
+<!-- Added Lines Block -->
+<tr class="diff-add text-on-surface">
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-surface-container-highest"></td>
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-[#3f8500]/10">5</td>
+<td class="pl-md py-xs whitespace-pre">    if student_data.get('practicum_eval') &gt; <span class="bg-[#3f8500]/20 px-1 rounded-sm">85</span>:</td>
+</tr>
+<tr class="diff-add text-on-surface">
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-surface-container-highest"></td>
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-[#3f8500]/10">6</td>
+<td class="pl-md py-xs whitespace-pre">        practicum_bonus = <span class="bg-[#3f8500]/20 px-1 rounded-sm">7.5</span></td>
+</tr>
+<tr class="diff-add text-on-surface">
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-surface-container-highest"></td>
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-[#3f8500]/10">7</td>
+<td class="pl-md py-xs whitespace-pre">    elif student_data.get('practicum_eval') &gt; 75:</td>
+</tr>
+<tr class="diff-add text-on-surface">
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-surface-container-highest"></td>
+<td class="w-10 text-right pr-sm py-xs border-r border-[#3f8500]/30 select-none bg-[#3f8500]/10">8</td>
+<td class="pl-md py-xs whitespace-pre">        practicum_bonus = 2.5</td>
+</tr>
+<tr class="text-stone">
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">7</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">9</td>
+<td class="pl-md py-xs whitespace-pre">    else:</td>
+</tr>
+<tr class="text-stone">
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">8</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">10</td>
+<td class="pl-md py-xs whitespace-pre">        practicum_bonus = 0</td>
+</tr>
+<tr class="text-stone">
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">9</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">11</td>
+<td class="pl-md py-xs whitespace-pre"> </td>
+</tr>
+<tr class="text-stone">
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">10</td>
+<td class="w-10 text-right pr-sm py-xs border-r border-hairline select-none bg-surface-container-highest">12</td>
+<td class="pl-md py-xs whitespace-pre">    return base_score + clinical_score + practicum_bonus</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

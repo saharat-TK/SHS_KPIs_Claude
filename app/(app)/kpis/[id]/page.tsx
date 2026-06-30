@@ -1,0 +1,322 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  PageHeader,
+  Card,
+  CardHeader,
+  CardBody,
+  Table,
+  Th,
+  Td,
+  Tr,
+  Button,
+  Badge,
+  Field,
+  Input,
+  Select,
+  StatusPill,
+  QueryBoundary,
+  ThresholdBar,
+  HEALTH_LABEL,
+  healthOf,
+} from "@/components/ui";
+import { Icon } from "@/components/ui/Icon";
+import { RequirePermission } from "@/components/shell/Guard";
+import {
+  useKpi,
+  useMetricsByKpi,
+  useUpdateKpi,
+  useDepartments,
+  useFormulas,
+} from "@/lib/data/hooks";
+import { KPI_CATEGORIES, type Kpi } from "@/lib/types";
+import { formatNumber } from "@/lib/utils";
+
+export default function KpiDetailPage() {
+  return (
+    <RequirePermission action="configure_kpis">
+      <KpiDetail />
+    </RequirePermission>
+  );
+}
+
+function KpiDetail() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const kpiQ = useKpi(id);
+  const metricsQ = useMetricsByKpi(id);
+  const departments = useDepartments();
+  const formulas = useFormulas();
+  const update = useUpdateKpi();
+
+  const [draft, setDraft] = useState<Kpi | null>(null);
+  useEffect(() => {
+    if (kpiQ.data) setDraft(kpiQ.data);
+  }, [kpiQ.data]);
+
+  const dirty =
+    !!draft && !!kpiQ.data && JSON.stringify(draft) !== JSON.stringify(kpiQ.data);
+
+  const catLabel = (c: string) =>
+    KPI_CATEGORIES.find((x) => x.id === c)?.label ?? c;
+  const deptName = (d: string) =>
+    departments.data?.find((x) => x.id === d)?.name ?? d;
+
+  const set = (patch: Partial<Kpi>) =>
+    setDraft((d) => (d ? { ...d, ...patch } : d));
+  const toggleDept = (deptId: string) =>
+    setDraft((d) => {
+      if (!d) return d;
+      const has = d.departmentIds.includes(deptId);
+      return {
+        ...d,
+        departmentIds: has
+          ? d.departmentIds.filter((x) => x !== deptId)
+          : [...d.departmentIds, deptId],
+      };
+    });
+
+  return (
+    <QueryBoundary isLoading={kpiQ.isLoading || !draft} isError={kpiQ.isError}>
+      {draft && (
+        <>
+          <PageHeader
+            title={draft.name}
+            description={`${catLabel(draft.category)} · weight ${draft.weight}%`}
+            actions={
+              <>
+                <Button variant="ghost" onClick={() => router.push("/kpis")}>
+                  Back
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!dirty}
+                  onClick={() => kpiQ.data && setDraft(kpiQ.data)}
+                >
+                  Discard
+                </Button>
+                <Button
+                  icon="save"
+                  disabled={!dirty || update.isPending}
+                  onClick={() =>
+                    update.mutate({ id, patch: draft })
+                  }
+                >
+                  {update.isPending ? "Saving…" : "Save Metadata"}
+                </Button>
+              </>
+            }
+          />
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-xl">
+            <div className="flex flex-col gap-xl min-w-0">
+              <Card>
+                <CardHeader
+                  title="Core Configuration"
+                  actions={<StatusPill status="active" />}
+                />
+                <CardBody className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
+                  <Field label="KPI Name">
+                    <Input value={draft.name} onChange={(e) => set({ name: e.target.value })} />
+                  </Field>
+                  <Field label="Category">
+                    <Select
+                      value={draft.category}
+                      onChange={(e) => set({ category: e.target.value as Kpi["category"] })}
+                    >
+                      {KPI_CATEGORIES.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Weight (%)" hint="Relative weight within category">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={draft.weight}
+                      onChange={(e) => set({ weight: Number(e.target.value) })}
+                    />
+                  </Field>
+                  <Field label="Unit">
+                    <Input value={draft.unit} onChange={(e) => set({ unit: e.target.value })} />
+                  </Field>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader
+                  title="KPI Calculation Logic"
+                  subtitle={draft.calculationMethod}
+                  actions={
+                    draft.formulaId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconRight="open_in_new"
+                        onClick={() => router.push("/formulas/builder")}
+                      >
+                        Open in builder
+                      </Button>
+                    )
+                  }
+                />
+                <CardBody>
+                  {draft.formulaId ? (
+                    <FormulaSummary
+                      formula={formulas.data?.find((f) => f.id === draft.formulaId)}
+                    />
+                  ) : (
+                    <p className="text-body-sm text-mute">
+                      No formula linked — value is entered manually or aggregated from
+                      sub-KPIs.
+                    </p>
+                  )}
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader
+                  title="Sub-KPIs Structure"
+                  subtitle="Component metrics that roll up into this KPI"
+                  actions={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon="add"
+                      onClick={() => router.push("/metrics")}
+                    >
+                      Manage
+                    </Button>
+                  }
+                />
+                <QueryBoundary isLoading={metricsQ.isLoading} isError={metricsQ.isError}>
+                  {(metricsQ.data ?? []).length === 0 ? (
+                    <CardBody>
+                      <p className="text-body-sm text-mute">No sub-KPIs defined.</p>
+                    </CardBody>
+                  ) : (
+                    <Table>
+                      <thead>
+                        <tr>
+                          <Th>Metric Name</Th>
+                          <Th align="center">Weight</Th>
+                          <Th align="right">Current</Th>
+                          <Th align="right">Target</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metricsQ.data!.map((m) => (
+                          <Tr key={m.id}>
+                            <Td className="font-medium">{m.name}</Td>
+                            <Td align="center">
+                              <Badge tone="neutral">{m.weight}%</Badge>
+                            </Td>
+                            <Td align="right">{formatNumber(m.currentValue, 1)} {m.unit}</Td>
+                            <Td align="right" className="text-mute">{formatNumber(m.target, 1)} {m.unit}</Td>
+                          </Tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
+                </QueryBoundary>
+              </Card>
+            </div>
+
+            <div className="flex flex-col gap-xl">
+              <Card>
+                <CardHeader title="Threshold Settings" />
+                <CardBody className="flex flex-col gap-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-body-sm text-mute">Current value</span>
+                    <span className="text-heading-md text-on-surface">
+                      {formatNumber(draft.currentValue, 1)} {draft.unit}
+                    </span>
+                  </div>
+                  <ThresholdBar value={draft.currentValue} thresholds={draft.thresholds} />
+                  <p className="text-caption-sm text-mute">
+                    {HEALTH_LABEL[healthOf(draft.currentValue, draft.thresholds)]}
+                  </p>
+                  <Field label="On-target threshold (≥)">
+                    <Input
+                      type="number"
+                      value={draft.thresholds.green}
+                      onChange={(e) =>
+                        set({ thresholds: { ...draft.thresholds, green: Number(e.target.value) } })
+                      }
+                    />
+                  </Field>
+                  <Field label="Watch threshold (≥)">
+                    <Input
+                      type="number"
+                      value={draft.thresholds.amber}
+                      onChange={(e) =>
+                        set({ thresholds: { ...draft.thresholds, amber: Number(e.target.value) } })
+                      }
+                    />
+                  </Field>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader
+                  title="Departmental Mapping"
+                  subtitle={`${draft.departmentIds.length} of ${departments.data?.length ?? 0} tracked`}
+                />
+                <CardBody className="flex flex-col gap-xs max-h-[320px] overflow-y-auto scroll-thin">
+                  {departments.data?.map((d) => {
+                    const on = draft.departmentIds.includes(d.id);
+                    return (
+                      <button
+                        key={d.id}
+                        onClick={() => toggleDept(d.id)}
+                        className="flex items-center justify-between gap-sm rounded-DEFAULT px-md py-sm hover:bg-surface-soft transition-colors text-left"
+                      >
+                        <span className="text-body-sm">{deptName(d.id)}</span>
+                        <Icon
+                          name={on ? "check_box" : "check_box_outline_blank"}
+                          size={20}
+                          className={on ? "text-primary-container" : "text-stone"}
+                        />
+                      </button>
+                    );
+                  })}
+                </CardBody>
+              </Card>
+            </div>
+          </div>
+        </>
+      )}
+    </QueryBoundary>
+  );
+}
+
+function FormulaSummary({
+  formula,
+}: {
+  formula?: { name: string; expression: string; currentVersion: string; variables: { symbol: string; label: string }[] };
+}) {
+  if (!formula) return <p className="text-body-sm text-mute">Formula not found.</p>;
+  return (
+    <div className="flex flex-col gap-md">
+      <div className="flex items-center gap-sm">
+        <Badge tone="primary">{formula.currentVersion}</Badge>
+        <span className="text-body-strong">{formula.name}</span>
+      </div>
+      <code className="block rounded-lg bg-surface-soft border border-hairline px-md py-sm font-mono text-body-sm text-on-surface">
+        {formula.expression}
+      </code>
+      <div className="flex flex-wrap gap-xs">
+        {formula.variables.map((v) => (
+          <Badge key={v.symbol} tone="neutral">
+            <span className="font-mono">{v.symbol}</span> = {v.label}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}

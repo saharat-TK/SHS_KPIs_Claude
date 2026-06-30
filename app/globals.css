@@ -1,0 +1,37 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background-color: theme("colors.background");
+  color: theme("colors.on-surface");
+}
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  user-select: none;
+  line-height: 1;
+}
+
+/* Thin scrollbars for dense data tables */
+.scroll-thin::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: theme("colors.surface-dim");
+  border-radius: 9999px;
+}
+
+@layer utilities {
+  .canvas {
+    @apply w-full max-w-canvas mx-auto;
+  }
+}

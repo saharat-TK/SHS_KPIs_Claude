@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Faculty Management - Health Sciences Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-container": "#e2e2e2",
+                        "inverse-surface": "#2f3131",
+                        "on-secondary-fixed": "#1b1b1b",
+                        "surface-dim": "#dadada",
+                        "on-background": "#1a1c1c",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#424936",
+                        "success": "#3f8500",
+                        "secondary-fixed": "#e2e2e2",
+                        "surface-soft": "#f7f7f7",
+                        "inverse-primary": "#94da32",
+                        "link-blue": "#0046a4",
+                        "secondary-fixed-dim": "#c6c6c6",
+                        "surface-container": "#eeeeee",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "ink": "#000000",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f3f3f4",
+                        "error": "#e52020",
+                        "on-tertiary-container": "#3b3d3d",
+                        "warning": "#df6500",
+                        "primary-fixed": "#aff74e",
+                        "surface-variant": "#e2e2e2",
+                        "on-primary-container": "#284400",
+                        "on-primary-fixed-variant": "#304f00",
+                        "on-tertiary": "#ffffff",
+                        "background": "#f9f9f9",
+                        "tertiary": "#5d5f5f",
+                        "on-secondary-container": "#646464",
+                        "outline-variant": "#c1cab1",
+                        "secondary": "#5e5e5e",
+                        "primary-container": "#76b900",
+                        "on-secondary-fixed-variant": "#474747",
+                        "surface-container-highest": "#e2e2e2",
+                        "stone": "#898989",
+                        "surface": "#f9f9f9",
+                        "tertiary-fixed": "#e2e2e2",
+                        "surface-container-lowest": "#ffffff",
+                        "hairline": "#cccccc",
+                        "surface-bright": "#f9f9f9",
+                        "on-error": "#ffffff",
+                        "primary-fixed-dim": "#94da32",
+                        "on-surface": "#1a1c1c",
+                        "surface-container-high": "#e8e8e8",
+                        "outline": "#727a64",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#f0f1f1",
+                        "tertiary-container": "#a6a7a7",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "hairline-strong": "#5e5e5e",
+                        "mute": "#757575",
+                        "primary-dark": "#5a8d00",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "primary": "#416900",
+                        "on-primary-fixed": "#102000",
+                        "surface-tint": "#416900"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "section": "64px",
+                        "base": "8px",
+                        "xxl": "32px",
+                        "md": "12px",
+                        "sm": "8px",
+                        "lg": "16px",
+                        "tiny": "2px",
+                        "xl": "24px",
+                        "xs": "4px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Hanken Grotesk"],
+                        "utility-xs": ["Hanken Grotesk"],
+                        "label-md": ["Hanken Grotesk"],
+                        "heading-md": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "caption-sm": ["Hanken Grotesk"],
+                        "body-sm": ["Hanken Grotesk"],
+                        "heading-lg": ["Hanken Grotesk"],
+                        "heading-xl": ["Hanken Grotesk"],
+                        "body-strong": ["Hanken Grotesk"],
+                        "display-xl": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["36px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "utility-xs": ["10px", { "lineHeight": "1.5", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.43", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "heading-md": ["20px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "caption-sm": ["12px", { "lineHeight": "1.25", "fontWeight": "400" }],
+                        "body-sm": ["15px", { "lineHeight": "1.67", "fontWeight": "400" }],
+                        "heading-lg": ["22px", { "lineHeight": "1.75", "fontWeight": "400" }],
+                        "heading-xl": ["24px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "body-strong": ["16px", { "lineHeight": "1.5", "fontWeight": "700" }],
+                        "display-xl": ["48px", { "lineHeight": "1.25", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Kinetic Precision Utilities */
+        .corner-signature {
+            position: relative;
+        }
+        .corner-signature::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            background-color: #76b900; /* primary-container */
+            border-top-right-radius: 0.125rem; /* DEFAULT radius */
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body-md min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+<!-- Desktop SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen p-md space-y-base bg-ink text-primary-container docked left-0 w-[280px] border-r border-hairline-strong flex-shrink-0 z-40 fixed top-0 left-0">
+<div class="mb-xl pt-lg px-md">
+<h1 class="font-heading-xl text-heading-xl text-on-primary">Health Sciences</h1>
+<p class="font-label-md text-label-md text-primary-container mt-tiny">KPI Monitor v2.1</p>
+</div>
+<div class="flex-1 flex flex-col gap-xs">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Overview</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="insights">insights</span>
+<span class="font-label-md text-label-md">Performance</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="trending_up">trending_up</span>
+<span class="font-label-md text-label-md">Forecasting</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg bg-primary text-on-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-label-md text-label-md">Faculty Data</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-md text-label-md">Audit Log</span>
+</a>
+</div>
+<div class="mt-auto border-t border-hairline-strong pt-md flex flex-col gap-xs">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+<span class="font-label-md text-label-md">Support</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-md text-label-md">Sign Out</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col md:ml-[280px] min-w-0">
+<!-- Mobile Top Nav (Hidden on Desktop) -->
+<header class="md:hidden flex justify-between items-center px-lg h-[64px] w-full z-50 bg-ink text-primary font-label-md text-label-md border-b border-hairline-strong sticky top-0">
+<span class="font-heading-md text-heading-md text-on-primary">Health Sciences Analytics</span>
+<div class="flex gap-md text-on-primary">
+<span class="material-symbols-outlined hover:text-primary-container transition-colors" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined hover:text-primary-container transition-colors" data-icon="settings">settings</span>
+</div>
+</header>
+<!-- Page Header -->
+<div class="px-xl py-lg md:px-xxl md:py-xl border-b border-hairline bg-surface-container-lowest sticky top-0 md:static z-30">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-md">
+<div>
+<h2 class="font-display-lg text-display-lg text-ink">Faculty Management</h2>
+<p class="font-body-md text-body-md text-secondary mt-xs">Total Roster: 342 Active Members</p>
+</div>
+<div class="flex gap-md">
+<button class="h-[44px] px-lg border border-hairline rounded text-ink font-label-md text-label-md hover:bg-surface-soft transition-colors flex items-center gap-sm">
+<span class="material-symbols-outlined text-[18px]" data-icon="download">download</span>
+                        Export List
+                    </button>
+<button class="h-[44px] px-lg bg-primary-container rounded text-on-primary font-label-md text-label-md hover:bg-primary-dark transition-colors flex items-center gap-sm">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                        Add Faculty
+                    </button>
+</div>
+</div>
+</div>
+<!-- Filter & Search Bar -->
+<div class="px-xl md:px-xxl py-lg bg-surface-soft border-b border-hairline flex flex-wrap gap-md items-center">
+<!-- Search -->
+<div class="relative flex-1 min-w-[200px]">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-secondary" data-icon="search">search</span>
+<input class="w-full h-[40px] pl-[40px] pr-md border border-hairline rounded bg-surface-container-lowest focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-sm text-body-sm transition-shadow" placeholder="Search by name, ID, or department..." type="text"/>
+</div>
+<!-- Filters -->
+<div class="flex gap-sm overflow-x-auto pb-tiny no-scrollbar">
+<select class="h-[40px] px-md border border-hairline rounded bg-surface-container-lowest font-body-sm text-body-sm focus:border-primary-container outline-none appearance-none pr-[32px] bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%24%2024%22%20fill%3D%22none%22%20stroke%3D%22%235e5e5e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_8px_center] bg-[length:16px_16px]">
+<option value="">All Departments</option>
+<option value="nursing">Nursing</option>
+<option value="pharmacy">Pharmacy</option>
+<option value="public_health">Public Health</option>
+</select>
+<select class="h-[40px] px-md border border-hairline rounded bg-surface-container-lowest font-body-sm text-body-sm focus:border-primary-container outline-none appearance-none pr-[32px] bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%24%2024%22%20fill%3D%22none%22%20stroke%3D%22%235e5e5e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_8px_center] bg-[length:16px_16px]">
+<option value="">All Ranks</option>
+<option value="prof">Professor</option>
+<option value="assoc">Assoc. Professor</option>
+<option value="asst">Asst. Professor</option>
+</select>
+<button class="h-[40px] px-md border border-hairline rounded bg-surface-container-lowest font-label-md text-label-md hover:bg-surface-soft transition-colors flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]" data-icon="tune">tune</span>
+                    More Filters
+                </button>
+</div>
+</div>
+<!-- Data Canvas -->
+<div class="flex-1 p-xl md:p-xxl bg-surface-container-lowest overflow-auto">
+<div class="border border-hairline rounded corner-signature bg-surface-container-lowest shadow-sm overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead class="bg-ink text-on-primary font-label-md text-label-md border-b border-hairline-strong">
+<tr>
+<th class="px-md py-sm font-normal">Faculty Member</th>
+<th class="px-md py-sm font-normal hidden sm:table-cell">Department</th>
+<th class="px-md py-sm font-normal hidden lg:table-cell">Rank / Tenure</th>
+<th class="px-md py-sm font-normal hidden xl:table-cell">Primary KPI Focus</th>
+<th class="px-md py-sm font-normal">Research Score</th>
+<th class="px-md py-sm font-normal text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm text-on-surface divide-y divide-hairline">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-soft transition-colors group cursor-pointer">
+<td class="px-md py-md">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-surface-dim overflow-hidden flex-shrink-0 border border-hairline">
+<img class="w-full h-full object-cover" data-alt="Professional headshot of a mature female academic with glasses, neutral expression, crisp lighting, high contrast corporate style photography, white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWyxFZoJrUzVyQq2dWWbZR4jgypdxEsS50mw8p_hKbKzjcm8eNoCi_53-3nn21wnP44TLtUW1z0OfZBBltKEdBLGrePcUacdtwek9j_P_dno1TxTOPGyEDbe7JlgNeDq34mN_RzfsqLeRaFvxiRuNu2DQZngR-hFg3gUyniK30RcMwyxAZpmLzBGSkdDduQt0UhOQhhzS3VHRkX0_zQxKk2tMQRx9oj5IsNA5ddfyPY3DpUKoSW-j7krejzlqFYdax6Omnw0FlWQ"/>
+</div>
+<div>
+<div class="font-body-strong text-body-strong text-ink">Dr. Sarah Jenkins</div>
+<div class="text-caption-sm text-secondary font-caption-sm">ID: FAC-8832</div>
+</div>
+</div>
+</td>
+<td class="px-md py-md hidden sm:table-cell">Nursing</td>
+<td class="px-md py-md hidden lg:table-cell">
+<div class="flex flex-col gap-xs items-start">
+<span class="px-xs py-tiny bg-surface-container-highest text-ink rounded font-utility-xs text-utility-xs uppercase tracking-wider">Professor</span>
+<span class="text-caption-sm text-success flex items-center gap-tiny"><span class="w-2 h-2 rounded-full bg-success inline-block"></span> Tenured</span>
+</div>
+</td>
+<td class="px-md py-md hidden xl:table-cell text-secondary">Graduation Rate</td>
+<td class="px-md py-md">
+<div class="flex items-center gap-sm">
+<span class="font-body-strong text-body-strong">94.2</span>
+<span class="material-symbols-outlined text-success text-[16px]" data-icon="trending_up">trending_up</span>
+</div>
+</td>
+<td class="px-md py-md text-right">
+<button class="text-secondary hover:text-primary-container transition-colors p-xs rounded">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="bg-surface-soft hover:bg-surface-container transition-colors group cursor-pointer">
+<td class="px-md py-md">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-surface-dim overflow-hidden flex-shrink-0 border border-hairline flex items-center justify-center text-secondary font-body-strong">
+                                        MR
+                                    </div>
+<div>
+<div class="font-body-strong text-body-strong text-ink">Dr. Marcus Reynolds</div>
+<div class="text-caption-sm text-secondary font-caption-sm">ID: FAC-7741</div>
+</div>
+</div>
+</td>
+<td class="px-md py-md hidden sm:table-cell">Pharmacy</td>
+<td class="px-md py-md hidden lg:table-cell">
+<div class="flex flex-col gap-xs items-start">
+<span class="px-xs py-tiny bg-surface-container-highest text-ink rounded font-utility-xs text-utility-xs uppercase tracking-wider">Assoc. Prof</span>
+<span class="text-caption-sm text-warning flex items-center gap-tiny"><span class="w-2 h-2 rounded-full bg-warning inline-block"></span> Tenure-Track</span>
+</div>
+</td>
+<td class="px-md py-md hidden xl:table-cell text-secondary">Clinical Placements</td>
+<td class="px-md py-md">
+<div class="flex items-center gap-sm">
+<span class="font-body-strong text-body-strong">88.5</span>
+<span class="material-symbols-outlined text-success text-[16px]" data-icon="trending_up">trending_up</span>
+</div>
+</td>
+<td class="px-md py-md text-right">
+<button class="text-secondary hover:text-primary-container transition-colors p-xs rounded">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-soft transition-colors group cursor-pointer">
+<td class="px-md py-md">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-surface-dim overflow-hidden flex-shrink-0 border border-hairline">
+<img class="w-full h-full object-cover" data-alt="Professional portrait of a young male academic, looking confident, wearing a sharp suit, high contrast lighting, clean corporate style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPTmRg0tWvITNAiNogFeLGhEumEBNfgdS_d9dK1UTHOcLbNK14njF7E-NMC4KYHKaz5Zchj9zJOUTmOh-k5sjKBj_oYaWh77vVNNue-HUnmbGKoff1ItcmoMD1U4NbqRT61lZmu9uEbTZetrl_tKHS6zDAaCFkjhveyBHgf3Rdnht1AuVH43JBlzApykamkAtpPhwgICclYzkMl1UgsvX4YLvwXJdHjPRYItaCUn748AoltcJsV7j69QSWy-ghpPaA1eMrk5GuAw"/>
+</div>
+<div>
+<div class="font-body-strong text-body-strong text-ink">Dr. Emily Chen</div>
+<div class="text-caption-sm text-secondary font-caption-sm">ID: FAC-9021</div>
+</div>
+</div>
+</td>
+<td class="px-md py-md hidden sm:table-cell">Public Health</td>
+<td class="px-md py-md hidden lg:table-cell">
+<div class="flex flex-col gap-xs items-start">
+<span class="px-xs py-tiny bg-surface-container-highest text-ink rounded font-utility-xs text-utility-xs uppercase tracking-wider">Asst. Prof</span>
+<span class="text-caption-sm text-secondary flex items-center gap-tiny"><span class="w-2 h-2 rounded-full bg-secondary inline-block"></span> Non-Tenure Track</span>
+</div>
+</td>
+<td class="px-md py-md hidden xl:table-cell text-secondary">Grant Acquisition</td>
+<td class="px-md py-md">
+<div class="flex items-center gap-sm">
+<span class="font-body-strong text-body-strong">72.1</span>
+<span class="material-symbols-outlined text-error text-[16px]" data-icon="trending_down">trending_down</span>
+</div>
+</td>
+<td class="px-md py-md text-right">
+<button class="text-secondary hover:text-primary-container transition-colors p-xs rounded">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Placeholder -->
+<div class="mt-lg flex justify-between items-center text-caption-sm font-caption-sm text-secondary">
+<span>Showing 1-3 of 342</span>
+<div class="flex gap-sm">
+<button class="px-sm py-xs border border-hairline rounded hover:bg-surface-soft disabled:opacity-50" disabled="">Prev</button>
+<button class="px-sm py-xs border border-hairline rounded hover:bg-surface-soft">Next</button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

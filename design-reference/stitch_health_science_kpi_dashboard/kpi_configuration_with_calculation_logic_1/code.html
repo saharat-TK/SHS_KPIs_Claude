@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>KPI Management - Health Sciences Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "success": "#3f8500",
+                      "secondary": "#5e5e5e",
+                      "on-error-container": "#93000a",
+                      "on-tertiary": "#ffffff",
+                      "on-surface-variant": "#424936",
+                      "surface-container-low": "#f3f3f4",
+                      "hairline": "#cccccc",
+                      "surface-container-high": "#e8e8e8",
+                      "on-secondary-fixed-variant": "#474747",
+                      "on-primary-fixed": "#102000",
+                      "secondary-fixed-dim": "#c6c6c6",
+                      "inverse-surface": "#2f3131",
+                      "on-secondary": "#ffffff",
+                      "tertiary-fixed": "#e2e2e2",
+                      "surface-tint": "#416900",
+                      "secondary-container": "#e2e2e2",
+                      "on-tertiary-container": "#3b3d3d",
+                      "tertiary": "#5d5f5f",
+                      "on-surface": "#1a1c1c",
+                      "mute": "#757575",
+                      "error": "#e52020",
+                      "secondary-fixed": "#e2e2e2",
+                      "ink": "#000000",
+                      "tertiary-fixed-dim": "#c6c6c7",
+                      "primary-fixed-dim": "#94da32",
+                      "primary": "#416900",
+                      "on-primary-container": "#284400",
+                      "inverse-primary": "#94da32",
+                      "surface-container-highest": "#e2e2e2",
+                      "on-primary": "#ffffff",
+                      "link-blue": "#0046a4",
+                      "surface-soft": "#f7f7f7",
+                      "primary-dark": "#5a8d00",
+                      "warning": "#df6500",
+                      "surface": "#f9f9f9",
+                      "on-background": "#1a1c1c",
+                      "surface-variant": "#e2e2e2",
+                      "outline-variant": "#c1cab1",
+                      "on-secondary-fixed": "#1b1b1b",
+                      "on-error": "#ffffff",
+                      "on-primary-fixed-variant": "#304f00",
+                      "hairline-strong": "#5e5e5e",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-bright": "#f9f9f9",
+                      "tertiary-container": "#a6a7a7",
+                      "on-tertiary-fixed": "#1a1c1c",
+                      "surface-dim": "#dadada",
+                      "surface-container": "#eeeeee",
+                      "inverse-on-surface": "#f0f1f1",
+                      "on-tertiary-fixed-variant": "#454747",
+                      "primary-fixed": "#aff74e",
+                      "on-secondary-container": "#646464",
+                      "primary-container": "#76b900",
+                      "stone": "#898989",
+                      "outline": "#727a64",
+                      "background": "#f9f9f9",
+                      "error-container": "#ffdad6"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "section": "64px",
+                      "tiny": "2px",
+                      "md": "12px",
+                      "sm": "8px",
+                      "xxl": "32px",
+                      "xs": "4px",
+                      "lg": "16px",
+                      "base": "8px",
+                      "xl": "24px"
+              },
+              "fontFamily": {
+                      "body-strong": [
+                              "Hanken Grotesk"
+                      ],
+                      "utility-xs": [
+                              "Hanken Grotesk"
+                      ],
+                      "caption-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "heading-xl": [
+                              "Hanken Grotesk"
+                      ],
+                      "heading-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "display-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "display-xl": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "heading-md": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "body-strong": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "utility-xs": [
+                              "10px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "caption-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.43",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "heading-xl": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "heading-lg": [
+                              "22px",
+                              {
+                                      "lineHeight": "1.75",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "36px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "display-xl": [
+                              "48px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "15px",
+                              {
+                                      "lineHeight": "1.67",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "heading-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        body { background-color: #f9f9f9; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0; }
+        .material-symbols-outlined[data-weight="fill"] { font-variation-settings: 'FILL' 1; }
+    </style>
+</head>
+<body class="font-body-md text-body-md text-on-surface antialiased bg-background min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<nav class="bg-ink dark:bg-ink docked full-width top-0 border-b border-hairline-strong shadow-[0_0_5px_0_rgba(0,0,0,0.1)] flex justify-between items-center px-xxl h-[64px] w-full z-50 sticky">
+<div class="flex items-center gap-xl h-full">
+<span class="font-heading-md text-heading-md text-on-primary">Health Sciences Analytics</span>
+<div class="hidden md:flex items-center h-full gap-xl ml-xl font-label-md text-label-md">
+<a class="text-on-primary hover:text-primary-container transition-colors h-full flex items-center style_interactions" href="#">Dashboard</a>
+<a class="text-on-primary hover:text-primary-container transition-colors h-full flex items-center style_interactions" href="#">Departments</a>
+<a class="text-on-primary hover:text-primary-container transition-colors h-full flex items-center style_interactions" href="#">Reports</a>
+<a class="text-primary-container border-b-2 border-primary-container h-full flex items-center pt-[2px] style_interactions" href="#">Administration</a>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<button aria-label="notifications" class="text-on-primary hover:bg-surface-container-highest/10 p-sm rounded transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button aria-label="settings" class="text-on-primary hover:bg-surface-container-highest/10 p-sm rounded transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-[32px] h-[32px] rounded-full bg-surface-container-highest overflow-hidden border border-hairline-strong ml-sm">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional headshot of a female data analyst with glasses, neutral expression, crisp lighting, high contrast, professional attire, set against a dark grey background in an engineering-grade analytical environment. Minimalist and sharp aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnrph4LbVgSvzL632hGW0m6KaSR28wssz1DLml8QbZDcmf5GqbhJ1dMmYOY_gZVGCQb9n7f1CfQNPEDcH4kLAesb_cSpxl71LlaWnU4UtOqoTfDSI-jY3MS6pJBuGXBPDRuCfkp9CSNz9MRvgskgA58SYI9mbJhvZe4sUe44ZoZ1miNj_AKhmMYIN3yHEffV4ycxy-hBgEl4dTZBDykG8Xu0oXZEtLQ7P9HdM-IQoPVpajxbebsFwY2GO3_j_X86DM5tN3vRxxTQ"/>
+</div>
+</div>
+</nav>
+<!-- Main Canvas -->
+<main class="flex-grow w-full max-w-[1440px] mx-auto px-xxl py-xl flex flex-col gap-section">
+<!-- Header & Breadcrumbs -->
+<header class="flex flex-col gap-md">
+<div class="flex items-center gap-sm font-caption-sm text-caption-sm text-mute">
+<span>Administration</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-on-surface font-label-md">KPI Management</span>
+</div>
+<div class="flex justify-between items-end">
+<div>
+<h1 class="font-display-lg text-display-lg text-on-surface">KPI Configuration</h1>
+</div>
+<button class="bg-primary-container hover:bg-primary-dark text-on-tertiary font-label-md text-label-md h-[44px] px-lg rounded-DEFAULT flex items-center gap-sm transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    Create New KPI
+                </button>
+</div>
+</header>
+<!-- 2-Column Layout -->
+<div class="flex flex-col md:flex-row gap-xl">
+<!-- Left Sidebar (Categories) -->
+<aside class="w-full md:w-[280px] flex-shrink-0 flex flex-col gap-md bg-surface-lowest rounded-lg border border-hairline p-lg h-fit sticky top-[88px]">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-mute">search</span>
+<input class="w-full h-[40px] pl-[40px] pr-md bg-surface rounded-DEFAULT border border-hairline focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-sm text-body-sm transition-all" placeholder="Search categories..." type="text"/>
+</div>
+<nav class="flex flex-col gap-tiny mt-sm">
+<a class="px-md py-sm rounded-DEFAULT bg-surface-soft border border-primary-container text-primary-dark font-label-md text-label-md flex justify-between items-center group" href="#">
+                        Student Success
+                        <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</a>
+<a class="px-md py-sm rounded-DEFAULT text-on-surface hover:bg-surface-soft border border-transparent font-body-md text-body-md flex justify-between items-center transition-colors" href="#">
+                        Faculty Excellence
+                    </a>
+<a class="px-md py-sm rounded-DEFAULT text-on-surface hover:bg-surface-soft border border-transparent font-body-md text-body-md flex justify-between items-center transition-colors" href="#">
+                        Research Output
+                    </a>
+<a class="px-md py-sm rounded-DEFAULT text-on-surface hover:bg-surface-soft border border-transparent font-body-md text-body-md flex justify-between items-center transition-colors" href="#">
+                        Operational Efficiency
+                    </a>
+<a class="px-md py-sm rounded-DEFAULT text-on-surface hover:bg-surface-soft border border-transparent font-body-md text-body-md flex justify-between items-center transition-colors" href="#">
+                        Financial Health
+                    </a>
+</nav>
+</aside>
+<!-- Main Content (Management View) -->
+<div class="flex-grow flex flex-col gap-lg min-w-0">
+<!-- Metadata Section -->
+<section class="bg-surface-lowest rounded-lg border border-hairline p-xl flex flex-col gap-lg">
+<div class="flex justify-between items-center border-b border-hairline pb-md">
+<h2 class="font-heading-md text-heading-md text-on-surface">Core Configuration</h2>
+<span class="px-sm py-tiny bg-surface-soft border border-hairline rounded-DEFAULT font-utility-xs text-utility-xs text-mute uppercase tracking-widest">Active</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-xl">
+<div class="flex flex-col gap-xs">
+<label class="font-label-md text-label-md text-on-surface">KPI Name</label>
+<input class="h-[44px] px-md rounded-DEFAULT border border-hairline focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-md text-body-md" type="text" value="Student Success Composite"/>
+</div>
+<div class="flex flex-col gap-xs">
+<label class="font-label-md text-label-md text-on-surface">Global Target (%)</label>
+<input class="h-[44px] px-md rounded-DEFAULT border border-hairline focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-md text-body-md" type="number" value="85"/>
+</div>
+<div class="flex flex-col gap-xs md:col-span-2">
+<label class="font-label-md text-label-md text-on-surface">Description</label>
+<textarea class="p-md rounded-DEFAULT border border-hairline focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-md text-body-md resize-none" rows="3">Aggregate index tracking cohort retention, licensure pass rates, and immediate post-graduate employment across all clinical programs.</textarea>
+</div>
+</div>
+<div class="flex justify-end gap-sm mt-sm">
+<button class="px-lg h-[44px] rounded-DEFAULT border border-hairline hover:bg-surface-soft font-label-md text-label-md transition-colors">Discard Changes</button>
+<button class="px-lg h-[44px] rounded-DEFAULT bg-primary-container hover:bg-primary-dark text-on-tertiary font-label-md text-label-md transition-colors">Save Metadata</button>
+</div>
+</section>
+<!-- Sub-KPIs Section -->
+<section class="bg-surface-lowest rounded-lg border border-hairline flex flex-col">
+<div class="p-lg border-b border-hairline flex justify-between items-center">
+<h2 class="font-heading-md text-heading-md text-on-surface">Sub-KPIs Structure</h2>
+<button class="text-primary-dark hover:text-primary font-label-md text-label-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">add</span> Add Metric
+                        </button>
+</div>
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-ink text-on-tertiary font-label-md text-label-md">
+<th class="py-sm px-lg font-normal w-1/3">Metric Name</th>
+<th class="py-sm px-lg font-normal">Weight</th><th class="py-sm px-lg font-normal">Calculation Method</th>
+<th class="py-sm px-lg font-normal">Current Value</th>
+<th class="py-sm px-lg font-normal text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm">
+<tr class="border-b border-hairline hover:bg-surface-soft transition-colors group">
+<td class="py-md px-lg font-body-strong text-body-strong">Graduation Rate (4-Year)</td>
+<td class="py-md px-lg">40%</td><td class="py-md px-lg">
+<select class="bg-surface border border-hairline rounded-DEFAULT text-body-sm px-sm py-xs focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none">
+<option selected="">Weighted Average</option>
+<option>Sum</option>
+<option>Min/Max</option>
+<option>Percentage</option>
+</select>
+</td>
+<td class="py-md px-lg flex items-center gap-sm">
+                                        82.4% <span class="material-symbols-outlined text-warning text-[16px]">arrow_downward</span>
+</td>
+<td class="py-md px-lg text-right">
+<button class="text-mute hover:text-on-surface transition-colors p-xs"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-mute hover:text-error transition-colors p-xs"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</td>
+</tr>
+<tr class="border-b border-hairline bg-surface-soft hover:bg-surface transition-colors group">
+<td class="py-md px-lg font-body-strong text-body-strong">Licensure Pass Rate</td>
+<td class="py-md px-lg">40%</td><td class="py-md px-lg">
+<select class="bg-surface border border-hairline rounded-DEFAULT text-body-sm px-sm py-xs focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none">
+<option selected="">Weighted Average</option>
+<option>Sum</option>
+<option>Min/Max</option>
+<option>Percentage</option>
+</select>
+</td>
+<td class="py-md px-lg flex items-center gap-sm">
+                                        91.2% <span class="material-symbols-outlined text-success text-[16px]">arrow_upward</span>
+</td>
+<td class="py-md px-lg text-right">
+<button class="text-mute hover:text-on-surface transition-colors p-xs"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-mute hover:text-error transition-colors p-xs"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</td>
+</tr>
+<tr class="border-b border-hairline hover:bg-surface-soft transition-colors group">
+<td class="py-md px-lg font-body-strong text-body-strong">Post-Grad Employment (6mo)</td>
+<td class="py-md px-lg">20%</td><td class="py-md px-lg">
+<select class="bg-surface border border-hairline rounded-DEFAULT text-body-sm px-sm py-xs focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none">
+<option selected="">Weighted Average</option>
+<option>Sum</option>
+<option>Min/Max</option>
+<option>Percentage</option>
+</select>
+</td>
+<td class="py-md px-lg flex items-center gap-sm">
+                                        88.9% <span class="material-symbols-outlined text-success text-[16px]">arrow_upward</span>
+</td>
+<td class="py-md px-lg text-right">
+<button class="text-mute hover:text-on-surface transition-colors p-xs"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-mute hover:text-error transition-colors p-xs"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section><section class="bg-surface-lowest rounded-lg border border-hairline p-xl flex flex-col gap-lg">
+<div class="flex justify-between items-center border-b border-hairline pb-md">
+<h2 class="font-heading-md text-heading-md text-on-surface">KPI Calculation Logic</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-xl">
+<div class="flex flex-col gap-xs">
+<label class="font-label-md text-label-md text-on-surface">Aggregation Rule</label>
+<select class="h-[44px] px-md rounded-DEFAULT border border-hairline focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-md text-body-md bg-surface">
+<option selected="">Weighted Sum of Sub-KPIs</option>
+<option>Simple Average</option>
+<option>Custom Formula</option>
+</select>
+</div>
+<div class="flex flex-col gap-xs">
+<label class="font-label-md text-label-md text-on-surface">Normalization</label>
+<div class="flex items-center gap-md h-[44px]">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-4 bg-primary-container rounded-full relative cursor-pointer">
+<div class="absolute right-[2px] top-[2px] w-3 h-3 bg-white rounded-full"></div>
+</div>
+<span class="font-body-sm text-body-sm">Enable Auto-Normalization</span>
+</div>
+<span class="text-mute text-caption-sm">(Ensures different units are comparable)</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Departmental Mapping Section -->
+<section class="bg-surface-lowest rounded-lg border border-hairline p-lg flex flex-col gap-md">
+<div class="flex justify-between items-center border-b border-hairline pb-sm">
+<h2 class="font-heading-md text-heading-md text-on-surface">Departmental Mapping (17 Tracked)</h2>
+<button class="text-on-surface border border-hairline hover:bg-surface-soft font-label-md text-label-md px-sm py-xs rounded-DEFAULT text-[12px]">Select All</button>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-sm mt-sm">
+<!-- Mapping Item -->
+<div class="flex items-center justify-between p-sm border border-primary-container bg-surface-soft rounded-DEFAULT">
+<span class="font-body-sm text-body-sm">Nursing</span>
+<div class="w-8 h-4 bg-primary-container rounded-full relative cursor-pointer">
+<div class="absolute right-[2px] top-[2px] w-3 h-3 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-sm border border-primary-container bg-surface-soft rounded-DEFAULT">
+<span class="font-body-sm text-body-sm">Physical Therapy</span>
+<div class="w-8 h-4 bg-primary-container rounded-full relative cursor-pointer">
+<div class="absolute right-[2px] top-[2px] w-3 h-3 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-sm border border-hairline rounded-DEFAULT opacity-60 hover:opacity-100 transition-opacity">
+<span class="font-body-sm text-body-sm">Public Health</span>
+<div class="w-8 h-4 bg-hairline rounded-full relative cursor-pointer">
+<div class="absolute left-[2px] top-[2px] w-3 h-3 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-sm border border-primary-container bg-surface-soft rounded-DEFAULT">
+<span class="font-body-sm text-body-sm">Occupational Therapy</span>
+<div class="w-8 h-4 bg-primary-container rounded-full relative cursor-pointer">
+<div class="absolute right-[2px] top-[2px] w-3 h-3 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-sm border border-primary-container bg-surface-soft rounded-DEFAULT">
+<span class="font-body-sm text-body-sm">Pharmacy</span>
+<div class="w-8 h-4 bg-primary-container rounded-full relative cursor-pointer">
+<div class="absolute right-[2px] top-[2px] w-3 h-3 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-sm border border-hairline rounded-DEFAULT opacity-60 hover:opacity-100 transition-opacity">
+<span class="font-body-sm text-body-sm">Biomedical Sciences</span>
+<div class="w-8 h-4 bg-hairline rounded-full relative cursor-pointer">
+<div class="absolute left-[2px] top-[2px] w-3 h-3 bg-white rounded-full"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Threshold Settings Section -->
+<section class="bg-surface-lowest rounded-lg border border-hairline p-lg flex flex-col gap-lg">
+<div class="border-b border-hairline pb-sm">
+<h2 class="font-heading-md text-heading-md text-on-surface">Threshold Settings</h2>
+<p class="font-caption-sm text-caption-sm text-mute mt-xs">Define percentage boundaries for global reporting visualization.</p>
+</div>
+<div class="flex flex-col sm:flex-row gap-lg">
+<div class="flex-1 flex flex-col gap-xs p-md border-l-4 border-error bg-error-container/20 rounded-r-DEFAULT">
+<label class="font-label-md text-label-md text-error flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">warning</span> Critical
+                            </label>
+<div class="flex items-center gap-sm">
+<span class="font-body-sm text-body-sm text-mute">&lt;</span>
+<input class="w-full h-[40px] px-sm border border-hairline rounded-DEFAULT focus:border-error focus:ring-1 focus:ring-error outline-none font-body-md" type="number" value="75"/>
+<span class="font-body-sm text-body-sm text-mute">%</span>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-xs p-md border-l-4 border-warning bg-warning/10 rounded-r-DEFAULT">
+<label class="font-label-md text-label-md text-warning flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">info</span> Warning
+                            </label>
+<div class="flex items-center gap-sm">
+<span class="font-body-sm text-body-sm text-mute">&lt;</span>
+<input class="w-full h-[40px] px-sm border border-hairline rounded-DEFAULT focus:border-warning focus:ring-1 focus:ring-warning outline-none font-body-md" type="number" value="85"/>
+<span class="font-body-sm text-body-sm text-mute">%</span>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-xs p-md border-l-4 border-success bg-success/10 rounded-r-DEFAULT">
+<label class="font-label-md text-label-md text-success flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">check_circle</span> Success
+                            </label>
+<div class="flex items-center gap-sm">
+<span class="font-body-sm text-body-sm text-mute">&gt;=</span>
+<input class="w-full h-[40px] px-sm border border-hairline rounded-DEFAULT focus:border-success focus:ring-1 focus:ring-success outline-none font-body-md" readonly="" type="number" value="85"/>
+<span class="font-body-sm text-body-sm text-mute">%</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-ink dark:bg-ink docked full-width bottom-0 border-t border-hairline-strong flex justify-between items-center px-xxl py-xl w-full mt-auto">
+<div class="font-caption-sm text-caption-sm text-on-primary">
+            © 2024 School of Health Sciences | Engineering-Grade Precision Interface
+        </div>
+<div class="flex gap-xl font-label-md text-label-md">
+<a class="text-mute hover:text-on-primary hover:underline transition-opacity duration-200" href="#">Data Privacy</a>
+<a class="text-mute hover:text-on-primary hover:underline transition-opacity duration-200" href="#">System Status</a>
+<a class="text-mute hover:text-on-primary hover:underline transition-opacity duration-200" href="#">Technical Documentation</a>
+</div>
+</footer>
+</body></html>

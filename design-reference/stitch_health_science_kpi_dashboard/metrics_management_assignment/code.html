@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Metrics Management - Health Sciences Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#424936",
+                        "surface-variant": "#e2e2e2",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "inverse-on-surface": "#f0f1f1",
+                        "on-background": "#1a1c1c",
+                        "surface-tint": "#416900",
+                        "inverse-surface": "#2f3131",
+                        "primary-fixed": "#aff74e",
+                        "mute": "#757575",
+                        "surface-container-high": "#e8e8e8",
+                        "on-secondary-fixed": "#1b1b1b",
+                        "on-secondary-container": "#646464",
+                        "on-primary": "#ffffff",
+                        "outline": "#727a64",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "error-container": "#ffdad6",
+                        "primary-container": "#76b900",
+                        "surface-container": "#eeeeee",
+                        "on-primary-fixed": "#102000",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#c6c6c6",
+                        "secondary": "#5e5e5e",
+                        "on-secondary": "#ffffff",
+                        "surface-container-highest": "#e2e2e2",
+                        "surface-bright": "#f9f9f9",
+                        "on-surface": "#1a1c1c",
+                        "ink": "#000000",
+                        "surface-container-lowest": "#ffffff",
+                        "link-blue": "#0046a4",
+                        "warning": "#df6500",
+                        "surface-dim": "#dadada",
+                        "tertiary": "#5d5f5f",
+                        "primary-fixed-dim": "#94da32",
+                        "on-error-container": "#93000a",
+                        "primary": "#416900",
+                        "background": "#f9f9f9",
+                        "hairline": "#cccccc",
+                        "on-tertiary-container": "#3b3d3d",
+                        "outline-variant": "#c1cab1",
+                        "on-secondary-fixed-variant": "#474747",
+                        "on-primary-container": "#284400",
+                        "tertiary-container": "#a6a7a7",
+                        "surface-soft": "#f7f7f7",
+                        "primary-dark": "#5a8d00",
+                        "error": "#e52020",
+                        "on-primary-fixed-variant": "#304f00",
+                        "hairline-strong": "#5e5e5e",
+                        "tertiary-fixed": "#e2e2e2",
+                        "inverse-primary": "#94da32",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "secondary-fixed": "#e2e2e2",
+                        "surface": "#f9f9f9",
+                        "success": "#3f8500",
+                        "secondary-container": "#e2e2e2",
+                        "on-tertiary": "#ffffff",
+                        "stone": "#898989",
+                        "surface-container-low": "#f3f3f4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "xl": "24px",
+                        "xs": "4px",
+                        "lg": "16px",
+                        "base": "8px",
+                        "sm": "8px",
+                        "md": "12px",
+                        "section": "64px",
+                        "tiny": "2px",
+                        "xxl": "32px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Hanken Grotesk"],
+                        "heading-lg": ["Hanken Grotesk"],
+                        "heading-xl": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "heading-md": ["Hanken Grotesk"],
+                        "caption-sm": ["Hanken Grotesk"],
+                        "body-strong": ["Hanken Grotesk"],
+                        "utility-xs": ["Hanken Grotesk"],
+                        "display-xl": ["Hanken Grotesk"],
+                        "body-sm": ["Hanken Grotesk"],
+                        "label-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "heading-lg": ["22px", { "lineHeight": "1.75", "fontWeight": "400" }],
+                        "heading-xl": ["24px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "display-lg": ["36px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "heading-md": ["20px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "caption-sm": ["12px", { "lineHeight": "1.25", "fontWeight": "400" }],
+                        "body-strong": ["16px", { "lineHeight": "1.5", "fontWeight": "700" }],
+                        "utility-xs": ["10px", { "lineHeight": "1.5", "fontWeight": "700" }],
+                        "display-xl": ["48px", { "lineHeight": "1.25", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-sm": ["15px", { "lineHeight": "1.67", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "1.43", "letterSpacing": "0.05em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; background-color: #f9f9f9; color: #1a1c1c; margin: 0; padding: 0; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined.fill { font-variation-settings: 'FILL' 1; }
+        
+        /* Kinetic Precision Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f7f7f7; }
+        ::-webkit-scrollbar-thumb { background: #cccccc; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #76b900; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="bg-ink dark:bg-ink text-primary dark:text-primary-container font-label-md text-label-md flex justify-between items-center px-xxl h-[64px] w-full z-50 sticky top-0 border-b border-hairline-strong shadow-[0_0_5px_0_rgba(0,0,0,0.1)] hidden md:flex">
+<div class="flex items-center gap-xl">
+<div class="font-heading-md text-heading-md text-on-primary">Health Sciences Analytics</div>
+<nav class="flex gap-lg h-full items-center">
+<a class="text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-md py-sm transition-all duration-200 active:opacity-80" href="#">Dashboard</a>
+<a class="text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-md py-sm transition-all duration-200 active:opacity-80" href="#">Departments</a>
+<a class="text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-md py-sm transition-all duration-200 active:opacity-80" href="#">Reports</a>
+<a class="text-primary-container border-b-2 border-primary-container pb-1 px-md py-sm transition-all duration-200 active:opacity-80" href="#">Administration</a>
+</nav>
+</div>
+<div class="flex items-center gap-lg">
+<button aria-label="notifications" class="text-on-primary hover:text-primary-container transition-colors"><span class="material-symbols-outlined">notifications</span></button>
+<button aria-label="settings" class="text-on-primary hover:text-primary-container transition-colors"><span class="material-symbols-outlined">settings</span></button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-hairline-strong">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional headshot of a female administrative user in a white lab coat, standing in a brightly lit modern hospital corridor with a clean, high-tech aesthetic, cool white lighting, sharp focus on the face." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUjmMLhog4-omWv1pOYtGyvHlC3HJrTnboPsXAK34Okte-QERzQqeHoVC_nfwQCDWn_hCht05n_vyKsKAS1RV0n2OtE8GDWJJTn-J7oLgv19e7O69dzlvxVwTH7YGY49DUvcAxtsKbd1HnFVqGF-Wk0qs5bSO2al14MObIBgEE-5fcL-n1tGCNuWnSgrVFGg0B0549dAkVNFGuRhGsSmXfb7UHcurHrgsKpb0fbdQOmBZYescicZDTC5bnEenFnG4v8LoGC6t9AA"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar (Desktop) -->
+<aside class="bg-ink dark:bg-ink text-primary-container dark:text-primary-container font-label-md text-label-md border-r border-hairline-strong hidden md:flex flex-col h-[calc(100vh-64px)] p-md space-y-base w-[280px] sticky top-[64px]">
+<div class="mb-lg flex items-center gap-md px-md">
+<div class="w-10 h-10 bg-surface-container-highest/20 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary">school</span>
+</div>
+<div>
+<div class="font-heading-xl text-heading-xl text-on-primary leading-tight">Health Sciences</div>
+<div class="font-caption-sm text-caption-sm text-mute">KPI Monitor v2.1</div>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-xs">
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded" href="#">
+<span class="material-symbols-outlined">dashboard</span> Overview
+                </a>
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded" href="#">
+<span class="material-symbols-outlined">insights</span> Performance
+                </a>
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded" href="#">
+<span class="material-symbols-outlined">trending_up</span> Forecasting
+                </a>
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded" href="#">
+<span class="material-symbols-outlined">groups</span> Faculty Data
+                </a>
+<a class="flex items-center gap-md px-md py-sm bg-primary text-on-primary rounded transition-all duration-200" href="#">
+<span class="material-symbols-outlined">history</span> Audit Log
+                </a>
+</nav>
+<div class="mt-auto pt-lg border-t border-hairline-strong flex flex-col gap-xs">
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded" href="#">
+<span class="material-symbols-outlined">help_outline</span> Support
+                </a>
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 transition-all duration-200 rounded" href="#">
+<span class="material-symbols-outlined">logout</span> Sign Out
+                </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 bg-surface-container-lowest overflow-y-auto p-lg md:p-xxl">
+<!-- Page Header -->
+<div class="mb-xl flex justify-between items-end border-b border-hairline pb-md">
+<div>
+<h1 class="font-display-lg text-display-lg text-ink">Metrics Management</h1>
+<p class="font-body-md text-body-md text-secondary mt-xs">Define, categorize, and assign performance tracking metrics across departments.</p>
+</div>
+<button class="bg-primary-container hover:bg-primary-dark text-on-primary font-label-md text-label-md px-lg py-sm rounded-DEFAULT h-[44px] flex items-center gap-sm transition-colors">
+<span class="material-symbols-outlined">add</span> New Metric
+                </button>
+</div>
+<!-- Two Column Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-xl">
+<!-- Left Column: Metric List -->
+<div class="lg:col-span-4 flex flex-col gap-md h-[calc(100vh-250px)]">
+<!-- Search/Filter -->
+<div class="relative">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-mute">search</span>
+<input class="w-full pl-[40px] pr-md py-sm border border-hairline rounded-DEFAULT focus:border-primary-container focus:ring-1 focus:ring-primary-container font-body-sm text-body-sm bg-surface-soft outline-none" placeholder="Search metrics..." type="text"/>
+</div>
+<!-- List Container -->
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT flex-1 overflow-y-auto">
+<!-- List Item (Active) -->
+<div class="p-md border-b border-hairline bg-surface-soft border-l-4 border-l-primary-container cursor-pointer hover:bg-surface-variant transition-colors">
+<div class="font-body-strong text-body-strong text-ink">Clinical Trial Enrollment Rate</div>
+<div class="font-caption-sm text-caption-sm text-secondary flex justify-between mt-xs">
+<span>Category: Research</span>
+<span class="text-primary-container font-bold">Active</span>
+</div>
+</div>
+<!-- List Item -->
+<div class="p-md border-b border-hairline cursor-pointer hover:bg-surface-soft transition-colors">
+<div class="font-body-strong text-body-strong text-ink">Faculty Publication Output</div>
+<div class="font-caption-sm text-caption-sm text-secondary flex justify-between mt-xs">
+<span>Category: Academic</span>
+<span class="text-primary-container font-bold">Active</span>
+</div>
+</div>
+<!-- List Item -->
+<div class="p-md border-b border-hairline cursor-pointer hover:bg-surface-soft transition-colors">
+<div class="font-body-strong text-body-strong text-ink">Patient Satisfaction Score (HCAHPS)</div>
+<div class="font-caption-sm text-caption-sm text-secondary flex justify-between mt-xs">
+<span>Category: Clinical</span>
+<span class="text-mute">Draft</span>
+</div>
+</div>
+<!-- List Item -->
+<div class="p-md border-b border-hairline cursor-pointer hover:bg-surface-soft transition-colors">
+<div class="font-body-strong text-body-strong text-ink">Grant Funding Yield</div>
+<div class="font-caption-sm text-caption-sm text-secondary flex justify-between mt-xs">
+<span>Category: Financial</span>
+<span class="text-primary-container font-bold">Active</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Configuration Details -->
+<div class="lg:col-span-8 flex flex-col gap-lg h-[calc(100vh-250px)] overflow-y-auto pr-md">
+<!-- Form Container Card (Bento Style) -->
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT p-xl relative overflow-hidden">
+<!-- Signature Corner Square -->
+<div class="absolute top-0 right-0 w-[12px] h-[12px] bg-primary-container"></div>
+<h2 class="font-heading-md text-heading-md text-ink mb-lg border-b border-hairline pb-xs">Metric Definition</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-lg">
+<div class="col-span-1 md:col-span-2">
+<label class="block font-label-md text-label-md text-ink mb-xs">Metric Name</label>
+<input class="w-full px-md py-sm border border-hairline rounded-DEFAULT focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-md text-body-md bg-surface-soft" type="text" value="Clinical Trial Enrollment Rate"/>
+</div>
+<div class="col-span-1 md:col-span-2">
+<label class="block font-label-md text-label-md text-ink mb-xs">Description</label>
+<textarea class="w-full px-md py-sm border border-hairline rounded-DEFAULT focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-md text-body-md bg-surface-soft resize-none" rows="3">Percentage of targeted clinical trial enrollment slots filled within the designated timeframe across all active departmental trials.</textarea>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-ink mb-xs">Category</label>
+<select class="w-full px-md py-sm border border-hairline rounded-DEFAULT focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-md text-body-md bg-surface-soft appearance-none">
+<option>Research</option>
+<option>Clinical</option>
+<option>Academic</option>
+<option>Financial</option>
+</select>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-ink mb-xs">Status</label>
+<div class="flex gap-md h-[40px] items-center">
+<label class="flex items-center gap-sm cursor-pointer">
+<input checked="" class="text-primary-container focus:ring-primary-container border-hairline" name="status" type="radio"/>
+<span class="font-body-sm text-body-sm">Active</span>
+</label>
+<label class="flex items-center gap-sm cursor-pointer">
+<input class="text-primary-container focus:ring-primary-container border-hairline" name="status" type="radio"/>
+<span class="font-body-sm text-body-sm">Draft</span>
+</label>
+<label class="flex items-center gap-sm cursor-pointer">
+<input class="text-primary-container focus:ring-primary-container border-hairline" name="status" type="radio"/>
+<span class="font-body-sm text-body-sm">Archived</span>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Target Configuration & Data Source -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-lg">
+<!-- Target Config -->
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT p-lg relative">
+<div class="absolute top-0 right-0 w-[12px] h-[12px] bg-primary-container"></div>
+<h3 class="font-body-strong text-body-strong text-ink mb-md">Target Configuration</h3>
+<div class="space-y-md">
+<div>
+<label class="block font-label-md text-label-md text-ink mb-xs">Reporting Frequency</label>
+<select class="w-full px-md py-sm border border-hairline rounded-DEFAULT focus:border-primary-container outline-none font-body-sm text-body-sm bg-surface-soft">
+<option>Monthly</option>
+<option>Quarterly</option>
+<option>Annually</option>
+</select>
+</div>
+<div class="flex gap-md">
+<div class="flex-1">
+<label class="block font-label-md text-label-md text-ink mb-xs">Target Value</label>
+<div class="relative">
+<input class="w-full pl-md pr-[30px] py-sm border border-hairline rounded-DEFAULT focus:border-primary-container outline-none font-body-sm text-body-sm bg-surface-soft" type="number" value="85"/>
+<span class="absolute right-md top-1/2 -translate-y-1/2 text-secondary font-body-sm">%</span>
+</div>
+</div>
+<div class="flex-1">
+<label class="block font-label-md text-label-md text-ink mb-xs">Benchmark (Nat'l)</label>
+<div class="relative">
+<input class="w-full pl-md pr-[30px] py-sm border border-hairline rounded-DEFAULT focus:border-primary-container outline-none font-body-sm text-body-sm bg-surface-soft" type="number" value="78"/>
+<span class="absolute right-md top-1/2 -translate-y-1/2 text-secondary font-body-sm">%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Data Source -->
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT p-lg relative">
+<div class="absolute top-0 right-0 w-[12px] h-[12px] bg-primary-container"></div>
+<h3 class="font-body-strong text-body-strong text-ink mb-md">Data Source Integration</h3>
+<div class="space-y-md">
+<div>
+<label class="block font-label-md text-label-md text-ink mb-xs">Integration Type</label>
+<select class="w-full px-md py-sm border border-hairline rounded-DEFAULT focus:border-primary-container outline-none font-body-sm text-body-sm bg-surface-soft">
+<option>REST API Endpoint</option>
+<option>Manual Entry</option>
+<option>Epic EHR Export</option>
+</select>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-ink mb-xs">API Endpoint / Path</label>
+<input class="w-full px-md py-sm border border-hairline rounded-DEFAULT focus:border-primary-container outline-none font-body-sm text-body-sm bg-surface-soft font-mono text-[12px]" type="text" value="https://api.hsa.edu/v1/trials/enrollment"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Department Assignment -->
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT p-xl relative">
+<div class="absolute top-0 right-0 w-[12px] h-[12px] bg-primary-container"></div>
+<h2 class="font-heading-md text-heading-md text-ink mb-md border-b border-hairline pb-xs">Department Assignment</h2>
+<p class="font-body-sm text-body-sm text-secondary mb-lg">Select the departments responsible for reporting this metric.</p>
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-sm gap-x-xl">
+<!-- Multi-select Checklist -->
+<label class="flex items-center gap-md p-sm hover:bg-surface-soft rounded cursor-pointer border border-transparent hover:border-hairline transition-all">
+<input checked="" class="text-primary-container rounded-[2px] border-hairline focus:ring-primary-container" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-ink">Cardiology</span>
+</label>
+<label class="flex items-center gap-md p-sm hover:bg-surface-soft rounded cursor-pointer border border-transparent hover:border-hairline transition-all">
+<input checked="" class="text-primary-container rounded-[2px] border-hairline focus:ring-primary-container" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-ink">Neurology</span>
+</label>
+<label class="flex items-center gap-md p-sm hover:bg-surface-soft rounded cursor-pointer border border-transparent hover:border-hairline transition-all">
+<input class="text-primary-container rounded-[2px] border-hairline focus:ring-primary-container" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-ink">Pediatrics</span>
+</label>
+<label class="flex items-center gap-md p-sm hover:bg-surface-soft rounded cursor-pointer border border-transparent hover:border-hairline transition-all">
+<input checked="" class="text-primary-container rounded-[2px] border-hairline focus:ring-primary-container" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-ink">Oncology</span>
+</label>
+<label class="flex items-center gap-md p-sm hover:bg-surface-soft rounded cursor-pointer border border-transparent hover:border-hairline transition-all">
+<input class="text-primary-container rounded-[2px] border-hairline focus:ring-primary-container" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-ink">Orthopedics</span>
+</label>
+<label class="flex items-center gap-md p-sm hover:bg-surface-soft rounded cursor-pointer border border-transparent hover:border-hairline transition-all">
+<input class="text-primary-container rounded-[2px] border-hairline focus:ring-primary-container" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-ink">Radiology</span>
+</label>
+</div>
+</div>
+<!-- Action Bar -->
+<div class="flex justify-end gap-md pt-md mt-auto">
+<button class="border border-hairline text-ink hover:bg-surface-soft font-label-md text-label-md px-xl py-sm rounded-DEFAULT h-[44px] transition-colors">Discard Changes</button>
+<button class="bg-primary-container hover:bg-primary-dark text-on-primary font-label-md text-label-md px-xl py-sm rounded-DEFAULT h-[44px] transition-colors">Save Metric</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Footer -->
+<footer class="bg-ink dark:bg-ink text-on-primary dark:text-on-primary font-caption-sm text-caption-sm flex justify-between items-center px-xxl py-xl w-full border-t border-hairline-strong z-50">
+<div>
+<span class="font-label-md text-label-md text-primary mr-sm">Health Sciences Analytics</span>
+<span class="text-mute">© 2024 School of Health Sciences | Engineering-Grade Precision Interface</span>
+</div>
+<div class="flex gap-lg">
+<a class="text-mute hover:text-on-primary hover:underline transition-opacity duration-200" href="#">Data Privacy</a>
+<a class="text-mute hover:text-on-primary hover:underline transition-opacity duration-200" href="#">System Status</a>
+<a class="text-mute hover:text-on-primary hover:underline transition-opacity duration-200" href="#">Technical Documentation</a>
+</div>
+</footer>
+</body></html>

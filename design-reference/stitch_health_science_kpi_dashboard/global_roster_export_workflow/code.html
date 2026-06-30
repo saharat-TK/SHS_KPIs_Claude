@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Global Roster Export - Health Sciences Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-variant": "#e2e2e2",
+                      "on-tertiary-container": "#3b3d3d",
+                      "on-surface": "#1a1c1c",
+                      "primary-fixed": "#aff74e",
+                      "surface-container": "#eeeeee",
+                      "on-secondary-fixed": "#1b1b1b",
+                      "on-tertiary": "#ffffff",
+                      "outline-variant": "#c1cab1",
+                      "primary-dark": "#5a8d00",
+                      "on-tertiary-fixed-variant": "#454747",
+                      "surface-dim": "#dadada",
+                      "stone": "#898989",
+                      "outline": "#727a64",
+                      "link-blue": "#0046a4",
+                      "surface-soft": "#f7f7f7",
+                      "background": "#f9f9f9",
+                      "surface-tint": "#416900",
+                      "secondary-fixed": "#e2e2e2",
+                      "inverse-primary": "#94da32",
+                      "tertiary-fixed": "#e2e2e2",
+                      "surface-container-lowest": "#ffffff",
+                      "on-background": "#1a1c1c",
+                      "error": "#e52020",
+                      "primary-container": "#76b900",
+                      "error-container": "#ffdad6",
+                      "tertiary": "#5d5f5f",
+                      "surface": "#f9f9f9",
+                      "primary": "#416900",
+                      "secondary": "#5e5e5e",
+                      "inverse-on-surface": "#f0f1f1",
+                      "secondary-container": "#e2e2e2",
+                      "tertiary-fixed-dim": "#c6c6c7",
+                      "surface-bright": "#f9f9f9",
+                      "primary-fixed-dim": "#94da32",
+                      "hairline-strong": "#5e5e5e",
+                      "on-surface-variant": "#424936",
+                      "on-tertiary-fixed": "#1a1c1c",
+                      "secondary-fixed-dim": "#c6c6c6",
+                      "hairline": "#cccccc",
+                      "ink": "#000000",
+                      "surface-container-highest": "#e2e2e2",
+                      "mute": "#757575",
+                      "warning": "#df6500",
+                      "on-secondary-fixed-variant": "#474747",
+                      "success": "#3f8500",
+                      "on-primary": "#ffffff",
+                      "inverse-surface": "#2f3131",
+                      "on-secondary-container": "#646464",
+                      "tertiary-container": "#a6a7a7",
+                      "on-secondary": "#ffffff",
+                      "surface-container-high": "#e8e8e8",
+                      "on-error": "#ffffff",
+                      "on-primary-container": "#284400",
+                      "surface-container-low": "#f3f3f4",
+                      "on-primary-fixed-variant": "#304f00",
+                      "on-error-container": "#93000a",
+                      "on-primary-fixed": "#102000"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "lg": "16px",
+                      "base": "8px",
+                      "tiny": "2px",
+                      "md": "12px",
+                      "xs": "4px",
+                      "xxl": "32px",
+                      "xl": "24px",
+                      "sm": "8px",
+                      "section": "64px"
+              },
+              "fontFamily": {
+                      "display-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "heading-xl": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-strong": [
+                              "Hanken Grotesk"
+                      ],
+                      "heading-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "utility-xs": [
+                              "Hanken Grotesk"
+                      ],
+                      "heading-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "display-xl": [
+                              "Hanken Grotesk"
+                      ],
+                      "caption-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-md": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "display-lg": [
+                              "36px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "heading-xl": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-strong": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "heading-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "utility-xs": [
+                              "10px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "heading-lg": [
+                              "22px",
+                              {
+                                      "lineHeight": "1.75",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-xl": [
+                              "48px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "caption-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "15px",
+                              {
+                                      "lineHeight": "1.67",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.43",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Custom scrollbar for data tables */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f9f9f9; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cccccc; 
+            border-radius: 2px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #898989; 
+        }
+
+        /* Checkbox custom style */
+        .custom-checkbox {
+            appearance: none;
+            background-color: #fff;
+            margin: 0;
+            font: inherit;
+            color: currentColor;
+            width: 16px;
+            height: 16px;
+            border: 1px solid #cccccc;
+            border-radius: 2px;
+            display: grid;
+            place-content: center;
+        }
+
+        .custom-checkbox::before {
+            content: "";
+            width: 10px;
+            height: 10px;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em #76b900;
+            transform-origin: center;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+
+        .custom-checkbox:checked::before {
+            transform: scale(1);
+        }
+        
+        .custom-checkbox:checked {
+            border-color: #76b900;
+        }
+      </style>
+</head>
+<body class="bg-background text-on-surface antialiased flex flex-col min-h-screen font-body-md">
+<!-- TopNavBar -->
+<nav class="bg-ink dark:bg-ink text-primary dark:text-primary-container font-label-md text-label-md flex justify-between items-center px-xxl h-[64px] w-full z-50 border-b border-hairline-strong shadow-[0_0_5px_0_rgba(0,0,0,0.1)] transition-all duration-200 active:opacity-80 relative">
+<div class="flex items-center gap-xl">
+<span class="font-heading-md text-heading-md text-on-primary tracking-tight">Health Sciences Analytics</span>
+<div class="hidden md:flex gap-lg items-center ml-xl">
+<a class="text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-md py-sm rounded-DEFAULT" href="#">Dashboard</a>
+<a class="text-primary-container border-b-2 border-primary-container pb-1 px-md py-sm hover:bg-surface-container-highest/10 transition-colors" href="#">Departments</a>
+<a class="text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-md py-sm rounded-DEFAULT" href="#">Reports</a>
+<a class="text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-md py-sm rounded-DEFAULT" href="#">Administration</a>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<div class="relative hidden md:block">
+<span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-mute text-[20px]">search</span>
+<input class="bg-surface-variant/10 border-hairline-strong text-on-primary placeholder:text-mute rounded-DEFAULT pl-xl pr-md py-sm w-[200px] focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all text-body-sm h-[32px]" placeholder="Search data..." type="text"/>
+</div>
+<button aria-label="Notifications" class="p-sm text-on-primary hover:text-primary-container transition-colors rounded-DEFAULT hover:bg-surface-container-highest/10">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<button aria-label="Settings" class="p-sm text-on-primary hover:text-primary-container transition-colors rounded-DEFAULT hover:bg-surface-container-highest/10">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden ml-sm border border-hairline-strong shrink-0">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional headshot of a female doctor or healthcare administrator in a clinical setting. Crisp white lighting, sharp focus, modern healthcare environment context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDq2HYgWTh2Qf8GfUdggxWNi3f5-GJcOHSqGrcYiSMFLIu95t6hNhPZavRRiMCyV_UFwrJEShDoM5ybJPqLU9Je7u9VHi_vz4AMm7As6kvNTHUukxela1Ji4Xdy6A82iD7Dp23wnZzXBW2Pve7DG2NSif3g_C63NWxTVP17uBu1lUtqJWtcvwEuqi9RleRlcA-SRfWnoHZ48tFScWHKF3kRThos7udw8ie1Qg1Eot3oEcMHcly9BrVgFLjxVO4IlV1wCBPlmu6p7A"/>
+</div>
+</div>
+</nav>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="bg-ink dark:bg-ink text-primary-container dark:text-primary-container font-label-md text-label-md flex flex-col h-screen p-md space-y-base w-[280px] border-r border-hairline-strong transition-all duration-200 shrink-0 hidden md:flex">
+<div class="flex items-center gap-md mb-xl p-sm">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-soft overflow-hidden flex items-center justify-center shrink-0 border border-hairline">
+<span class="material-symbols-outlined text-ink text-[24px]" data-weight="fill">school</span>
+</div>
+<div class="flex flex-col">
+<span class="font-heading-md text-heading-md text-on-primary leading-tight">Health Sciences</span>
+<span class="text-caption-sm font-caption-sm text-mute">KPI Monitor v2.1</span>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-xs">
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 rounded-DEFAULT transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 rounded-DEFAULT transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">insights</span>
+<span>Performance</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 rounded-DEFAULT transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">trending_up</span>
+<span>Forecasting</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm bg-primary text-on-primary rounded-lg transition-all duration-200 shadow-sm border border-surface-tint" href="#">
+<span class="material-symbols-outlined text-[20px]">groups</span>
+<span>Faculty Data</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 rounded-DEFAULT transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">history</span>
+<span>Audit Log</span>
+</a>
+</nav>
+<div class="mt-auto pt-lg border-t border-hairline-strong flex flex-col gap-xs">
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 rounded-DEFAULT transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-on-primary hover:bg-surface-container-highest/20 rounded-DEFAULT transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+<span>Sign Out</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area (Background) -->
+<main class="flex-1 overflow-y-auto bg-surface-soft relative flex flex-col">
+<!-- Page Header -->
+<div class="px-xxl py-xl border-b border-hairline bg-surface-container-lowest">
+<div class="flex justify-between items-end max-w-7xl mx-auto w-full">
+<div>
+<h1 class="font-display-lg text-display-lg text-ink tracking-tight">Faculty Roster</h1>
+<p class="font-body-md text-body-md text-mute mt-xs">Active faculty and performance standing across all departments.</p>
+</div>
+<div class="flex gap-md">
+<button class="h-[44px] px-lg border border-hairline bg-surface-container-lowest text-ink font-label-md text-label-md rounded-DEFAULT hover:bg-surface-soft transition-colors flex items-center gap-sm">
+<span class="material-symbols-outlined text-[18px]">filter_list</span>
+                            Filter
+                        </button>
+<button class="h-[44px] px-lg bg-primary-container text-on-primary font-label-md text-label-md rounded-DEFAULT hover:bg-primary-dark transition-colors flex items-center gap-sm shadow-sm">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                            Export Roster
+                        </button>
+</div>
+</div>
+</div>
+<!-- Canvas Content (Mocked Faculty Data) -->
+<div class="p-xxl flex-1 max-w-7xl mx-auto w-full">
+<!-- Summary Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-xl mb-xl">
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT p-lg relative overflow-hidden">
+<div class="absolute top-0 right-0 w-[12px] h-[12px] bg-primary-container"></div>
+<h3 class="font-heading-md text-heading-md text-ink">Total Faculty</h3>
+<div class="mt-md flex items-end justify-between">
+<span class="font-display-lg text-display-lg text-ink">1,428</span>
+<span class="font-body-sm text-body-sm text-success flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">arrow_upward</span>
+                                +2.4% YTD
+                            </span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT p-lg relative overflow-hidden">
+<div class="absolute top-0 right-0 w-[12px] h-[12px] bg-primary-container"></div>
+<h3 class="font-heading-md text-heading-md text-ink">Tenured Ratio</h3>
+<div class="mt-md flex items-end justify-between">
+<span class="font-display-lg text-display-lg text-ink">68%</span>
+<span class="font-body-sm text-body-sm text-mute">Target: 65%</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT p-lg relative overflow-hidden">
+<div class="absolute top-0 right-0 w-[12px] h-[12px] bg-primary-container"></div>
+<h3 class="font-heading-md text-heading-md text-ink">Avg Performance Score</h3>
+<div class="mt-md flex items-end justify-between">
+<span class="font-display-lg text-display-lg text-ink">4.2/5</span>
+<span class="font-body-sm text-body-sm text-success flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+                                Top Quartile
+                            </span>
+</div>
+</div>
+</div>
+<!-- Data Table Container -->
+<div class="bg-surface-container-lowest border border-hairline rounded-DEFAULT overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-ink border-b border-hairline-strong">
+<th class="py-md px-lg font-label-md text-label-md text-on-primary">Name / ID</th>
+<th class="py-md px-lg font-label-md text-label-md text-on-primary">Department</th>
+<th class="py-md px-lg font-label-md text-label-md text-on-primary">Status</th>
+<th class="py-md px-lg font-label-md text-label-md text-on-primary">Tenure</th>
+<th class="py-md px-lg font-label-md text-label-md text-on-primary text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm">
+<tr class="border-b border-hairline hover:bg-surface-soft transition-colors">
+<td class="py-md px-lg">
+<div class="font-body-strong">Dr. Sarah Jenkins</div>
+<div class="text-caption-sm text-mute">ID: HS-8842</div>
+</td>
+<td class="py-md px-lg text-ink">Neurology</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center px-sm py-tiny rounded-DEFAULT bg-surface-variant text-ink font-utility-xs uppercase tracking-wider">Active</span>
+</td>
+<td class="py-md px-lg text-ink">Tenured</td>
+<td class="py-md px-lg text-right">
+<button class="text-mute hover:text-ink transition-colors"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<tr class="border-b border-hairline bg-surface-soft hover:bg-surface-variant/30 transition-colors">
+<td class="py-md px-lg">
+<div class="font-body-strong">Dr. Marcus Chen</div>
+<div class="text-caption-sm text-mute">ID: HS-9102</div>
+</td>
+<td class="py-md px-lg text-ink">Cardiology</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center px-sm py-tiny rounded-DEFAULT bg-surface-variant text-ink font-utility-xs uppercase tracking-wider">Active</span>
+</td>
+<td class="py-md px-lg text-ink">Track</td>
+<td class="py-md px-lg text-right">
+<button class="text-mute hover:text-ink transition-colors"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<tr class="border-b border-hairline hover:bg-surface-soft transition-colors">
+<td class="py-md px-lg">
+<div class="font-body-strong">Dr. Elena Rostova</div>
+<div class="text-caption-sm text-mute">ID: HS-7731</div>
+</td>
+<td class="py-md px-lg text-ink">Pediatrics</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center px-sm py-tiny rounded-DEFAULT bg-surface-variant text-ink font-utility-xs uppercase tracking-wider">Active</span>
+</td>
+<td class="py-md px-lg text-ink">Tenured</td>
+<td class="py-md px-lg text-right">
+<button class="text-mute hover:text-ink transition-colors"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<tr class="border-b border-hairline bg-surface-soft hover:bg-surface-variant/30 transition-colors">
+<td class="py-md px-lg">
+<div class="font-body-strong">Dr. James Wilson</div>
+<div class="text-caption-sm text-mute">ID: HS-6522</div>
+</td>
+<td class="py-md px-lg text-ink">Oncology</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center px-sm py-tiny rounded-DEFAULT bg-error-container text-on-error-container font-utility-xs uppercase tracking-wider">Sabbatical</span>
+</td>
+<td class="py-md px-lg text-ink">Tenured</td>
+<td class="py-md px-lg text-right">
+<button class="text-mute hover:text-ink transition-colors"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="bg-ink dark:bg-ink text-on-primary dark:text-on-primary font-caption-sm text-caption-sm flex justify-between items-center px-xxl py-xl w-full border-t border-hairline-strong transition-opacity duration-200 mt-auto">
+<div>
+<span class="font-label-md text-label-md text-primary block mb-xs">Health Sciences Analytics</span>
+<span class="text-mute">© 2024 School of Health Sciences | Engineering-Grade Precision Interface</span>
+</div>
+<div class="flex gap-lg">
+<a class="text-mute hover:text-on-primary hover:underline transition-colors" href="#">Data Privacy</a>
+<a class="text-mute hover:text-on-primary hover:underline transition-colors" href="#">System Status</a>
+<a class="text-mute hover:text-on-primary hover:underline transition-colors" href="#">Technical Documentation</a>
+</div>
+</footer>
+<!-- MODAL OVERLAY: Global Roster Export -->
+<!-- Background overlay dimmed -->
+<div class="absolute inset-0 bg-ink/60 z-50 flex items-center justify-center p-md backdrop-blur-[2px]">
+<!-- Modal Container -->
+<div class="bg-surface-container-lowest w-full max-w-2xl border border-hairline shadow-xl rounded-DEFAULT flex flex-col relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+<!-- Decorative Corner Square -->
+<div class="absolute top-0 left-0 w-[16px] h-[16px] bg-primary-container z-10"></div>
+<!-- Modal Header -->
+<div class="px-xl py-lg border-b border-hairline bg-surface-soft flex justify-between items-center pl-xxl">
+<div>
+<h2 class="font-heading-xl text-heading-xl text-ink tracking-tight">Global Roster Export</h2>
+<p class="font-body-sm text-body-sm text-mute mt-xs">Configure data parameters for high-fidelity extraction.</p>
+</div>
+<button aria-label="Close modal" class="text-mute hover:text-ink transition-colors p-sm">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Modal Body -->
+<div class="p-xl flex flex-col gap-xl">
+<!-- File Format Selection -->
+<div class="flex flex-col gap-sm">
+<label class="font-label-md text-label-md text-ink uppercase tracking-wider text-caption-sm">1. File Format</label>
+<div class="flex border border-hairline rounded-DEFAULT overflow-hidden bg-surface-soft p-xs gap-xs">
+<label class="flex-1 text-center cursor-pointer relative">
+<input checked="" class="peer sr-only" name="format" type="radio" value="csv"/>
+<div class="py-sm px-md rounded-DEFAULT font-label-md text-label-md text-mute peer-checked:bg-surface-container-lowest peer-checked:text-ink peer-checked:shadow-sm transition-all border border-transparent peer-checked:border-hairline">
+                                        CSV Data
+                                    </div>
+</label>
+<label class="flex-1 text-center cursor-pointer relative">
+<input class="peer sr-only" name="format" type="radio" value="excel"/>
+<div class="py-sm px-md rounded-DEFAULT font-label-md text-label-md text-mute peer-checked:bg-surface-container-lowest peer-checked:text-ink peer-checked:shadow-sm transition-all border border-transparent peer-checked:border-hairline">
+                                        Excel Sheet
+                                    </div>
+</label>
+<label class="flex-1 text-center cursor-pointer relative">
+<input class="peer sr-only" name="format" type="radio" value="pdf"/>
+<div class="py-sm px-md rounded-DEFAULT font-label-md text-label-md text-mute peer-checked:bg-surface-container-lowest peer-checked:text-ink peer-checked:shadow-sm transition-all border border-transparent peer-checked:border-hairline">
+                                        PDF Report
+                                    </div>
+</label>
+</div>
+</div>
+<!-- Data Selection -->
+<div class="flex flex-col gap-sm">
+<label class="font-label-md text-label-md text-ink uppercase tracking-wider text-caption-sm flex justify-between">
+<span>2. Data Selection</span>
+<button class="text-link-blue hover:underline font-body-sm text-caption-sm normal-case tracking-normal">Select All</button>
+</label>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md border border-hairline p-md rounded-DEFAULT bg-surface-container-lowest">
+<label class="flex items-start gap-md cursor-pointer group p-sm hover:bg-surface-soft rounded-DEFAULT transition-colors">
+<input checked="" class="custom-checkbox mt-xs" type="checkbox"/>
+<div class="flex flex-col">
+<span class="font-body-strong text-body-strong text-ink group-hover:text-primary-dark transition-colors">Faculty Identifiers</span>
+<span class="font-body-sm text-caption-sm text-mute">Names, IDs, Contact Info</span>
+</div>
+</label>
+<label class="flex items-start gap-md cursor-pointer group p-sm hover:bg-surface-soft rounded-DEFAULT transition-colors">
+<input checked="" class="custom-checkbox mt-xs" type="checkbox"/>
+<div class="flex flex-col">
+<span class="font-body-strong text-body-strong text-ink group-hover:text-primary-dark transition-colors">Departmental Data</span>
+<span class="font-body-sm text-caption-sm text-mute">Assignments, Roles, Locations</span>
+</div>
+</label>
+<label class="flex items-start gap-md cursor-pointer group p-sm hover:bg-surface-soft rounded-DEFAULT transition-colors">
+<input class="custom-checkbox mt-xs" type="checkbox"/>
+<div class="flex flex-col">
+<span class="font-body-strong text-body-strong text-ink group-hover:text-primary-dark transition-colors">Performance Metrics</span>
+<span class="font-body-sm text-caption-sm text-mute">Scores, Evaluations, Trends</span>
+</div>
+</label>
+<label class="flex items-start gap-md cursor-pointer group p-sm hover:bg-surface-soft rounded-DEFAULT transition-colors">
+<input checked="" class="custom-checkbox mt-xs" type="checkbox"/>
+<div class="flex flex-col">
+<span class="font-body-strong text-body-strong text-ink group-hover:text-primary-dark transition-colors">Tenure Info</span>
+<span class="font-body-sm text-caption-sm text-mute">Status, Track timeline, Dates</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Date Range Picker -->
+<div class="flex flex-col gap-sm">
+<label class="font-label-md text-label-md text-ink uppercase tracking-wider text-caption-sm">3. Date Range Limit</label>
+<div class="flex items-center gap-md">
+<div class="flex-1 relative">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-mute text-[18px]">calendar_today</span>
+<input class="w-full pl-xl pr-md py-sm border border-hairline rounded-DEFAULT text-body-md font-body-md text-ink bg-surface-container-lowest focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all" type="text" value="Jan 01, 2023"/>
+</div>
+<span class="text-mute font-body-md">—</span>
+<div class="flex-1 relative">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-mute text-[18px]">calendar_today</span>
+<input class="w-full pl-xl pr-md py-sm border border-hairline rounded-DEFAULT text-body-md font-body-md text-ink bg-surface-container-lowest focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all" type="text" value="Present"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="px-xl py-lg border-t border-hairline bg-surface-soft flex justify-end gap-md">
+<button class="h-[44px] px-xl border border-hairline text-ink font-label-md text-label-md rounded-DEFAULT hover:bg-surface-variant transition-colors bg-surface-container-lowest">
+                            Cancel
+                        </button>
+<button class="h-[44px] px-xl bg-[#76b900] text-on-primary font-label-md text-label-md rounded-DEFAULT hover:bg-primary-dark transition-colors flex items-center gap-sm">
+<span class="material-symbols-outlined text-[18px]">bolt</span>
+                            Generate Export
+                        </button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

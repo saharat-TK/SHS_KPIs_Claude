@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Health Sciences Analytics - Student Success Deep-Dive</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f3f3f4",
+                        "mute": "#757575",
+                        "primary": "#416900",
+                        "on-primary": "#ffffff",
+                        "on-primary-container": "#284400",
+                        "surface-container": "#eeeeee",
+                        "surface": "#f9f9f9",
+                        "on-surface-variant": "#424936",
+                        "primary-container": "#76b900",
+                        "inverse-surface": "#2f3131",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#304f00",
+                        "on-background": "#1a1c1c",
+                        "hairline": "#cccccc",
+                        "surface-variant": "#e2e2e2",
+                        "stone": "#898989",
+                        "on-primary-fixed": "#102000",
+                        "surface-container-high": "#e8e8e8",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "outline": "#727a64",
+                        "tertiary": "#5d5f5f",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-container": "#3b3d3d",
+                        "inverse-primary": "#94da32",
+                        "tertiary-container": "#a6a7a7",
+                        "ink": "#000000",
+                        "on-error": "#ffffff",
+                        "primary-dark": "#5a8d00",
+                        "secondary-container": "#e2e2e2",
+                        "on-error-container": "#93000a",
+                        "success": "#3f8500",
+                        "tertiary-fixed": "#e2e2e2",
+                        "hairline-strong": "#5e5e5e",
+                        "surface-tint": "#416900",
+                        "inverse-on-surface": "#f0f1f1",
+                        "secondary": "#5e5e5e",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "surface-soft": "#f7f7f7",
+                        "on-secondary-fixed": "#1b1b1b",
+                        "secondary-fixed": "#e2e2e2",
+                        "on-secondary-fixed-variant": "#474747",
+                        "surface-dim": "#dadada",
+                        "primary-fixed": "#aff74e",
+                        "link-blue": "#0046a4",
+                        "secondary-fixed-dim": "#c6c6c6",
+                        "on-surface": "#1a1c1c",
+                        "primary-fixed-dim": "#94da32",
+                        "error": "#e52020",
+                        "warning": "#df6500",
+                        "outline-variant": "#c1cab1",
+                        "surface-container-highest": "#e2e2e2",
+                        "surface-bright": "#f9f9f9",
+                        "on-secondary-container": "#646464",
+                        "background": "#f9f9f9"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "8px",
+                        "xs": "4px",
+                        "md": "12px",
+                        "xl": "24px",
+                        "xxl": "32px",
+                        "lg": "16px",
+                        "sm": "8px",
+                        "section": "64px",
+                        "tiny": "2px"
+                    },
+                    "fontFamily": {
+                        "utility-xs": ["Hanken Grotesk"],
+                        "label-md": ["Hanken Grotesk"],
+                        "heading-xl": ["Hanken Grotesk"],
+                        "heading-md": ["Hanken Grotesk"],
+                        "display-xl": ["Hanken Grotesk"],
+                        "body-strong": ["Hanken Grotesk"],
+                        "caption-sm": ["Hanken Grotesk"],
+                        "body-sm": ["Hanken Grotesk"],
+                        "heading-lg": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "utility-xs": ["10px", { "lineHeight": "1.5", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.43", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "heading-xl": ["24px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "heading-md": ["20px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "display-xl": ["48px", { "lineHeight": "1.25", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-strong": ["16px", { "lineHeight": "1.5", "fontWeight": "700" }],
+                        "caption-sm": ["12px", { "lineHeight": "1.25", "fontWeight": "400" }],
+                        "body-sm": ["15px", { "lineHeight": "1.67", "fontWeight": "400" }],
+                        "heading-lg": ["22px", { "lineHeight": "1.75", "fontWeight": "400" }],
+                        "display-lg": ["36px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; background-color: #ffffff; color: #1a1c1c; }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface min-h-screen flex flex-col font-body-md">
+<!-- TopNavBar -->
+<header class="bg-ink dark:bg-ink flex justify-between items-center px-xxl h-[64px] w-full z-50 docked full-width top-0 border-b border-hairline-strong shadow-[0_0_5px_0_rgba(0,0,0,0.1)] transition-all duration-200">
+<div class="flex items-center space-x-xl">
+<h1 class="font-heading-md text-heading-md text-on-primary">Health Sciences Analytics</h1>
+<nav class="hidden md:flex space-x-lg font-label-md text-label-md">
+<a class="text-primary-container border-b-2 border-primary-container pb-1 transition-all duration-200 active:opacity-80" href="#">Dashboard</a>
+<a class="text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-sm py-xs rounded-sm transition-all duration-200 active:opacity-80" href="#">Departments</a>
+<a class="text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-sm py-xs rounded-sm transition-all duration-200 active:opacity-80" href="#">Reports</a>
+<a class="text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-sm py-xs rounded-sm transition-all duration-200 active:opacity-80" href="#">Administration</a>
+</nav>
+</div>
+<div class="flex items-center space-x-md">
+<div class="relative">
+<input class="bg-inverse-surface border-hairline-strong border-b text-on-primary placeholder-mute px-sm py-xs w-48 focus:outline-none focus:border-primary-container focus:bg-ink transition-colors font-body-sm text-body-sm" placeholder="Search..." type="text"/>
+<span class="material-symbols-outlined absolute right-sm top-1/2 transform -translate-y-1/2 text-mute pointer-events-none text-sm">search</span>
+</div>
+<button aria-label="notifications" class="text-on-primary hover:text-primary-container transition-colors p-xs">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
+</button>
+<button aria-label="settings" class="text-on-primary hover:text-primary-container transition-colors p-xs">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+</button>
+<div class="w-8 h-8 rounded bg-surface-variant overflow-hidden border border-hairline-strong">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional headshot of a female healthcare administrator in her 40s, wearing glasses and a dark blazer. The lighting is bright and even, set against a neutral gray background. The image evokes a sense of competence, authority, and meticulous attention to detail suitable for a high-level analytics dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuANft_z-Ol85ihLR8pIy8FHa_tCb43ED9S-yWvqGg5W0ELGHzD-Fb0MEsxEWmMu5nG67klvMRdd9ulywk0Kv-_6EH8LTLMBtNjFfN_y-N6HrsvPWEohlQs0_jNaAkVtgSQgTPQjvecuXE8Zr-sP-DDd0K0uzUeIkMaaMiI1tWU4sIrlRx3g94TWpgNASi3FLJUeGTpSn8kjyQhYigQ7mU3GKZrZcz83cHyo55sRmuR72JdEox0Gi_HKA6dzMv4zX5HLNX-hIzHz-g"/>
+</div>
+</div>
+</header>
+<div class="flex-1 flex flex-col px-xxl py-xl max-w-7xl mx-auto w-full">
+<!-- Breadcrumb & Sub-nav -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-xl border-b border-hairline pb-md">
+<div class="font-body-sm text-body-sm text-mute flex items-center space-x-xs mb-sm md:mb-0">
+<span class="hover:text-on-surface cursor-pointer transition-colors">KPI Monitor</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface font-body-strong text-body-strong">Student Success Deep-Dive</span>
+</div>
+<div class="flex space-x-sm">
+<button class="px-md py-xs border border-hairline rounded font-utility-xs text-utility-xs text-on-surface hover:bg-surface-soft transition-colors">Q1 2024</button>
+<button class="px-md py-xs border border-hairline rounded font-utility-xs text-utility-xs text-on-surface hover:bg-surface-soft transition-colors">Q2 2024</button>
+<button class="px-md py-xs border border-hairline rounded font-utility-xs text-utility-xs text-on-surface hover:bg-surface-soft transition-colors">Q3 2024</button>
+<button class="px-md py-xs border-b-2 border-primary-container border-x border-t border-hairline rounded font-utility-xs text-utility-xs text-primary-container bg-surface-soft transition-colors">Q4 2024 (Active)</button>
+</div>
+</div>
+<!-- Hero Summary Card -->
+<section class="mb-section bg-surface-container-lowest border border-hairline rounded lg:p-xl p-lg relative overflow-hidden flex flex-col md:flex-row items-center justify-between">
+<div class="absolute top-0 right-0 w-3 h-3 bg-primary-container"></div>
+<div class="w-full md:w-1/3 mb-lg md:mb-0 border-b md:border-b-0 md:border-r border-hairline pb-lg md:pb-0 pr-0 md:pr-xl">
+<h2 class="font-heading-lg text-heading-lg mb-sm">Overall Student Success</h2>
+<div class="font-display-xl text-display-xl flex items-baseline space-x-sm">
+<span>84.2%</span>
+<span class="font-body-strong text-body-strong text-success flex items-center">
+<span class="material-symbols-outlined text-md">arrow_upward</span> 2.4%
+                    </span>
+</div>
+<p class="font-body-sm text-body-sm text-mute mt-xs">Aggregate across all departments for active quarter.</p>
+</div>
+<div class="w-full md:w-2/3 pl-0 md:pl-xl flex flex-col justify-center h-32 relative">
+<div class="w-full h-full flex items-end space-x-sm">
+<!-- Placeholder for Sparkline Trend -->
+<div class="w-1/12 h-[40%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[45%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[42%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[50%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[48%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[60%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[65%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[62%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[70%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[75%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[80%] bg-surface-variant border border-hairline"></div>
+<div class="w-1/12 h-[100%] bg-primary-container border border-primary-dark"></div>
+</div>
+<div class="absolute bottom-0 left-0 w-full flex justify-between font-utility-xs text-utility-xs text-mute mt-xs">
+<span>Jan</span>
+<span>Dec</span>
+</div>
+</div>
+</section>
+<!-- Departmental Grid -->
+<section class="mb-section">
+<h3 class="font-heading-md text-heading-md mb-lg border-b border-hairline pb-xs">Departmental Breakdown</h3>
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-md">
+<!-- Generating some sample cards to represent the 17 requested -->
+<div class="bg-surface-container-lowest border border-hairline rounded p-md hover:bg-surface-soft transition-colors cursor-pointer relative">
+<div class="absolute top-0 right-0 w-1.5 h-1.5 bg-primary-container"></div>
+<h4 class="font-body-strong text-body-strong truncate mb-xs">Nursing</h4>
+<div class="font-heading-md text-heading-md mb-sm">88.5%</div>
+<div class="w-full h-1 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary-container w-[88.5%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-hairline rounded p-md hover:bg-surface-soft transition-colors cursor-pointer relative">
+<h4 class="font-body-strong text-body-strong truncate mb-xs">Pharmacy</h4>
+<div class="font-heading-md text-heading-md mb-sm">91.2%</div>
+<div class="w-full h-1 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary-container w-[91.2%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-hairline rounded p-md hover:bg-surface-soft transition-colors cursor-pointer relative">
+<h4 class="font-body-strong text-body-strong truncate mb-xs">Public Health</h4>
+<div class="font-heading-md text-heading-md mb-sm">79.4%</div>
+<div class="w-full h-1 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-warning w-[79.4%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-hairline rounded p-md hover:bg-surface-soft transition-colors cursor-pointer relative">
+<h4 class="font-body-strong text-body-strong truncate mb-xs">Biomedical Sci</h4>
+<div class="font-heading-md text-heading-md mb-sm">82.1%</div>
+<div class="w-full h-1 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary-container w-[82.1%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-hairline rounded p-md hover:bg-surface-soft transition-colors cursor-pointer relative">
+<h4 class="font-body-strong text-body-strong truncate mb-xs">Phys. Therapy</h4>
+<div class="font-heading-md text-heading-md mb-sm">94.0%</div>
+<div class="w-full h-1 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary-container w-[94.0%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-hairline rounded p-md hover:bg-surface-soft transition-colors cursor-pointer relative">
+<div class="absolute top-0 right-0 w-1.5 h-1.5 bg-error"></div>
+<h4 class="font-body-strong text-body-strong truncate mb-xs">Occ. Therapy</h4>
+<div class="font-heading-md text-heading-md mb-sm">71.5%</div>
+<div class="w-full h-1 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-error w-[71.5%]"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Sub-KPI Breakdown Table -->
+<section class="mb-section">
+<h3 class="font-heading-md text-heading-md mb-lg border-b border-hairline pb-xs">Sub-KPI Technical Breakdown</h3>
+<div class="overflow-x-auto border border-hairline rounded">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-ink text-on-primary font-label-md text-label-md">
+<th class="p-sm border-b border-hairline-strong">Department</th>
+<th class="p-sm border-b border-hairline-strong">Graduation Rate</th>
+<th class="p-sm border-b border-hairline-strong">Licensure Pass Rate</th>
+<th class="p-sm border-b border-hairline-strong">Post-Grad Emp.</th>
+<th class="p-sm border-b border-hairline-strong text-right">Trend</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm">
+<tr class="bg-surface-container-lowest hover:bg-surface-soft transition-colors border-b border-hairline">
+<td class="p-sm font-body-strong">Nursing</td>
+<td class="p-sm">92%</td>
+<td class="p-sm flex items-center space-x-xs"><span>98%</span><span class="material-symbols-outlined text-success text-sm">arrow_upward</span></td>
+<td class="p-sm">95%</td>
+<td class="p-sm text-right"><span class="inline-block w-16 h-4 bg-surface-variant border border-hairline"><span class="block h-full bg-primary-container w-11/12"></span></span></td>
+</tr>
+<tr class="bg-surface-soft hover:bg-surface-variant transition-colors border-b border-hairline">
+<td class="p-sm font-body-strong">Pharmacy</td>
+<td class="p-sm">89%</td>
+<td class="p-sm flex items-center space-x-xs"><span>95%</span><span class="material-symbols-outlined text-success text-sm">arrow_upward</span></td>
+<td class="p-sm">98%</td>
+<td class="p-sm text-right"><span class="inline-block w-16 h-4 bg-surface-variant border border-hairline"><span class="block h-full bg-primary-container w-full"></span></span></td>
+</tr>
+<tr class="bg-surface-container-lowest hover:bg-surface-soft transition-colors border-b border-hairline">
+<td class="p-sm font-body-strong">Public Health</td>
+<td class="p-sm flex items-center space-x-xs"><span>81%</span><span class="material-symbols-outlined text-warning text-sm">arrow_downward</span></td>
+<td class="p-sm">85%</td>
+<td class="p-sm">78%</td>
+<td class="p-sm text-right"><span class="inline-block w-16 h-4 bg-surface-variant border border-hairline"><span class="block h-full bg-warning w-8/12"></span></span></td>
+</tr>
+<tr class="bg-surface-soft hover:bg-surface-variant transition-colors border-b border-hairline">
+<td class="p-sm font-body-strong">Biomedical Sci</td>
+<td class="p-sm">85%</td>
+<td class="p-sm">N/A</td>
+<td class="p-sm flex items-center space-x-xs"><span>88%</span><span class="material-symbols-outlined text-success text-sm">arrow_upward</span></td>
+<td class="p-sm text-right"><span class="inline-block w-16 h-4 bg-surface-variant border border-hairline"><span class="block h-full bg-primary-container w-9/12"></span></span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="mt-md flex justify-end">
+<button class="bg-primary-container hover:bg-primary-dark text-on-primary font-label-md text-label-md px-lg py-sm rounded-sm transition-colors border border-transparent active:border-ink">Export Data CSV</button>
+</div>
+</section>
+</div>
+<!-- Footer -->
+<footer class="bg-ink dark:bg-ink text-on-primary font-caption-sm text-caption-sm flex justify-between items-center px-xxl py-xl w-full docked full-width bottom-0 border-t border-hairline-strong mt-auto transition-opacity duration-200">
+<div>© 2024 School of Health Sciences | Engineering-Grade Precision Interface</div>
+<div class="flex space-x-lg">
+<a class="text-mute hover:text-on-primary hover:underline transition-colors" href="#">Data Privacy</a>
+<a class="text-mute hover:text-on-primary hover:underline transition-colors" href="#">System Status</a>
+<a class="text-mute hover:text-on-primary hover:underline transition-colors" href="#">Technical Documentation</a>
+</div>
+</footer>
+</body></html>

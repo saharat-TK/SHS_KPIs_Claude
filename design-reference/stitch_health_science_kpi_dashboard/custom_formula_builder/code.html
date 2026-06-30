@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Custom Formula Builder - Health Sciences Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-container": "#646464",
+                      "surface-bright": "#f9f9f9",
+                      "on-surface-variant": "#424936",
+                      "inverse-surface": "#2f3131",
+                      "hairline-strong": "#5e5e5e",
+                      "background": "#f9f9f9",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "surface-container-lowest": "#ffffff",
+                      "on-error": "#ffffff",
+                      "error": "#e52020",
+                      "surface-container-low": "#f3f3f4",
+                      "outline": "#727a64",
+                      "on-tertiary-fixed": "#1a1c1c",
+                      "secondary-container": "#e2e2e2",
+                      "secondary-fixed": "#e2e2e2",
+                      "inverse-primary": "#94da32",
+                      "on-primary-container": "#284400",
+                      "link-blue": "#0046a4",
+                      "error-container": "#ffdad6",
+                      "surface-container-high": "#e8e8e8",
+                      "on-error-container": "#93000a",
+                      "on-primary-fixed-variant": "#304f00",
+                      "warning": "#df6500",
+                      "surface-tint": "#416900",
+                      "stone": "#898989",
+                      "success": "#3f8500",
+                      "on-surface": "#1a1c1c",
+                      "tertiary": "#5d5f5f",
+                      "tertiary-fixed": "#e2e2e2",
+                      "primary-fixed": "#aff74e",
+                      "primary-fixed-dim": "#94da32",
+                      "primary-container": "#76b900",
+                      "primary": "#416900",
+                      "inverse-on-surface": "#f0f1f1",
+                      "on-primary-fixed": "#102000",
+                      "surface-soft": "#f7f7f7",
+                      "surface-container": "#eeeeee",
+                      "mute": "#757575",
+                      "secondary-fixed-dim": "#c6c6c6",
+                      "surface-dim": "#dadada",
+                      "hairline": "#cccccc",
+                      "surface-container-highest": "#e2e2e2",
+                      "tertiary-container": "#a6a7a7",
+                      "on-secondary-fixed": "#1b1b1b",
+                      "ink": "#000000",
+                      "on-tertiary-container": "#3b3d3d",
+                      "tertiary-fixed-dim": "#c6c6c7",
+                      "surface-variant": "#e2e2e2",
+                      "on-secondary-fixed-variant": "#474747",
+                      "secondary": "#5e5e5e",
+                      "primary-dark": "#5a8d00",
+                      "on-tertiary-fixed-variant": "#454747",
+                      "outline-variant": "#c1cab1",
+                      "on-background": "#1a1c1c",
+                      "surface": "#f9f9f9",
+                      "on-primary": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "xl": "24px",
+                      "lg": "16px",
+                      "xxl": "32px",
+                      "md": "12px",
+                      "tiny": "2px",
+                      "section": "64px",
+                      "xs": "4px",
+                      "sm": "8px",
+                      "base": "8px"
+              },
+              "fontFamily": {
+                      "body-md": ["Hanken Grotesk"],
+                      "body-sm": ["Hanken Grotesk"],
+                      "utility-xs": ["Hanken Grotesk"],
+                      "caption-sm": ["Hanken Grotesk"],
+                      "body-strong": ["Hanken Grotesk"],
+                      "label-md": ["Hanken Grotesk"],
+                      "heading-md": ["Hanken Grotesk"],
+                      "heading-xl": ["Hanken Grotesk"],
+                      "display-xl": ["Hanken Grotesk"],
+                      "heading-lg": ["Hanken Grotesk"],
+                      "display-lg": ["Hanken Grotesk"]
+              },
+              "fontSize": {
+                      "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "body-sm": ["15px", {"lineHeight": "1.67", "fontWeight": "400"}],
+                      "utility-xs": ["10px", {"lineHeight": "1.5", "fontWeight": "700"}],
+                      "caption-sm": ["12px", {"lineHeight": "1.25", "fontWeight": "400"}],
+                      "body-strong": ["16px", {"lineHeight": "1.5", "fontWeight": "700"}],
+                      "label-md": ["14px", {"lineHeight": "1.43", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "heading-md": ["20px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                      "heading-xl": ["24px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                      "display-xl": ["48px", {"lineHeight": "1.25", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "heading-lg": ["22px", {"lineHeight": "1.75", "fontWeight": "400"}],
+                      "display-lg": ["36px", {"lineHeight": "1.25", "fontWeight": "700"}]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased h-screen flex flex-col">
+<!-- TopNavBar (Shared Component) -->
+<header class="bg-ink dark:bg-ink docked full-width top-0 border-b border-hairline-strong shadow-[0_0_5px_0_rgba(0,0,0,0.1)] flex justify-between items-center px-xxl h-[64px] w-full z-50">
+<div class="flex items-center gap-xl">
+<h1 class="font-heading-md text-heading-md text-on-primary tracking-tight">Health Sciences Analytics</h1>
+<nav class="hidden md:flex gap-lg ml-xl">
+<a class="font-label-md text-label-md text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-md py-sm transition-all duration-200 active:opacity-80" href="#">Dashboard</a>
+<a class="font-label-md text-label-md text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-md py-sm transition-all duration-200 active:opacity-80" href="#">Departments</a>
+<a class="font-label-md text-label-md text-on-primary hover:text-primary-container transition-colors hover:bg-surface-container-highest/10 px-md py-sm transition-all duration-200 active:opacity-80" href="#">Reports</a>
+<a class="font-label-md text-label-md text-primary-container border-b-2 border-primary-container pb-1 transition-all duration-200 active:opacity-80" href="#">Administration</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<button class="text-on-primary hover:text-primary-container transition-colors p-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
+</button>
+<button class="text-on-primary hover:text-primary-container transition-colors p-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden ml-sm border border-hairline-strong">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A close up, professional headshot of a user profile avatar. Clean white background. High contrast, sharp focus, corporate modern style. Neutral tones with a very subtle green rim light on the edge of the face." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYIw2F4udyGeIFxPtX9Ks5j-Huc5-eY5JPbHLxS2waM4bMWl4aWHnSqX0Mxfzv-Ta5XuiOMIOEG-nDm0ETskEMT2HBanSGggQLSbWGXtPkUEapK63TxU6Ao7BnzeWnkbUwlUsNNiuEXYzfyWtBRKyZslifFql94tXvmp09w9M3PlyV5zGAFjPrs01pjxWNh9a_A4BbTALAexKkxFvlE5_FBiijrC15NYzCoyGmOWF5KBCnJfp8F8q-9QUGtGsiLKXOdS5TGdUOAQ"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto bg-background px-xxl py-xl">
+<!-- Breadcrumbs & Header -->
+<div class="mb-xl">
+<div class="flex items-center gap-sm text-mute font-caption-sm text-caption-sm mb-md">
+<span>Administration</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span>KPI Management</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface font-body-strong">Formula Builder</span>
+</div>
+<h2 class="font-heading-xl text-heading-xl text-on-surface">Custom Formula Builder</h2>
+</div>
+<!-- 12-Column Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-xl">
+<!-- Formula Definition Card (spans 8 cols on desktop) -->
+<div class="md:col-span-8 bg-surface-container-lowest border border-hairline rounded relative flex flex-col">
+<!-- Signature Green Square -->
+<div class="absolute top-0 right-0 w-3 h-3 bg-primary-container rounded-tr"></div>
+<div class="p-lg border-b border-hairline bg-surface-bright rounded-t flex justify-between items-center">
+<h3 class="font-heading-md text-heading-md">Formula Definition</h3>
+<span class="material-symbols-outlined text-mute text-[20px]">functions</span>
+</div>
+<div class="p-lg flex-1 flex flex-col gap-lg">
+<!-- Formula Name Input -->
+<div>
+<label class="block font-label-md text-label-md mb-xs text-on-surface-variant">Formula Name</label>
+<input class="w-full h-[44px] px-md border border-hairline rounded focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none font-body-md text-body-md transition-colors bg-surface-container-lowest" type="text" value="Weighted Institutional Pass Rate"/>
+</div>
+<!-- Editor Area -->
+<div class="flex-1 flex flex-col min-h-[300px]">
+<label class="block font-label-md text-label-md mb-xs text-on-surface-variant">Formula Editor</label>
+<div class="flex-1 border border-hairline rounded bg-[#f5f5f5] flex">
+<!-- Line Numbers -->
+<div class="w-10 bg-surface-container border-r border-hairline flex flex-col items-end py-sm pr-xs font-utility-xs text-utility-xs text-mute font-mono select-none">
+<span>1</span>
+<span>2</span>
+<span>3</span>
+</div>
+<!-- Code Editor -->
+<textarea class="flex-1 bg-transparent p-sm outline-none resize-none font-mono text-body-sm text-on-surface w-full h-full" spellcheck="false">( {Licensure_Pass_Rate} * 0.6 ) + 
+( {Graduation_Rate_On_Time} * 0.4 ) / 
+MAX({Clinical_Hours_Completed}, 100)
+                                </textarea>
+</div>
+</div>
+<!-- Test Action -->
+<div class="flex justify-end mt-md">
+<button class="bg-primary-container hover:bg-primary-dark text-on-primary font-label-md text-label-md h-[44px] px-xl rounded transition-colors flex items-center gap-sm">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+                                Test Formula
+                            </button>
+</div>
+</div>
+</div>
+<!-- Right Column (spans 4 cols) -->
+<div class="md:col-span-4 flex flex-col gap-xl">
+<!-- Variable Library Card -->
+<div class="bg-surface-container-lowest border border-hairline rounded relative flex flex-col flex-1 max-h-[400px]">
+<div class="absolute top-0 right-0 w-3 h-3 bg-primary-container rounded-tr"></div>
+<div class="p-lg border-b border-hairline bg-surface-bright rounded-t flex justify-between items-center">
+<h3 class="font-heading-md text-heading-md">Variable Library</h3>
+<span class="material-symbols-outlined text-mute text-[20px]">library_books</span>
+</div>
+<div class="p-sm flex-1 overflow-y-auto">
+<!-- Search -->
+<div class="mb-sm relative">
+<input class="w-full h-[36px] pl-lg pr-sm border border-hairline rounded focus:border-primary-container outline-none font-body-sm text-body-sm" placeholder="Search variables..." type="text"/>
+<span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-mute text-[18px]">search</span>
+</div>
+<!-- List -->
+<ul class="space-y-xs">
+<li class="flex items-center justify-between p-sm hover:bg-surface-soft border border-transparent hover:border-hairline rounded cursor-pointer group transition-colors">
+<span class="font-utility-xs text-utility-xs font-mono text-on-surface-variant bg-surface-container px-xs py-tiny rounded">{Graduation_Rate}</span>
+<span class="material-symbols-outlined text-mute opacity-0 group-hover:opacity-100 text-[16px] transition-opacity">add</span>
+</li>
+<li class="flex items-center justify-between p-sm hover:bg-surface-soft border border-transparent hover:border-hairline rounded cursor-pointer group transition-colors">
+<span class="font-utility-xs text-utility-xs font-mono text-on-surface-variant bg-surface-container px-xs py-tiny rounded">{Licensure_Pass_Rate}</span>
+<span class="material-symbols-outlined text-mute opacity-0 group-hover:opacity-100 text-[16px] transition-opacity">add</span>
+</li>
+<li class="flex items-center justify-between p-sm hover:bg-surface-soft border border-transparent hover:border-hairline rounded cursor-pointer group transition-colors">
+<span class="font-utility-xs text-utility-xs font-mono text-on-surface-variant bg-surface-container px-xs py-tiny rounded">{Clinical_Hours_Completed}</span>
+<span class="material-symbols-outlined text-mute opacity-0 group-hover:opacity-100 text-[16px] transition-opacity">add</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Logic & Validation Card -->
+<div class="bg-surface-container-lowest border border-hairline rounded relative flex flex-col">
+<div class="absolute top-0 right-0 w-3 h-3 bg-primary-container rounded-tr"></div>
+<div class="p-lg border-b border-hairline bg-surface-bright rounded-t flex justify-between items-center">
+<h3 class="font-heading-md text-heading-md">Logic &amp; Validation</h3>
+<span class="material-symbols-outlined text-mute text-[20px]">rule</span>
+</div>
+<div class="p-lg flex flex-col gap-lg">
+<!-- Validation Output Console -->
+<div class="bg-ink p-sm rounded border border-hairline-strong font-mono text-utility-xs">
+<div class="text-mute mb-xs">&gt; RUNNING VALIDATION...</div>
+<div class="text-primary-container flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+                                    SYNTAX VALID
+                                </div>
+<div class="text-on-secondary mt-xs">&gt; TEST RESULT: 84.2%</div>
+</div>
+<!-- Settings -->
+<div class="grid grid-cols-2 gap-md">
+<div>
+<label class="block font-label-md text-label-md mb-xs text-on-surface-variant">Precision</label>
+<select class="w-full h-[36px] px-sm border border-hairline rounded focus:border-primary-container outline-none font-body-sm text-body-sm bg-surface-container-lowest">
+<option>2 Decimals</option>
+<option>1 Decimal</option>
+<option>Whole Number</option>
+</select>
+</div>
+<div>
+<label class="block font-label-md text-label-md mb-xs text-on-surface-variant">Fallback Value</label>
+<input class="w-full h-[36px] px-sm border border-hairline rounded focus:border-primary-container outline-none font-body-sm text-body-sm bg-surface-container-lowest" type="text" value="0"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div> <!-- End Grid -->
+<!-- Bottom Operations Action Bar -->
+<div class="mt-section border-t border-hairline pt-xl flex justify-end gap-md">
+<button class="border border-hairline hover:bg-surface-soft text-ink font-label-md text-label-md h-[44px] px-xl rounded transition-colors">
+                    Discard Changes
+                </button>
+<button class="bg-primary-container hover:bg-primary-dark text-on-primary font-label-md text-label-md h-[44px] px-xl rounded transition-colors">
+                    Save Formula
+                </button>
+</div>
+</main>
+</div>
+</body></html>

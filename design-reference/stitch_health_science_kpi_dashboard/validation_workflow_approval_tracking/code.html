@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Validation Workflow - Health Sciences KPI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "error": "#e52020",
+                    "primary-fixed-dim": "#94da32",
+                    "warning": "#df6500",
+                    "surface-container-highest": "#e2e2e2",
+                    "outline-variant": "#c1cab1",
+                    "background": "#f9f9f9",
+                    "surface-bright": "#f9f9f9",
+                    "on-secondary-container": "#646464",
+                    "surface-tint": "#416900",
+                    "inverse-on-surface": "#f0f1f1",
+                    "hairline-strong": "#5e5e5e",
+                    "on-secondary-fixed": "#1b1b1b",
+                    "surface-soft": "#f7f7f7",
+                    "secondary": "#5e5e5e",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "surface-dim": "#dadada",
+                    "primary-fixed": "#aff74e",
+                    "link-blue": "#0046a4",
+                    "secondary-fixed": "#e2e2e2",
+                    "on-secondary-fixed-variant": "#474747",
+                    "secondary-fixed-dim": "#c6c6c6",
+                    "on-surface": "#1a1c1c",
+                    "secondary-container": "#e2e2e2",
+                    "primary-dark": "#5a8d00",
+                    "success": "#3f8500",
+                    "on-error-container": "#93000a",
+                    "tertiary-fixed": "#e2e2e2",
+                    "tertiary-container": "#a6a7a7",
+                    "ink": "#000000",
+                    "inverse-primary": "#94da32",
+                    "on-tertiary-container": "#3b3d3d",
+                    "on-error": "#ffffff",
+                    "surface-container-high": "#e8e8e8",
+                    "outline": "#727a64",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "tertiary": "#5d5f5f",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "error-container": "#ffdad6",
+                    "primary-container": "#76b900",
+                    "inverse-surface": "#2f3131",
+                    "on-primary-fixed-variant": "#304f00",
+                    "on-background": "#1a1c1c",
+                    "hairline": "#cccccc",
+                    "on-tertiary": "#ffffff",
+                    "surface-variant": "#e2e2e2",
+                    "on-primary-fixed": "#102000",
+                    "stone": "#898989",
+                    "on-primary": "#ffffff",
+                    "primary": "#416900",
+                    "surface-container": "#eeeeee",
+                    "surface": "#f9f9f9",
+                    "on-primary-container": "#284400",
+                    "on-surface-variant": "#424936",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#f3f3f4",
+                    "on-secondary": "#ffffff",
+                    "mute": "#757575"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "xxl": "32px",
+                    "lg": "16px",
+                    "sm": "8px",
+                    "tiny": "2px",
+                    "section": "64px",
+                    "xs": "4px",
+                    "base": "8px",
+                    "md": "12px",
+                    "xl": "24px"
+            },
+            "fontFamily": {
+                    "body-strong": ["Hanken Grotesk"],
+                    "label-md": ["Hanken Grotesk"],
+                    "utility-xs": ["Hanken Grotesk"],
+                    "heading-xl": ["Hanken Grotesk"],
+                    "heading-md": ["Hanken Grotesk"],
+                    "display-xl": ["Hanken Grotesk"],
+                    "heading-lg": ["Hanken Grotesk"],
+                    "body-sm": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "body-md": ["Hanken Grotesk"],
+                    "caption-sm": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "body-strong": ["16px", {"lineHeight": "1.5", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "1.43", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "utility-xs": ["10px", {"lineHeight": "1.5", "fontWeight": "700"}],
+                    "heading-xl": ["24px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                    "heading-md": ["20px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                    "display-xl": ["48px", {"lineHeight": "1.25", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "heading-lg": ["22px", {"lineHeight": "1.75", "fontWeight": "400"}],
+                    "body-sm": ["15px", {"lineHeight": "1.67", "fontWeight": "400"}],
+                    "display-lg": ["36px", {"lineHeight": "1.25", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "caption-sm": ["12px", {"lineHeight": "1.25", "fontWeight": "400"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .kpi-signature {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            background-color: theme('colors.primary-container');
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="docked left-0 h-full w-64 border-r border-hairline-strong flat no shadows bg-ink dark:bg-ink flex flex-col fixed pt-20 pb-8 z-20 hidden md:flex">
+<div class="px-xxl mb-xl">
+<h1 class="font-heading-md text-heading-md text-primary-container">KPI Analytics</h1>
+<p class="font-body-sm text-body-sm text-secondary-fixed-dim">v4.2.0-stable</p>
+</div>
+<div class="flex-1 overflow-y-auto px-lg">
+<ul class="space-y-sm">
+<li>
+<a class="flex items-center px-lg py-md rounded text-secondary-fixed-dim hover:bg-secondary-fixed-dim/5 transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined mr-md">dashboard</span>
+                        Overview
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-lg py-md rounded bg-primary-dark/20 text-primary-container border-l-4 border-primary-container transition-all font-label-md text-label-md scale-[0.99] duration-100" href="#">
+<span class="material-symbols-outlined mr-md">science</span>
+                        Research Stats
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-lg py-md rounded text-secondary-fixed-dim hover:bg-secondary-fixed-dim/5 transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined mr-md">groups</span>
+                        Faculty Metrics
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-lg py-md rounded text-secondary-fixed-dim hover:bg-secondary-fixed-dim/5 transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined mr-md">terminal</span>
+                        System Logs
+                    </a>
+</li>
+</ul>
+</div>
+<div class="px-xxl mt-auto pt-xl border-t border-hairline-strong">
+<button class="w-full bg-primary-container hover:bg-primary-dark text-on-primary font-label-md text-label-md py-md rounded DEFAULT transition-colors mb-lg">
+                Generate Report
+            </button>
+<ul class="space-y-sm">
+<li>
+<a class="flex items-center px-lg py-sm rounded text-secondary-fixed-dim hover:bg-secondary-fixed-dim/5 transition-all font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined mr-md text-[18px]">help</span>
+                        Help Center
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-lg py-sm rounded text-secondary-fixed-dim hover:bg-secondary-fixed-dim/5 transition-all font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined mr-md text-[18px]">logout</span>
+                        Sign Out
+                    </a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col md:ml-64 w-full h-full relative">
+<!-- TopNavBar -->
+<header class="docked full-width top-0 border-b border-hairline-strong shadow-sm bg-ink dark:bg-ink flex justify-between items-center w-full px-xxl h-16 z-10 sticky">
+<div class="flex items-center">
+<span class="font-heading-xl text-heading-xl text-primary-container tracking-tight mr-xl md:hidden">Health Sciences KPI</span>
+<nav class="hidden md:flex space-x-xl">
+<a class="font-label-md text-label-md text-secondary-fixed-dim hover:text-surface-container-lowest hover:bg-secondary-fixed-dim/10 transition-colors py-sm px-md rounded" href="#">Dashboard</a>
+<a class="font-label-md text-label-md text-secondary-fixed-dim hover:text-surface-container-lowest hover:bg-secondary-fixed-dim/10 transition-colors py-sm px-md rounded" href="#">Departments</a>
+<a class="font-label-md text-label-md text-secondary-fixed-dim hover:text-surface-container-lowest hover:bg-secondary-fixed-dim/10 transition-colors py-sm px-md rounded" href="#">Reports</a>
+<a class="font-label-md text-label-md text-secondary-fixed-dim hover:text-surface-container-lowest hover:bg-secondary-fixed-dim/10 transition-colors py-sm px-md rounded" href="#">Administration</a>
+</nav>
+</div>
+<div class="flex items-center space-x-lg">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-md top-1/2 transform -translate-y-1/2 text-secondary-fixed-dim text-[18px]">search</span>
+<input class="bg-surface-soft border border-hairline-strong rounded DEFAULT py-sm pl-xl pr-md text-body-sm focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none w-64 transition-colors" placeholder="Search metrics..." type="text"/>
+</div>
+<button class="text-secondary-fixed-dim hover:text-surface-container-lowest transition-colors p-sm rounded hover:bg-secondary-fixed-dim/10">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-secondary-fixed-dim hover:text-surface-container-lowest transition-colors p-sm rounded hover:bg-secondary-fixed-dim/10">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-secondary-fixed-dim overflow-hidden border border-hairline-strong ml-sm">
+<img alt="Administrator Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a female administrator in her 40s with a neat bun, wearing a dark blazer over a light blouse. Clean, bright studio lighting, neutral grey background. High resolution, corporate aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQu5vIrPAfzYjLIqbue7D0DO5Y--weV5ygOzCqjq85gmtgOCVlu-EnY4-GgLKX2PiYALOlGMNo_FqnXHWEXXNSBixvjunPwu_ftjyf6F2BLoOXim56Gq2DkDg9pU9Qn3UBdblNDd67JBs7NnP0KAUPmyrqWjC4TTKeUlz_pOQJuWoJaH1vEMrjnOTPifD76egR-aB9zuYAueO2t8BrgVEK47h3DSebmJigYlCi0hLXwD3fUo74RZpBnpX9co6bsSLmpG4hSUUUMQ"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 overflow-y-auto p-xl md:p-xxl bg-surface-bright pb-section">
+<div class="max-w-[1600px] mx-auto">
+<!-- Page Header -->
+<div class="mb-xl flex justify-between items-end border-b border-hairline pb-md">
+<div>
+<h2 class="font-heading-xl text-heading-xl text-ink">Validation Workflow</h2>
+<p class="font-body-md text-body-md text-secondary mt-xs">Manage and verify departmental KPI submissions.</p>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-xl">
+<!-- Queue Table Area (8 cols on xl) -->
+<div class="xl:col-span-8 flex flex-col gap-lg">
+<div class="bg-surface-container-lowest border border-hairline rounded DEFAULT relative overflow-hidden flex-1">
+<div class="kpi-signature"></div>
+<div class="p-lg border-b border-hairline bg-surface-soft flex justify-between items-center">
+<h3 class="font-heading-md text-heading-md text-ink">Validation Queue</h3>
+<div class="flex gap-sm">
+<button class="px-md py-sm border border-hairline rounded DEFAULT font-label-md text-label-md text-ink hover:bg-surface-soft transition-colors flex items-center">
+<span class="material-symbols-outlined mr-xs text-[18px]">filter_list</span> Filter
+                                    </button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-ink text-on-primary font-label-md text-label-md border-b border-hairline">
+<th class="p-md py-lg font-bold">Metric Name</th>
+<th class="p-md py-lg font-bold">Department</th>
+<th class="p-md py-lg font-bold">Submitted Date</th>
+<th class="p-md py-lg font-bold">Status</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm text-ink divide-y divide-hairline">
+<tr class="bg-surface-soft hover:bg-surface-container transition-colors cursor-pointer border-l-2 border-primary-container">
+<td class="p-md font-body-strong">Graduation Rate</td>
+<td class="p-md">Nursing</td>
+<td class="p-md text-secondary">Oct 24, 2023</td>
+<td class="p-md">
+<span class="inline-flex items-center px-sm py-xs rounded-sm bg-warning/10 text-warning font-label-md text-[11px] uppercase tracking-wider border border-warning/20">
+                                                    Manual Review Required
+                                                </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-soft transition-colors cursor-pointer">
+<td class="p-md font-body-strong">Research Grants</td>
+<td class="p-md">Biomedical Engineering</td>
+<td class="p-md text-secondary">Oct 23, 2023</td>
+<td class="p-md">
+<span class="inline-flex items-center px-sm py-xs rounded-sm bg-secondary/10 text-secondary font-label-md text-[11px] uppercase tracking-wider border border-secondary/20">
+                                                    Awaiting Review
+                                                </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-soft transition-colors cursor-pointer">
+<td class="p-md font-body-strong">Faculty Publications</td>
+<td class="p-md">Public Health</td>
+<td class="p-md text-secondary">Oct 22, 2023</td>
+<td class="p-md">
+<span class="inline-flex items-center px-sm py-xs rounded-sm bg-success/10 text-success font-label-md text-[11px] uppercase tracking-wider border border-success/20">
+                                                    Automated Check Passed
+                                                </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Validation Panel (4 cols on xl) -->
+<div class="xl:col-span-4 flex flex-col">
+<div class="bg-surface-container-lowest border border-hairline rounded DEFAULT relative flex-1 flex flex-col">
+<div class="kpi-signature"></div>
+<!-- Panel Header -->
+<div class="p-lg border-b border-hairline bg-surface-soft">
+<div class="text-caption-sm text-secondary uppercase tracking-widest mb-xs">Selected Metric</div>
+<h3 class="font-heading-lg text-heading-lg text-ink font-bold leading-tight">Graduation Rate</h3>
+<p class="font-body-sm text-body-sm text-secondary mt-xs">Nursing Department • Fall 2023 Cohort</p>
+</div>
+<!-- Panel Body -->
+<div class="p-lg flex-1 overflow-y-auto space-y-xl">
+<!-- Integrity Checks -->
+<div>
+<h4 class="font-label-md text-label-md text-ink mb-md uppercase tracking-wider border-b border-hairline pb-xs">Automated Integrity Checks</h4>
+<div class="space-y-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center">
+<span class="material-symbols-outlined text-success mr-sm text-[20px]">check_circle</span>
+<span class="font-body-sm text-body-sm text-ink">Data Range Check</span>
+</div>
+<span class="font-utility-xs text-secondary">PASSED</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center">
+<span class="material-symbols-outlined text-error mr-sm text-[20px]">error</span>
+<span class="font-body-sm text-body-sm text-ink font-body-strong">Historical Variance Check</span>
+</div>
+<span class="font-utility-xs text-error">+15% DEV</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center">
+<span class="material-symbols-outlined text-success mr-sm text-[20px]">check_circle</span>
+<span class="font-body-sm text-body-sm text-ink">Schema Match</span>
+</div>
+<span class="font-utility-xs text-secondary">PASSED</span>
+</div>
+</div>
+</div>
+<!-- Approval Stages -->
+<div>
+<h4 class="font-label-md text-label-md text-ink mb-md uppercase tracking-wider border-b border-hairline pb-xs">Approval Stages</h4>
+<div class="relative pl-lg border-l-2 border-hairline space-y-lg ml-md mt-lg">
+<!-- Step 1 -->
+<div class="relative">
+<div class="absolute -left-[27px] top-0 w-4 h-4 rounded-full bg-success border-2 border-surface-container-lowest"></div>
+<h5 class="font-body-strong text-body-strong text-ink leading-none">Data Submission</h5>
+<p class="font-caption-sm text-caption-sm text-secondary mt-xs">Complete • SysAdmin</p>
+</div>
+<!-- Step 2 -->
+<div class="relative">
+<div class="absolute -left-[27px] top-0 w-4 h-4 rounded-full bg-success border-2 border-surface-container-lowest"></div>
+<h5 class="font-body-strong text-body-strong text-ink leading-none">Automated Validation</h5>
+<p class="font-caption-sm text-caption-sm text-secondary mt-xs">Complete • System</p>
+</div>
+<!-- Step 3 -->
+<div class="relative">
+<div class="absolute -left-[27px] top-0 w-4 h-4 rounded-full bg-primary-container border-2 border-surface-container-lowest ring-4 ring-primary-container/20"></div>
+<h5 class="font-body-strong text-body-strong text-primary-container leading-none">Departmental Head Sign-off</h5>
+<p class="font-caption-sm text-caption-sm text-ink mt-xs">In Progress • Dr. E. Carter</p>
+</div>
+<!-- Step 4 -->
+<div class="relative">
+<div class="absolute -left-[27px] top-0 w-4 h-4 rounded-full bg-surface-dim border-2 border-hairline"></div>
+<h5 class="font-body-strong text-body-strong text-secondary leading-none">Dean of Admin Review</h5>
+<p class="font-caption-sm text-caption-sm text-mute mt-xs">Pending</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Review Actions Footer -->
+<div class="p-lg border-t border-hairline bg-surface-soft flex flex-col gap-md">
+<div class="flex gap-sm">
+<button class="flex-1 px-md py-md border border-hairline rounded DEFAULT font-label-md text-label-md text-ink hover:bg-surface-container-highest transition-colors">
+                                        Request Clarification
+                                    </button>
+<button class="px-md py-md border border-error/30 text-error rounded DEFAULT font-label-md text-label-md hover:bg-error/10 transition-colors">
+                                        Reject
+                                    </button>
+</div>
+<button class="w-full bg-primary-container hover:bg-primary-dark text-on-primary font-label-md text-label-md py-md rounded DEFAULT transition-colors flex justify-center items-center h-[44px]">
+<span class="material-symbols-outlined mr-xs text-[18px]">verified</span>
+                                    Approve &amp; Publish
+                                </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
