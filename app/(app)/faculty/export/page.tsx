@@ -108,7 +108,7 @@ function ExportWorkflow() {
         isLoading={faculty.isLoading || departments.isLoading}
         isError={faculty.isError}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-xl">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-lg">
           <Card className="overflow-hidden h-fit">
             <div className="flex flex-wrap items-center gap-md border-b border-hairline p-lg">
               <div className="min-w-[200px] flex-1">

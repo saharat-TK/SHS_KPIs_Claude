@@ -151,7 +151,7 @@ export default function StudentSuccessPage() {
           })}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-xl">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
           <Card>
             <CardHeader title="Overall Trend" subtitle="Mean across departments by quarter" />
             <CardBody>

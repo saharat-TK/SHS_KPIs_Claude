@@ -95,8 +95,8 @@ function FormulaBuilder() {
       />
 
       <QueryBoundary isLoading={formulas.isLoading} isError={formulas.isError}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-xl">
-          <div className="flex flex-col gap-xl min-w-0">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-lg">
+          <div className="flex flex-col gap-lg min-w-0">
             <Card>
               <CardHeader
                 title="Formula Definition"
@@ -167,7 +167,7 @@ function FormulaBuilder() {
             </Card>
           </div>
 
-          <div className="flex flex-col gap-xl">
+          <div className="flex flex-col gap-lg">
             <Card>
               <CardHeader title="Variable Library" subtitle="Symbols available to this formula" />
               <CardBody className="flex flex-col gap-md">

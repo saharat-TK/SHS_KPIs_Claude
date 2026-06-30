@@ -14,17 +14,28 @@ import {
   StatusPill,
   QueryBoundary,
   EmptyState,
+  Modal,
+  Field,
+  Input,
+  Select,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
-import { useDepartments, useFaculty } from "@/lib/data/hooks";
+import {
+  useDepartments,
+  useFaculty,
+  useCreateDepartment,
+} from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
+import type { Department } from "@/lib/types";
 import { cn, formatNumber } from "@/lib/utils";
 
 export default function CommitteePage() {
   const { can } = useAuth();
   const departments = useDepartments();
   const faculty = useFaculty();
+  const create = useCreateDepartment();
   const [selected, setSelected] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
 
   const counts = useMemo(() => {
     const m = new Map<string, number>();
@@ -38,6 +49,9 @@ export default function CommitteePage() {
   const deptFaculty = (faculty.data ?? []).filter(
     (f) => f.departmentId === activeId,
   );
+  const leadName = activeDept?.headId
+    ? faculty.data?.find((f) => f.id === activeDept.headId)?.name
+    : undefined;
 
   return (
     <>
@@ -46,7 +60,7 @@ export default function CommitteePage() {
         description="Organizational structure of the School of Health Sciences."
         actions={
           can("manage_faculty") && (
-            <Button icon="add" variant="outline">
+            <Button icon="add" variant="outline" onClick={() => setShowAdd(true)}>
               Add Committee
             </Button>
           )
@@ -57,7 +71,7 @@ export default function CommitteePage() {
         isLoading={departments.isLoading || faculty.isLoading}
         isError={departments.isError}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-xl">
+        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-lg">
           <div className="flex flex-col gap-sm">
             {departments.data?.map((d) => {
               const on = d.id === activeId;
@@ -105,7 +119,9 @@ export default function CommitteePage() {
               <>
                 <CardHeader
                   title={activeDept.name}
-                  subtitle={`${activeDept.faculty} · Key metric: ${activeDept.keyMetric}`}
+                  subtitle={`${activeDept.faculty} · Key metric: ${activeDept.keyMetric}${
+                    leadName ? ` · Lead: ${leadName}` : ""
+                  }`}
                   actions={
                     <Badge tone="primary">
                       {deptFaculty.length} members
@@ -145,6 +161,98 @@ export default function CommitteePage() {
           </Card>
         </div>
       </QueryBoundary>
+
+      <AddCommitteeModal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        faculty={(faculty.data ?? []).map((f) => ({ id: f.id, name: f.name }))}
+        submitting={create.isPending}
+        onSubmit={(input) =>
+          create.mutate(input, {
+            onSuccess: (d) => {
+              setShowAdd(false);
+              setSelected(d.id);
+            },
+          })
+        }
+      />
     </>
+  );
+}
+
+function AddCommitteeModal({
+  open,
+  onClose,
+  faculty,
+  onSubmit,
+  submitting,
+}: {
+  open: boolean;
+  onClose: () => void;
+  faculty: { id: string; name: string }[];
+  onSubmit: (input: Omit<Department, "id">) => void;
+  submitting: boolean;
+}) {
+  const [name, setName] = useState("");
+  const [headId, setHeadId] = useState("");
+
+  const close = () => {
+    setName("");
+    setHeadId("");
+    onClose();
+  };
+
+  const valid = name.trim().length > 1 && headId !== "";
+
+  return (
+    <Modal
+      open={open}
+      onClose={close}
+      title="Add Committee"
+      subtitle="Create a new standing committee (stored in-session for this prototype)."
+      footer={
+        <>
+          <Button variant="ghost" onClick={close}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!valid || submitting}
+            onClick={() =>
+              onSubmit({
+                name: name.trim(),
+                faculty: "School of Health Science",
+                status: "active",
+                keyMetric: "—",
+                headId,
+              })
+            }
+          >
+            {submitting ? "Saving…" : "Add Committee"}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-lg">
+        <Field label="Committee Name">
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Quality Assurance Committee"
+          />
+        </Field>
+        <Field label="Lead Faculty">
+          <Select value={headId} onChange={(e) => setHeadId(e.target.value)}>
+            <option value="" disabled>
+              Select lead faculty…
+            </option>
+            {faculty.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+    </Modal>
   );
 }

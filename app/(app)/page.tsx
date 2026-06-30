@@ -88,7 +88,7 @@ export default function DashboardPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-xl">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-lg">
           <Card>
             <CardHeader
               title="KPI Health by Category"

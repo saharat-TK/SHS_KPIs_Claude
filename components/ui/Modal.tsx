@@ -45,7 +45,7 @@ export function Modal({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-md border-b border-hairline px-xl py-lg">
+        <div className="flex items-start justify-between gap-md border-b border-hairline px-lg py-md">
           <div>
             <h2 className="text-heading-md text-on-surface">{title}</h2>
             {subtitle && <p className="text-caption-sm text-mute mt-tiny">{subtitle}</p>}
@@ -58,9 +58,9 @@ export function Modal({
             <Icon name="close" size={20} />
           </button>
         </div>
-        <div className="px-xl py-lg">{children}</div>
+        <div className="px-lg py-md">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-sm border-t border-hairline px-xl py-lg">
+          <div className="flex items-center justify-end gap-sm border-t border-hairline px-lg py-md">
             {footer}
           </div>
         )}

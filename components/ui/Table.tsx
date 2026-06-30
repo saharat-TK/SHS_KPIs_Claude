@@ -29,7 +29,7 @@ export function Th({
   return (
     <th
       className={cn(
-        "border-b border-hairline px-lg py-md text-caption-sm font-medium uppercase tracking-wider text-mute",
+        "border-b border-hairline px-lg py-sm text-caption-sm font-medium uppercase tracking-wider text-mute",
         align === "right" && "text-right",
         align === "center" && "text-center",
         align === "left" && "text-left",
@@ -67,7 +67,7 @@ export function Td({
     <td
       onClick={onClick}
       className={cn(
-        "border-b border-hairline px-lg py-md text-on-surface align-middle",
+        "border-b border-hairline px-lg py-sm text-on-surface align-middle",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className,

@@ -12,8 +12,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenu={() => setNavOpen(true)} />
-        <main className="flex-1 px-lg lg:px-xl py-xl">
-          <div className="mx-auto w-full max-w-canvas flex flex-col gap-xl">
+        <main className="flex-1 px-lg lg:px-xl py-lg">
+          <div className="mx-auto w-full max-w-canvas flex flex-col gap-lg">
             {children}
           </div>
         </main>

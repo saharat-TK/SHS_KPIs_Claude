@@ -31,13 +31,13 @@ export function StatCard({
         : "trending_flat";
 
   return (
-    <Card className={cn("p-xl flex flex-col gap-sm", className)}>
+    <Card className={cn("p-lg flex flex-col gap-sm", className)}>
       <div className="flex items-center justify-between">
         <span className="text-label-md text-mute">{label}</span>
         {icon && <Icon name={icon} size={20} className="text-primary" />}
       </div>
       <div className="flex items-end gap-xs">
-        <span className="text-display-lg text-on-surface leading-none">{value}</span>
+        <span className="text-display-md text-on-surface leading-none">{value}</span>
         {unit && <span className="text-body-sm text-mute mb-tiny">{unit}</span>}
       </div>
       {delta && (

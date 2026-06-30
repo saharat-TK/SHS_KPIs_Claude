@@ -39,7 +39,7 @@ export function Sidebar({
         <Link
           href="/"
           onClick={onClose}
-          className="flex h-[64px] items-center gap-sm px-lg border-b border-hairline"
+          className="flex h-[56px] items-center gap-sm px-lg border-b border-hairline"
         >
           <Image
             src="/shs-logo.png"

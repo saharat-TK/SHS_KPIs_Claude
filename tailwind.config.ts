@@ -72,7 +72,7 @@ const config: Config = {
       },
       borderRadius: {
         DEFAULT: "0.125rem",
-        lg: "0.25rem",
+        lg: "0.125rem",
         xl: "0.5rem",
         full: "0.75rem",
       },
@@ -93,6 +93,7 @@ const config: Config = {
       fontSize: {
         "display-xl": ["48px", { lineHeight: "1.1", letterSpacing: "-0.5px", fontWeight: "700" }],
         "display-lg": ["36px", { lineHeight: "1.15", fontWeight: "700" }],
+        "display-md": ["28px", { lineHeight: "1.15", fontWeight: "700" }],
         "heading-xl": ["24px", { lineHeight: "1.25", fontWeight: "700" }],
         "heading-lg": ["22px", { lineHeight: "1.3", fontWeight: "700" }],
         "heading-md": ["20px", { lineHeight: "1.3", fontWeight: "700" }],

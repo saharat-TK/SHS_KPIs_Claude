@@ -21,6 +21,11 @@ export const departmentsRepo = {
   list: () => delay(getDB().departments),
   get: (id: string) =>
     delay(getDB().departments.find((d) => d.id === id) ?? null),
+  create: async (input: Omit<Department, "id">) => {
+    const dept: Department = { ...input, id: uid("dept") };
+    getDB().departments.push(dept);
+    return delay(dept);
+  },
 };
 
 // Faculty --------------------------------------------------------------------

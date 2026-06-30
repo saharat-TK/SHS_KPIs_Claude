@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type {
+  Department,
   FacultyMember,
   Kpi,
   Metric,
@@ -21,6 +22,17 @@ import {
   metricsRepo,
   validationsRepo,
 } from "./repositories";
+
+// ── Toast design-system seam ────────────────────────────────────────────────
+// Every mutation declares its confirmation message once via `meta.toast`. A
+// global MutationCache handler in app/providers.tsx reads it and fires a toast
+// on success (and a default error toast on failure). See components/ui/Toast.tsx.
+type ToastMeta = string | ((data: unknown, variables: unknown) => string);
+declare module "@tanstack/react-query" {
+  interface Register {
+    mutationMeta: { toast?: ToastMeta; errorToast?: string };
+  }
+}
 
 export const qk = {
   departments: ["departments"] as const,
@@ -79,10 +91,20 @@ export const useValidations = () =>
   useQuery({ queryKey: qk.validations, queryFn: validationsRepo.list });
 
 // Mutations ------------------------------------------------------------------
+export function useCreateDepartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<Department, "id">) => departmentsRepo.create(input),
+    meta: { toast: (d) => `Committee "${(d as Department).name}" added` },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.departments }),
+  });
+}
+
 export function useCreateFaculty() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Omit<FacultyMember, "id">) => facultyRepo.create(input),
+    meta: { toast: "Faculty member added" },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.faculty }),
   });
 }
@@ -91,6 +113,7 @@ export function useCreateKpi() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Omit<Kpi, "id">) => kpisRepo.create(input),
+    meta: { toast: "KPI created" },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.kpis }),
   });
 }
@@ -100,6 +123,7 @@ export function useUpdateKpi() {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: Partial<Kpi> }) =>
       kpisRepo.update(id, patch),
+    meta: { toast: "KPI updated" },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: qk.kpis });
       qc.invalidateQueries({ queryKey: qk.kpi(id) });
@@ -111,6 +135,7 @@ export function useDeleteKpi() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => kpisRepo.remove(id),
+    meta: { toast: "KPI deleted" },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.kpis }),
   });
 }
@@ -122,6 +147,9 @@ export function useUpsertMetric() {
       "id" in input
         ? metricsRepo.update(input.id, input)
         : metricsRepo.create(input),
+    meta: {
+      toast: (_d, v) => ("id" in (v as object) ? "Metric updated" : "Metric created"),
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["metrics"] }),
   });
 }
@@ -130,6 +158,7 @@ export function useDeleteMetric() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => metricsRepo.remove(id),
+    meta: { toast: "Metric deleted" },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["metrics"] }),
   });
 }
@@ -143,6 +172,7 @@ export function useSaveFormula() {
       author: string;
       changeNote: string;
     }) => formulasRepo.save(args.id, args.expression, args.author, args.changeNote),
+    meta: { toast: "Formula saved" },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["formulas"] }),
   });
 }
@@ -152,6 +182,7 @@ export function useRevertFormula() {
   return useMutation({
     mutationFn: (args: { formulaId: string; versionId: string; author: string }) =>
       formulasRepo.revert(args.formulaId, args.versionId, args.author),
+    meta: { toast: "Formula reverted" },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["formulas"] }),
   });
 }
@@ -165,6 +196,16 @@ export function useDecideValidation() {
       reviewerId: string;
       comment?: ValidationComment;
     }) => validationsRepo.decide(args.id, args.status, args.reviewerId, args.comment),
+    meta: {
+      toast: (_d, v) => {
+        const s = (v as { status: ValidationStatus }).status;
+        return s === "approved"
+          ? "Submission approved"
+          : s === "rejected"
+            ? "Submission rejected"
+            : "Clarification requested";
+      },
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.validations }),
   });
 }

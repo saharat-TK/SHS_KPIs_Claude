@@ -10,7 +10,7 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-end justify-between gap-md">
       <div className="min-w-0">
-        <h1 className="text-display-lg text-on-surface">{title}</h1>
+        <h1 className="text-heading-xl text-on-surface">{title}</h1>
         {description && (
           <p className="text-body-sm text-mute mt-xs max-w-[640px]">{description}</p>
         )}

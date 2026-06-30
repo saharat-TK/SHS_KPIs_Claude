@@ -110,8 +110,8 @@ function KpiDetail() {
             }
           />
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-xl">
-            <div className="flex flex-col gap-xl min-w-0">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-lg">
+            <div className="flex flex-col gap-lg min-w-0">
               <Card>
                 <CardHeader
                   title="Core Configuration"
@@ -227,7 +227,7 @@ function KpiDetail() {
               </Card>
             </div>
 
-            <div className="flex flex-col gap-xl">
+            <div className="flex flex-col gap-lg">
               <Card>
                 <CardHeader title="Threshold Settings" />
                 <CardBody className="flex flex-col gap-lg">
