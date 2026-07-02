@@ -204,6 +204,7 @@ function CreateKpiModal({
                 weight,
                 unit,
                 calculationMethod: "Manual entry",
+                calculationType: "weighted_sum",
                 currentValue: 0,
                 thresholds: { green: 80, amber: 60 },
                 committeeIds: [],
