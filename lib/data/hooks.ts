@@ -7,7 +7,9 @@ import {
 } from "@tanstack/react-query";
 import type {
   Committee,
+  CommitteeMembership,
   FacultyMember,
+  FacultyRecord,
   Kpi,
   Metric,
   ValidationComment,
@@ -15,7 +17,9 @@ import type {
 } from "@/lib/types";
 import {
   committeesRepo,
+  committeeMembershipsRepo,
   facultyRepo,
+  facultyRecordsRepo,
   formulasRepo,
   kpisRepo,
   measurementsRepo,
@@ -46,6 +50,8 @@ export const qk = {
   allVersions: ["formulas", "versions", "all"] as const,
   measurements: ["measurements"] as const,
   validations: ["validations"] as const,
+  facultyRecords: ["facultyRecords"] as const,
+  committeeMemberships: ["committeeMemberships"] as const,
 };
 
 // Queries --------------------------------------------------------------------
@@ -54,6 +60,12 @@ export const useCommittees = () =>
 
 export const useFaculty = () =>
   useQuery({ queryKey: qk.faculty, queryFn: facultyRepo.list });
+
+export const useFacultyRecords = () =>
+  useQuery({ queryKey: qk.facultyRecords, queryFn: facultyRecordsRepo.list });
+
+export const useCommitteeMemberships = () =>
+  useQuery({ queryKey: qk.committeeMemberships, queryFn: committeeMembershipsRepo.list });
 
 export const useKpis = () =>
   useQuery({ queryKey: qk.kpis, queryFn: kpisRepo.list });
@@ -106,6 +118,97 @@ export function useCreateFaculty() {
     mutationFn: (input: Omit<FacultyMember, "id">) => facultyRepo.create(input),
     meta: { toast: "Faculty member added" },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.faculty }),
+  });
+}
+
+export function useUpdateFaculty() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<FacultyMember> }) =>
+      facultyRepo.update(id, patch),
+    meta: { toast: "Faculty member updated" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.faculty }),
+  });
+}
+
+export function useDeleteFaculty() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => facultyRepo.remove(id),
+    meta: { toast: "Faculty member removed" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.faculty }),
+  });
+}
+
+export function useCreateFacultyRecord() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<FacultyRecord, "id">) => facultyRecordsRepo.create(input),
+    meta: { toast: "Faculty member added" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.facultyRecords }),
+  });
+}
+
+export function useUpdateFacultyRecord() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<FacultyRecord> }) =>
+      facultyRecordsRepo.update(id, patch),
+    meta: { toast: "Faculty member updated" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.facultyRecords }),
+  });
+}
+
+export function useDeleteFacultyRecord() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => facultyRecordsRepo.remove(id),
+    meta: { toast: "Faculty member removed" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.facultyRecords }),
+  });
+}
+
+export function useCreateCommitteeMembership() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      facultyId: string;
+      committeeId: string;
+      position: CommitteeMembership["position"];
+      kpiFocus: string;
+    }) => committeeMembershipsRepo.create(input),
+    meta: {
+      toast: (d) => `${(d as CommitteeMembership).facultyName} assigned to committee`,
+      errorToast: "Failed to assign faculty member",
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.committeeMemberships }),
+  });
+}
+
+export function useUpdateCommitteeMembership() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      facultyId,
+      committeeId,
+      patch,
+    }: {
+      facultyId: string;
+      committeeId: string;
+      patch: { position?: CommitteeMembership["position"]; kpiFocus?: string };
+    }) => committeeMembershipsRepo.update(facultyId, committeeId, patch),
+    meta: { toast: "Membership updated" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.committeeMemberships }),
+  });
+}
+
+export function useDeleteCommitteeMembership() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ facultyId, committeeId }: { facultyId: string; committeeId: string }) =>
+      committeeMembershipsRepo.remove(facultyId, committeeId),
+    meta: { toast: "Membership removed" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.committeeMemberships }),
   });
 }
 

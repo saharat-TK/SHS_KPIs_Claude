@@ -24,7 +24,7 @@ const COLUMNS = [
   { id: "name", label: "Name" },
   { id: "committee", label: "Committee" },
   { id: "rank", label: "Rank" },
-  { id: "tenureStatus", label: "Tenure" },
+  { id: "position", label: "Position" },
   { id: "kpiFocus", label: "KPI Focus" },
   { id: "researchScore", label: "Research Score" },
   { id: "status", label: "Status" },
@@ -149,7 +149,7 @@ function ExportWorkflow() {
                   </Th>
                   <Th>Name / ID</Th>
                   <Th>Committee</Th>
-                  <Th>Tenure</Th>
+                  <Th>Position</Th>
                   <Th align="right">Score</Th>
                 </tr>
               </thead>
@@ -173,7 +173,7 @@ function ExportWorkflow() {
                       </div>
                     </Td>
                     <Td className="text-mute">{committeeName(f.committeeId)}</Td>
-                    <Td>{f.tenureStatus}</Td>
+                    <Td>{f.position}</Td>
                     <Td align="right" className="font-medium">
                       {f.researchScore}
                     </Td>
