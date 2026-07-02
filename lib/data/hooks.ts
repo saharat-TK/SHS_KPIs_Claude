@@ -11,6 +11,7 @@ import type {
   FacultyMember,
   FacultyRecord,
   Kpi,
+  KpiCategoryRecord,
   Metric,
   ValidationComment,
   ValidationStatus,
@@ -21,6 +22,7 @@ import {
   facultyRepo,
   facultyRecordsRepo,
   formulasRepo,
+  kpiCategoriesRepo,
   kpisRepo,
   measurementsRepo,
   metricsRepo,
@@ -43,6 +45,7 @@ export const qk = {
   faculty: ["faculty"] as const,
   kpis: ["kpis"] as const,
   kpi: (id: string) => ["kpis", id] as const,
+  kpiCategories: ["kpiCategories"] as const,
   metrics: ["metrics"] as const,
   metricsByKpi: (id: string) => ["metrics", "byKpi", id] as const,
   formulas: ["formulas"] as const,
@@ -72,6 +75,9 @@ export const useKpis = () =>
 
 export const useKpi = (id: string) =>
   useQuery({ queryKey: qk.kpi(id), queryFn: () => kpisRepo.get(id), enabled: !!id });
+
+export const useKpiCategories = () =>
+  useQuery({ queryKey: qk.kpiCategories, queryFn: kpiCategoriesRepo.list });
 
 export const useMetrics = () =>
   useQuery({ queryKey: qk.metrics, queryFn: metricsRepo.list });
@@ -209,6 +215,69 @@ export function useDeleteCommitteeMembership() {
       committeeMembershipsRepo.remove(facultyId, committeeId),
     meta: { toast: "Membership removed" },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.committeeMemberships }),
+  });
+}
+
+export function useCreateKpiCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { label: string; description?: string; sortOrder?: number }) =>
+      kpiCategoriesRepo.create(input),
+    meta: { toast: (d) => `Category "${(d as KpiCategoryRecord).label}" added` },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.kpiCategories }),
+  });
+}
+
+export function useUpdateKpiCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: { label?: string; description?: string; sortOrder?: number };
+    }) => kpiCategoriesRepo.update(id, patch),
+    meta: { toast: "Category updated" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.kpiCategories }),
+  });
+}
+
+export function useDeleteKpiCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => kpiCategoriesRepo.remove(id),
+    meta: { toast: "Category removed" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.kpiCategories }),
+  });
+}
+
+// Drag-to-reorder: applies the new order to the cache immediately (so the
+// dragged row doesn't snap back while the request is in flight) and rolls
+// back on failure. No toast — the row settling into place is the feedback.
+export function useReorderKpiCategories() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (order: string[]) => kpiCategoriesRepo.reorder(order),
+    onMutate: async (order: string[]) => {
+      await qc.cancelQueries({ queryKey: qk.kpiCategories });
+      const previous = qc.getQueryData<KpiCategoryRecord[]>(qk.kpiCategories);
+      if (previous) {
+        const byId = new Map(previous.map((c) => [c.id, c]));
+        const reordered = order
+          .map((id, i) => {
+            const c = byId.get(id);
+            return c ? { ...c, sortOrder: i + 1 } : undefined;
+          })
+          .filter((c): c is KpiCategoryRecord => !!c);
+        qc.setQueryData(qk.kpiCategories, reordered);
+      }
+      return { previous };
+    },
+    onError: (_err, _order, context) => {
+      if (context?.previous) qc.setQueryData(qk.kpiCategories, context.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.kpiCategories }),
   });
 }
 

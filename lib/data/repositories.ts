@@ -6,6 +6,7 @@ import type {
   Formula,
   FormulaVersion,
   Kpi,
+  KpiCategoryRecord,
   Measurement,
   Metric,
   ValidationComment,
@@ -136,6 +137,57 @@ export const committeeMembershipsRepo = {
       method: "DELETE",
     });
     if (!res.ok) throw new Error("Failed to remove membership");
+    return res.json();
+  },
+};
+
+// KPI categories — real MySQL-backed (shs_kpis_claude.kpi_categories), user-
+// managed via the "Manage Categories" modal on the KPI Management page.
+// Fetch-based like facultyRecordsRepo. Note: deletion of an in-use category is
+// blocked in the UI against the in-memory KPIs, since KPIs aren't in MySQL yet.
+export const kpiCategoriesRepo = {
+  list: async (): Promise<KpiCategoryRecord[]> => {
+    const res = await fetch("/api/kpi-categories");
+    if (!res.ok) throw new Error("Failed to load categories");
+    return res.json();
+  },
+  create: async (input: {
+    label: string;
+    description?: string;
+    sortOrder?: number;
+  }): Promise<KpiCategoryRecord> => {
+    const res = await fetch("/api/kpi-categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: input.label, description: input.description, sortOrder: input.sortOrder }),
+    });
+    if (!res.ok) throw new Error("Failed to create category");
+    return res.json();
+  },
+  update: async (
+    id: string,
+    patch: { label?: string; description?: string; sortOrder?: number },
+  ): Promise<KpiCategoryRecord> => {
+    const res = await fetch(`/api/kpi-categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error("Failed to update category");
+    return res.json();
+  },
+  remove: async (id: string): Promise<{ id: string }> => {
+    const res = await fetch(`/api/kpi-categories/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to remove category");
+    return res.json();
+  },
+  reorder: async (order: string[]): Promise<KpiCategoryRecord[]> => {
+    const res = await fetch("/api/kpi-categories/reorder", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order }),
+    });
+    if (!res.ok) throw new Error("Failed to reorder categories");
     return res.json();
   },
 };
@@ -296,6 +348,7 @@ export type {
   Formula,
   FormulaVersion,
   Kpi,
+  KpiCategoryRecord,
   Measurement,
   Metric,
   ValidationSubmission,

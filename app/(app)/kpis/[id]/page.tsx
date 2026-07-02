@@ -31,6 +31,7 @@ import {
   useUpdateKpi,
   useCommittees,
   useFormulas,
+  useKpiCategories,
 } from "@/lib/data/hooks";
 import {
   KPI_CATEGORIES,
@@ -55,7 +56,10 @@ function KpiDetail() {
   const metricsQ = useMetricsByKpi(id);
   const committees = useCommittees();
   const formulas = useFormulas();
+  const categoriesQ = useKpiCategories();
   const update = useUpdateKpi();
+
+  const categories = categoriesQ.data ?? KPI_CATEGORIES;
 
   const [draft, setDraft] = useState<Kpi | null>(null);
   useEffect(() => {
@@ -66,7 +70,7 @@ function KpiDetail() {
     !!draft && !!kpiQ.data && JSON.stringify(draft) !== JSON.stringify(kpiQ.data);
 
   const catLabel = (c: string) =>
-    KPI_CATEGORIES.find((x) => x.id === c)?.label ?? c;
+    categories.find((x) => x.id === c)?.label ?? c;
   const committeeName = (d: string) =>
     committees.data?.find((x) => x.id === d)?.name ?? d;
 
@@ -145,7 +149,7 @@ function KpiDetail() {
                       value={draft.category}
                       onChange={(e) => set({ category: e.target.value as Kpi["category"] })}
                     >
-                      {KPI_CATEGORIES.map((c) => (
+                      {categories.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.label}
                         </option>
