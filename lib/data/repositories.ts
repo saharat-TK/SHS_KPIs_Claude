@@ -1,6 +1,8 @@
 import type {
   Committee,
+  CommitteeMembership,
   FacultyMember,
+  FacultyRecord,
   Formula,
   FormulaVersion,
   Kpi,
@@ -36,10 +38,105 @@ export const facultyRepo = {
     getDB().faculty.push(member);
     return delay(member);
   },
+  update: async (id: string, patch: Partial<FacultyMember>) => {
+    const db = getDB();
+    const idx = db.faculty.findIndex((f) => f.id === id);
+    if (idx === -1) throw new Error("Faculty member not found");
+    db.faculty[idx] = { ...db.faculty[idx], ...patch, id };
+    return delay(db.faculty[idx]);
+  },
   remove: async (id: string) => {
     const db = getDB();
     db.faculty = db.faculty.filter((f) => f.id !== id);
     return delay({ id });
+  },
+};
+
+// Faculty records — real MySQL-backed (shs_kpis_claude.faculty), used only by
+// the Faculty Management page (app/(app)/faculty/management/page.tsx).
+// Parallel to, not a replacement for, facultyRepo above — the mock-data pages
+// (export, and the committee-entity CRUD on the committee page) keep using
+// facultyRepo/committeesRepo untouched.
+export const facultyRecordsRepo = {
+  list: async (): Promise<FacultyRecord[]> => {
+    const res = await fetch("/api/faculty");
+    if (!res.ok) throw new Error("Failed to load faculty");
+    return res.json();
+  },
+  create: async (input: Omit<FacultyRecord, "id">): Promise<FacultyRecord> => {
+    const res = await fetch("/api/faculty", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error("Failed to create faculty member");
+    return res.json();
+  },
+  update: async (
+    id: string,
+    patch: Partial<FacultyRecord>,
+  ): Promise<FacultyRecord> => {
+    const res = await fetch(`/api/faculty/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error("Failed to update faculty member");
+    return res.json();
+  },
+  remove: async (id: string): Promise<{ id: string }> => {
+    const res = await fetch(`/api/faculty/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to remove faculty member");
+    return res.json();
+  },
+};
+
+// Committee memberships — real MySQL-backed (shs_kpis_claude.committee_memberships),
+// joined with faculty/committees for display. Used by the read-only Faculty
+// Roster page (app/(app)/faculty/page.tsx) and the assign/edit UI on the
+// Committees page (app/(app)/committee/page.tsx).
+export const committeeMembershipsRepo = {
+  list: async (): Promise<CommitteeMembership[]> => {
+    const res = await fetch("/api/committee-memberships");
+    if (!res.ok) throw new Error("Failed to load committee memberships");
+    return res.json();
+  },
+  create: async (input: {
+    facultyId: string;
+    committeeId: string;
+    position: CommitteeMembership["position"];
+    kpiFocus: string;
+  }): Promise<CommitteeMembership> => {
+    const res = await fetch("/api/committee-memberships", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error("Failed to create membership");
+    return res.json();
+  },
+  update: async (
+    facultyId: string,
+    committeeId: string,
+    patch: { position?: CommitteeMembership["position"]; kpiFocus?: string },
+  ): Promise<CommitteeMembership> => {
+    const res = await fetch(`/api/committee-memberships/${facultyId}/${committeeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error("Failed to update membership");
+    return res.json();
+  },
+  remove: async (
+    facultyId: string,
+    committeeId: string,
+  ): Promise<{ facultyId: string; committeeId: string }> => {
+    const res = await fetch(`/api/committee-memberships/${facultyId}/${committeeId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to remove membership");
+    return res.json();
   },
 };
 

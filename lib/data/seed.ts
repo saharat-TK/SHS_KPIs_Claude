@@ -36,8 +36,8 @@ export const committees: Committee[] = [
 
 const FIRST = ["Anchali", "Krit", "Nida", "Somsak", "Pim", "Thanawat", "Suda", "Niran", "Wanida", "Chai", "Malee", "Apinya", "Decha", "Kanya", "Phuwadol", "Siriporn", "Narong", "Ratana", "Worawit", "Achara", "Boonmee"];
 const LAST = ["Wong", "Saetang", "Phuwadol", "Srisai", "Chaiyo", "Intara", "Boon", "Ratana", "Suk", "Mongkol", "Pansa", "Vora", "Klahan", "Chinda", "Thong"];
-const RANKS = ["Professor", "Associate Professor", "Assistant Professor", "Lecturer", "Instructor"] as const;
-const TENURE = ["Tenured", "Tenure-Track", "Non-Tenure", "Contract"] as const;
+const RANKS = ["Professor", "Associate Professor", "Assistant Professor", "Lecturer", "Support Staff"] as const;
+const POSITIONS = ["Counselor", "Committee Lead", "Committee", "Committee and Secretary"] as const;
 const FOCUS = ["Student Success", "Research Output", "Clinical Excellence", "Curriculum Design", "Community Health"];
 
 function buildFaculty(): FacultyMember[] {
@@ -52,7 +52,7 @@ function buildFaculty(): FacultyMember[] {
         name: `Dr. ${FIRST[(n * 3) % FIRST.length]} ${LAST[(n * 5) % LAST.length]}`,
         committeeId: d.id,
         rank: RANKS[(n + i) % RANKS.length],
-        tenureStatus: TENURE[(n * 2 + i) % TENURE.length],
+        position: POSITIONS[(n * 3 + i) % POSITIONS.length],
         kpiFocus: FOCUS[(n + i) % FOCUS.length],
         researchScore: 58 + ((n * 13 + i * 7) % 40), // 58-97
         status: d.status === "draft" ? "draft" : "active",

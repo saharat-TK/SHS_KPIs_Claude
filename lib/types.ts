@@ -33,19 +33,52 @@ export type Rank =
   | "Associate Professor"
   | "Assistant Professor"
   | "Lecturer"
-  | "Instructor";
+  | "Support Staff";
 
-export type TenureStatus = "Tenured" | "Tenure-Track" | "Non-Tenure" | "Contract";
+export type Position = "Counselor" | "Committee Lead" | "Committee" | "Committee and Secretary";
 
 export interface FacultyMember {
   id: string;
   name: string;
   committeeId: string;
   rank: Rank;
-  tenureStatus: TenureStatus;
+  position: Position;
   kpiFocus: string;
   researchScore: number; // 0-100
   status: EntityStatus;
+}
+
+// ── Real MySQL-backed faculty record (shs_kpis_claude.faculty) ──────────────
+// Distinct from FacultyMember (the in-memory prototype entity used by
+// faculty/management, faculty/export, and committee pages). Person-level
+// only — committee membership lives in a separate committee_memberships
+// junction table and isn't modeled here yet.
+export type Program = "BioMed" | "EnvH" | "OHS" | "PH" | "Sport Science" | "SHS Office";
+
+export type SystemRole = "admin" | "user";
+
+export interface FacultyRecord {
+  id: string;
+  name: string;
+  rank: Rank;
+  email: string | null;
+  nameTh: string | null;
+  program: Program;
+  status: EntityStatus;
+  systemRole: SystemRole;
+}
+
+// The faculty <-> committee bridge (shs_kpis_claude.committee_memberships),
+// joined with faculty/committees for display. facultyId/committeeId together
+// are the composite key — a membership's identity isn't editable, only its
+// position/kpiFocus are.
+export interface CommitteeMembership {
+  facultyId: string;
+  committeeId: string;
+  position: Position;
+  kpiFocus: string;
+  facultyName: string;
+  committeeName: string;
 }
 
 export interface Thresholds {

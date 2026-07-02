@@ -32,9 +32,9 @@ export const NAV: NavGroup[] = [
       { label: "Committees", href: "/committee", icon: "account_tree" },
       { label: "Faculty Roster", href: "/faculty", icon: "groups" },
       {
-        label: "Roster Export",
-        href: "/faculty/export",
-        icon: "download",
+        label: "Faculty Management",
+        href: "/faculty/management",
+        icon: "manage_accounts",
         requires: "manage_faculty",
       },
     ],
