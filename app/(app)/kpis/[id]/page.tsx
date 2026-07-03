@@ -16,6 +16,7 @@ import {
   Field,
   Input,
   Select,
+  RadioGroup,
   StatusPill,
   QueryBoundary,
   ThresholdBar,
@@ -31,8 +32,13 @@ import {
   useCommittees,
   useFormulas,
 } from "@/lib/data/hooks";
-import { KPI_CATEGORIES, type Kpi } from "@/lib/types";
-import { formatNumber } from "@/lib/utils";
+import {
+  KPI_CATEGORIES,
+  KPI_CALCULATION_TYPES,
+  type Kpi,
+  type KpiCalculationType,
+} from "@/lib/types";
+import { formatNumber, computeKpiValue } from "@/lib/utils";
 
 export default function KpiDetailPage() {
   return (
@@ -66,6 +72,19 @@ function KpiDetail() {
 
   const set = (patch: Partial<Kpi>) =>
     setDraft((d) => (d ? { ...d, ...patch } : d));
+
+  // Switching to an aggregate method derives the KPI value from its sub-KPIs so
+  // the Threshold panel stays consistent; the write flows through normal Save.
+  const setCalculationType = (calculationType: KpiCalculationType) =>
+    setDraft((d) => {
+      if (!d) return d;
+      const derived = computeKpiValue(calculationType, metricsQ.data ?? []);
+      return {
+        ...d,
+        calculationType,
+        currentValue: derived ?? d.currentValue,
+      };
+    });
   const toggleCommittee = (committeeId: string) =>
     setDraft((d) => {
       if (!d) return d;
@@ -151,9 +170,12 @@ function KpiDetail() {
               <Card>
                 <CardHeader
                   title="KPI Calculation Logic"
-                  subtitle={draft.calculationMethod}
+                  subtitle={
+                    KPI_CALCULATION_TYPES.find((t) => t.id === draft.calculationType)
+                      ?.label
+                  }
                   actions={
-                    draft.formulaId && (
+                    draft.calculationType === "custom_formula" && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -165,16 +187,36 @@ function KpiDetail() {
                     )
                   }
                 />
-                <CardBody>
-                  {draft.formulaId ? (
-                    <FormulaSummary
-                      formula={formulas.data?.find((f) => f.id === draft.formulaId)}
-                    />
+                <CardBody className="flex flex-col gap-lg">
+                  <RadioGroup
+                    name="calculationType"
+                    value={draft.calculationType}
+                    options={KPI_CALCULATION_TYPES.map((t) => ({
+                      value: t.id,
+                      label: t.label,
+                      hint: t.hint,
+                    }))}
+                    onChange={setCalculationType}
+                  />
+                  {draft.calculationType === "custom_formula" ? (
+                    draft.formulaId ? (
+                      <FormulaSummary
+                        formula={formulas.data?.find((f) => f.id === draft.formulaId)}
+                      />
+                    ) : (
+                      <p className="text-body-sm text-mute">
+                        No formula linked yet — open the builder to create or link one.
+                      </p>
+                    )
                   ) : (
-                    <p className="text-body-sm text-mute">
-                      No formula linked — value is entered manually or aggregated from
-                      sub-KPIs.
-                    </p>
+                    <AggregateSummary
+                      unit={draft.unit}
+                      count={(metricsQ.data ?? []).length}
+                      value={computeKpiValue(
+                        draft.calculationType,
+                        metricsQ.data ?? []
+                      )}
+                    />
                   )}
                 </CardBody>
               </Card>
@@ -292,6 +334,34 @@ function KpiDetail() {
         </>
       )}
     </QueryBoundary>
+  );
+}
+
+function AggregateSummary({
+  value,
+  count,
+  unit,
+}: {
+  value: number | null;
+  count: number;
+  unit: string;
+}) {
+  if (count === 0) {
+    return (
+      <p className="text-body-sm text-mute">
+        No sub-KPIs to aggregate — add component metrics below to derive a value.
+      </p>
+    );
+  }
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-surface-soft border border-hairline px-md py-sm">
+      <span className="text-body-sm text-mute">
+        Derived from {count} sub-KPI{count === 1 ? "" : "s"}
+      </span>
+      <span className="text-heading-sm text-on-surface">
+        {value === null ? "—" : `${formatNumber(value, 1)} ${unit}`}
+      </span>
+    </div>
   );
 }
 

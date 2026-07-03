@@ -4,6 +4,7 @@ export { Card, CardHeader, CardBody } from "./Card";
 export { Badge } from "./Badge";
 export { Table, Th, Td, Tr } from "./Table";
 export { Input, SearchInput, Select, Field } from "./Input";
+export { RadioGroup, type RadioOption } from "./RadioGroup";
 export { Tabs, type TabItem } from "./Tabs";
 export { Modal } from "./Modal";
 export { StatCard } from "./StatCard";

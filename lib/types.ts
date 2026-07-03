@@ -19,6 +19,33 @@ export const KPI_CATEGORIES: { id: KpiCategory; label: string }[] = [
 
 export type EntityStatus = "active" | "inactive" | "draft";
 
+export type KpiCalculationType =
+  | "weighted_sum"
+  | "simple_average"
+  | "custom_formula";
+
+export const KPI_CALCULATION_TYPES: {
+  id: KpiCalculationType;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    id: "weighted_sum",
+    label: "Weighted Sum of sub-KPIs",
+    hint: "Sub-KPI values combined by their weights",
+  },
+  {
+    id: "simple_average",
+    label: "Simple average",
+    hint: "Unweighted mean of sub-KPIs",
+  },
+  {
+    id: "custom_formula",
+    label: "Custom formula",
+    hint: "Evaluated from a linked formula",
+  },
+];
+
 export interface Committee {
   id: string;
   name: string;
@@ -92,6 +119,7 @@ export interface Kpi {
   category: KpiCategory;
   weight: number; // 0-100, relative weight within category
   calculationMethod: string;
+  calculationType: KpiCalculationType;
   currentValue: number;
   unit: string; // e.g. "%", "score", "ratio"
   thresholds: Thresholds;
