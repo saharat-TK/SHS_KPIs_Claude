@@ -205,7 +205,9 @@ function KpiDetail() {
                   {draft.calculationType === "custom_formula" ? (
                     draft.formulaId ? (
                       <FormulaSummary
-                        formula={formulas.data?.find((f) => f.id === draft.formulaId)}
+                        formula={formulas.data?.find(
+                          (f) => String(f.id) === draft.formulaId,
+                        )}
                       />
                     ) : (
                       <p className="text-body-sm text-mute">
@@ -372,20 +374,25 @@ function AggregateSummary({
 function FormulaSummary({
   formula,
 }: {
-  formula?: { name: string; expression: string; currentVersion: string; variables: { symbol: string; label: string }[] };
+  formula?: {
+    name: string;
+    expression: string;
+    currentVersion: string | null;
+    variables?: { symbol: string; label: string }[];
+  };
 }) {
   if (!formula) return <p className="text-body-sm text-mute">Formula not found.</p>;
   return (
     <div className="flex flex-col gap-md">
       <div className="flex items-center gap-sm">
-        <Badge tone="primary">{formula.currentVersion}</Badge>
+        {formula.currentVersion && <Badge tone="primary">{formula.currentVersion}</Badge>}
         <span className="text-body-strong">{formula.name}</span>
       </div>
       <code className="block rounded-lg bg-surface-soft border border-hairline px-md py-sm font-mono text-body-sm text-on-surface">
         {formula.expression}
       </code>
       <div className="flex flex-wrap gap-xs">
-        {formula.variables.map((v) => (
+        {(formula.variables ?? []).map((v) => (
           <Badge key={v.symbol} tone="neutral">
             <span className="font-mono">{v.symbol}</span> = {v.label}
           </Badge>

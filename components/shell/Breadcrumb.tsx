@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { useBreadcrumbLabels } from "./BreadcrumbLabels";
 
 const LABELS: Record<string, string> = {
   "": "Dashboard",
@@ -10,6 +11,9 @@ const LABELS: Record<string, string> = {
   faculty: "Faculty Roster",
   export: "Roster Export",
   kpis: "KPI Management",
+  "kpi-management": "KPI Management",
+  library: "KPIs Library",
+  performance: "Performance Records",
   metrics: "Metrics",
   formulas: "Formulas",
   builder: "Formula Builder",
@@ -21,14 +25,15 @@ const LABELS: Record<string, string> = {
 
 export function Breadcrumb() {
   const pathname = usePathname();
+  const overrides = useBreadcrumbLabels();
   const segments = pathname.split("/").filter(Boolean);
 
   const crumbs = [
     { href: "/", label: "Home" },
-    ...segments.map((seg, i) => ({
-      href: "/" + segments.slice(0, i + 1).join("/"),
-      label: LABELS[seg] ?? seg,
-    })),
+    ...segments.map((seg, i) => {
+      const href = "/" + segments.slice(0, i + 1).join("/");
+      return { href, label: overrides[href] ?? LABELS[seg] ?? seg };
+    }),
   ];
 
   return (

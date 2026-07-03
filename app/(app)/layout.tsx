@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
+import { BreadcrumbLabelProvider } from "@/components/shell/BreadcrumbLabels";
 
 const SIDEBAR_COLLAPSED_KEY = "shs-sidebar-collapsed";
 
@@ -23,21 +24,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar
-        open={navOpen}
-        onClose={() => setNavOpen(false)}
-        collapsed={sidebarCollapsed}
-        onToggleCollapsed={toggleSidebarCollapsed}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onMenu={() => setNavOpen(true)} />
-        <main className="flex-1 px-lg lg:px-xl py-lg">
-          <div className="mx-auto w-full max-w-canvas flex flex-col gap-lg">
-            {children}
-          </div>
-        </main>
+    <BreadcrumbLabelProvider>
+      <div className="flex min-h-screen">
+        <Sidebar
+          open={navOpen}
+          onClose={() => setNavOpen(false)}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={toggleSidebarCollapsed}
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar onMenu={() => setNavOpen(true)} />
+          <main className="flex-1 px-lg lg:px-xl py-lg">
+            <div className="mx-auto w-full max-w-canvas flex flex-col gap-lg">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </BreadcrumbLabelProvider>
   );
 }

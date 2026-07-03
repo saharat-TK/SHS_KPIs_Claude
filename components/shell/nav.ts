@@ -7,6 +7,9 @@ export interface NavItem {
   /** Action required to see this item; omit = visible to all roles. */
   requires?: Action;
   exact?: boolean;
+  /** Nested sub-menu items. When present this item renders as a collapsible
+   *  parent whose row toggles the children rather than navigating. */
+  children?: NavItem[];
 }
 
 export interface NavGroup {
@@ -40,10 +43,33 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Administration",
+    label: "KPI Management",
     items: [
       {
         label: "KPI Management",
+        href: "/kpi-management",
+        icon: "stacked_bar_chart",
+        children: [
+          {
+            label: "KPIs Library",
+            href: "/kpi-management/library",
+            icon: "library_books",
+            requires: "configure_kpis",
+          },
+          {
+            label: "Performance Records",
+            href: "/kpi-management/performance",
+            icon: "assessment",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Administration (prototype)",
+    items: [
+      {
+        label: "KPIs (prototype)",
         href: "/kpis",
         icon: "tune",
         requires: "configure_kpis",

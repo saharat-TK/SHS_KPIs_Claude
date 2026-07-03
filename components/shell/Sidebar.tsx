@@ -3,10 +3,16 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { Icon } from "@/components/ui/Icon";
-import { NAV } from "./nav";
+import { NAV, type NavItem } from "./nav";
+
+type Can = (action: NonNullable<NavItem["requires"]>) => boolean;
+
+const isPathActive = (pathname: string, href: string, exact?: boolean) =>
+  exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
 
 export function Sidebar({
   open,
@@ -22,8 +28,10 @@ export function Sidebar({
   const pathname = usePathname();
   const { can } = useAuth();
 
-  const isActive = (href: string, exact?: boolean) =>
-    exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+  const isVisible = (item: NavItem): boolean => {
+    if (item.children) return item.children.some(isVisible);
+    return !item.requires || can(item.requires);
+  };
 
   return (
     <>
@@ -91,9 +99,7 @@ export function Sidebar({
           )}
         >
           {NAV.map((group) => {
-            const items = group.items.filter(
-              (i) => !i.requires || can(i.requires),
-            );
+            const items = group.items.filter(isVisible);
             if (items.length === 0) return null;
             return (
               <div
@@ -111,36 +117,26 @@ export function Sidebar({
                 >
                   {group.label}
                 </p>
-                {items.map((item) => {
-                  const active = isActive(item.href, item.exact);
-                  return (
-                    <Link
+                {items.map((item) =>
+                  item.children ? (
+                    <NavParent
                       key={item.href}
-                      href={item.href}
-                      onClick={onClose}
-                      title={collapsed ? item.label : undefined}
-                      className={cn(
-                        "flex items-center gap-xs rounded-DEFAULT px-sm py-xs text-label-sm transition-colors",
-                        collapsed && "lg:h-10 lg:w-10 lg:justify-center lg:p-0",
-                        active
-                          ? "bg-surface-soft text-primary-dark border border-primary-container"
-                          : "text-on-surface border border-transparent hover:bg-surface-soft",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT",
-                          active ? "bg-primary-container/20" : "text-mute",
-                        )}
-                      >
-                        <Icon name={item.icon} size={19} />
-                      </span>
-                      <span className={cn("min-w-0 truncate", collapsed && "lg:hidden")}>
-                        {item.label}
-                      </span>
-                    </Link>
-                  );
-                })}
+                      item={item}
+                      pathname={pathname}
+                      can={can}
+                      collapsed={collapsed}
+                      onClose={onClose}
+                    />
+                  ) : (
+                    <NavLeaf
+                      key={item.href}
+                      item={item}
+                      active={isPathActive(pathname, item.href, item.exact)}
+                      collapsed={collapsed}
+                      onClose={onClose}
+                    />
+                  ),
+                )}
               </div>
             );
           })}
@@ -160,5 +156,136 @@ export function Sidebar({
         </div>
       </aside>
     </>
+  );
+}
+
+function NavLeaf({
+  item,
+  active,
+  collapsed,
+  onClose,
+  indented,
+}: {
+  item: NavItem;
+  active: boolean;
+  collapsed: boolean;
+  onClose: () => void;
+  indented?: boolean;
+}) {
+  return (
+    <Link
+      href={item.href}
+      onClick={onClose}
+      title={collapsed ? item.label : undefined}
+      className={cn(
+        "flex items-center gap-xs rounded-DEFAULT px-sm py-xs text-label-sm transition-colors",
+        collapsed && "lg:h-10 lg:w-10 lg:justify-center lg:p-0",
+        indented && !collapsed && "pl-md",
+        active
+          ? "bg-surface-soft text-primary-dark border border-primary-container"
+          : "text-on-surface border border-transparent hover:bg-surface-soft",
+      )}
+    >
+      <span
+        className={cn(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT",
+          active ? "bg-primary-container/20" : "text-mute",
+        )}
+      >
+        <Icon name={item.icon} size={indented ? 17 : 19} />
+      </span>
+      <span className={cn("min-w-0 truncate", collapsed && "lg:hidden")}>
+        {item.label}
+      </span>
+    </Link>
+  );
+}
+
+function NavParent({
+  item,
+  pathname,
+  can,
+  collapsed,
+  onClose,
+}: {
+  item: NavItem;
+  pathname: string;
+  can: Can;
+  collapsed: boolean;
+  onClose: () => void;
+}) {
+  const children = (item.children ?? []).filter(
+    (c) => !c.requires || can(c.requires),
+  );
+  const childActive = children.some((c) =>
+    isPathActive(pathname, c.href, c.exact),
+  );
+  const [open, setOpen] = useState(childActive);
+
+  // Auto-open when navigating into one of the children.
+  useEffect(() => {
+    if (childActive) setOpen(true);
+  }, [childActive]);
+
+  // Collapsed rail has no room for a disclosure — show the children as icons.
+  if (collapsed) {
+    return (
+      <>
+        {children.map((c) => (
+          <NavLeaf
+            key={c.href}
+            item={c}
+            active={isPathActive(pathname, c.href, c.exact)}
+            collapsed={collapsed}
+            onClose={onClose}
+          />
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-tiny">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={cn(
+          "flex items-center gap-xs rounded-DEFAULT px-sm py-xs text-label-sm transition-colors",
+          childActive && !open
+            ? "text-primary-dark"
+            : "text-on-surface hover:bg-surface-soft",
+        )}
+      >
+        <span
+          className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT",
+            childActive ? "bg-primary-container/20 text-primary-dark" : "text-mute",
+          )}
+        >
+          <Icon name={item.icon} size={19} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+        <Icon
+          name={open ? "expand_less" : "expand_more"}
+          size={18}
+          className="shrink-0 text-mute"
+        />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-tiny">
+          {children.map((c) => (
+            <NavLeaf
+              key={c.href}
+              item={c}
+              active={isPathActive(pathname, c.href, c.exact)}
+              collapsed={collapsed}
+              onClose={onClose}
+              indented
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

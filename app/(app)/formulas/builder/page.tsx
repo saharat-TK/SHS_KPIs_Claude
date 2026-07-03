@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   PageHeader,
   Card,
@@ -18,7 +19,7 @@ import { RequirePermission } from "@/components/shell/Guard";
 import { useFormulas, useSaveFormula } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { checkFormula } from "@/lib/formula";
-import type { Formula, FormulaVariable } from "@/lib/types";
+import type { FormulaRecord, FormulaVariableRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function FormulaBuilderPage() {
@@ -31,30 +32,37 @@ export default function FormulaBuilderPage() {
 
 function FormulaBuilder() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const formulas = useFormulas();
   const save = useSaveFormula();
 
-  const [formulaId, setFormulaId] = useState<string>("");
+  const [formulaId, setFormulaId] = useState<number | "">("");
   const [expression, setExpression] = useState("");
-  const [variables, setVariables] = useState<FormulaVariable[]>([]);
+  const [variables, setVariables] = useState<FormulaVariableRecord[]>([]);
   const [changeNote, setChangeNote] = useState("");
   const [sample, setSample] = useState<Record<string, number>>({});
 
-  const active: Formula | undefined = useMemo(
+  const active: FormulaRecord | undefined = useMemo(
     () => formulas.data?.find((f) => f.id === formulaId),
     [formulas.data, formulaId],
   );
 
+  // Preselect the formula named in ?formula= (from the library "Open in builder"
+  // link), falling back to the first one.
   useEffect(() => {
-    if (!formulaId && formulas.data?.[0]) setFormulaId(formulas.data[0].id);
-  }, [formulas.data, formulaId]);
+    if (formulaId !== "" || !formulas.data?.length) return;
+    const wanted = Number(searchParams.get("formula"));
+    const match = formulas.data.find((f) => f.id === wanted);
+    setFormulaId(match ? match.id : formulas.data[0].id);
+  }, [formulas.data, formulaId, searchParams]);
 
   useEffect(() => {
     if (active) {
+      const vars = active.variables ?? [];
       setExpression(active.expression);
-      setVariables(active.variables);
+      setVariables(vars);
       setChangeNote("");
-      setSample(Object.fromEntries(active.variables.map((v) => [v.symbol, 1])));
+      setSample(Object.fromEntries(vars.map((v) => [v.symbol, 1])));
     }
   }, [active]);
 
@@ -106,7 +114,7 @@ function FormulaBuilder() {
               />
               <CardBody className="flex flex-col gap-lg">
                 <Field label="Editing formula">
-                  <Select value={formulaId} onChange={(e) => setFormulaId(e.target.value)}>
+                  <Select value={formulaId} onChange={(e) => setFormulaId(Number(e.target.value))}>
                     {formulas.data?.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.name}

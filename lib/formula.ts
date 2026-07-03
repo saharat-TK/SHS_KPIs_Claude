@@ -1,5 +1,4 @@
 import { create, all, type MathJsInstance } from "mathjs";
-import type { FormulaVariable } from "@/lib/types";
 
 // Restricted mathjs instance — no symbolic imports, no access to globals.
 const math: MathJsInstance = create(all, {});
@@ -22,6 +21,14 @@ math.import(
   { override: true },
 );
 
+/** Bump a "vMAJOR.MINOR" version string by one minor. Shared by the formula
+ *  save/revert routes. Mirrors the original in-memory bump logic. */
+export function bumpVersion(v: string | null | undefined): string {
+  const m = (v ?? "").match(/v(\d+)\.(\d+)/);
+  if (!m) return "v1.0";
+  return `v${m[1]}.${Number(m[2]) + 1}`;
+}
+
 export interface FormulaCheck {
   ok: boolean;
   message: string;
@@ -42,7 +49,7 @@ const RESERVED = new Set([
  */
 export function checkFormula(
   expression: string,
-  variables: FormulaVariable[],
+  variables: { symbol: string }[],
   sample?: Record<string, number>,
 ): FormulaCheck {
   const expr = expression.trim();

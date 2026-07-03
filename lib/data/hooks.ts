@@ -16,6 +16,13 @@ import type {
   ValidationComment,
   ValidationStatus,
 } from "@/lib/types";
+import type {
+  AnnualTarget,
+  LibraryKpi,
+  LibraryMetric,
+  StrategicSet,
+  StrategicSetStatus,
+} from "@/lib/types";
 import {
   committeesRepo,
   committeeMembershipsRepo,
@@ -24,8 +31,11 @@ import {
   formulasRepo,
   kpiCategoriesRepo,
   kpisRepo,
+  libraryKpisRepo,
+  libraryMetricsRepo,
   measurementsRepo,
   metricsRepo,
+  strategicSetsRepo,
   validationsRepo,
 } from "./repositories";
 
@@ -55,6 +65,11 @@ export const qk = {
   validations: ["validations"] as const,
   facultyRecords: ["facultyRecords"] as const,
   committeeMemberships: ["committeeMemberships"] as const,
+  strategicSets: ["strategicSets"] as const,
+  strategicSet: (id: number) => ["strategicSets", id] as const,
+  libraryKpis: (setId: number) => ["libraryKpis", setId] as const,
+  libraryKpi: (id: number) => ["libraryKpi", id] as const,
+  libraryMetrics: (kpiId: number) => ["libraryMetrics", kpiId] as const,
 };
 
 // Queries --------------------------------------------------------------------
@@ -91,13 +106,6 @@ export const useMetricsByKpi = (kpiId: string) =>
 
 export const useFormulas = () =>
   useQuery({ queryKey: qk.formulas, queryFn: formulasRepo.list });
-
-export const useFormulaVersions = (formulaId: string) =>
-  useQuery({
-    queryKey: qk.formulaVersions(formulaId),
-    queryFn: () => formulasRepo.versions(formulaId),
-    enabled: !!formulaId,
-  });
 
 export const useAllVersions = () =>
   useQuery({ queryKey: qk.allVersions, queryFn: formulasRepo.allVersions });
@@ -339,7 +347,7 @@ export function useSaveFormula() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (args: {
-      id: string;
+      id: number;
       expression: string;
       author: string;
       changeNote: string;
@@ -352,10 +360,181 @@ export function useSaveFormula() {
 export function useRevertFormula() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: { formulaId: string; versionId: string; author: string }) =>
+    mutationFn: (args: { formulaId: number; versionId: number; author: string }) =>
       formulasRepo.revert(args.formulaId, args.versionId, args.author),
     meta: { toast: "Formula reverted" },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["formulas"] }),
+  });
+}
+
+// ── KPI Management — Strategic Sets ─────────────────────────────────────────
+export const useStrategicSets = () =>
+  useQuery({ queryKey: qk.strategicSets, queryFn: strategicSetsRepo.list });
+
+export const useStrategicSet = (id: number) =>
+  useQuery({
+    queryKey: qk.strategicSet(id),
+    queryFn: () => strategicSetsRepo.get(id),
+    enabled: Number.isFinite(id) && id > 0,
+  });
+
+export function useCreateStrategicSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      name: string;
+      description?: string;
+      startYear: number;
+      cloneFromSetId?: number;
+      createdBy?: string;
+    }) => strategicSetsRepo.create(input),
+    meta: {
+      toast: (d, v) =>
+        (v as { cloneFromSetId?: number }).cloneFromSetId
+          ? `Set "${(d as StrategicSet).name}" cloned`
+          : `Set "${(d as StrategicSet).name}" created`,
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.strategicSets }),
+  });
+}
+
+export function useUpdateStrategicSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: number;
+      patch: { name?: string; description?: string; status?: StrategicSetStatus };
+    }) => strategicSetsRepo.update(id, patch),
+    meta: { toast: "Strategic set updated" },
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: qk.strategicSets });
+      qc.invalidateQueries({ queryKey: qk.strategicSet(id) });
+    },
+  });
+}
+
+export function useDeleteStrategicSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => strategicSetsRepo.remove(id),
+    meta: { toast: "Strategic set deleted" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.strategicSets }),
+  });
+}
+
+// ── Library KPIs ────────────────────────────────────────────────────────────
+export const useLibraryKpis = (setId: number) =>
+  useQuery({
+    queryKey: qk.libraryKpis(setId),
+    queryFn: () => libraryKpisRepo.listBySet(setId),
+    enabled: Number.isFinite(setId) && setId > 0,
+  });
+
+export const useLibraryKpi = (id: number) =>
+  useQuery({
+    queryKey: qk.libraryKpi(id),
+    queryFn: () => libraryKpisRepo.get(id),
+    enabled: Number.isFinite(id) && id > 0,
+  });
+
+export function useCreateLibraryKpi() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<LibraryKpi> & { setId: number; name: string }) =>
+      libraryKpisRepo.create(input),
+    meta: { toast: (d) => `KPI "${(d as LibraryKpi).name}" created` },
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey: qk.libraryKpis((d as LibraryKpi).setId) });
+      qc.invalidateQueries({ queryKey: qk.strategicSets });
+    },
+  });
+}
+
+export function useUpdateLibraryKpi() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: number; patch: Partial<LibraryKpi> }) =>
+      libraryKpisRepo.update(id, patch),
+    meta: { toast: "KPI updated" },
+    onSuccess: (d) => {
+      const k = d as LibraryKpi;
+      qc.invalidateQueries({ queryKey: qk.libraryKpi(k.id) });
+      qc.invalidateQueries({ queryKey: qk.libraryKpis(k.setId) });
+    },
+  });
+}
+
+export function useDeleteLibraryKpi(setId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => libraryKpisRepo.remove(id),
+    meta: { toast: "KPI deleted" },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.libraryKpis(setId) });
+      qc.invalidateQueries({ queryKey: qk.strategicSets });
+    },
+  });
+}
+
+export function useSaveLibraryKpiTargets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, targets }: { id: number; targets: AnnualTarget[] }) =>
+      libraryKpisRepo.saveTargets(id, targets),
+    meta: { toast: "Targets saved" },
+    onSuccess: (_d, { id }) => qc.invalidateQueries({ queryKey: qk.libraryKpi(id) }),
+  });
+}
+
+// ── Library Metrics (sub-KPIs) ──────────────────────────────────────────────
+export const useLibraryMetrics = (kpiId: number) =>
+  useQuery({
+    queryKey: qk.libraryMetrics(kpiId),
+    queryFn: () => libraryMetricsRepo.listByKpi(kpiId),
+    enabled: Number.isFinite(kpiId) && kpiId > 0,
+  });
+
+export function useCreateLibraryMetric() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<LibraryMetric> & { kpiId: number; name: string }) =>
+      libraryMetricsRepo.create(input),
+    meta: { toast: (d) => `Metric "${(d as LibraryMetric).name}" created` },
+    onSuccess: (d) =>
+      qc.invalidateQueries({ queryKey: qk.libraryMetrics((d as LibraryMetric).kpiId) }),
+  });
+}
+
+export function useUpdateLibraryMetric() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: number; patch: Partial<LibraryMetric> }) =>
+      libraryMetricsRepo.update(id, patch),
+    meta: { toast: "Metric updated" },
+    onSuccess: (d) =>
+      qc.invalidateQueries({ queryKey: qk.libraryMetrics((d as LibraryMetric).kpiId) }),
+  });
+}
+
+export function useDeleteLibraryMetric(kpiId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => libraryMetricsRepo.remove(id),
+    meta: { toast: "Metric deleted" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.libraryMetrics(kpiId) }),
+  });
+}
+
+export function useSaveLibraryMetricTargets(kpiId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, targets }: { id: number; targets: AnnualTarget[] }) =>
+      libraryMetricsRepo.saveTargets(id, targets),
+    meta: { toast: "Targets saved" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.libraryMetrics(kpiId) }),
   });
 }
 
