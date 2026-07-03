@@ -2,14 +2,23 @@
 
 export type Role = "admin" | "reviewer" | "committee" | "viewer";
 
-export type KpiCategory =
-  | "student_success"
-  | "faculty_excellence"
-  | "research_output"
-  | "operational_efficiency"
-  | "financial_health";
+// KPI categories are now user-managed and DB-backed (table `kpi_categories`,
+// exposed via /api/kpi-categories). `category` on a KPI is the stable category
+// id (slug). The union was promoted to a plain string once categories became
+// editable data rather than a fixed set.
+export type KpiCategory = string;
 
-export const KPI_CATEGORIES: { id: KpiCategory; label: string }[] = [
+export interface KpiCategoryRecord {
+  id: string; // stable slug, e.g. "student_success"
+  label: string; // display name (DB column `name`, aliased on read)
+  description?: string;
+  sortOrder: number;
+}
+
+// Canonical default set — mirrors the seed rows in
+// schema/SHS_KPI_Category_schema.sql. Used as a loading/offline fallback so the
+// category tabs never render empty before the DB query resolves.
+export const KPI_CATEGORIES: { id: string; label: string }[] = [
   { id: "student_success", label: "Student Success" },
   { id: "faculty_excellence", label: "Faculty Excellence" },
   { id: "research_output", label: "Research Output" },
