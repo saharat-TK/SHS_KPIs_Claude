@@ -14,6 +14,11 @@ import type {
   LibraryMetric,
   Measurement,
   Metric,
+  PerformanceRecord,
+  PerformanceStatus,
+  PerfKpi,
+  PerfMetric,
+  QuarterProgress,
   StrategicSet,
   StrategicSetStatus,
   ValidationComment,
@@ -459,6 +464,81 @@ export const libraryMetricsRepo = {
         body: JSON.stringify({ targets }),
       }),
       "Failed to save targets",
+    ),
+};
+
+// ── KPI Management — Performance records (activated snapshots, DB-backed) ─────
+export const performanceRecordsRepo = {
+  list: async (): Promise<PerformanceRecord[]> =>
+    jsonOrThrow(await fetch("/api/performance-records"), "Failed to load performance records"),
+  get: async (id: number): Promise<PerformanceRecord> =>
+    jsonOrThrow(await fetch(`/api/performance-records/${id}`), "Failed to load performance record"),
+  activate: async (input: {
+    sourceSetId: number;
+    name?: string;
+    activatedBy?: string;
+  }): Promise<PerformanceRecord> =>
+    jsonOrThrow(
+      await fetch("/api/performance-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to activate performance record",
+    ),
+  update: async (
+    id: number,
+    patch: { name?: string; status?: PerformanceStatus },
+  ): Promise<PerformanceRecord> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update performance record",
+    ),
+  remove: async (id: number): Promise<{ id: number }> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}`, { method: "DELETE" }),
+      "Failed to delete performance record",
+    ),
+  sync: async (id: number): Promise<PerformanceRecord> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}/sync`, { method: "POST" }),
+      "Failed to sync performance record",
+    ),
+  kpisByRecord: async (recordId: number): Promise<PerfKpi[]> =>
+    jsonOrThrow(await fetch(`/api/perf-kpis?recordId=${recordId}`), "Failed to load performance KPIs"),
+  getKpi: async (perfKpiId: number): Promise<PerfKpi> =>
+    jsonOrThrow(await fetch(`/api/perf-kpis/${perfKpiId}`), "Failed to load performance KPI"),
+  metricsByKpi: async (perfKpiId: number): Promise<PerfMetric[]> =>
+    jsonOrThrow(await fetch(`/api/perf-metrics?perfKpiId=${perfKpiId}`), "Failed to load performance metrics"),
+  getMetric: async (perfMetricId: number): Promise<PerfMetric> =>
+    jsonOrThrow(await fetch(`/api/perf-metrics/${perfMetricId}`), "Failed to load performance metric"),
+  saveKpiProgress: async (
+    perfKpiId: number,
+    input: { yearNo: number; quarterNo: number; progressValue: number | null; issue: string; solution: string; recordedBy?: string },
+  ): Promise<QuarterProgress[]> =>
+    jsonOrThrow(
+      await fetch(`/api/perf-kpis/${perfKpiId}/progress`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to save progress",
+    ),
+  saveMetricProgress: async (
+    perfMetricId: number,
+    input: { yearNo: number; quarterNo: number; progressValue: number | null; issue: string; solution: string; recordedBy?: string },
+  ): Promise<QuarterProgress[]> =>
+    jsonOrThrow(
+      await fetch(`/api/perf-metrics/${perfMetricId}/progress`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to save progress",
     ),
 };
 

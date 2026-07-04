@@ -359,6 +359,8 @@ export interface PerfKpi extends Omit<LibraryKpi, "id" | "setId" | "annualTarget
   sourceKpiId: number | null;
   hasChildren: boolean;
   annualTargets?: AnnualTarget[];
+  progress?: QuarterProgress[];
+  startYear?: number; // from the parent performance_record (detail view)
 }
 
 export interface PerfMetric extends Omit<LibraryMetric, "id" | "kpiId" | "annualTargets"> {
@@ -366,6 +368,9 @@ export interface PerfMetric extends Omit<LibraryMetric, "id" | "kpiId" | "annual
   perfKpiId: number;
   sourceMetricId: number | null;
   annualTargets?: AnnualTarget[];
+  progress?: QuarterProgress[];
+  startYear?: number;
+  recordId?: number;
 }
 
 /** One recorded quarter. quarterTarget is computed on read (running sum of

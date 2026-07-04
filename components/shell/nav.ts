@@ -51,15 +51,15 @@ export const NAV: NavGroup[] = [
         icon: "stacked_bar_chart",
         children: [
           {
+            label: "Performance Records",
+            href: "/kpi-management/performance",
+            icon: "assessment",
+          },
+          {
             label: "KPIs Library",
             href: "/kpi-management/library",
             icon: "library_books",
             requires: "configure_kpis",
-          },
-          {
-            label: "Performance Records",
-            href: "/kpi-management/performance",
-            icon: "assessment",
           },
         ],
       },
