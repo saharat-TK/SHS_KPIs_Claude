@@ -36,6 +36,7 @@ export interface ProgressPanelProps {
    *  in sync). When omitted, the panel manages the year internally. */
   year?: number;
   onYearChange?: (year: number) => void;
+  mainColumnFooter?: React.ReactNode;
   onSave: (
     yearNo: number,
     quarterNo: number,
@@ -56,6 +57,7 @@ export function ProgressPanel({
   saving,
   year: yearProp,
   onYearChange,
+  mainColumnFooter,
   onSave,
 }: ProgressPanelProps) {
   const [internalYear, setInternalYear] = useState(1);
@@ -129,6 +131,8 @@ export function ProgressPanel({
             onSave={(data) => onSave(year, quarter, data)}
           />
         </Card>
+
+        {mainColumnFooter}
       </div>
 
       <div className="flex flex-col gap-lg">
