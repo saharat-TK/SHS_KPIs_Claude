@@ -78,7 +78,6 @@ export const qk = {
   perfKpis: (recordId: number) => ["perfKpis", recordId] as const,
   perfKpi: (id: number) => ["perfKpi", id] as const,
   perfMetrics: (perfKpiId: number) => ["perfMetrics", perfKpiId] as const,
-  perfMetric: (id: number) => ["perfMetric", id] as const,
 };
 
 // Queries --------------------------------------------------------------------
@@ -624,13 +623,6 @@ export const usePerfMetricsByKpi = (perfKpiId: number) =>
     enabled: Number.isFinite(perfKpiId) && perfKpiId > 0,
   });
 
-export const usePerfMetric = (id: number) =>
-  useQuery({
-    queryKey: qk.perfMetric(id),
-    queryFn: () => performanceRecordsRepo.getMetric(id),
-    enabled: Number.isFinite(id) && id > 0,
-  });
-
 type ProgressInput = {
   yearNo: number;
   quarterNo: number;
@@ -657,9 +649,11 @@ export function useSaveMetricProgress(perfMetricId: number, perfKpiId: number) {
       performanceRecordsRepo.saveMetricProgress(perfMetricId, input),
     meta: { toast: "Progress saved" },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.perfMetric(perfMetricId) });
       // Parent KPI roll-up may have changed.
       qc.invalidateQueries({ queryKey: qk.perfKpi(perfKpiId) });
+      // The Sub-KPIs table (usePerfMetricsByKpi) reads this list query — refresh
+      // it too so saving in the pop-up updates the table live, in place.
+      qc.invalidateQueries({ queryKey: qk.perfMetrics(perfKpiId) });
     },
   });
 }
