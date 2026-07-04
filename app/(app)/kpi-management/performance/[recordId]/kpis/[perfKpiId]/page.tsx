@@ -37,6 +37,7 @@ import {
 } from "@/lib/kpi/progress";
 import { formatNumber } from "@/lib/utils";
 import { ProgressPanel } from "./ProgressPanel";
+import { MetricProgressModal } from "./MetricProgressModal";
 
 export default function PerfKpiProgressPage() {
   return (
@@ -61,6 +62,11 @@ function PerfKpiProgress() {
   // Year selection is lifted here so the Sub-KPIs table stays in sync with the
   // ProgressPanel's Year tabs.
   const [year, setYear] = useState(1);
+  // Entering progress for a sub-KPI opens a pop-up instead of navigating away.
+  // Store only the id (not the metric object) so the pop-up re-derives a fresh
+  // metric from `metrics` after a save invalidates the list query — otherwise
+  // the pop-up would keep showing the stale value it was opened with.
+  const [editingMetricId, setEditingMetricId] = useState<number | null>(null);
 
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}/kpis`, "KPIs");
@@ -143,10 +149,7 @@ function PerfKpiProgress() {
                               hasTh && pct != null
                                 ? healthOf(pct, { green: m.thresholdGreen!, amber: m.thresholdAmber! })
                                 : null;
-                            const go = () =>
-                              router.push(
-                                `/kpi-management/performance/${recordId}/kpis/${perfKpiId}/metrics/${m.id}`,
-                              );
+                            const go = () => setEditingMetricId(m.id);
                             return (
                               <Tr key={m.id} onClick={go}>
                                 <Td className="font-medium">{m.name}</Td>
@@ -216,6 +219,19 @@ function PerfKpiProgress() {
                 Values are entered directly per quarter above.
               </div>
             )}
+
+            {editingMetricId != null && (() => {
+              const editingMetric = metrics.find((m) => m.id === editingMetricId);
+              return editingMetric ? (
+                <MetricProgressModal
+                  key={editingMetric.id}
+                  metric={editingMetric}
+                  perfKpiId={perfKpiId}
+                  year={year}
+                  onClose={() => setEditingMetricId(null)}
+                />
+              ) : null;
+            })()}
           </>
         )}
       </QueryBoundary>

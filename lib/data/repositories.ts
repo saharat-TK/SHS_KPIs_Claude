@@ -514,8 +514,6 @@ export const performanceRecordsRepo = {
     jsonOrThrow(await fetch(`/api/perf-kpis/${perfKpiId}`), "Failed to load performance KPI"),
   metricsByKpi: async (perfKpiId: number): Promise<PerfMetric[]> =>
     jsonOrThrow(await fetch(`/api/perf-metrics?perfKpiId=${perfKpiId}`), "Failed to load performance metrics"),
-  getMetric: async (perfMetricId: number): Promise<PerfMetric> =>
-    jsonOrThrow(await fetch(`/api/perf-metrics/${perfMetricId}`), "Failed to load performance metric"),
   saveKpiProgress: async (
     perfKpiId: number,
     input: { yearNo: number; quarterNo: number; progressValue: number | null; issue: string; solution: string; recordedBy?: string },

@@ -192,7 +192,7 @@ export function ProgressPanel({
   );
 }
 
-function QuarterEntry({
+export function QuarterEntry({
   quarter,
   target,
   existing,
@@ -224,13 +224,13 @@ function QuarterEntry({
       <div>
         <h3 className="text-heading-md text-on-surface">Q{quarter} Data Entry</h3>
         <p className="text-caption-sm text-mute mt-tiny">
-          {target == null ? "No target" : `Target: ${formatNumber(target, 2)} ${unit ?? ""}`}
+          {target == null ? "No target" : `Cumulative Target: ${formatNumber(target, 2)} ${unit ?? ""}`}
         </p>
       </div>
 
       <div className="flex flex-col gap-xs">
         <span className="text-label-md text-on-surface">
-          {valueEditable ? "Progress value" : "Computed value"}
+          {valueEditable ? "Progress value (Cumulative)" : "Computed value (Cumulative)"}
         </span>
         {valueEditable ? (
           <Input
