@@ -44,14 +44,14 @@ export function Sidebar({
       )}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[234px] shrink-0 border-r border-hairline bg-surface-lowest flex flex-col transition-[transform,width] duration-200 lg:sticky lg:inset-auto lg:top-0 lg:h-screen lg:translate-x-0 lg:z-40",
+          "fixed inset-y-0 left-0 z-50 w-[234px] shrink-0 border-r border-[#151515] bg-black flex flex-col transition-[transform,width] duration-200 lg:sticky lg:inset-auto lg:top-0 lg:h-screen lg:translate-x-0 lg:z-40",
           collapsed ? "lg:w-[72px]" : "lg:w-[234px]",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div
           className={cn(
-            "relative flex h-[56px] items-center border-b border-hairline px-md",
+            "relative flex h-[56px] items-center border-b border-[#151515] px-md",
             collapsed ? "lg:justify-center lg:px-sm" : "gap-xs",
           )}
         >
@@ -74,8 +74,8 @@ export function Sidebar({
               className="h-8 w-auto shrink-0"
             />
             <div className={cn("min-w-0 leading-tight", collapsed && "lg:hidden")}>
-              <p className="truncate text-body-strong text-on-surface">Health Sciences</p>
-              <p className="truncate text-caption-sm text-mute">Analytics Platform</p>
+              <p className="truncate text-body-strong text-white">Health Sciences</p>
+              <p className="truncate text-caption-sm text-[#8a8a8a]">Analytics Platform</p>
             </div>
           </Link>
           <button
@@ -84,8 +84,8 @@ export function Sidebar({
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={cn(
-              "ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT text-mute transition-colors hover:bg-surface-soft hover:text-on-surface lg:flex",
-              collapsed && "lg:absolute lg:left-[52px] lg:ml-0 lg:border lg:border-hairline lg:bg-surface-lowest",
+              "ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT text-[#8a8a8a] transition-colors hover:bg-[#151515] hover:text-white lg:flex",
+              collapsed && "lg:absolute lg:left-[52px] lg:ml-0 lg:border lg:border-[#272727] lg:bg-black",
             )}
           >
             <Icon name={collapsed ? "chevron_right" : "chevron_left"} size={20} />
@@ -111,7 +111,7 @@ export function Sidebar({
               >
                 <p
                   className={cn(
-                    "px-sm text-utility-xs uppercase tracking-wider text-stone mb-xs",
+                    "px-sm text-utility-xs uppercase tracking-wider text-[#8a8a8a] mb-xs",
                     collapsed && "lg:hidden",
                   )}
                 >
@@ -144,7 +144,7 @@ export function Sidebar({
 
         <div
           className={cn(
-            "truncate border-t border-hairline px-md py-sm text-caption-sm text-mute",
+            "truncate border-t border-[#151515] px-md py-sm text-caption-sm text-[#8a8a8a]",
             collapsed && "lg:px-sm lg:text-center",
           )}
           title="MFU · School of Health Sciences"
@@ -178,20 +178,15 @@ function NavLeaf({
       onClick={onClose}
       title={collapsed ? item.label : undefined}
       className={cn(
-        "flex items-center gap-xs rounded-DEFAULT px-sm py-xs text-label-sm transition-colors",
+        "flex items-center gap-xs rounded-DEFAULT border-y border-r border-l-4 px-sm py-xs text-label-sm transition-colors",
         collapsed && "lg:h-10 lg:w-10 lg:justify-center lg:p-0",
         indented && !collapsed && "pl-md",
         active
-          ? "bg-surface-soft text-primary-dark border border-primary-container"
-          : "text-on-surface border border-transparent hover:bg-surface-soft",
+          ? "border-y-primary border-r-primary border-l-primary-container bg-primary text-white"
+          : "border-transparent text-white hover:bg-[#151515]",
       )}
     >
-      <span
-        className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT",
-          active ? "bg-primary-container/20" : "text-mute",
-        )}
-      >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT text-white">
         <Icon name={item.icon} size={indented ? 17 : 19} />
       </span>
       <span className={cn("min-w-0 truncate", collapsed && "lg:hidden")}>
@@ -251,16 +246,16 @@ function NavParent({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={cn(
-          "flex items-center gap-xs rounded-DEFAULT px-sm py-xs text-label-sm transition-colors",
+          "flex items-center gap-xs rounded-DEFAULT border border-transparent px-sm py-xs text-label-sm transition-colors",
           childActive && !open
-            ? "text-primary-dark"
-            : "text-on-surface hover:bg-surface-soft",
+            ? "text-primary-container"
+            : "text-white hover:bg-[#151515]",
         )}
       >
         <span
           className={cn(
             "flex h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT",
-            childActive ? "bg-primary-container/20 text-primary-dark" : "text-mute",
+            childActive ? "text-primary-container" : "text-white",
           )}
         >
           <Icon name={item.icon} size={19} />
@@ -269,7 +264,7 @@ function NavParent({
         <Icon
           name={open ? "expand_less" : "expand_more"}
           size={18}
-          className="shrink-0 text-mute"
+          className="shrink-0 text-[#d8d8d8]"
         />
       </button>
       {open && (
