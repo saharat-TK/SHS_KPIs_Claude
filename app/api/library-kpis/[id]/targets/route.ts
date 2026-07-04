@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import { validateAnnualTargets } from "@/lib/kpi/targets";
+import { syncActiveRecordsForSet, setIdForKpi } from "@/lib/kpi/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,8 @@ export async function PUT(
           [params.id, t.yearNo, t.targetValue ?? null],
         );
       }
+      // Reflect the updated targets on every active performance record.
+      await syncActiveRecordsForSet(conn, await setIdForKpi(conn, Number(params.id)));
       await conn.commit();
     } catch (err) {
       await conn.rollback();

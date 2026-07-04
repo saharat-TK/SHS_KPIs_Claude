@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { LIBRARY_METRIC_FIELDS } from "@/lib/kpi/fields";
+import { syncActiveRecordsForSet, setIdForKpi } from "@/lib/kpi/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,8 @@ export async function POST(req: NextRequest) {
           sortOrder,
         ],
       );
+      // Propagate the new sub-KPI to every active performance record.
+      await syncActiveRecordsForSet(conn, await setIdForKpi(conn, Number(b.kpiId)));
       await conn.commit();
 
       const [created] = await conn.query<RowDataPacket[]>(

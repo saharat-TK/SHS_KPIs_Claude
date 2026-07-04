@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
-import { syncRecordFromLibrary } from "@/lib/kpi/performance";
+import { syncRecordFromLibrary, recomputeRecordRollups } from "@/lib/kpi/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +24,7 @@ export async function POST(
     try {
       await conn.beginTransaction();
       await syncRecordFromLibrary(conn, Number(params.id));
+      await recomputeRecordRollups(conn, Number(params.id));
       await conn.commit();
     } catch (err) {
       await conn.rollback();

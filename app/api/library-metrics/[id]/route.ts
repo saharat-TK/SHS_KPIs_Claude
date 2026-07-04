@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { LIBRARY_METRIC_FIELDS } from "@/lib/kpi/fields";
+import {
+  syncActiveRecordsForSet,
+  setIdForMetric,
+  activeRecordsHaveMetricProgress,
+} from "@/lib/kpi/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -80,13 +85,28 @@ export async function PATCH(
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
     values.push(params.id);
-    const [result] = await pool.query<ResultSetHeader>(
-      `UPDATE library_metric SET ${setClauses.join(", ")} WHERE id = ?`,
-      values,
-    );
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: "Metric not found" }, { status: 404 });
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [result] = await conn.query<ResultSetHeader>(
+        `UPDATE library_metric SET ${setClauses.join(", ")} WHERE id = ?`,
+        values,
+      );
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return NextResponse.json({ error: "Metric not found" }, { status: 404 });
+      }
+      // Reflect the edit (incl. weight → roll-up) on active performance records.
+      await syncActiveRecordsForSet(conn, await setIdForMetric(conn, Number(params.id)));
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
     }
+
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${LIBRARY_METRIC_FIELDS} FROM library_metric m WHERE m.id = ?`,
       [params.id],
@@ -105,14 +125,41 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
-    const [result] = await pool.query<ResultSetHeader>(
-      "DELETE FROM library_metric WHERE id = ?",
-      [params.id],
-    );
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: "Metric not found" }, { status: 404 });
+    const metricId = Number(params.id);
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Guard: don't discard entered progress in an active record.
+      if (await activeRecordsHaveMetricProgress(conn, metricId)) {
+        await conn.rollback();
+        return NextResponse.json(
+          {
+            error:
+              "Can't delete: an active performance record already has recorded progress for this sub-KPI. Close or adjust that record first.",
+          },
+          { status: 409 },
+        );
+      }
+
+      const setId = await setIdForMetric(conn, metricId);
+      const [result] = await conn.query<ResultSetHeader>(
+        "DELETE FROM library_metric WHERE id = ?",
+        [metricId],
+      );
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return NextResponse.json({ error: "Metric not found" }, { status: 404 });
+      }
+      await syncActiveRecordsForSet(conn, setId);
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
     }
-    return NextResponse.json({ id: Number(params.id) });
+    return NextResponse.json({ id: metricId });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to delete metric" },

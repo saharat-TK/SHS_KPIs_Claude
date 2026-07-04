@@ -251,3 +251,106 @@ export async function syncRecordFromLibrary(conn: PoolConnection, recordId: numb
     [recordId],
   );
 }
+
+// ── Auto-propagation of library edits to active performance records ───────────
+
+/** Resolve the strategic set that owns a library KPI (null if not found). */
+export async function setIdForKpi(
+  conn: PoolConnection,
+  libKpiId: number,
+): Promise<number | null> {
+  const [rows] = await conn.query<RowDataPacket[]>(
+    "SELECT set_id FROM library_kpi WHERE id = ?",
+    [libKpiId],
+  );
+  return rows.length ? Number(rows[0].set_id) : null;
+}
+
+/** Resolve the strategic set that owns a library metric (via its KPI). */
+export async function setIdForMetric(
+  conn: PoolConnection,
+  libMetricId: number,
+): Promise<number | null> {
+  const [rows] = await conn.query<RowDataPacket[]>(
+    `SELECT k.set_id AS setId FROM library_metric m
+       JOIN library_kpi k ON k.id = m.kpi_id WHERE m.id = ?`,
+    [libMetricId],
+  );
+  return rows.length ? Number(rows[0].setId) : null;
+}
+
+/** Recompute every has_children KPI's roll-up across all quarters for a record,
+ *  so computed values stay correct after weight/structure changes. */
+export async function recomputeRecordRollups(conn: PoolConnection, recordId: number) {
+  const [kpis] = await conn.query<RowDataPacket[]>(
+    "SELECT id FROM perf_kpi WHERE record_id = ? AND has_children = 1",
+    [recordId],
+  );
+  for (const k of kpis) {
+    for (let year = 1; year <= 5; year++) {
+      for (let quarter = 1; quarter <= 4; quarter++) {
+        await recomputeKpiQuarter(conn, k.id, year, quarter);
+      }
+    }
+  }
+}
+
+/** Re-sync every ACTIVE performance record activated from a set (definitions +
+ *  targets + roll-ups). Called automatically after any library write. Closed /
+ *  archived records are left frozen. No-op if setId is null. */
+export async function syncActiveRecordsForSet(
+  conn: PoolConnection,
+  setId: number | null,
+) {
+  if (setId == null) return;
+  const [records] = await conn.query<RowDataPacket[]>(
+    "SELECT id FROM performance_record WHERE source_set_id = ? AND status = 'active'",
+    [setId],
+  );
+  for (const r of records) {
+    await syncRecordFromLibrary(conn, r.id);
+    await recomputeRecordRollups(conn, r.id);
+  }
+}
+
+/** True if any ACTIVE record has entered progress tied to this library KPI —
+ *  either the KPI's own quarter progress or any of its metrics' progress
+ *  (deleting the KPI would cascade the metrics and lose that data). */
+export async function activeRecordsHaveKpiProgress(
+  conn: PoolConnection,
+  libKpiId: number,
+): Promise<boolean> {
+  const [rows] = await conn.query<RowDataPacket[]>(
+    `SELECT 1 FROM perf_kpi pk
+       JOIN performance_record r ON r.id = pk.record_id AND r.status = 'active'
+      WHERE pk.source_kpi_id = ?
+        AND (
+          EXISTS (SELECT 1 FROM perf_kpi_quarter_progress q WHERE q.perf_kpi_id = pk.id)
+          OR EXISTS (
+            SELECT 1 FROM perf_metric_quarter_progress mq
+              JOIN perf_metric pm ON pm.id = mq.perf_metric_id
+             WHERE pm.perf_kpi_id = pk.id
+          )
+        )
+      LIMIT 1`,
+    [libKpiId],
+  );
+  return rows.length > 0;
+}
+
+/** True if any ACTIVE record has entered progress tied to this library metric. */
+export async function activeRecordsHaveMetricProgress(
+  conn: PoolConnection,
+  libMetricId: number,
+): Promise<boolean> {
+  const [rows] = await conn.query<RowDataPacket[]>(
+    `SELECT 1 FROM perf_metric pm
+       JOIN perf_kpi pk ON pk.id = pm.perf_kpi_id
+       JOIN performance_record r ON r.id = pk.record_id AND r.status = 'active'
+       JOIN perf_metric_quarter_progress mq ON mq.perf_metric_id = pm.id
+      WHERE pm.source_metric_id = ?
+      LIMIT 1`,
+    [libMetricId],
+  );
+  return rows.length > 0;
+}
