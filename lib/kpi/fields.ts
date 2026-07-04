@@ -19,7 +19,8 @@ export const LIBRARY_METRIC_FIELDS = `
   m.data_collect_method AS dataCollectMethod, m.collection_period AS collectionPeriod,
   m.data_source_url AS dataSourceUrl, m.committee_id AS committeeId,
   m.person_in_charge_id AS personInChargeId, m.weight, m.unit,
-  m.five_year_target AS fiveYearTarget, m.threshold_green AS thresholdGreen,
+  m.five_year_target AS fiveYearTarget, m.target_mode AS targetMode,
+  m.threshold_green AS thresholdGreen,
   m.threshold_amber AS thresholdAmber, m.sort_order AS sortOrder
 `;
 

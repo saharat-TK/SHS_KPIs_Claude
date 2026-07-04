@@ -17,9 +17,9 @@
 --       overwrite the snapshot) EXCEPT already-entered quarterly progress,
 --       which is preserved. Snapshot rows keep source_*_id back-pointers so a
 --       re-sync can match library rows to their performance copies.
---    5. five_year_target is a CUMULATIVE SUM CAP: SUM(the 5 annual targets)
---       must not exceed five_year_target (app-enforced). Each single year may
---       also not exceed it. Same rule for KPIs and metrics.
+--    5. five_year_target is a PER-YEAR CAP: each annual target must not
+--       exceed five_year_target (app-enforced). The sum of annual targets may
+--       exceed it. Same rule for KPIs and metrics.
 --    6. Metrics carry their OWN green/amber thresholds (same as KPIs) so the
 --       metric progress bar can show colour bands.
 --    7. Calculation logic is BOTH: calculation_type covers simple weighted/
@@ -115,7 +115,7 @@ CREATE TABLE library_kpi (
   -- Annual target (5 years)
   weight              DECIMAL(6,2) NOT NULL DEFAULT 0,      -- relative weight
   unit                VARCHAR(50)  NULL,                    -- "%", "score", "ratio", "จำนวน"
-  five_year_target    DECIMAL(14,4) NULL,                   -- cumulative cap: SUM(5 yearly targets) <= this (decision #5)
+  five_year_target    DECIMAL(14,4) NULL,                   -- per-year cap for each annual target (decision #5)
   -- Calculation logic + roll-up (decision #7: BOTH simple type AND optional formula)
   calculation_type    ENUM('weighted_sum','simple_average','custom_formula') NOT NULL DEFAULT 'weighted_sum',
   calculation_logic   TEXT NULL,                            -- free-text notes / description of the logic
@@ -163,6 +163,7 @@ CREATE TABLE library_metric (
   weight              DECIMAL(6,2) NOT NULL DEFAULT 0,
   unit                VARCHAR(50)  NULL,
   five_year_target    DECIMAL(14,4) NULL,
+  target_mode         ENUM('none','inherit_parent','manual') NOT NULL DEFAULT 'manual',
   -- Threshold setting (decision #6: metrics carry their own colour bands)
   threshold_green     DECIMAL(14,4) NULL,                   -- >= green  => healthy
   threshold_amber     DECIMAL(14,4) NULL,                   -- >= amber  => watch
@@ -328,11 +329,14 @@ CREATE TABLE perf_metric_quarter_progress (
 
 -- =============================================================================
 --  NOTES / rules enforced in the application layer (not by DDL)
---  * five_year_target is a CUMULATIVE SUM CAP (decision #5): on save of any
---    library_*_annual_target / perf_*_annual_target, enforce BOTH
---      SUM(the 5 year targets) <= five_year_target   AND
---      each single year target  <= five_year_target.
---    (A CHECK can't SUM sibling rows or compare across tables.)
+--  Existing database migration for target inheritance mode:
+--    ALTER TABLE library_metric
+--      ADD COLUMN target_mode ENUM('none','inherit_parent','manual')
+--      NOT NULL DEFAULT 'manual' AFTER five_year_target;
+--  * five_year_target is a PER-YEAR CAP (decision #5): on save of any
+--    library_*_annual_target / perf_*_annual_target, enforce each single year
+--    target <= five_year_target. The sum of annual targets may exceed it.
+--    (A CHECK can't compare annual target rows with parent target rows.)
 --  * custom_formula KPIs (decision #7): when calculation_type='custom_formula',
 --    formula_id must be set; the roll-up evaluates formula.expression (mathjs)
 --    over the child metric values. weighted_sum/simple_average ignore formula_id.

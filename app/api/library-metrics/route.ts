@@ -6,6 +6,10 @@ import { syncActiveRecordsForSet, setIdForKpi } from "@/lib/kpi/performance";
 
 export const dynamic = "force-dynamic";
 
+const TARGET_MODES = new Set(["none", "inherit_parent", "manual"]);
+const targetModeOf = (value: unknown) =>
+  typeof value === "string" && TARGET_MODES.has(value) ? value : "manual";
+
 export async function GET(req: NextRequest) {
   try {
     const kpiId = req.nextUrl.searchParams.get("kpiId");
@@ -48,8 +52,8 @@ export async function POST(req: NextRequest) {
         `INSERT INTO library_metric
            (kpi_id, name, description, category_id, data_collect_method,
             collection_period, data_source_url, committee_id, person_in_charge_id,
-            weight, unit, five_year_target, threshold_green, threshold_amber, sort_order)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            weight, unit, five_year_target, target_mode, threshold_green, threshold_amber, sort_order)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           b.kpiId,
           b.name.trim(),
@@ -63,6 +67,7 @@ export async function POST(req: NextRequest) {
           b.weight ?? 0,
           b.unit?.trim() || null,
           b.fiveYearTarget ?? null,
+          targetModeOf(b.targetMode),
           b.thresholdGreen ?? null,
           b.thresholdAmber ?? null,
           sortOrder,

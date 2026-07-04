@@ -22,6 +22,7 @@ const COLUMN_MAP: Record<string, string> = {
   weight: "weight",
   unit: "unit",
   fiveYearTarget: "five_year_target",
+  targetMode: "target_mode",
   thresholdGreen: "threshold_green",
   thresholdAmber: "threshold_amber",
   sortOrder: "sort_order",
@@ -36,6 +37,17 @@ const NULLABLE_TEXT = new Set([
   "committeeId",
   "personInChargeId",
 ]);
+
+const TARGET_MODES = new Set(["none", "inherit_parent", "manual"]);
+
+function normalizePatchValue(key: string, value: unknown) {
+  if (key === "targetMode") {
+    return typeof value === "string" && TARGET_MODES.has(value) ? value : "manual";
+  }
+  return NULLABLE_TEXT.has(key)
+    ? (typeof value === "string" ? value.trim() : value) || null
+    : value;
+}
 
 export async function GET(
   _req: NextRequest,
@@ -74,11 +86,7 @@ export async function PATCH(
       if (key in body) {
         setClauses.push(`${column} = ?`);
         const v = body[key];
-        values.push(
-          NULLABLE_TEXT.has(key)
-            ? (typeof v === "string" ? v.trim() : v) || null
-            : v,
-        );
+        values.push(normalizePatchValue(key, v));
       }
     }
     if (setClauses.length === 0) {
