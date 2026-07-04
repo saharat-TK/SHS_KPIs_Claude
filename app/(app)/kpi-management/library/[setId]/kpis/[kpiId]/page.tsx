@@ -144,13 +144,17 @@ function KpiDetail() {
     (JSON.stringify(draft) !== JSON.stringify(original) ||
       JSON.stringify(years) !== JSON.stringify(originalYears));
 
-  // Cumulative-sum cap (decision #5) — mirrored client-side.
-  const yearSum = years.reduce<number>((a, v) => a + (v ?? 0), 0);
+  // Per-year cap (decision #5) - mirrored client-side.
   const cap = draft?.fiveYearTarget ?? null;
+  const overCapYear =
+    cap == null
+      ? null
+      : years
+          .map((targetValue, index) => ({ yearNo: index + 1, targetValue }))
+          .find(({ targetValue }) => targetValue != null && targetValue > cap);
   const capError =
-    cap != null &&
-    (yearSum > cap || years.some((v) => v != null && v > cap))
-      ? `Annual targets (sum ${yearSum.toFixed(2)}) must not exceed the 5-year target (${cap.toFixed(2)}).`
+    cap != null && overCapYear?.targetValue != null
+      ? `Year ${overCapYear.yearNo} target (${overCapYear.targetValue.toFixed(2)}) must not exceed the 5-year target (${cap.toFixed(2)}).`
       : null;
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
@@ -329,7 +333,7 @@ function KpiDetail() {
               <Card>
                 <CardHeader
                   title="Annual Target (5 years)"
-                  subtitle="The 5-year target is the cumulative cap; the sum of yearly targets cannot exceed it."
+                  subtitle="Each year target must not exceed the 5-year target."
                 />
                 <CardBody className="flex flex-col gap-lg">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-lg">
@@ -375,8 +379,8 @@ function KpiDetail() {
                   </div>
                   <div className="flex items-center justify-between text-caption-sm">
                     <span className="text-mute">
-                      Sum of yearly targets: <span className="text-on-surface font-medium">{yearSum.toFixed(2)}</span>
-                      {cap != null && <> / {cap.toFixed(2)}</>}
+                      Each year target must not exceed the 5-year target
+                      {cap != null && <> ({cap.toFixed(2)})</>}.
                     </span>
                     {capError && <span className="text-error">{capError}</span>}
                   </div>

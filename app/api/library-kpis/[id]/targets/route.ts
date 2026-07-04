@@ -7,7 +7,7 @@ import { syncActiveRecordsForSet, setIdForKpi } from "@/lib/kpi/performance";
 export const dynamic = "force-dynamic";
 
 // Replace the 5 annual-target rows for a KPI in one transaction, enforcing the
-// cumulative-sum cap against the KPI's five_year_target.
+// per-year cap against the KPI's five_year_target.
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } },

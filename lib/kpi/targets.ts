@@ -1,9 +1,7 @@
-// Cumulative-sum-cap rule (schema decision #5): the five_year_target is the
-// total across the whole strategic period. The 5 annual targets are slices of
-// it, so BOTH the sum of the annual targets AND each individual year must not
-// exceed the cap. Enforced here (app layer) because a CHECK can't sum sibling
-// rows or compare across tables. Shared by the library and performance target
-// routes so KPIs and metrics validate identically.
+// Per-year cap rule (schema decision #5): when five_year_target is set, each
+// annual target must be less than or equal to it. The sum of annual targets may
+// exceed the cap. Shared by the library target routes so KPIs and metrics
+// validate identically.
 
 export interface TargetInput {
   yearNo: number; // 1..5
@@ -34,17 +32,9 @@ export function validateAnnualTargets(
     if (t.targetValue != null && t.targetValue > fiveYearTarget) {
       return {
         ok: false,
-        error: `Year ${t.yearNo} target (${t.targetValue}) exceeds the 5-year target (${fiveYearTarget})`,
+        error: `Year ${t.yearNo} target (${t.targetValue}) must not exceed the 5-year target (${fiveYearTarget})`,
       };
     }
-  }
-
-  const sum = targets.reduce((acc, t) => acc + (t.targetValue ?? 0), 0);
-  if (sum > fiveYearTarget) {
-    return {
-      ok: false,
-      error: `The sum of annual targets (${sum}) exceeds the 5-year target (${fiveYearTarget})`,
-    };
   }
 
   return { ok: true };

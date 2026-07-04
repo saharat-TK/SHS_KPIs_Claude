@@ -196,11 +196,15 @@ function MetricModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metric?.id]);
 
-  const yearSum = years.reduce<number>((a, v) => a + (v ?? 0), 0);
+  const overCapYear =
+    fiveYearTarget == null
+      ? null
+      : years
+          .map((targetValue, index) => ({ yearNo: index + 1, targetValue }))
+          .find(({ targetValue }) => targetValue != null && targetValue > fiveYearTarget);
   const capError =
-    fiveYearTarget != null &&
-    (yearSum > fiveYearTarget || years.some((v) => v != null && v > fiveYearTarget))
-      ? `Annual targets (sum ${yearSum.toFixed(2)}) must not exceed the 5-year target (${fiveYearTarget.toFixed(2)}).`
+    fiveYearTarget != null && overCapYear?.targetValue != null
+      ? `Year ${overCapYear.yearNo} target (${overCapYear.targetValue.toFixed(2)}) must not exceed the 5-year target (${fiveYearTarget.toFixed(2)}).`
       : null;
 
   const submitting = create.isPending || update.isPending || saveTargets.isPending;
@@ -379,7 +383,13 @@ function MetricModal({
             </Field>
           ))}
         </div>
-        {capError && <span className="text-caption-sm text-error">{capError}</span>}
+        <div className="flex items-center justify-between text-caption-sm">
+          <span className="text-mute">
+            Each year target must not exceed the 5-year target
+            {fiveYearTarget != null && <> ({fiveYearTarget.toFixed(2)})</>}.
+          </span>
+          {capError && <span className="text-error">{capError}</span>}
+        </div>
       </div>
     </Modal>
   );
