@@ -18,6 +18,11 @@ function createPool() {
     waitForConnections: true,
     connectionLimit: 10,
     dateStrings: true,
+    // Return DECIMAL/NEWDECIMAL columns as JS numbers, not strings (mysql2's
+    // default). Our TS types treat weight/targets/thresholds as `number`, and
+    // the app does arithmetic on them (target sums, cap checks, roll-ups), so
+    // string values would break math and .toFixed() formatting.
+    decimalNumbers: true,
   });
 }
 

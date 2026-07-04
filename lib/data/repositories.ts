@@ -5,14 +5,37 @@ import type {
   FacultyRecord,
   Formula,
   FormulaVersion,
+  FormulaRecord,
+  FormulaVersionRecord,
+  AnnualTarget,
   Kpi,
+  KpiCategoryRecord,
+  LibraryKpi,
+  LibraryMetric,
   Measurement,
   Metric,
+  PerformanceRecord,
+  PerformanceStatus,
+  PerfKpi,
+  PerfMetric,
+  QuarterProgress,
+  StrategicSet,
+  StrategicSetStatus,
   ValidationComment,
   ValidationStatus,
   ValidationSubmission,
 } from "@/lib/types";
 import { delay, getDB, uid } from "./store";
+
+// Shared helper for the DB-backed KPI-management repos: throw the API's error
+// message (so mutation error toasts are meaningful) instead of a generic string.
+async function jsonOrThrow<T>(res: Response, fallback: string): Promise<T> {
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || fallback);
+  }
+  return res.json();
+}
 
 // ── The repository layer: the single seam between UI and data source. ────────
 // Every function is async and returns plain data. Phase 2 reimplements the
@@ -140,6 +163,57 @@ export const committeeMembershipsRepo = {
   },
 };
 
+// KPI categories — real MySQL-backed (shs_kpis_claude.kpi_categories), user-
+// managed via the "Manage Categories" modal on the KPI Management page.
+// Fetch-based like facultyRecordsRepo. Note: deletion of an in-use category is
+// blocked in the UI against the in-memory KPIs, since KPIs aren't in MySQL yet.
+export const kpiCategoriesRepo = {
+  list: async (): Promise<KpiCategoryRecord[]> => {
+    const res = await fetch("/api/kpi-categories");
+    if (!res.ok) throw new Error("Failed to load categories");
+    return res.json();
+  },
+  create: async (input: {
+    label: string;
+    description?: string;
+    sortOrder?: number;
+  }): Promise<KpiCategoryRecord> => {
+    const res = await fetch("/api/kpi-categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: input.label, description: input.description, sortOrder: input.sortOrder }),
+    });
+    if (!res.ok) throw new Error("Failed to create category");
+    return res.json();
+  },
+  update: async (
+    id: string,
+    patch: { label?: string; description?: string; sortOrder?: number },
+  ): Promise<KpiCategoryRecord> => {
+    const res = await fetch(`/api/kpi-categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error("Failed to update category");
+    return res.json();
+  },
+  remove: async (id: string): Promise<{ id: string }> => {
+    const res = await fetch(`/api/kpi-categories/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to remove category");
+    return res.json();
+  },
+  reorder: async (order: string[]): Promise<KpiCategoryRecord[]> => {
+    const res = await fetch("/api/kpi-categories/reorder", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order }),
+    });
+    if (!res.ok) throw new Error("Failed to reorder categories");
+    return res.json();
+  },
+};
+
 // KPIs -----------------------------------------------------------------------
 export const kpisRepo = {
   list: () => delay(getDB().kpis),
@@ -187,72 +261,59 @@ export const metricsRepo = {
   },
 };
 
-// Formulas -------------------------------------------------------------------
+// Formulas — real MySQL-backed (shs_kpis_claude.formula / formula_variable /
+// formula_version). Used by the migrated Formula Builder + Version History and
+// by the library KPI calculation-logic picker. Numeric BIGINT ids.
 export const formulasRepo = {
-  list: () => delay(getDB().formulas),
-  get: (id: string) => delay(getDB().formulas.find((f) => f.id === id) ?? null),
-  versions: (formulaId: string) =>
-    delay(
-      getDB()
-        .formulaVersions.filter((v) => v.formulaId === formulaId)
-        .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1)),
-    ),
-  allVersions: () =>
-    delay(
-      [...getDB().formulaVersions].sort((a, b) =>
-        a.timestamp < b.timestamp ? 1 : -1,
-      ),
+  list: async (): Promise<FormulaRecord[]> =>
+    jsonOrThrow(await fetch("/api/formulas"), "Failed to load formulas"),
+  get: async (id: number): Promise<FormulaRecord> =>
+    jsonOrThrow(await fetch(`/api/formulas/${id}`), "Failed to load formula"),
+  allVersions: async (): Promise<FormulaVersionRecord[]> =>
+    jsonOrThrow(await fetch("/api/formulas/versions"), "Failed to load versions"),
+  create: async (input: {
+    name: string;
+    expression: string;
+    variables?: { symbol: string; label: string; source?: string }[];
+    author?: string;
+    changeNote?: string;
+  }): Promise<FormulaRecord> =>
+    jsonOrThrow(
+      await fetch("/api/formulas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to create formula",
     ),
   save: async (
-    id: string,
+    id: number,
     expression: string,
     author: string,
     changeNote: string,
-  ) => {
-    const db = getDB();
-    const formula = db.formulas.find((f) => f.id === id);
-    if (!formula) throw new Error("Formula not found");
-    const nextVersion = bumpVersion(formula.currentVersion);
-    formula.expression = expression;
-    formula.currentVersion = nextVersion;
-    const version: FormulaVersion = {
-      id: uid("fv"),
-      formulaId: id,
-      version: nextVersion,
-      expression,
-      author,
-      timestamp: new Date().toISOString(),
-      changeNote,
-    };
-    db.formulaVersions.push(version);
-    return delay({ formula, version });
-  },
-  revert: async (formulaId: string, versionId: string, author: string) => {
-    const db = getDB();
-    const formula = db.formulas.find((f) => f.id === formulaId);
-    const target = db.formulaVersions.find((v) => v.id === versionId);
-    if (!formula || !target) throw new Error("Not found");
-    const nextVersion = bumpVersion(formula.currentVersion);
-    formula.expression = target.expression;
-    formula.currentVersion = nextVersion;
-    db.formulaVersions.push({
-      id: uid("fv"),
-      formulaId,
-      version: nextVersion,
-      expression: target.expression,
-      author,
-      timestamp: new Date().toISOString(),
-      changeNote: `Reverted to ${target.version}.`,
-    });
-    return delay(formula);
-  },
+  ): Promise<FormulaRecord> =>
+    jsonOrThrow(
+      await fetch(`/api/formulas/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expression, author, changeNote }),
+      }),
+      "Failed to save formula",
+    ),
+  revert: async (
+    formulaId: number,
+    versionId: number,
+    author: string,
+  ): Promise<FormulaRecord> =>
+    jsonOrThrow(
+      await fetch(`/api/formulas/${formulaId}/revert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId, author }),
+      }),
+      "Failed to revert formula",
+    ),
 };
-
-function bumpVersion(v: string): string {
-  const m = v.match(/v(\d+)\.(\d+)/);
-  if (!m) return "v1.0";
-  return `v${m[1]}.${Number(m[2]) + 1}`;
-}
 
 // Measurements ---------------------------------------------------------------
 export const measurementsRepo = {
@@ -290,12 +351,206 @@ export const validationsRepo = {
   },
 };
 
+// ── KPI Management — Strategic Sets (DB-backed) ─────────────────────────────
+// Real MySQL-backed (shs_kpis_claude.strategic_set + library_*). The versioned
+// 5-Year Strategic Set templates edited from the admin-only KPIs Library.
+export const strategicSetsRepo = {
+  list: async (): Promise<StrategicSet[]> =>
+    jsonOrThrow(await fetch("/api/strategic-sets"), "Failed to load strategic sets"),
+  get: async (id: number): Promise<StrategicSet> =>
+    jsonOrThrow(await fetch(`/api/strategic-sets/${id}`), "Failed to load strategic set"),
+  create: async (input: {
+    name: string;
+    description?: string;
+    startYear: number;
+    cloneFromSetId?: number;
+    createdBy?: string;
+  }): Promise<StrategicSet> =>
+    jsonOrThrow(
+      await fetch("/api/strategic-sets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to create strategic set",
+    ),
+  update: async (
+    id: number,
+    patch: { name?: string; description?: string; status?: StrategicSetStatus },
+  ): Promise<StrategicSet> =>
+    jsonOrThrow(
+      await fetch(`/api/strategic-sets/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update strategic set",
+    ),
+  remove: async (id: number): Promise<{ id: number }> =>
+    jsonOrThrow(
+      await fetch(`/api/strategic-sets/${id}`, { method: "DELETE" }),
+      "Failed to delete strategic set",
+    ),
+};
+
+// ── KPI Management — Library KPIs (DB-backed) ───────────────────────────────
+export const libraryKpisRepo = {
+  listBySet: async (setId: number): Promise<LibraryKpi[]> =>
+    jsonOrThrow(await fetch(`/api/library-kpis?setId=${setId}`), "Failed to load KPIs"),
+  get: async (id: number): Promise<LibraryKpi> =>
+    jsonOrThrow(await fetch(`/api/library-kpis/${id}`), "Failed to load KPI"),
+  create: async (input: Partial<LibraryKpi> & { setId: number; name: string }): Promise<LibraryKpi> =>
+    jsonOrThrow(
+      await fetch("/api/library-kpis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to create KPI",
+    ),
+  update: async (id: number, patch: Partial<LibraryKpi>): Promise<LibraryKpi> =>
+    jsonOrThrow(
+      await fetch(`/api/library-kpis/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update KPI",
+    ),
+  remove: async (id: number): Promise<{ id: number }> =>
+    jsonOrThrow(await fetch(`/api/library-kpis/${id}`, { method: "DELETE" }), "Failed to delete KPI"),
+  saveTargets: async (id: number, targets: AnnualTarget[]): Promise<AnnualTarget[]> =>
+    jsonOrThrow(
+      await fetch(`/api/library-kpis/${id}/targets`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targets }),
+      }),
+      "Failed to save targets",
+    ),
+};
+
+// ── KPI Management — Library Metrics (sub-KPIs, DB-backed) ───────────────────
+export const libraryMetricsRepo = {
+  listByKpi: async (kpiId: number): Promise<LibraryMetric[]> =>
+    jsonOrThrow(await fetch(`/api/library-metrics?kpiId=${kpiId}`), "Failed to load metrics"),
+  get: async (id: number): Promise<LibraryMetric> =>
+    jsonOrThrow(await fetch(`/api/library-metrics/${id}`), "Failed to load metric"),
+  create: async (input: Partial<LibraryMetric> & { kpiId: number; name: string }): Promise<LibraryMetric> =>
+    jsonOrThrow(
+      await fetch("/api/library-metrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to create metric",
+    ),
+  update: async (id: number, patch: Partial<LibraryMetric>): Promise<LibraryMetric> =>
+    jsonOrThrow(
+      await fetch(`/api/library-metrics/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update metric",
+    ),
+  remove: async (id: number): Promise<{ id: number }> =>
+    jsonOrThrow(await fetch(`/api/library-metrics/${id}`, { method: "DELETE" }), "Failed to delete metric"),
+  saveTargets: async (id: number, targets: AnnualTarget[]): Promise<AnnualTarget[]> =>
+    jsonOrThrow(
+      await fetch(`/api/library-metrics/${id}/targets`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targets }),
+      }),
+      "Failed to save targets",
+    ),
+};
+
+// ── KPI Management — Performance records (activated snapshots, DB-backed) ─────
+export const performanceRecordsRepo = {
+  list: async (): Promise<PerformanceRecord[]> =>
+    jsonOrThrow(await fetch("/api/performance-records"), "Failed to load performance records"),
+  get: async (id: number): Promise<PerformanceRecord> =>
+    jsonOrThrow(await fetch(`/api/performance-records/${id}`), "Failed to load performance record"),
+  activate: async (input: {
+    sourceSetId: number;
+    name?: string;
+    activatedBy?: string;
+  }): Promise<PerformanceRecord> =>
+    jsonOrThrow(
+      await fetch("/api/performance-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to activate performance record",
+    ),
+  update: async (
+    id: number,
+    patch: { name?: string; status?: PerformanceStatus },
+  ): Promise<PerformanceRecord> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update performance record",
+    ),
+  remove: async (id: number): Promise<{ id: number }> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}`, { method: "DELETE" }),
+      "Failed to delete performance record",
+    ),
+  sync: async (id: number): Promise<PerformanceRecord> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}/sync`, { method: "POST" }),
+      "Failed to sync performance record",
+    ),
+  kpisByRecord: async (recordId: number): Promise<PerfKpi[]> =>
+    jsonOrThrow(await fetch(`/api/perf-kpis?recordId=${recordId}`), "Failed to load performance KPIs"),
+  getKpi: async (perfKpiId: number): Promise<PerfKpi> =>
+    jsonOrThrow(await fetch(`/api/perf-kpis/${perfKpiId}`), "Failed to load performance KPI"),
+  metricsByKpi: async (perfKpiId: number): Promise<PerfMetric[]> =>
+    jsonOrThrow(await fetch(`/api/perf-metrics?perfKpiId=${perfKpiId}`), "Failed to load performance metrics"),
+  getMetric: async (perfMetricId: number): Promise<PerfMetric> =>
+    jsonOrThrow(await fetch(`/api/perf-metrics/${perfMetricId}`), "Failed to load performance metric"),
+  saveKpiProgress: async (
+    perfKpiId: number,
+    input: { yearNo: number; quarterNo: number; progressValue: number | null; issue: string; solution: string; recordedBy?: string },
+  ): Promise<QuarterProgress[]> =>
+    jsonOrThrow(
+      await fetch(`/api/perf-kpis/${perfKpiId}/progress`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to save progress",
+    ),
+  saveMetricProgress: async (
+    perfMetricId: number,
+    input: { yearNo: number; quarterNo: number; progressValue: number | null; issue: string; solution: string; recordedBy?: string },
+  ): Promise<QuarterProgress[]> =>
+    jsonOrThrow(
+      await fetch(`/api/perf-metrics/${perfMetricId}/progress`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to save progress",
+    ),
+};
+
 export type {
   Committee,
   FacultyMember,
   Formula,
   FormulaVersion,
+  FormulaRecord,
+  FormulaVersionRecord,
   Kpi,
+  KpiCategoryRecord,
   Measurement,
   Metric,
   ValidationSubmission,

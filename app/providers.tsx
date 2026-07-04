@@ -40,10 +40,15 @@ function QueryProvider({ children }: { children: React.ReactNode }) {
             const msg = typeof t === "function" ? t(data, variables) : t;
             if (msg) toastRef.current(msg, "success");
           },
-          onError: (_err, _variables, _ctx, mutation) => {
+          onError: (err, _variables, _ctx, mutation) => {
+            // Prefer an explicit meta.errorToast, else the API's thrown message
+            // (repos throw Error(body.error)) so reasons like a blocked delete
+            // surface to the user; fall back to a generic message.
             toastRef.current(
               mutation.meta?.errorToast ??
-                "Something went wrong. Please try again.",
+                (err instanceof Error && err.message
+                  ? err.message
+                  : "Something went wrong. Please try again."),
               "error",
             );
           },

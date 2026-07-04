@@ -36,14 +36,14 @@ function FormulaHistory() {
   const revert = useRevertFormula();
   const [filter, setFilter] = useState("all");
 
-  const formulaName = (id: string) =>
-    formulas.data?.find((f) => f.id === id)?.name ?? id;
-  const currentVersion = (id: string) =>
+  const formulaName = (id: number) =>
+    formulas.data?.find((f) => f.id === id)?.name ?? String(id);
+  const currentVersion = (id: number) =>
     formulas.data?.find((f) => f.id === id)?.currentVersion;
 
   const rows = useMemo(() => {
     const list = versions.data ?? [];
-    return filter === "all" ? list : list.filter((v) => v.formulaId === filter);
+    return filter === "all" ? list : list.filter((v) => String(v.formulaId) === filter);
   }, [versions.data, filter]);
 
   return (
@@ -110,7 +110,7 @@ function FormulaHistory() {
                       </code>
                       <p className="mt-xs text-body-sm text-on-surface">{v.changeNote}</p>
                       <p className="text-caption-sm text-mute">
-                        {v.author} · {formatDate(v.timestamp)}
+                        {v.author} · {formatDate(v.createdAt)}
                       </p>
                     </div>
 

@@ -25,6 +25,7 @@ import {
   useCommittees,
   useFaculty,
   useValidations,
+  useKpiCategories,
 } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { KPI_CATEGORIES } from "@/lib/types";
@@ -36,6 +37,9 @@ export default function DashboardPage() {
   const committees = useCommittees();
   const faculty = useFaculty();
   const validations = useValidations();
+  const categoriesQ = useKpiCategories();
+
+  const categories = categoriesQ.data ?? KPI_CATEGORIES;
 
   const loading =
     kpis.isLoading || committees.isLoading || faculty.isLoading || validations.isLoading;
@@ -51,14 +55,14 @@ export default function DashboardPage() {
   const pending = (validations.data ?? []).filter((v) => v.status === "pending").length;
 
   const categorySummary = useMemo(() => {
-    return KPI_CATEGORIES.map((c) => {
+    return categories.map((c) => {
       const list = (kpis.data ?? []).filter((k) => k.category === c.id);
       const healthy = list.filter(
         (k) => healthOf(k.currentValue, k.thresholds) === "healthy",
       ).length;
       return { ...c, total: list.length, healthy };
     });
-  }, [kpis.data]);
+  }, [kpis.data, categories]);
 
   return (
     <>
@@ -183,7 +187,7 @@ export default function DashboardPage() {
               <tbody>
                 {atRisk.map((k) => {
                   const health = healthOf(k.currentValue, k.thresholds);
-                  const cat = KPI_CATEGORIES.find((c) => c.id === k.category)?.label;
+                  const cat = categories.find((c) => c.id === k.category)?.label;
                   return (
                     <Tr key={k.id}>
                       <Td className="font-medium">{k.name}</Td>
