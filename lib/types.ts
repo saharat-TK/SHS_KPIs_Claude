@@ -305,11 +305,14 @@ export interface LibraryMetric {
   weight: number;
   unit: string | null;
   fiveYearTarget: number | null;
+  targetMode: MetricTargetMode;
   thresholdGreen: number | null;
   thresholdAmber: number | null;
   sortOrder: number;
   annualTargets?: AnnualTarget[];
 }
+
+export type MetricTargetMode = "none" | "inherit_parent" | "manual";
 
 // ── Persisted formula engine (distinct from the in-memory Formula* above,
 //    which the legacy /formulas pages still use). Numeric BIGINT ids. ──────────
@@ -363,7 +366,7 @@ export interface PerfKpi extends Omit<LibraryKpi, "id" | "setId" | "annualTarget
   startYear?: number; // from the parent performance_record (detail view)
 }
 
-export interface PerfMetric extends Omit<LibraryMetric, "id" | "kpiId" | "annualTargets"> {
+export interface PerfMetric extends Omit<LibraryMetric, "id" | "kpiId" | "annualTargets" | "targetMode"> {
   id: number;
   perfKpiId: number;
   sourceMetricId: number | null;

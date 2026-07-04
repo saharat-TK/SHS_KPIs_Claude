@@ -163,6 +163,7 @@ CREATE TABLE library_metric (
   weight              DECIMAL(6,2) NOT NULL DEFAULT 0,
   unit                VARCHAR(50)  NULL,
   five_year_target    DECIMAL(14,4) NULL,
+  target_mode         ENUM('none','inherit_parent','manual') NOT NULL DEFAULT 'manual',
   -- Threshold setting (decision #6: metrics carry their own colour bands)
   threshold_green     DECIMAL(14,4) NULL,                   -- >= green  => healthy
   threshold_amber     DECIMAL(14,4) NULL,                   -- >= amber  => watch
@@ -328,6 +329,10 @@ CREATE TABLE perf_metric_quarter_progress (
 
 -- =============================================================================
 --  NOTES / rules enforced in the application layer (not by DDL)
+--  Existing database migration for target inheritance mode:
+--    ALTER TABLE library_metric
+--      ADD COLUMN target_mode ENUM('none','inherit_parent','manual')
+--      NOT NULL DEFAULT 'manual' AFTER five_year_target;
 --  * five_year_target is a PER-YEAR CAP (decision #5): on save of any
 --    library_*_annual_target / perf_*_annual_target, enforce each single year
 --    target <= five_year_target. The sum of annual targets may exceed it.

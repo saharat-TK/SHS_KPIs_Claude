@@ -201,6 +201,10 @@ function KpiDetail() {
   const formulas = formulasQ.data ?? [];
   const metrics = metricsQ.data ?? [];
   const hasChildren = metrics.length > 0;
+  const parentTargets = useMemo(
+    () => ({ fiveYearTarget: draft?.fiveYearTarget ?? null, years }),
+    [draft?.fiveYearTarget, years],
+  );
 
   return (
     <>
@@ -418,6 +422,7 @@ function KpiDetail() {
                     name="calcType"
                     value={draft.calculationType}
                     onChange={(v) => set("calculationType", v)}
+                    orientation="horizontal"
                     options={KPI_CALCULATION_TYPES.map((t) => ({
                       value: t.id,
                       label: t.label,
@@ -467,6 +472,7 @@ function KpiDetail() {
               {/* Sub-KPIs (Metrics) */}
               <MetricEditor
                 kpiId={kpiId}
+                parentTargets={parentTargets}
                 categories={categories}
                 committees={committees}
                 faculty={faculty}

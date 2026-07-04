@@ -14,6 +14,7 @@ import {
   Field,
   Input,
   Select,
+  RadioGroup,
   QueryBoundary,
   EmptyState,
 } from "@/components/ui";
@@ -32,6 +33,7 @@ import {
   type FacultyRecord,
   type LibraryMetric,
   type AnnualTarget,
+  type MetricTargetMode,
 } from "@/lib/types";
 
 function toYearSlots(targets: AnnualTarget[] | undefined): (number | null)[] {
@@ -42,13 +44,44 @@ function toYearSlots(targets: AnnualTarget[] | undefined): (number | null)[] {
   return slots;
 }
 
+type ParentTargets = {
+  fiveYearTarget: number | null;
+  years: (number | null)[];
+};
+
+const ZERO_YEARS: (number | null)[] = [0, 0, 0, 0, 0];
+
+const TARGET_MODE_OPTIONS: {
+  value: MetricTargetMode;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    value: "none",
+    label: "No target",
+    hint: "Save zero target values for this sub-KPI.",
+  },
+  {
+    value: "inherit_parent",
+    label: "Get from Parent",
+    hint: "Use the parent KPI's 5-year and annual targets.",
+  },
+  {
+    value: "manual",
+    label: "Manually input",
+    hint: "Enter this sub-KPI's own target values.",
+  },
+];
+
 export function MetricEditor({
   kpiId,
+  parentTargets,
   categories,
   committees,
   faculty,
 }: {
   kpiId: number;
+  parentTargets: ParentTargets;
   categories: { id: string; label: string }[];
   committees: Committee[];
   faculty: FacultyRecord[];
@@ -134,6 +167,7 @@ export function MetricEditor({
         <MetricModal
           kpiId={kpiId}
           metric={editing}
+          parentTargets={parentTargets}
           categories={categories}
           committees={committees}
           faculty={faculty}
@@ -150,6 +184,7 @@ export function MetricEditor({
 function MetricModal({
   kpiId,
   metric,
+  parentTargets,
   categories,
   committees,
   faculty,
@@ -157,6 +192,7 @@ function MetricModal({
 }: {
   kpiId: number;
   metric: LibraryMetric | null;
+  parentTargets: ParentTargets;
   categories: { id: string; label: string }[];
   committees: Committee[];
   faculty: FacultyRecord[];
@@ -181,6 +217,9 @@ function MetricModal({
   const [fiveYearTarget, setFiveYearTarget] = useState<number | null>(
     metric?.fiveYearTarget ?? null,
   );
+  const [targetMode, setTargetMode] = useState<MetricTargetMode>(
+    metric?.targetMode ?? "manual",
+  );
   const [thresholdGreen, setThresholdGreen] = useState<number | null>(metric?.thresholdGreen ?? null);
   const [thresholdAmber, setThresholdAmber] = useState<number | null>(metric?.thresholdAmber ?? null);
   const [years, setYears] = useState<(number | null)[]>(toYearSlots(metric?.annualTargets));
@@ -190,11 +229,27 @@ function MetricModal({
     if (metric) {
       fetch(`/api/library-metrics/${metric.id}`)
         .then((r) => r.json())
-        .then((full: LibraryMetric) => setYears(toYearSlots(full.annualTargets)))
+        .then((full: LibraryMetric) => {
+          setTargetMode(full.targetMode ?? "manual");
+          setFiveYearTarget(full.fiveYearTarget ?? null);
+          setYears(toYearSlots(full.annualTargets));
+        })
         .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metric?.id]);
+
+  useEffect(() => {
+    if (targetMode === "none") {
+      setFiveYearTarget(0);
+      setYears([...ZERO_YEARS]);
+      return;
+    }
+    if (targetMode === "inherit_parent") {
+      setFiveYearTarget(parentTargets.fiveYearTarget);
+      setYears([...parentTargets.years]);
+    }
+  }, [parentTargets.fiveYearTarget, parentTargets.years, targetMode]);
 
   const overCapYear =
     fiveYearTarget == null
@@ -209,6 +264,7 @@ function MetricModal({
 
   const submitting = create.isPending || update.isPending || saveTargets.isPending;
   const valid = name.trim().length > 1 && !capError;
+  const targetInputsDisabled = targetMode !== "manual";
 
   const persistTargets = (id: number) =>
     saveTargets.mutate(
@@ -229,6 +285,7 @@ function MetricModal({
       dataSourceUrl,
       description,
       fiveYearTarget,
+      targetMode,
       thresholdGreen,
       thresholdAmber,
     };
@@ -251,6 +308,7 @@ function MetricModal({
       onClose={onClose}
       title={metric ? "Edit Sub-KPI" : "Add Sub-KPI"}
       subtitle="Sub-KPIs carry their own targets and thresholds."
+      size="mdWide"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -357,11 +415,20 @@ function MetricModal({
           </Field>
         </div>
 
+        <h3 className="text-label-md text-on-surface">Target</h3>
+        <RadioGroup
+          name="metricTargetMode"
+          value={targetMode}
+          onChange={setTargetMode}
+          options={TARGET_MODE_OPTIONS}
+        />
+
         <Field label="5-Year Target (cap)">
           <Input
             type="number"
             step="0.01"
             value={fiveYearTarget ?? ""}
+            disabled={targetInputsDisabled}
             onChange={(e) =>
               setFiveYearTarget(e.target.value === "" ? null : Number(e.target.value))
             }
@@ -374,6 +441,7 @@ function MetricModal({
                 type="number"
                 step="0.01"
                 value={v ?? ""}
+                disabled={targetInputsDisabled}
                 onChange={(e) => {
                   const next = [...years];
                   next[i] = e.target.value === "" ? null : Number(e.target.value);

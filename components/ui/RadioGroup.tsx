@@ -12,15 +12,25 @@ export function RadioGroup<T extends string>({
   options,
   onChange,
   className,
+  orientation = "vertical",
 }: {
   name: string;
   value: T;
   options: RadioOption<T>[];
   onChange: (value: T) => void;
   className?: string;
+  orientation?: "vertical" | "horizontal";
 }) {
   return (
-    <div role="radiogroup" className={cn("flex flex-col gap-xs", className)}>
+    <div
+      role="radiogroup"
+      className={cn(
+        orientation === "horizontal"
+          ? "grid grid-cols-1 sm:grid-cols-3 gap-xs"
+          : "flex flex-col gap-xs",
+        className,
+      )}
+    >
       {options.map((opt) => {
         const selected = opt.value === value;
         return (

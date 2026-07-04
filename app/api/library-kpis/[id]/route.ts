@@ -7,6 +7,7 @@ import {
   setIdForKpi,
   activeRecordsHaveKpiProgress,
 } from "@/lib/kpi/performance";
+import { syncInheritedMetricTargetsForKpi } from "@/lib/kpi/targetInheritance";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +104,9 @@ export async function PATCH(
       if (result.affectedRows === 0) {
         await conn.rollback();
         return NextResponse.json({ error: "KPI not found" }, { status: 404 });
+      }
+      if ("fiveYearTarget" in body) {
+        await syncInheritedMetricTargetsForKpi(conn, Number(params.id));
       }
       // Reflect the edit on every active performance record for this set.
       await syncActiveRecordsForSet(conn, await setIdForKpi(conn, Number(params.id)));
