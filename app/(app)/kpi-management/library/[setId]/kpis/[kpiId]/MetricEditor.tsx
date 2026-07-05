@@ -14,6 +14,7 @@ import {
   Field,
   Input,
   Select,
+  UnitSelect,
   RadioGroup,
   QueryBoundary,
   EmptyState,
@@ -205,7 +206,7 @@ function MetricModal({
   const [name, setName] = useState(metric?.name ?? "");
   const [categoryId, setCategoryId] = useState(metric?.categoryId ?? "");
   const [weight, setWeight] = useState(metric?.weight ?? 100);
-  const [unit, setUnit] = useState(metric?.unit ?? "%");
+  const [unit, setUnit] = useState(metric?.unit?.trim() || "Item");
   const [collectionPeriod, setCollectionPeriod] = useState<CollectionPeriod>(
     metric?.collectionPeriod ?? "every_quarter",
   );
@@ -397,7 +398,7 @@ function MetricModal({
             />
           </Field>
           <Field label="Unit">
-            <Input value={unit} onChange={(e) => setUnit(e.target.value)} />
+            <UnitSelect value={unit} onChange={setUnit} />
           </Field>
           <Field label="On-target (≥)">
             <Input

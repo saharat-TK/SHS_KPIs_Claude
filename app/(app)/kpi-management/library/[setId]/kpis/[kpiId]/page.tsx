@@ -12,6 +12,7 @@ import {
   Field,
   Input,
   Select,
+  UnitSelect,
   RadioGroup,
   ThresholdBar,
   QueryBoundary,
@@ -93,7 +94,7 @@ function draftOf(k: LibraryKpi): Draft {
     committeeId: k.committeeId ?? "",
     personInChargeId: k.personInChargeId ?? "",
     weight: k.weight,
-    unit: k.unit ?? "",
+    unit: k.unit?.trim() || "Item",
     fiveYearTarget: k.fiveYearTarget,
     calculationType: k.calculationType,
     calculationLogic: k.calculationLogic ?? "",
@@ -349,7 +350,7 @@ function KpiDetail() {
                       />
                     </Field>
                     <Field label="Unit">
-                      <Input value={draft.unit} onChange={(e) => set("unit", e.target.value)} />
+                      <UnitSelect value={draft.unit} onChange={(value) => set("unit", value)} />
                     </Field>
                     <Field label="5-Year Target (cap)">
                       <Input
