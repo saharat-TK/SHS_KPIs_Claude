@@ -207,6 +207,23 @@ CREATE TABLE performance_record (
   CONSTRAINT fk_perf_set FOREIGN KEY (source_set_id) REFERENCES strategic_set(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── performance_record_period ───────────────────────────────────────────────
+-- Admin-managed recording availability for a performance record. Missing rows
+-- are treated by the application as closed, so existing records are closed by
+-- default until an admin opens specific years/quarters.
+CREATE TABLE performance_record_period (
+  record_id   BIGINT UNSIGNED NOT NULL,
+  year_no     TINYINT UNSIGNED NOT NULL CHECK (year_no BETWEEN 1 AND 5),
+  quarter_no  TINYINT UNSIGNED NOT NULL CHECK (quarter_no BETWEEN 1 AND 4),
+  is_open     BOOLEAN NOT NULL DEFAULT 0,
+  opened_by   VARCHAR(255) NULL,
+  opened_at   TIMESTAMP NULL,
+  updated_by  VARCHAR(255) NULL,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (record_id, year_no, quarter_no),
+  CONSTRAINT fk_perf_period_record FOREIGN KEY (record_id) REFERENCES performance_record(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── perf_kpi ─────────────────────────────────────────────────────────────────
 -- Snapshot of a library_kpi. Carries source_kpi_id so re-sync can match rows.
 CREATE TABLE perf_kpi (

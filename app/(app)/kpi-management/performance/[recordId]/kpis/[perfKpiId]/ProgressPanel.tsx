@@ -13,9 +13,11 @@ import {
   HEALTH_LABEL,
   healthOf,
 } from "@/components/ui";
+import { Icon } from "@/components/ui/Icon";
 import { cn, formatNumber } from "@/lib/utils";
 import { percentOfTarget, HEALTH_TONE } from "@/lib/kpi/progress";
-import type { AnnualTarget, QuarterProgress } from "@/lib/types";
+import { isPeriodOpen, openQuartersForYear } from "@/lib/kpi/performancePeriods";
+import type { AnnualTarget, PerformancePeriod, QuarterProgress } from "@/lib/types";
 
 const QUARTERS = [1, 2, 3, 4];
 const YEARS = [1, 2, 3, 4, 5];
@@ -31,6 +33,8 @@ export interface ProgressPanelProps {
   valueEditable: boolean;
   computedNote?: string;
   readOnly?: boolean;
+  periods?: PerformancePeriod[];
+  periodsLoading?: boolean;
   saving: boolean;
   /** Optional controlled year selection (so a parent can keep a sub-KPIs table
    *  in sync). When omitted, the panel manages the year internally. */
@@ -54,6 +58,8 @@ export function ProgressPanel({
   valueEditable,
   computedNote,
   readOnly = false,
+  periods,
+  periodsLoading = false,
   saving,
   year: yearProp,
   onYearChange,
@@ -70,6 +76,19 @@ export function ProgressPanel({
   const quarterTarget = (q: number) => (yearTarget == null ? null : (yearTarget * q) / 4);
   const progressFor = (q: number) =>
     progress.find((p) => p.yearNo === year && p.quarterNo === q);
+  const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
+  const effectiveReadOnly = readOnly || periodsLoading || periodLocked;
+  // Only decorate quarter tabs once real period data has loaded (20 rows).
+  const hasPeriods = !!periods && periods.length > 0 && !periodsLoading;
+  const openThisYear = hasPeriods ? openQuartersForYear(periods!, year) : [];
+  const openQuarterLabel = openThisYear.length
+    ? `Open this year: ${openThisYear.map((q) => `Q${q}`).join(", ")}`
+    : "No quarters open this year — ask an admin to open one.";
+  const readOnlyMessage = periodsLoading
+    ? "Recording period status is loading. Data entry is temporarily disabled."
+    : periodLocked
+      ? `Year ${year} Quarter ${quarter} is closed for recording. Ask an admin to open it to enter progress.`
+      : undefined;
 
   // Current value = latest quarter with an entered/computed value this year.
   const current = [...QUARTERS]
@@ -100,24 +119,39 @@ export function ProgressPanel({
         <Card className="overflow-hidden">
           {/* Boxed quarter tabs across the top of the single card. */}
           <div className="flex">
-            {QUARTERS.map((q, i) => (
-              <button
-                key={q}
-                type="button"
-                aria-selected={q === quarter}
-                onClick={() => setQuarter(q)}
-                className={cn(
-                  "flex-1 px-md py-sm text-label-md text-center border-b border-hairline transition-colors",
-                  i > 0 && "border-l border-hairline",
-                  q === quarter
-                    ? "bg-primary text-on-primary border-b-primary"
-                    : "bg-surface-lowest text-on-surface hover:bg-surface-soft",
-                )}
-              >
-                Quarter {q}
-              </button>
-            ))}
+            {QUARTERS.map((q, i) => {
+              const closed = hasPeriods && !isPeriodOpen(periods!, year, q);
+              return (
+                <button
+                  key={q}
+                  type="button"
+                  aria-selected={q === quarter}
+                  onClick={() => setQuarter(q)}
+                  className={cn(
+                    "flex-1 px-md py-sm text-label-md text-center border-b border-hairline transition-colors",
+                    i > 0 && "border-l border-hairline",
+                    q === quarter
+                      ? "bg-primary text-on-primary border-b-primary"
+                      : closed
+                        ? "bg-surface-soft text-mute hover:bg-surface-container-high"
+                        : "bg-surface-lowest text-on-surface hover:bg-surface-soft",
+                  )}
+                >
+                  <span className="inline-flex items-center justify-center gap-tiny">
+                    {closed && <Icon name="lock" size={14} />}
+                    Quarter {q}
+                    {closed && <span className="opacity-80">· Closed</span>}
+                  </span>
+                </button>
+              );
+            })}
           </div>
+
+          {hasPeriods && (
+            <div className="border-b border-hairline bg-surface-lowest px-md py-tiny text-caption-sm text-mute">
+              {openQuarterLabel}
+            </div>
+          )}
 
           <QuarterEntry
             key={`${year}-${quarter}`}
@@ -126,7 +160,8 @@ export function ProgressPanel({
             existing={progressFor(quarter)}
             valueEditable={valueEditable}
             unit={unit}
-            readOnly={readOnly}
+            readOnly={effectiveReadOnly}
+            readOnlyMessage={readOnlyMessage}
             saving={saving}
             onSave={(data) => onSave(year, quarter, data)}
           />
@@ -199,6 +234,7 @@ export function QuarterEntry({
   valueEditable,
   unit,
   readOnly,
+  readOnlyMessage,
   saving,
   onSave,
 }: {
@@ -208,6 +244,7 @@ export function QuarterEntry({
   valueEditable: boolean;
   unit: string | null;
   readOnly: boolean;
+  readOnlyMessage?: string;
   saving: boolean;
   onSave: (data: { progressValue: number | null; issue: string; solution: string }) => void;
 }) {
@@ -227,6 +264,12 @@ export function QuarterEntry({
           {target == null ? "No target" : `Cumulative Target: ${formatNumber(target, 2)} ${unit ?? ""}`}
         </p>
       </div>
+
+      {readOnlyMessage && (
+        <div className="rounded border border-hairline bg-surface-soft px-md py-sm text-body-sm text-mute">
+          {readOnlyMessage}
+        </div>
+      )}
 
       <div className="flex flex-col gap-xs">
         <span className="text-label-md text-on-surface">

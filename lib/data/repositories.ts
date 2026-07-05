@@ -15,6 +15,7 @@ import type {
   Measurement,
   Metric,
   PerformanceRecord,
+  PerformancePeriod,
   PerformanceStatus,
   PerfKpi,
   PerfMetric,
@@ -543,6 +544,24 @@ export const performanceRecordsRepo = {
     jsonOrThrow(
       await fetch(`/api/performance-records/${id}/sync`, { method: "POST" }),
       "Failed to sync performance record",
+    ),
+  periods: async (id: number): Promise<PerformancePeriod[]> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}/periods`),
+      "Failed to load recording periods",
+    ),
+  savePeriods: async (
+    id: number,
+    periods: { yearNo: number; quarterNo: number; isOpen: boolean }[],
+    updatedBy?: string,
+  ): Promise<PerformancePeriod[]> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}/periods`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ periods, updatedBy }),
+      }),
+      "Failed to save recording periods",
     ),
   kpisByRecord: async (recordId: number): Promise<PerfKpi[]> =>
     jsonOrThrow(await fetch(`/api/perf-kpis?recordId=${recordId}`), "Failed to load performance KPIs"),
