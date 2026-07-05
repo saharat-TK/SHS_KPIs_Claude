@@ -13,6 +13,7 @@ import {
   Badge,
   Tabs,
   Select,
+  UnitSelect,
   QueryBoundary,
   EmptyState,
   Modal,
@@ -214,7 +215,7 @@ function CreateKpiModal({
   const [categoryId, setCategoryId] = useState("");
   const [kpiType, setKpiType] = useState<KpiType>("operational");
   const [weight, setWeight] = useState(10);
-  const [unit, setUnit] = useState("%");
+  const [unit, setUnit] = useState("Item");
 
   useEffect(() => {
     if (open) {
@@ -222,7 +223,7 @@ function CreateKpiModal({
       setCategoryId("");
       setKpiType("operational");
       setWeight(10);
-      setUnit("%");
+      setUnit("Item");
     }
   }, [open]);
 
@@ -294,7 +295,7 @@ function CreateKpiModal({
             />
           </Field>
           <Field label="Unit">
-            <Input value={unit} onChange={(e) => setUnit(e.target.value)} />
+            <UnitSelect value={unit} onChange={setUnit} />
           </Field>
         </div>
       </div>

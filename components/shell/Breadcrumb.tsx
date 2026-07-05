@@ -21,6 +21,8 @@ const LABELS: Record<string, string> = {
   analytics: "Analytics",
   "student-success": "Student Success",
   validation: "Validation Queue",
+  admin: "Administration",
+  units: "Units",
 };
 
 export function Breadcrumb() {
