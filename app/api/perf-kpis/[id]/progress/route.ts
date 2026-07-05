@@ -26,11 +26,21 @@ export async function PUT(
     }
 
     const [kpiRows] = await pool.query<RowDataPacket[]>(
-      "SELECT has_children FROM perf_kpi WHERE id = ?",
-      [params.id],
+      `SELECT k.has_children, k.record_id AS recordId, COALESCE(p.is_open, 0) AS isOpen
+       FROM perf_kpi k
+       LEFT JOIN performance_record_period p
+         ON p.record_id = k.record_id AND p.year_no = ? AND p.quarter_no = ?
+       WHERE k.id = ?`,
+      [yearNo, quarterNo, params.id],
     );
     if (kpiRows.length === 0) {
       return NextResponse.json({ error: "Performance KPI not found" }, { status: 404 });
+    }
+    if (!kpiRows[0].isOpen) {
+      return NextResponse.json(
+        { error: "This recording period is closed" },
+        { status: 409 },
+      );
     }
     const isLeaf = !kpiRows[0].has_children;
     const recordedBy = (b.recordedBy as string) ?? null;

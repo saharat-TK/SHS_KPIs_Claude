@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -23,10 +23,18 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import {
   usePerformanceRecords,
   useActivatePerformanceRecord,
+  usePerformancePeriods,
+  useSavePerformancePeriods,
   useStrategicSets,
 } from "@/lib/data/hooks";
+import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/utils";
-import type { PerformanceRecord, PerformanceStatus, StrategicSet } from "@/lib/types";
+import type {
+  PerformancePeriod,
+  PerformanceRecord,
+  PerformanceStatus,
+  StrategicSet,
+} from "@/lib/types";
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
   active: "success",
@@ -49,6 +57,7 @@ function Performance() {
   const setsQ = useStrategicSets();
   const activate = useActivatePerformanceRecord();
   const [showActivate, setShowActivate] = useState(false);
+  const [periodRecord, setPeriodRecord] = useState<PerformanceRecord | null>(null);
 
   const records = recordsQ.data ?? [];
   const isAdmin = can("configure_kpis");
@@ -112,17 +121,12 @@ function Performance() {
                       {r.activatedAt ? formatDate(r.activatedAt) : "—"}
                     </Td>
                     <Td align="right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconRight="chevron_right"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/kpi-management/performance/${r.id}`);
-                        }}
-                      >
-                        Open
-                      </Button>
+                      <RecordActions
+                        record={r}
+                        isAdmin={isAdmin}
+                        onOpen={() => router.push(`/kpi-management/performance/${r.id}`)}
+                        onPeriods={() => setPeriodRecord(r)}
+                      />
                     </Td>
                   </Tr>
                 ))}
@@ -146,7 +150,202 @@ function Performance() {
           })
         }
       />
+
+      {periodRecord && (
+        <RecordingPeriodsModal
+          record={periodRecord}
+          onClose={() => setPeriodRecord(null)}
+        />
+      )}
     </>
+  );
+}
+
+function RecordActions({
+  record,
+  isAdmin,
+  onOpen,
+  onPeriods,
+}: {
+  record: PerformanceRecord;
+  isAdmin: boolean;
+  onOpen: () => void;
+  onPeriods: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+
+  const toggleMenu = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const menuHeight = 72;
+    const gap = 4;
+    const top =
+      rect.bottom + gap + menuHeight > window.innerHeight
+        ? Math.max(gap, rect.top - menuHeight - gap)
+        : rect.bottom + gap;
+    setMenuPosition({ top, right: window.innerWidth - rect.right });
+    setOpen((v) => !v);
+  };
+
+  return (
+    <div className="relative inline-flex" onClick={(e) => e.stopPropagation()}>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={`Actions for ${record.name}`}
+        title="Actions"
+        className="rounded p-xs text-mute hover:bg-surface-soft hover:text-on-surface"
+        onClick={toggleMenu}
+      >
+        <Icon name="more_vert" size={20} />
+      </button>
+      {open && menuPosition && (
+        <div
+          className="fixed z-[200] min-w-[180px] overflow-hidden rounded border border-hairline bg-surface-lowest shadow-chrome"
+          style={{ top: menuPosition.top, right: menuPosition.right }}
+        >
+          <button
+            type="button"
+            className="flex w-full items-center gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
+            onClick={() => {
+              setOpen(false);
+              onOpen();
+            }}
+          >
+            <Icon name="open_in_new" size={18} />
+            Open record
+          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
+              onClick={() => {
+                setOpen(false);
+                onPeriods();
+              }}
+            >
+              <Icon name="event_available" size={18} />
+              Recording periods
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecordingPeriodsModal({
+  record,
+  onClose,
+}: {
+  record: PerformanceRecord;
+  onClose: () => void;
+}) {
+  const { user } = useAuth();
+  const periodsQ = usePerformancePeriods(record.id);
+  const save = useSavePerformancePeriods();
+  const [draft, setDraft] = useState<Pick<PerformancePeriod, "yearNo" | "quarterNo" | "isOpen">[]>([]);
+
+  useEffect(() => {
+    if (periodsQ.data) {
+      setDraft(
+        periodsQ.data.map((p) => ({
+          yearNo: p.yearNo,
+          quarterNo: p.quarterNo,
+          isOpen: p.isOpen,
+        })),
+      );
+    }
+  }, [periodsQ.data]);
+
+  const periodFor = (yearNo: number, quarterNo: number) =>
+    draft.find((p) => p.yearNo === yearNo && p.quarterNo === quarterNo);
+
+  const setQuarter = (yearNo: number, quarterNo: number, isOpen: boolean) =>
+    setDraft((items) =>
+      items.map((p) => (p.yearNo === yearNo && p.quarterNo === quarterNo ? { ...p, isOpen } : p)),
+    );
+
+  const setYear = (yearNo: number, isOpen: boolean) =>
+    setDraft((items) => items.map((p) => (p.yearNo === yearNo ? { ...p, isOpen } : p)));
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Recording Periods"
+      subtitle={`${record.name} · ${record.startYear}–${record.endYear}`}
+      size="lg"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            icon="save"
+            disabled={periodsQ.isLoading || save.isPending || draft.length !== 20}
+            onClick={() =>
+              save.mutate(
+                { id: record.id, periods: draft, updatedBy: user?.email },
+                { onSuccess: onClose },
+              )
+            }
+          >
+            {save.isPending ? "Saving…" : "Save Periods"}
+          </Button>
+        </>
+      }
+    >
+      <QueryBoundary isLoading={periodsQ.isLoading} isError={periodsQ.isError}>
+        <div className="flex flex-col gap-md">
+          {[1, 2, 3, 4, 5].map((yearNo) => {
+            const quarters = [1, 2, 3, 4].map((quarterNo) => periodFor(yearNo, quarterNo));
+            const allOpen = quarters.every((p) => p?.isOpen);
+            return (
+              <div
+                key={yearNo}
+                className="grid grid-cols-1 gap-md rounded border border-hairline bg-surface-lowest p-md sm:grid-cols-[150px_120px_1fr]"
+              >
+                <div>
+                  <div className="text-label-md text-on-surface">Year {yearNo}</div>
+                  <div className="text-caption-sm text-mute">{record.startYear + yearNo - 1}</div>
+                </div>
+                <Button
+                  variant={allOpen ? "outline" : "secondary"}
+                  size="sm"
+                  onClick={() => setYear(yearNo, !allOpen)}
+                >
+                  {allOpen ? "Close Year" : "Open Year"}
+                </Button>
+                <div className="grid grid-cols-2 gap-sm sm:grid-cols-4">
+                  {[1, 2, 3, 4].map((quarterNo) => {
+                    const period = periodFor(yearNo, quarterNo);
+                    const isOpen = !!period?.isOpen;
+                    return (
+                      <button
+                        key={quarterNo}
+                        type="button"
+                        className={[
+                          "flex h-[34px] items-center justify-center rounded-DEFAULT border px-sm text-label-md transition-colors",
+                          isOpen
+                            ? "border-primary-container bg-primary text-on-primary"
+                            : "border-hairline bg-surface-soft text-mute hover:text-on-surface",
+                        ].join(" ")}
+                        onClick={() => setQuarter(yearNo, quarterNo, !isOpen)}
+                      >
+                        Q{quarterNo} {isOpen ? "Open" : "Closed"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </QueryBoundary>
+    </Modal>
   );
 }
 

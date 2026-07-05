@@ -20,6 +20,7 @@ import type {
   AnnualTarget,
   LibraryKpi,
   LibraryMetric,
+  PerformancePeriod,
   PerformanceRecord,
   PerformanceStatus,
   StrategicSet,
@@ -78,6 +79,7 @@ export const qk = {
   libraryMetrics: (kpiId: number) => ["libraryMetrics", kpiId] as const,
   performanceRecords: ["performanceRecords"] as const,
   performanceRecord: (id: number) => ["performanceRecords", id] as const,
+  performancePeriods: (id: number) => ["performanceRecords", id, "periods"] as const,
   perfKpis: (recordId: number) => ["perfKpis", recordId] as const,
   perfKpi: (id: number) => ["perfKpi", id] as const,
   perfMetrics: (perfKpiId: number) => ["perfMetrics", perfKpiId] as const,
@@ -598,6 +600,13 @@ export const usePerformanceRecord = (id: number) =>
     enabled: Number.isFinite(id) && id > 0,
   });
 
+export const usePerformancePeriods = (id: number) =>
+  useQuery({
+    queryKey: qk.performancePeriods(id),
+    queryFn: () => performanceRecordsRepo.periods(id),
+    enabled: Number.isFinite(id) && id > 0,
+  });
+
 export const usePerfKpis = (recordId: number) =>
   useQuery({
     queryKey: qk.perfKpis(recordId),
@@ -646,6 +655,26 @@ export function useDeletePerformanceRecord() {
     mutationFn: (id: number) => performanceRecordsRepo.remove(id),
     meta: { toast: "Record deleted" },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.performanceRecords }),
+  });
+}
+
+export function useSavePerformancePeriods() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      periods,
+      updatedBy,
+    }: {
+      id: number;
+      periods: Pick<PerformancePeriod, "yearNo" | "quarterNo" | "isOpen">[];
+      updatedBy?: string;
+    }) => performanceRecordsRepo.savePeriods(id, periods, updatedBy),
+    meta: { toast: "Recording periods updated" },
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: qk.performancePeriods(id) });
+      qc.invalidateQueries({ queryKey: qk.performanceRecords });
+    },
   });
 }
 

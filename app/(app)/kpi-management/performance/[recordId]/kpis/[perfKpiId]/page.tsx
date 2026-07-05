@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import {
   usePerfKpi,
   usePerfMetricsByKpi,
+  usePerformancePeriods,
   usePerformanceRecord,
   useSaveKpiProgress,
 } from "@/lib/data/hooks";
@@ -56,6 +57,7 @@ function PerfKpiProgress() {
 
   const kpiQ = usePerfKpi(perfKpiId);
   const recordQ = usePerformanceRecord(recordId);
+  const periodsQ = usePerformancePeriods(recordId);
   const metricsQ = usePerfMetricsByKpi(perfKpiId);
   const save = useSaveKpiProgress(perfKpiId);
 
@@ -110,6 +112,8 @@ function PerfKpiProgress() {
                   ? "This KPI's quarterly value is computed from its sub-KPIs. Enter each sub-KPI's progress below."
                   : undefined
               }
+              periods={periodsQ.data ?? []}
+              periodsLoading={periodsQ.isLoading}
               saving={save.isPending}
               year={year}
               onYearChange={setYear}
@@ -228,6 +232,8 @@ function PerfKpiProgress() {
                   metric={editingMetric}
                   perfKpiId={perfKpiId}
                   year={year}
+                  periods={periodsQ.data ?? []}
+                  periodsLoading={periodsQ.isLoading}
                   onClose={() => setEditingMetricId(null)}
                 />
               ) : null;

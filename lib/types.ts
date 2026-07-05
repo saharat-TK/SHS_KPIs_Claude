@@ -364,6 +364,16 @@ export interface PerformanceRecord {
   kpiCount?: number;
 }
 
+export interface PerformancePeriod {
+  yearNo: number;
+  quarterNo: number;
+  isOpen: boolean;
+  openedBy: string | null;
+  openedAt: string | null;
+  updatedBy: string | null;
+  updatedAt: string | null;
+}
+
 export interface PerfKpi extends Omit<LibraryKpi, "id" | "setId" | "annualTargets"> {
   id: number;
   recordId: number;

@@ -12,9 +12,10 @@ import {
 } from "@/components/ui";
 import { cn, formatNumber } from "@/lib/utils";
 import { targetForYear, percentOfTarget, HEALTH_TONE } from "@/lib/kpi/progress";
+import { isPeriodOpen } from "@/lib/kpi/performancePeriods";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSaveMetricProgress } from "@/lib/data/hooks";
-import type { PerfMetric } from "@/lib/types";
+import type { PerformancePeriod, PerfMetric } from "@/lib/types";
 import { QuarterEntry } from "./ProgressPanel";
 
 const QUARTERS = [1, 2, 3, 4];
@@ -24,11 +25,15 @@ export function MetricProgressModal({
   perfKpiId,
   year,
   onClose,
+  periods,
+  periodsLoading = false,
 }: {
   metric: PerfMetric;
   perfKpiId: number;
   year: number;
   onClose: () => void;
+  periods?: PerformancePeriod[];
+  periodsLoading?: boolean;
 }) {
   const { user } = useAuth();
   const [quarter, setQuarter] = useState(1);
@@ -47,6 +52,12 @@ export function MetricProgressModal({
   const current = progressFor(quarter)?.progressValue ?? null;
   const pct = percentOfTarget(current, target);
   const hasThresholds = metric.thresholdGreen != null && metric.thresholdAmber != null;
+  const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
+  const readOnlyMessage = periodsLoading
+    ? "Recording period status is loading. Data entry is temporarily disabled."
+    : periodLocked
+      ? `Year ${year} Quarter ${quarter} is closed for recording.`
+      : undefined;
 
   return (
     <Modal
@@ -86,7 +97,8 @@ export function MetricProgressModal({
             existing={progressFor(quarter)}
             valueEditable
             unit={metric.unit}
-            readOnly={false}
+            readOnly={periodsLoading || periodLocked}
+            readOnlyMessage={readOnlyMessage}
             saving={save.isPending}
             onSave={(data) =>
               save.mutate({ ...data, yearNo: year, quarterNo: quarter, recordedBy: user?.email })

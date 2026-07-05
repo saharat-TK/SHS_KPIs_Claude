@@ -15,7 +15,8 @@ import {
 } from "@/components/ui";
 import { cn, formatNumber } from "@/lib/utils";
 import { percentOfTarget, HEALTH_TONE } from "@/lib/kpi/progress";
-import type { AnnualTarget, QuarterProgress } from "@/lib/types";
+import { isPeriodOpen } from "@/lib/kpi/performancePeriods";
+import type { AnnualTarget, PerformancePeriod, QuarterProgress } from "@/lib/types";
 
 const QUARTERS = [1, 2, 3, 4];
 const YEARS = [1, 2, 3, 4, 5];
@@ -31,6 +32,8 @@ export interface ProgressPanelProps {
   valueEditable: boolean;
   computedNote?: string;
   readOnly?: boolean;
+  periods?: PerformancePeriod[];
+  periodsLoading?: boolean;
   saving: boolean;
   /** Optional controlled year selection (so a parent can keep a sub-KPIs table
    *  in sync). When omitted, the panel manages the year internally. */
@@ -54,6 +57,8 @@ export function ProgressPanel({
   valueEditable,
   computedNote,
   readOnly = false,
+  periods,
+  periodsLoading = false,
   saving,
   year: yearProp,
   onYearChange,
@@ -70,6 +75,13 @@ export function ProgressPanel({
   const quarterTarget = (q: number) => (yearTarget == null ? null : (yearTarget * q) / 4);
   const progressFor = (q: number) =>
     progress.find((p) => p.yearNo === year && p.quarterNo === q);
+  const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
+  const effectiveReadOnly = readOnly || periodsLoading || periodLocked;
+  const readOnlyMessage = periodsLoading
+    ? "Recording period status is loading. Data entry is temporarily disabled."
+    : periodLocked
+      ? `Year ${year} Quarter ${quarter} is closed for recording.`
+      : undefined;
 
   // Current value = latest quarter with an entered/computed value this year.
   const current = [...QUARTERS]
@@ -126,7 +138,8 @@ export function ProgressPanel({
             existing={progressFor(quarter)}
             valueEditable={valueEditable}
             unit={unit}
-            readOnly={readOnly}
+            readOnly={effectiveReadOnly}
+            readOnlyMessage={readOnlyMessage}
             saving={saving}
             onSave={(data) => onSave(year, quarter, data)}
           />
@@ -199,6 +212,7 @@ export function QuarterEntry({
   valueEditable,
   unit,
   readOnly,
+  readOnlyMessage,
   saving,
   onSave,
 }: {
@@ -208,6 +222,7 @@ export function QuarterEntry({
   valueEditable: boolean;
   unit: string | null;
   readOnly: boolean;
+  readOnlyMessage?: string;
   saving: boolean;
   onSave: (data: { progressValue: number | null; issue: string; solution: string }) => void;
 }) {
@@ -227,6 +242,12 @@ export function QuarterEntry({
           {target == null ? "No target" : `Cumulative Target: ${formatNumber(target, 2)} ${unit ?? ""}`}
         </p>
       </div>
+
+      {readOnlyMessage && (
+        <div className="rounded border border-hairline bg-surface-soft px-md py-sm text-body-sm text-mute">
+          {readOnlyMessage}
+        </div>
+      )}
 
       <div className="flex flex-col gap-xs">
         <span className="text-label-md text-on-surface">

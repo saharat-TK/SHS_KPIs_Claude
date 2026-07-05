@@ -28,12 +28,24 @@ export async function PUT(
       await conn.beginTransaction();
 
       const [metricRows] = await conn.query<RowDataPacket[]>(
-        "SELECT perf_kpi_id FROM perf_metric WHERE id = ?",
-        [params.id],
+        `SELECT m.perf_kpi_id, k.record_id AS recordId, COALESCE(p.is_open, 0) AS isOpen
+         FROM perf_metric m
+         JOIN perf_kpi k ON k.id = m.perf_kpi_id
+         LEFT JOIN performance_record_period p
+           ON p.record_id = k.record_id AND p.year_no = ? AND p.quarter_no = ?
+         WHERE m.id = ?`,
+        [yearNo, quarterNo, params.id],
       );
       if (metricRows.length === 0) {
         await conn.rollback();
         return NextResponse.json({ error: "Performance metric not found" }, { status: 404 });
+      }
+      if (!metricRows[0].isOpen) {
+        await conn.rollback();
+        return NextResponse.json(
+          { error: "This recording period is closed" },
+          { status: 409 },
+        );
       }
 
       await conn.query(
