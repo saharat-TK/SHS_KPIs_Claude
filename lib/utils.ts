@@ -13,7 +13,7 @@ import type { KpiCalculationType, Metric } from "./types";
 
 /**
  * Derive a KPI's value from its sub-KPIs for aggregate calculation types.
- * - weighted_sum: weighted average, Σ(wᵢ·vᵢ) / Σ(wᵢ) (normalized so uneven weights work)
+ * - weighted_sum: percent-weighted sum, Σ(wᵢ/100 · vᵢ) (weights are % contributions)
  * - simple_average: unweighted mean of sub-KPI current values
  * - custom_formula: not aggregated here (formula-driven), returns null
  * Returns null when there is nothing to aggregate.
@@ -29,14 +29,8 @@ export function computeKpiValue(
     return sum / metrics.length;
   }
 
-  // weighted_sum → weighted average normalized by total weight
-  const totalWeight = metrics.reduce((acc, m) => acc + m.weight, 0);
-  if (totalWeight === 0) return null;
-  const weighted = metrics.reduce(
-    (acc, m) => acc + m.weight * m.currentValue,
-    0
-  );
-  return weighted / totalWeight;
+  // weighted_sum → percent-weighted sum
+  return metrics.reduce((acc, m) => acc + (m.weight / 100) * m.currentValue, 0);
 }
 
 export function formatDate(iso: string): string {

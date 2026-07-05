@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { LIBRARY_METRIC_FIELDS } from "@/lib/kpi/fields";
 import { syncActiveRecordsForSet, setIdForKpi } from "@/lib/kpi/performance";
+import { validateWeight } from "@/lib/kpi/weight";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,10 @@ export async function POST(req: NextRequest) {
     if (!b.name || !b.name.trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
+    const weight = validateWeight(b.weight);
+    if (typeof weight !== "number") {
+      return NextResponse.json({ error: weight.error }, { status: 400 });
+    }
 
     const conn = await pool.getConnection();
     try {
@@ -64,7 +69,7 @@ export async function POST(req: NextRequest) {
           b.dataSourceUrl?.trim() || null,
           b.committeeId || null,
           b.personInChargeId || null,
-          b.weight ?? 0,
+          weight,
           b.unit?.trim() || null,
           b.fiveYearTarget ?? null,
           targetModeOf(b.targetMode),

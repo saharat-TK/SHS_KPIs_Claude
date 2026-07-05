@@ -7,6 +7,7 @@ import {
   setIdForMetric,
   activeRecordsHaveMetricProgress,
 } from "@/lib/kpi/performance";
+import { validateWeight } from "@/lib/kpi/weight";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,13 @@ export async function PATCH(
 ) {
   try {
     const body = await req.json();
+    if ("weight" in body) {
+      const weight = validateWeight(body.weight);
+      if (typeof weight !== "number") {
+        return NextResponse.json({ error: weight.error }, { status: 400 });
+      }
+      body.weight = weight;
+    }
     const setClauses: string[] = [];
     const values: unknown[] = [];
     for (const [key, column] of Object.entries(COLUMN_MAP)) {

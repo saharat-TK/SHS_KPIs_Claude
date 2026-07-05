@@ -204,7 +204,7 @@ function MetricModal({
 
   const [name, setName] = useState(metric?.name ?? "");
   const [categoryId, setCategoryId] = useState(metric?.categoryId ?? "");
-  const [weight, setWeight] = useState(metric?.weight ?? 10);
+  const [weight, setWeight] = useState(metric?.weight ?? 100);
   const [unit, setUnit] = useState(metric?.unit ?? "%");
   const [collectionPeriod, setCollectionPeriod] = useState<CollectionPeriod>(
     metric?.collectionPeriod ?? "every_quarter",
@@ -263,7 +263,8 @@ function MetricModal({
       : null;
 
   const submitting = create.isPending || update.isPending || saveTargets.isPending;
-  const valid = name.trim().length > 1 && !capError;
+  const weightValid = Number.isInteger(weight) && weight >= 1 && weight <= 100;
+  const valid = name.trim().length > 1 && weightValid && !capError;
   const targetInputsDisabled = targetMode !== "manual";
 
   const persistTargets = (id: number) =>
@@ -388,6 +389,9 @@ function MetricModal({
           <Field label="Weight (%)">
             <Input
               type="number"
+              min={1}
+              max={100}
+              step={1}
               value={weight}
               onChange={(e) => setWeight(Number(e.target.value))}
             />

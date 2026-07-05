@@ -551,9 +551,8 @@ function computeTargetPreview(
   if (type === "simple_average") {
     return vals.reduce((a, x) => a + x.v, 0) / vals.length;
   }
-  const totalWeight = vals.reduce((a, x) => a + x.w, 0);
-  if (totalWeight === 0) return null;
-  return vals.reduce((a, x) => a + x.w * x.v, 0) / totalWeight;
+  // weighted_sum → percent-weighted sum
+  return vals.reduce((a, x) => a + (x.w / 100) * x.v, 0);
 }
 
 function AggregateSummary({
