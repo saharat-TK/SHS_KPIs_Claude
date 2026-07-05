@@ -137,7 +137,7 @@ export function ProgressPanel({
 
       <div className="flex flex-col gap-lg">
         <Card>
-          <CardHeader title="Threshold Setting" subtitle={`Year ${year}`} />
+          <CardHeader title="Threshold" subtitle={`Year ${year}`} />
           <CardBody className="flex flex-col gap-md">
             <div className="flex items-center justify-between">
               <span className="text-body-sm text-mute">Annual target</span>
