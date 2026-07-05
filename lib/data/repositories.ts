@@ -21,6 +21,7 @@ import type {
   QuarterProgress,
   StrategicSet,
   StrategicSetStatus,
+  UnitRecord,
   ValidationComment,
   ValidationStatus,
   ValidationSubmission,
@@ -212,6 +213,41 @@ export const kpiCategoriesRepo = {
     if (!res.ok) throw new Error("Failed to reorder categories");
     return res.json();
   },
+};
+
+// Units — real MySQL-backed (shs_kpis_claude.units), admin-managed reference
+// list of measurement units. Uses jsonOrThrow so the API's error text (e.g. the
+// duplicate-name 409) surfaces in the error toast.
+export const unitsRepo = {
+  list: async (): Promise<UnitRecord[]> =>
+    jsonOrThrow(await fetch("/api/units"), "Failed to load units"),
+  create: async (input: {
+    unitNameTh: string;
+    unitNameEn: string;
+    description?: string;
+  }): Promise<UnitRecord> =>
+    jsonOrThrow(
+      await fetch("/api/units", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to create unit",
+    ),
+  update: async (
+    id: number,
+    patch: { unitNameTh?: string; unitNameEn?: string; description?: string },
+  ): Promise<UnitRecord> =>
+    jsonOrThrow(
+      await fetch(`/api/units/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update unit",
+    ),
+  remove: async (id: number): Promise<{ id: number }> =>
+    jsonOrThrow(await fetch(`/api/units/${id}`, { method: "DELETE" }), "Failed to remove unit"),
 };
 
 // KPIs -----------------------------------------------------------------------

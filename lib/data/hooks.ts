@@ -24,6 +24,7 @@ import type {
   PerformanceStatus,
   StrategicSet,
   StrategicSetStatus,
+  UnitRecord,
 } from "@/lib/types";
 import {
   committeesRepo,
@@ -39,6 +40,7 @@ import {
   metricsRepo,
   performanceRecordsRepo,
   strategicSetsRepo,
+  unitsRepo,
   validationsRepo,
 } from "./repositories";
 
@@ -59,6 +61,7 @@ export const qk = {
   kpis: ["kpis"] as const,
   kpi: (id: string) => ["kpis", id] as const,
   kpiCategories: ["kpiCategories"] as const,
+  units: ["units"] as const,
   metrics: ["metrics"] as const,
   metricsByKpi: (id: string) => ["metrics", "byKpi", id] as const,
   formulas: ["formulas"] as const,
@@ -265,6 +268,44 @@ export function useDeleteKpiCategory() {
     mutationFn: (id: string) => kpiCategoriesRepo.remove(id),
     meta: { toast: "Category removed" },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.kpiCategories }),
+  });
+}
+
+// ── Units (admin-managed measurement units) ─────────────────────────────────
+export const useUnits = () =>
+  useQuery({ queryKey: qk.units, queryFn: unitsRepo.list });
+
+export function useCreateUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { unitNameTh: string; unitNameEn: string; description?: string }) =>
+      unitsRepo.create(input),
+    meta: { toast: (d) => `Unit "${(d as UnitRecord).unitNameEn}" added` },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.units }),
+  });
+}
+
+export function useUpdateUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: number;
+      patch: { unitNameTh?: string; unitNameEn?: string; description?: string };
+    }) => unitsRepo.update(id, patch),
+    meta: { toast: "Unit updated" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.units }),
+  });
+}
+
+export function useDeleteUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => unitsRepo.remove(id),
+    meta: { toast: "Unit removed" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.units }),
   });
 }
 

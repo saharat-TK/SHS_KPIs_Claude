@@ -66,6 +66,17 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
+    label: "Administration",
+    items: [
+      {
+        label: "Units",
+        href: "/admin/units",
+        icon: "square_foot",
+        requires: "configure_kpis",
+      },
+    ],
+  },
+  {
     label: "Administration (prototype)",
     items: [
       {

@@ -15,6 +15,14 @@ export interface KpiCategoryRecord {
   sortOrder: number;
 }
 
+// Admin-managed measurement unit for KPIs/metrics (shs_kpis_claude.units).
+export interface UnitRecord {
+  id: number;
+  unitNameTh: string;
+  unitNameEn: string;
+  description: string | null;
+}
+
 // Canonical default set — mirrors the seed rows in
 // schema/SHS_KPI_Category_schema.sql. Used as a loading/offline fallback so the
 // category tabs never render empty before the DB query resolves.
