@@ -15,9 +15,8 @@ function rollup(
     return present.reduce((a, r) => a + r.value, 0) / present.length;
   }
   if (calcType === "weighted_sum") {
-    const tw = present.reduce((a, r) => a + r.weight, 0);
-    if (tw === 0) return null;
-    return present.reduce((a, r) => a + r.weight * r.value, 0) / tw;
+    // Percent-weighted sum: each weight is a percentage contribution.
+    return present.reduce((a, r) => a + (r.weight / 100) * r.value, 0);
   }
   return null;
 }
