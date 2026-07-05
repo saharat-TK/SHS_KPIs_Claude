@@ -362,6 +362,7 @@ export interface PerformanceRecord {
   activatedAt: string;
   lastSyncedAt: string | null;
   kpiCount?: number;
+  openPeriodCount?: number;
 }
 
 export interface PerformancePeriod {

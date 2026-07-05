@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildPerformancePeriodMatrix,
+  firstOpenQuarter,
   isPeriodOpen,
   normalizePerformancePeriodInput,
+  openPeriodSummary,
+  openQuartersForYear,
 } from "../lib/kpi/performancePeriods.ts";
 
 test("buildPerformancePeriodMatrix returns twenty closed periods by default", () => {
@@ -43,4 +46,40 @@ test("normalizePerformancePeriodInput rejects invalid period coordinates", () =>
     () => normalizePerformancePeriodInput([{ yearNo: 6, quarterNo: 1, isOpen: true }]),
     /Invalid yearNo\/quarterNo/,
   );
+});
+
+test("openQuartersForYear returns only that year's open quarters, ascending", () => {
+  const periods = buildPerformancePeriodMatrix([
+    { yearNo: 1, quarterNo: 3, isOpen: true },
+    { yearNo: 1, quarterNo: 1, isOpen: true },
+    { yearNo: 2, quarterNo: 1, isOpen: true },
+  ]);
+
+  assert.deepEqual(openQuartersForYear(periods, 1), [1, 3]);
+  assert.deepEqual(openQuartersForYear(periods, 2), [1]);
+  assert.deepEqual(openQuartersForYear(periods, 3), []);
+});
+
+test("firstOpenQuarter returns the lowest open quarter or null", () => {
+  const periods = buildPerformancePeriodMatrix([
+    { yearNo: 1, quarterNo: 3, isOpen: true },
+    { yearNo: 1, quarterNo: 2, isOpen: true },
+  ]);
+
+  assert.equal(firstOpenQuarter(periods, 1), 2);
+  assert.equal(firstOpenQuarter(periods, 5), null);
+});
+
+test("openPeriodSummary counts open periods over the full matrix", () => {
+  const periods = buildPerformancePeriodMatrix([
+    { yearNo: 1, quarterNo: 1, isOpen: true },
+    { yearNo: 1, quarterNo: 2, isOpen: true },
+    { yearNo: 2, quarterNo: 1, isOpen: true },
+  ]);
+
+  assert.deepEqual(openPeriodSummary(periods), { openCount: 3, total: 20 });
+  assert.deepEqual(openPeriodSummary(buildPerformancePeriodMatrix([])), {
+    openCount: 0,
+    total: 20,
+  });
 });

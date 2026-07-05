@@ -10,7 +10,9 @@ const SELECT_FIELDS = `
   r.start_year AS startYear, r.end_year AS endYear, r.status,
   r.activated_by AS activatedBy, r.activated_at AS activatedAt,
   r.last_synced_at AS lastSyncedAt,
-  (SELECT COUNT(*) FROM perf_kpi k WHERE k.record_id = r.id) AS kpiCount
+  (SELECT COUNT(*) FROM perf_kpi k WHERE k.record_id = r.id) AS kpiCount,
+  (SELECT COUNT(*) FROM performance_record_period p
+     WHERE p.record_id = r.id AND p.is_open = 1) AS openPeriodCount
 `;
 
 export async function GET() {

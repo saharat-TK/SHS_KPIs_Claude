@@ -72,3 +72,32 @@ export function isPeriodOpen(
 ) {
   return periods.some((p) => p.yearNo === yearNo && p.quarterNo === quarterNo && p.isOpen);
 }
+
+/** Open quarter numbers for a given year, ascending. */
+export function openQuartersForYear(
+  periods: PerformancePeriod[],
+  yearNo: number,
+): number[] {
+  return periods
+    .filter((p) => p.yearNo === yearNo && p.isOpen)
+    .map((p) => p.quarterNo)
+    .sort((a, b) => a - b);
+}
+
+/** Lowest open quarter for a year, or null when none are open. */
+export function firstOpenQuarter(
+  periods: PerformancePeriod[],
+  yearNo: number,
+): number | null {
+  const open = openQuartersForYear(periods, yearNo);
+  return open.length > 0 ? open[0] : null;
+}
+
+/** Count of open periods across the full 5×4 matrix. */
+export function openPeriodSummary(periods: PerformancePeriod[]): {
+  openCount: number;
+  total: number;
+} {
+  const openCount = periods.reduce((n, p) => (p.isOpen ? n + 1 : n), 0);
+  return { openCount, total: PERFORMANCE_YEAR_COUNT * PERFORMANCE_QUARTER_COUNT };
+}

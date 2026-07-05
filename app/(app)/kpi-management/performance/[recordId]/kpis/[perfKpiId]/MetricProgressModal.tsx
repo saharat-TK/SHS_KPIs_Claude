@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Modal,
   CardHeader,
@@ -10,9 +10,10 @@ import {
   HEALTH_LABEL,
   healthOf,
 } from "@/components/ui";
+import { Icon } from "@/components/ui/Icon";
 import { cn, formatNumber } from "@/lib/utils";
 import { targetForYear, percentOfTarget, HEALTH_TONE } from "@/lib/kpi/progress";
-import { isPeriodOpen } from "@/lib/kpi/performancePeriods";
+import { firstOpenQuarter, isPeriodOpen } from "@/lib/kpi/performancePeriods";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSaveMetricProgress } from "@/lib/data/hooks";
 import type { PerformancePeriod, PerfMetric } from "@/lib/types";
@@ -36,7 +37,21 @@ export function MetricProgressModal({
   periodsLoading?: boolean;
 }) {
   const { user } = useAuth();
-  const [quarter, setQuarter] = useState(1);
+  // Land on the first OPEN quarter for this year (fallback Q1) so users don't
+  // open onto a locked quarter. Only auto-select until the user manually picks.
+  const [quarter, setQuarter] = useState(
+    () => (periods ? firstOpenQuarter(periods, year) : null) ?? 1,
+  );
+  const userPickedQuarter = useRef(false);
+  useEffect(() => {
+    if (userPickedQuarter.current) return;
+    const firstOpen = periods ? firstOpenQuarter(periods, year) : null;
+    if (firstOpen != null) setQuarter(firstOpen);
+  }, [periods, year]);
+  const pickQuarter = (q: number) => {
+    userPickedQuarter.current = true;
+    setQuarter(q);
+  };
   const save = useSaveMetricProgress(metric.id, perfKpiId);
 
   const yearTarget = targetForYear(metric.annualTargets, year);
@@ -53,10 +68,11 @@ export function MetricProgressModal({
   const pct = percentOfTarget(current, target);
   const hasThresholds = metric.thresholdGreen != null && metric.thresholdAmber != null;
   const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
+  const hasPeriods = !!periods && periods.length > 0 && !periodsLoading;
   const readOnlyMessage = periodsLoading
     ? "Recording period status is loading. Data entry is temporarily disabled."
     : periodLocked
-      ? `Year ${year} Quarter ${quarter} is closed for recording.`
+      ? `Year ${year} Quarter ${quarter} is closed for recording. Ask an admin to open it to enter progress.`
       : undefined;
 
   return (
@@ -71,23 +87,32 @@ export function MetricProgressModal({
         <div className="overflow-hidden rounded-lg border border-hairline">
           {/* Boxed quarter tabs, matching the full-page ProgressPanel. */}
           <div className="flex">
-            {QUARTERS.map((q, i) => (
-              <button
-                key={q}
-                type="button"
-                aria-selected={q === quarter}
-                onClick={() => setQuarter(q)}
-                className={cn(
-                  "flex-1 px-md py-sm text-label-md text-center border-b border-hairline transition-colors",
-                  i > 0 && "border-l border-hairline",
-                  q === quarter
-                    ? "bg-primary text-on-primary border-b-primary"
-                    : "bg-surface-lowest text-on-surface hover:bg-surface-soft",
-                )}
-              >
-                Quarter {q}
-              </button>
-            ))}
+            {QUARTERS.map((q, i) => {
+              const closed = hasPeriods && !isPeriodOpen(periods!, year, q);
+              return (
+                <button
+                  key={q}
+                  type="button"
+                  aria-selected={q === quarter}
+                  onClick={() => pickQuarter(q)}
+                  className={cn(
+                    "flex-1 px-md py-sm text-label-md text-center border-b border-hairline transition-colors",
+                    i > 0 && "border-l border-hairline",
+                    q === quarter
+                      ? "bg-primary text-on-primary border-b-primary"
+                      : closed
+                        ? "bg-surface-soft text-mute hover:bg-surface-container-high"
+                        : "bg-surface-lowest text-on-surface hover:bg-surface-soft",
+                  )}
+                >
+                  <span className="inline-flex items-center justify-center gap-tiny">
+                    {closed && <Icon name="lock" size={14} />}
+                    Quarter {q}
+                    {closed && <span className="opacity-80">· Closed</span>}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <QuarterEntry

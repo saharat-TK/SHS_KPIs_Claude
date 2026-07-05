@@ -23,8 +23,14 @@ import {
   usePerformanceRecord,
   usePerfKpis,
   useKpiCategories,
+  usePerformancePeriods,
   useSyncPerformanceRecord,
 } from "@/lib/data/hooks";
+import {
+  openPeriodSummary,
+  openQuartersForYear,
+  PERFORMANCE_YEAR_COUNT,
+} from "@/lib/kpi/performancePeriods";
 import { formatDate } from "@/lib/utils";
 import type { KpiType, PerformanceStatus } from "@/lib/types";
 
@@ -56,6 +62,7 @@ function PerformanceRecordDetail() {
   const recordQ = usePerformanceRecord(recordId);
   const kpisQ = usePerfKpis(recordId);
   const categoriesQ = useKpiCategories();
+  const periodsQ = usePerformancePeriods(recordId);
   const sync = useSyncPerformanceRecord();
 
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
@@ -66,6 +73,16 @@ function PerformanceRecordDetail() {
   const categories = categoriesQ.data ?? [];
   const kpis = kpisQ.data ?? [];
   const isAdmin = can("configure_kpis");
+
+  const periods = periodsQ.data ?? [];
+  const { openCount } = openPeriodSummary(periods);
+  const openByYear = Array.from({ length: PERFORMANCE_YEAR_COUNT }, (_, i) => i + 1)
+    .map((yearNo) => {
+      const qs = openQuartersForYear(periods, yearNo);
+      return qs.length ? `Y${yearNo} ${qs.map((q) => `Q${q}`).join(", ")}` : null;
+    })
+    .filter(Boolean)
+    .join(" · ");
 
   const tabs = [
     { id: "all", label: "All", count: kpis.length },
@@ -127,6 +144,21 @@ function PerformanceRecordDetail() {
           , then use <span className="font-medium">Sync from Library</span> to pull the changes in
           (entered progress is preserved).
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-sm rounded-lg border border-hairline bg-surface-lowest px-md py-sm text-body-sm">
+        <Icon name="event_available" size={18} className="text-stone" />
+        <Badge tone={openCount > 0 ? "success" : "neutral"}>{openCount} / 20 open</Badge>
+        <span className="text-mute">
+          {openCount > 0
+            ? `Recording open: ${openByYear}`
+            : "No recording periods are open."}
+        </span>
+        {isAdmin && (
+          <span className="text-caption-sm text-stone">
+            Manage open/closed quarters from the Records list → Recording periods.
+          </span>
+        )}
       </div>
 
       <Tabs items={tabs} active={cat} onChange={setCat} />

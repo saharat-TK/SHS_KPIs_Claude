@@ -99,6 +99,7 @@ function Performance() {
                   <Th align="center">Years</Th>
                   <Th align="center">Status</Th>
                   <Th align="center">KPIs</Th>
+                  <Th align="center">Open Periods</Th>
                   <Th align="center">Activated</Th>
                   <Th align="right">Actions</Th>
                 </tr>
@@ -117,6 +118,11 @@ function Performance() {
                       <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>
                     </Td>
                     <Td align="center">{r.kpiCount ?? 0}</Td>
+                    <Td align="center">
+                      <Badge tone={(r.openPeriodCount ?? 0) > 0 ? "success" : "neutral"}>
+                        {r.openPeriodCount ?? 0} / 20 open
+                      </Badge>
+                    </Td>
                     <Td align="center" className="text-mute">
                       {r.activatedAt ? formatDate(r.activatedAt) : "—"}
                     </Td>
@@ -263,6 +269,36 @@ function RecordingPeriodsModal({
   const periodFor = (yearNo: number, quarterNo: number) =>
     draft.find((p) => p.yearNo === yearNo && p.quarterNo === quarterNo);
 
+  // Audit metadata (opened/updated by + timestamps) lives on the loaded query,
+  // not the editable draft — it reflects what's currently persisted.
+  const auditFor = (yearNo: number, quarterNo: number) =>
+    periodsQ.data?.find((p) => p.yearNo === yearNo && p.quarterNo === quarterNo);
+
+  const auditText = (yearNo: number, quarterNo: number): string | undefined => {
+    const p = auditFor(yearNo, quarterNo);
+    if (!p) return undefined;
+    const parts: string[] = [];
+    if (p.isOpen && p.openedBy) {
+      parts.push(`Opened by ${p.openedBy}${p.openedAt ? ` on ${formatDate(p.openedAt)}` : ""}`);
+    }
+    if (p.updatedBy) {
+      parts.push(`Updated by ${p.updatedBy}${p.updatedAt ? ` on ${formatDate(p.updatedAt)}` : ""}`);
+    }
+    return parts.length ? parts.join(" · ") : undefined;
+  };
+
+  const yearAuditText = (yearNo: number): string | null => {
+    const rows = (periodsQ.data ?? []).filter((p) => p.yearNo === yearNo && p.updatedAt);
+    if (rows.length === 0) return null;
+    const latest = rows.reduce((a, b) =>
+      String(a.updatedAt) >= String(b.updatedAt) ? a : b,
+    );
+    if (!latest.updatedAt) return null;
+    return `Last changed: Q${latest.quarterNo}${
+      latest.updatedBy ? ` by ${latest.updatedBy}` : ""
+    } · ${formatDate(latest.updatedAt)}`;
+  };
+
   const setQuarter = (yearNo: number, quarterNo: number, isOpen: boolean) =>
     setDraft((items) =>
       items.map((p) => (p.yearNo === yearNo && p.quarterNo === quarterNo ? { ...p, isOpen } : p)),
@@ -319,26 +355,32 @@ function RecordingPeriodsModal({
                 >
                   {allOpen ? "Close Year" : "Open Year"}
                 </Button>
-                <div className="grid grid-cols-2 gap-sm sm:grid-cols-4">
-                  {[1, 2, 3, 4].map((quarterNo) => {
-                    const period = periodFor(yearNo, quarterNo);
-                    const isOpen = !!period?.isOpen;
-                    return (
-                      <button
-                        key={quarterNo}
-                        type="button"
-                        className={[
-                          "flex h-[34px] items-center justify-center rounded-DEFAULT border px-sm text-label-md transition-colors",
-                          isOpen
-                            ? "border-primary-container bg-primary text-on-primary"
-                            : "border-hairline bg-surface-soft text-mute hover:text-on-surface",
-                        ].join(" ")}
-                        onClick={() => setQuarter(yearNo, quarterNo, !isOpen)}
-                      >
-                        Q{quarterNo} {isOpen ? "Open" : "Closed"}
-                      </button>
-                    );
-                  })}
+                <div className="flex flex-col gap-xs">
+                  <div className="grid grid-cols-2 gap-sm sm:grid-cols-4">
+                    {[1, 2, 3, 4].map((quarterNo) => {
+                      const period = periodFor(yearNo, quarterNo);
+                      const isOpen = !!period?.isOpen;
+                      return (
+                        <button
+                          key={quarterNo}
+                          type="button"
+                          title={auditText(yearNo, quarterNo)}
+                          className={[
+                            "flex h-[34px] items-center justify-center rounded-DEFAULT border px-sm text-label-md transition-colors",
+                            isOpen
+                              ? "border-primary-container bg-primary text-on-primary"
+                              : "border-hairline bg-surface-soft text-mute hover:text-on-surface",
+                          ].join(" ")}
+                          onClick={() => setQuarter(yearNo, quarterNo, !isOpen)}
+                        >
+                          Q{quarterNo} {isOpen ? "Open" : "Closed"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {yearAuditText(yearNo) && (
+                    <div className="text-caption-sm text-stone">{yearAuditText(yearNo)}</div>
+                  )}
                 </div>
               </div>
             );
