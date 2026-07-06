@@ -35,6 +35,7 @@ import {
 import { formatNumber } from "@/lib/utils";
 import { ProgressPanel } from "./ProgressPanel";
 import { MetricProgressModal } from "./MetricProgressModal";
+import { AnnualQuarterProgressMatrix } from "./AnnualQuarterProgressMatrix";
 
 export default function PerfKpiProgressPage() {
   return (
@@ -120,6 +121,9 @@ function PerfKpiProgress() {
               onQuarterChange={setQuarter}
               onSave={(yearNo, quarterNo, data) =>
                 save.mutate({ ...data, yearNo, quarterNo, recordedBy: user?.email })
+              }
+              rightColumnContent={
+                <AnnualQuarterProgressMatrix kpi={kpi} metrics={metrics} year={year} />
               }
               quarterContent={
                 kpi.hasChildren ? (
