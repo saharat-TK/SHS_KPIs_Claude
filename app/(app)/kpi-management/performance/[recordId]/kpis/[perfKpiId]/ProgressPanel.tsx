@@ -40,7 +40,10 @@ export interface ProgressPanelProps {
    *  in sync). When omitted, the panel manages the year internally. */
   year?: number;
   onYearChange?: (year: number) => void;
-  mainColumnFooter?: React.ReactNode;
+  /** Optional controlled quarter selection for quarter-scoped child content. */
+  quarter?: number;
+  onQuarterChange?: (quarter: number) => void;
+  quarterContent?: React.ReactNode;
   onSave: (
     yearNo: number,
     quarterNo: number,
@@ -63,13 +66,17 @@ export function ProgressPanel({
   saving,
   year: yearProp,
   onYearChange,
-  mainColumnFooter,
+  quarter: quarterProp,
+  onQuarterChange,
+  quarterContent,
   onSave,
 }: ProgressPanelProps) {
   const [internalYear, setInternalYear] = useState(1);
   const year = yearProp ?? internalYear;
   const setYear = onYearChange ?? setInternalYear;
-  const [quarter, setQuarter] = useState(1);
+  const [internalQuarter, setInternalQuarter] = useState(1);
+  const quarter = quarterProp ?? internalQuarter;
+  const setQuarter = onQuarterChange ?? setInternalQuarter;
 
   const yearTarget = annualTargets.find((t) => t.yearNo === year)?.targetValue ?? null;
   // Accumulated quarter target: running sum of (yearTarget / 4) through quarter q.
@@ -125,7 +132,7 @@ export function ProgressPanel({
                 <button
                   key={q}
                   type="button"
-                  aria-selected={q === quarter}
+                  aria-pressed={q === quarter}
                   onClick={() => setQuarter(q)}
                   className={cn(
                     "flex-1 px-md py-sm text-label-md text-center border-b border-hairline transition-colors",
@@ -165,9 +172,9 @@ export function ProgressPanel({
             saving={saving}
             onSave={(data) => onSave(year, quarter, data)}
           />
-        </Card>
 
-        {mainColumnFooter}
+          {quarterContent}
+        </Card>
       </div>
 
       <div className="flex flex-col gap-lg">
@@ -258,11 +265,30 @@ export function QuarterEntry({
 
   return (
     <CardBody className="flex flex-col gap-lg">
-      <div>
-        <h3 className="text-heading-md text-on-surface">Q{quarter} Data Entry</h3>
-        <p className="text-caption-sm text-mute mt-tiny">
-          {target == null ? "No target" : `Cumulative Target: ${formatNumber(target, 2)} ${unit ?? ""}`}
-        </p>
+      <div className="flex flex-col gap-sm sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-heading-md text-on-surface">Q{quarter} Data Entry</h3>
+          <p className="text-caption-sm text-mute mt-tiny">
+            {target == null ? "No target" : `Cumulative Target: ${formatNumber(target, 2)} ${unit ?? ""}`}
+          </p>
+        </div>
+
+        {!readOnly && (
+          <Button
+            icon="save"
+            disabled={!canSave || saving}
+            onClick={() =>
+              onSave({
+                progressValue:
+                  valueEditable && value !== "" ? Number(value) : existing?.progressValue ?? null,
+                issue: issue.trim(),
+                solution: solution.trim(),
+              })
+            }
+          >
+            {saving ? "Saving…" : `Save Q${quarter}`}
+          </Button>
+        )}
       </div>
 
       {readOnlyMessage && (
@@ -309,25 +335,6 @@ export function QuarterEntry({
           placeholder="How it will be addressed"
         />
       </div>
-
-      {!readOnly && (
-        <div className="flex justify-end border-t border-hairline pt-md">
-          <Button
-            icon="save"
-            disabled={!canSave || saving}
-            onClick={() =>
-              onSave({
-                progressValue:
-                  valueEditable && value !== "" ? Number(value) : existing?.progressValue ?? null,
-                issue: issue.trim(),
-                solution: solution.trim(),
-              })
-            }
-          >
-            {saving ? "Saving…" : `Save Q${quarter}`}
-          </Button>
-        </div>
-      )}
     </CardBody>
   );
 }
