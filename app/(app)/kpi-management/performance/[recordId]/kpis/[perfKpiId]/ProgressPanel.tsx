@@ -44,6 +44,7 @@ export interface ProgressPanelProps {
   quarter?: number;
   onQuarterChange?: (quarter: number) => void;
   quarterContent?: React.ReactNode;
+  rightColumnContent?: React.ReactNode;
   onSave: (
     yearNo: number,
     quarterNo: number,
@@ -69,6 +70,7 @@ export function ProgressPanel({
   quarter: quarterProp,
   onQuarterChange,
   quarterContent,
+  rightColumnContent,
   onSave,
 }: ProgressPanelProps) {
   const [internalYear, setInternalYear] = useState(1);
@@ -229,6 +231,8 @@ export function ProgressPanel({
             </div>
           </CardBody>
         </Card>
+
+        {rightColumnContent}
       </div>
     </div>
   );
