@@ -30,6 +30,7 @@ import {
 import {
   targetForYear,
   percentOfTarget,
+  quarterTargetFor,
   HEALTH_TONE,
 } from "@/lib/kpi/progress";
 import { formatNumber } from "@/lib/utils";
@@ -119,6 +120,11 @@ function PerfKpiProgress() {
               onYearChange={setYear}
               quarter={quarter}
               onQuarterChange={setQuarter}
+              quarterlyTargetMode={kpi.quarterlyTargetMode}
+              variable1Name={kpi.variable1Name}
+              variable1Unit={kpi.variable1Unit}
+              variable2Name={kpi.variable2Name}
+              variable2Unit={kpi.variable2Unit}
               onSave={(yearNo, quarterNo, data) =>
                 save.mutate({ ...data, yearNo, quarterNo, recordedBy: user?.email })
               }
@@ -143,6 +149,7 @@ function PerfKpiProgress() {
                       <Table>
                         <thead>
                           <tr>
+                            <Th>Metric no.</Th>
                             <Th>Metrics</Th>
                             <Th align="right">Annual Target</Th>
                             <Th align="right">Q{quarter} Target</Th>
@@ -153,10 +160,13 @@ function PerfKpiProgress() {
                           </tr>
                         </thead>
                         <tbody>
-                          {metrics.map((m) => {
+                          {metrics.map((m, index) => {
                             const annualTarget = targetForYear(m.annualTargets, year);
-                            const quarterTarget =
-                              annualTarget == null ? null : (annualTarget * quarter) / 4;
+                            const quarterTarget = quarterTargetFor(
+                              annualTarget,
+                              quarter,
+                              kpi.quarterlyTargetMode,
+                            );
                             const selectedProgress = m.progress?.find(
                               (p) => p.yearNo === year && p.quarterNo === quarter,
                             );
@@ -170,6 +180,9 @@ function PerfKpiProgress() {
                             const go = () => setEditingMetricId(m.id);
                             return (
                               <Tr key={m.id} onClick={go}>
+                                <Td>
+                                  <Badge tone="neutral">M{index + 1}</Badge>
+                                </Td>
                                 <Td className="font-medium">{m.name}</Td>
                                 <Td align="right">
                                   {annualTarget == null
@@ -254,6 +267,7 @@ function PerfKpiProgress() {
                   perfKpiId={perfKpiId}
                   year={year}
                   quarter={quarter}
+                  quarterlyTargetMode={kpi.quarterlyTargetMode}
                   periods={periodsQ.data ?? []}
                   periodsLoading={periodsQ.isLoading}
                   onClose={() => setEditingMetricId(null)}

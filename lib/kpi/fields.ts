@@ -11,7 +11,11 @@ export const LIBRARY_KPI_FIELDS = `
   k.weight, k.unit, k.five_year_target AS fiveYearTarget,
   k.calculation_type AS calculationType, k.calculation_logic AS calculationLogic,
   k.formula_id AS formulaId, k.threshold_green AS thresholdGreen,
-  k.threshold_amber AS thresholdAmber, k.sort_order AS sortOrder
+  k.threshold_amber AS thresholdAmber,
+  k.quarterly_target_mode AS quarterlyTargetMode,
+  k.variable1_name AS variable1Name, k.variable1_unit AS variable1Unit,
+  k.variable2_name AS variable2Name, k.variable2_unit AS variable2Unit,
+  k.sort_order AS sortOrder
 `;
 
 export const LIBRARY_METRIC_FIELDS = `
@@ -33,7 +37,11 @@ export const PERF_KPI_FIELDS = `
   k.weight, k.unit, k.five_year_target AS fiveYearTarget,
   k.calculation_type AS calculationType, k.calculation_logic AS calculationLogic,
   k.formula_id AS formulaId, k.threshold_green AS thresholdGreen,
-  k.threshold_amber AS thresholdAmber, k.sort_order AS sortOrder,
+  k.threshold_amber AS thresholdAmber,
+  k.quarterly_target_mode AS quarterlyTargetMode,
+  k.variable1_name AS variable1Name, k.variable1_unit AS variable1Unit,
+  k.variable2_name AS variable2Name, k.variable2_unit AS variable2Unit,
+  k.sort_order AS sortOrder,
   k.has_children AS hasChildren
 `;
 

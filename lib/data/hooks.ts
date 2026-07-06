@@ -697,6 +697,8 @@ type ProgressInput = {
   yearNo: number;
   quarterNo: number;
   progressValue: number | null;
+  variable1Value?: number | null;
+  variable2Value?: number | null;
   issue: string;
   solution: string;
   recordedBy?: string;

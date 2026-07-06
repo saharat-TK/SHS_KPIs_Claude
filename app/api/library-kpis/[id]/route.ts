@@ -30,6 +30,11 @@ const COLUMN_MAP: Record<string, string> = {
   formulaId: "formula_id",
   thresholdGreen: "threshold_green",
   thresholdAmber: "threshold_amber",
+  quarterlyTargetMode: "quarterly_target_mode",
+  variable1Name: "variable1_name",
+  variable1Unit: "variable1_unit",
+  variable2Name: "variable2_name",
+  variable2Unit: "variable2_unit",
   sortOrder: "sort_order",
 };
 
@@ -43,6 +48,10 @@ const NULLABLE_TEXT = new Set([
   "categoryId",
   "committeeId",
   "personInChargeId",
+  "variable1Name",
+  "variable1Unit",
+  "variable2Name",
+  "variable2Unit",
 ]);
 
 export async function GET(

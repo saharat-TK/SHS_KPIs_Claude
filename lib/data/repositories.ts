@@ -571,7 +571,16 @@ export const performanceRecordsRepo = {
     jsonOrThrow(await fetch(`/api/perf-metrics?perfKpiId=${perfKpiId}`), "Failed to load performance metrics"),
   saveKpiProgress: async (
     perfKpiId: number,
-    input: { yearNo: number; quarterNo: number; progressValue: number | null; issue: string; solution: string; recordedBy?: string },
+    input: {
+      yearNo: number;
+      quarterNo: number;
+      progressValue: number | null;
+      variable1Value?: number | null;
+      variable2Value?: number | null;
+      issue: string;
+      solution: string;
+      recordedBy?: string;
+    },
   ): Promise<QuarterProgress[]> =>
     jsonOrThrow(
       await fetch(`/api/perf-kpis/${perfKpiId}/progress`, {

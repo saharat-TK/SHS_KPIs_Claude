@@ -15,9 +15,20 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { cn, formatNumber } from "@/lib/utils";
-import { percentOfTarget, HEALTH_TONE } from "@/lib/kpi/progress";
+import {
+  percentOfTarget,
+  quarterTargetFor,
+  kpiValueFromVariables,
+  unitNeedsDivisor,
+  HEALTH_TONE,
+} from "@/lib/kpi/progress";
 import { isPeriodOpen, openQuartersForYear } from "@/lib/kpi/performancePeriods";
-import type { AnnualTarget, PerformancePeriod, QuarterProgress } from "@/lib/types";
+import type {
+  AnnualTarget,
+  PerformancePeriod,
+  QuarterlyTargetMode,
+  QuarterProgress,
+} from "@/lib/types";
 
 const QUARTERS = [1, 2, 3, 4];
 const YEARS = [1, 2, 3, 4, 5];
@@ -43,12 +54,26 @@ export interface ProgressPanelProps {
   /** Optional controlled quarter selection for quarter-scoped child content. */
   quarter?: number;
   onQuarterChange?: (quarter: number) => void;
+  /** How quarterly targets are derived (defaults to cumulative divide_equally). */
+  quarterlyTargetMode?: QuarterlyTargetMode;
+  /** KPI-variable definitions (leaf KPIs); when variable1Name is set the value
+   *  is entered as V1 (+V2 for Percent/Ratio) instead of a single field. */
+  variable1Name?: string | null;
+  variable1Unit?: string | null;
+  variable2Name?: string | null;
+  variable2Unit?: string | null;
   quarterContent?: React.ReactNode;
   rightColumnContent?: React.ReactNode;
   onSave: (
     yearNo: number,
     quarterNo: number,
-    data: { progressValue: number | null; issue: string; solution: string },
+    data: {
+      progressValue: number | null;
+      variable1Value?: number | null;
+      variable2Value?: number | null;
+      issue: string;
+      solution: string;
+    },
   ) => void;
 }
 
@@ -69,6 +94,11 @@ export function ProgressPanel({
   onYearChange,
   quarter: quarterProp,
   onQuarterChange,
+  quarterlyTargetMode = "divide_equally",
+  variable1Name,
+  variable1Unit,
+  variable2Name,
+  variable2Unit,
   quarterContent,
   rightColumnContent,
   onSave,
@@ -81,8 +111,21 @@ export function ProgressPanel({
   const setQuarter = onQuarterChange ?? setInternalQuarter;
 
   const yearTarget = annualTargets.find((t) => t.yearNo === year)?.targetValue ?? null;
-  // Accumulated quarter target: running sum of (yearTarget / 4) through quarter q.
-  const quarterTarget = (q: number) => (yearTarget == null ? null : (yearTarget * q) / 4);
+  // Quarter target per the KPI's mode: cumulative annual*q/4, or the full annual.
+  const quarterTarget = (q: number) => quarterTargetFor(yearTarget, q, quarterlyTargetMode);
+  const targetLabel = quarterlyTargetMode === "use_annual" ? "Annual Target" : "Cumulative Target";
+  // Leaf KPIs with a defined Variable 1 enter their value via variables.
+  const variables =
+    valueEditable && variable1Name
+      ? {
+          needsDivisor: unitNeedsDivisor(unit),
+          v1Name: variable1Name,
+          v1Unit: variable1Unit ?? null,
+          v2Name: variable2Name ?? null,
+          v2Unit: variable2Unit ?? null,
+          kpiUnit: unit,
+        }
+      : null;
   const progressFor = (q: number) =>
     progress.find((p) => p.yearNo === year && p.quarterNo === q);
   const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
@@ -166,9 +209,11 @@ export function ProgressPanel({
             key={`${year}-${quarter}`}
             quarter={quarter}
             target={quarterTarget(quarter)}
+            targetLabel={targetLabel}
             existing={progressFor(quarter)}
             valueEditable={valueEditable}
             unit={unit}
+            variables={variables}
             readOnly={effectiveReadOnly}
             readOnlyMessage={readOnlyMessage}
             saving={saving}
@@ -238,12 +283,23 @@ export function ProgressPanel({
   );
 }
 
+export interface QuarterEntryVariables {
+  needsDivisor: boolean;
+  v1Name: string;
+  v1Unit: string | null;
+  v2Name: string | null;
+  v2Unit: string | null;
+  kpiUnit: string | null;
+}
+
 export function QuarterEntry({
   quarter,
   target,
+  targetLabel = "Cumulative Target",
   existing,
   valueEditable,
   unit,
+  variables,
   readOnly,
   readOnlyMessage,
   saving,
@@ -251,45 +307,75 @@ export function QuarterEntry({
 }: {
   quarter: number;
   target: number | null;
+  targetLabel?: string;
   existing?: QuarterProgress;
   valueEditable: boolean;
   unit: string | null;
+  /** When set (leaf KPI with defined variables), value is entered as V1 (+V2). */
+  variables?: QuarterEntryVariables | null;
   readOnly: boolean;
   readOnlyMessage?: string;
   saving: boolean;
-  onSave: (data: { progressValue: number | null; issue: string; solution: string }) => void;
+  onSave: (data: {
+    progressValue: number | null;
+    variable1Value?: number | null;
+    variable2Value?: number | null;
+    issue: string;
+    solution: string;
+  }) => void;
 }) {
   const [value, setValue] = useState<string>(
     existing?.progressValue != null ? String(existing.progressValue) : "",
   );
+  const [var1Str, setVar1Str] = useState<string>(
+    existing?.variable1Value != null ? String(existing.variable1Value) : "",
+  );
+  const [var2Str, setVar2Str] = useState<string>(
+    existing?.variable2Value != null ? String(existing.variable2Value) : "",
+  );
   const [issue, setIssue] = useState(existing?.issue ?? "");
   const [solution, setSolution] = useState(existing?.solution ?? "");
 
-  const canSave = !readOnly && issue.trim().length > 0 && solution.trim().length > 0;
+  const v1Num = var1Str === "" ? null : Number(var1Str);
+  const v2Num = var2Str === "" ? null : Number(var2Str);
+  const computedValue = variables ? kpiValueFromVariables(variables.kpiUnit, v1Num, v2Num) : null;
+
+  const variablesFilled =
+    !variables ||
+    (var1Str.trim() !== "" && (!variables.needsDivisor || var2Str.trim() !== ""));
+  const canSave =
+    !readOnly && issue.trim().length > 0 && solution.trim().length > 0 && variablesFilled;
+
+  const emitSave = () =>
+    onSave(
+      variables
+        ? {
+            progressValue: computedValue,
+            variable1Value: v1Num,
+            variable2Value: variables.needsDivisor ? v2Num : null,
+            issue: issue.trim(),
+            solution: solution.trim(),
+          }
+        : {
+            progressValue:
+              valueEditable && value !== "" ? Number(value) : existing?.progressValue ?? null,
+            issue: issue.trim(),
+            solution: solution.trim(),
+          },
+    );
 
   return (
-    <CardBody className="flex flex-col gap-lg">
+    <CardBody className="flex flex-col gap-lg border-b border-hairline bg-surface-soft">
       <div className="flex flex-col gap-sm sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-heading-md text-on-surface">Q{quarter} Data Entry</h3>
           <p className="text-caption-sm text-mute mt-tiny">
-            {target == null ? "No target" : `Cumulative Target: ${formatNumber(target, 2)} ${unit ?? ""}`}
+            {target == null ? "No target" : `${targetLabel}: ${formatNumber(target, 2)} ${unit ?? ""}`}
           </p>
         </div>
 
         {!readOnly && (
-          <Button
-            icon="save"
-            disabled={!canSave || saving}
-            onClick={() =>
-              onSave({
-                progressValue:
-                  valueEditable && value !== "" ? Number(value) : existing?.progressValue ?? null,
-                issue: issue.trim(),
-                solution: solution.trim(),
-              })
-            }
-          >
+          <Button icon="save" disabled={!canSave || saving} onClick={emitSave}>
             {saving ? "Saving…" : `Save Q${quarter}`}
           </Button>
         )}
@@ -301,27 +387,70 @@ export function QuarterEntry({
         </div>
       )}
 
-      <div className="flex flex-col gap-xs">
-        <span className="text-label-md text-on-surface">
-          {valueEditable ? "Progress value (Cumulative)" : "Computed value (Cumulative)"}
-        </span>
-        {valueEditable ? (
-          <Input
-            type="number"
-            step="0.01"
-            value={value}
-            disabled={readOnly}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Enter recorded value"
-          />
-        ) : (
-          <div className="flex h-[36px] items-center rounded-DEFAULT border border-hairline bg-surface-soft px-md text-body-sm text-mute">
-            {existing?.progressValue == null
-              ? "— (awaiting sub-KPI data)"
-              : `${formatNumber(existing.progressValue, 2)} ${unit ?? ""}`}
+      {variables ? (
+        <div className="flex flex-col gap-md">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
+            <div className="flex flex-col gap-xs">
+              <span className="text-label-md text-on-surface">
+                {variables.v1Name}
+                {variables.v1Unit ? ` (${variables.v1Unit})` : ""}
+              </span>
+              <Input
+                type="number"
+                step="0.01"
+                value={var1Str}
+                disabled={readOnly}
+                onChange={(e) => setVar1Str(e.target.value)}
+                placeholder="Enter Variable 1"
+              />
+            </div>
+            {variables.needsDivisor && (
+              <div className="flex flex-col gap-xs">
+                <span className="text-label-md text-on-surface">
+                  {variables.v2Name ?? "Variable 2"}
+                  {variables.v2Unit ? ` (${variables.v2Unit})` : ""}
+                </span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={var2Str}
+                  disabled={readOnly}
+                  onChange={(e) => setVar2Str(e.target.value)}
+                  placeholder="Enter Variable 2"
+                />
+              </div>
+            )}
           </div>
-        )}
-      </div>
+          <div className="flex items-center justify-between rounded-DEFAULT border border-hairline bg-surface-lowest px-md py-sm">
+            <span className="text-body-sm text-mute">Computed value (Cumulative)</span>
+            <span className="text-body-strong text-on-surface">
+              {computedValue == null ? "—" : `${formatNumber(computedValue, 2)} ${unit ?? ""}`}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-xs">
+          <span className="text-label-md text-on-surface">
+            {valueEditable ? "Progress value (Cumulative)" : "Computed value (Cumulative)"}
+          </span>
+          {valueEditable ? (
+            <Input
+              type="number"
+              step="0.01"
+              value={value}
+              disabled={readOnly}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="Enter recorded value"
+            />
+          ) : (
+            <div className="flex h-[36px] items-center rounded-DEFAULT border border-hairline bg-surface-soft px-md text-body-sm text-mute">
+              {existing?.progressValue == null
+                ? "— (awaiting sub-KPI data)"
+                : `${formatNumber(existing.progressValue, 2)} ${unit ?? ""}`}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
         <RequiredArea

@@ -41,8 +41,10 @@ import {
   type LibraryMetric,
   type FormulaRecord,
   type AnnualTarget,
+  type QuarterlyTargetMode,
 } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
+import { unitNeedsDivisor } from "@/lib/kpi/progress";
 import { MetricEditor } from "./MetricEditor";
 
 // Normalise the sparse annual-target rows into a fixed 5-slot array.
@@ -78,6 +80,11 @@ type Draft = {
   calculationType: KpiCalculationType;
   calculationLogic: string;
   formulaId: number | null;
+  quarterlyTargetMode: QuarterlyTargetMode;
+  variable1Name: string;
+  variable1Unit: string;
+  variable2Name: string;
+  variable2Unit: string;
   thresholdGreen: number | null;
   thresholdAmber: number | null;
 };
@@ -99,6 +106,11 @@ function draftOf(k: LibraryKpi): Draft {
     calculationType: k.calculationType,
     calculationLogic: k.calculationLogic ?? "",
     formulaId: k.formulaId,
+    quarterlyTargetMode: k.quarterlyTargetMode,
+    variable1Name: k.variable1Name ?? "",
+    variable1Unit: k.variable1Unit?.trim() || "Item",
+    variable2Name: k.variable2Name ?? "",
+    variable2Unit: k.variable2Unit?.trim() || "Item",
     thresholdGreen: k.thresholdGreen,
     thresholdAmber: k.thresholdAmber,
   };
@@ -158,11 +170,23 @@ function KpiDetail() {
       ? `Year ${overCapYear.yearNo} target (${overCapYear.targetValue.toFixed(2)}) must not exceed the 5-year target (${cap.toFixed(2)}).`
       : null;
 
+  // KPI variables (decision: Variable 1 required always; Variable 2 required
+  // only when the unit is Percent/Ratio).
+  const needsDivisor = draft ? unitNeedsDivisor(draft.unit) : false;
+  const varError =
+    draft == null
+      ? null
+      : !draft.variable1Name.trim()
+        ? "Variable 1 (Dividend) name is required."
+        : needsDivisor && !draft.variable2Name.trim()
+          ? "Variable 2 (Divisor) name is required when the unit is Percent or Ratio."
+          : null;
+
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => (d ? { ...d, [key]: value } : d));
 
   const save = () => {
-    if (!draft || capError) return;
+    if (!draft || capError || varError) return;
     update.mutate(
       {
         id: kpiId,
@@ -182,6 +206,11 @@ function KpiDetail() {
           calculationType: draft.calculationType,
           calculationLogic: draft.calculationLogic,
           formulaId: draft.calculationType === "custom_formula" ? draft.formulaId : null,
+          quarterlyTargetMode: draft.quarterlyTargetMode,
+          variable1Name: draft.variable1Name,
+          variable1Unit: draft.variable1Unit,
+          variable2Name: needsDivisor ? draft.variable2Name : null,
+          variable2Unit: needsDivisor ? draft.variable2Unit : null,
           thresholdGreen: draft.thresholdGreen,
           thresholdAmber: draft.thresholdAmber,
         },
@@ -223,7 +252,7 @@ function KpiDetail() {
             </Button>
             <Button
               icon="save"
-              disabled={!dirty || !!capError || update.isPending || saveTargets.isPending}
+              disabled={!dirty || !!capError || !!varError || update.isPending || saveTargets.isPending}
               onClick={save}
             >
               {update.isPending || saveTargets.isPending ? "Saving…" : "Save Changes"}
@@ -467,6 +496,83 @@ function KpiDetail() {
                       value={computeTargetPreview(draft.calculationType, metrics)}
                     />
                   )}
+
+                  <div className="flex flex-col gap-sm border-t border-hairline pt-lg">
+                    <div>
+                      <span className="text-label-md text-on-surface">Quarterly Target</span>
+                      <p className="text-caption-sm text-mute mt-tiny">
+                        How each quarter&apos;s target is derived on performance records — applies to
+                        this KPI and its sub-KPIs.
+                      </p>
+                    </div>
+                    <RadioGroup
+                      name="quarterlyTargetMode"
+                      value={draft.quarterlyTargetMode}
+                      onChange={(v) => set("quarterlyTargetMode", v as QuarterlyTargetMode)}
+                      orientation="horizontal"
+                      options={[
+                        {
+                          value: "divide_equally",
+                          label: "Divide annual target into quarters (25% each)",
+                          hint: "Cumulative — Q1 25%, Q2 50%, Q3 75%, Q4 100% of the annual target.",
+                        },
+                        {
+                          value: "use_annual",
+                          label: "Use annual target as each quarter's target",
+                          hint: "Every quarter is measured against the full annual target.",
+                        },
+                      ]}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-md border-t border-hairline pt-lg">
+                    <div>
+                      <span className="text-label-md text-on-surface">KPI variables</span>
+                      <p className="text-caption-sm text-mute mt-tiny">
+                        Data entered per quarter on performance records (for KPIs without sub-KPIs).
+                        Value = Variable 1
+                        {needsDivisor
+                          ? draft.unit.trim().toLowerCase() === "percent"
+                            ? " ÷ Variable 2 × 100"
+                            : " ÷ Variable 2"
+                          : ""}
+                        .
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-md">
+                      <Field label="Variable 1 (Dividend) — name">
+                        <Input
+                          value={draft.variable1Name}
+                          onChange={(e) => set("variable1Name", e.target.value)}
+                          placeholder="e.g. Graduates employed"
+                        />
+                      </Field>
+                      <Field label="Unit">
+                        <UnitSelect
+                          value={draft.variable1Unit}
+                          onChange={(value) => set("variable1Unit", value)}
+                        />
+                      </Field>
+                      <Field label="Variable 2 (Divisor) — name">
+                        <Input
+                          value={needsDivisor ? draft.variable2Name : ""}
+                          disabled={!needsDivisor}
+                          onChange={(e) => set("variable2Name", e.target.value)}
+                          placeholder={
+                            needsDivisor ? "e.g. Total graduates" : "Enabled for Percent / Ratio units"
+                          }
+                        />
+                      </Field>
+                      <Field label="Unit">
+                        <UnitSelect
+                          value={needsDivisor ? draft.variable2Unit : "Item"}
+                          disabled={!needsDivisor}
+                          onChange={(value) => set("variable2Unit", value)}
+                        />
+                      </Field>
+                    </div>
+                    {varError && <span className="text-caption-sm text-error">{varError}</span>}
+                  </div>
                 </CardBody>
               </Card>
 

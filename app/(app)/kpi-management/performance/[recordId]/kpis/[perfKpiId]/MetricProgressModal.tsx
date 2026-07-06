@@ -10,11 +10,11 @@ import {
   healthOf,
 } from "@/components/ui";
 import { formatNumber } from "@/lib/utils";
-import { targetForYear, percentOfTarget, HEALTH_TONE } from "@/lib/kpi/progress";
+import { targetForYear, percentOfTarget, quarterTargetFor, HEALTH_TONE } from "@/lib/kpi/progress";
 import { isPeriodOpen } from "@/lib/kpi/performancePeriods";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useSaveMetricProgress } from "@/lib/data/hooks";
-import type { PerformancePeriod, PerfMetric } from "@/lib/types";
+import type { PerformancePeriod, PerfMetric, QuarterlyTargetMode } from "@/lib/types";
 import { QuarterEntry } from "./ProgressPanel";
 
 export function MetricProgressModal({
@@ -22,6 +22,7 @@ export function MetricProgressModal({
   perfKpiId,
   year,
   quarter,
+  quarterlyTargetMode = "divide_equally",
   onClose,
   periods,
   periodsLoading = false,
@@ -30,6 +31,8 @@ export function MetricProgressModal({
   perfKpiId: number;
   year: number;
   quarter: number;
+  /** Inherited from the parent KPI — governs how the quarter target is derived. */
+  quarterlyTargetMode?: QuarterlyTargetMode;
   onClose: () => void;
   periods?: PerformancePeriod[];
   periodsLoading?: boolean;
@@ -38,9 +41,9 @@ export function MetricProgressModal({
   const save = useSaveMetricProgress(metric.id, perfKpiId);
 
   const yearTarget = targetForYear(metric.annualTargets, year);
-  // Accumulated quarter target: running sum of (yearTarget / 4) through quarter q —
-  // same formula as the full-page ProgressPanel.
-  const quarterTarget = (q: number) => (yearTarget == null ? null : (yearTarget * q) / 4);
+  // Quarter target per the parent KPI's mode: cumulative annual*q/4 or full annual.
+  const quarterTarget = (q: number) => quarterTargetFor(yearTarget, q, quarterlyTargetMode);
+  const targetLabel = quarterlyTargetMode === "use_annual" ? "Annual Target" : "Cumulative Target";
   const progressFor = (q: number) =>
     metric.progress?.find((p) => p.yearNo === year && p.quarterNo === q);
 
@@ -75,6 +78,7 @@ export function MetricProgressModal({
             key={`${year}-${quarter}`}
             quarter={quarter}
             target={target}
+            targetLabel={targetLabel}
             existing={progressFor(quarter)}
             valueEditable
             unit={metric.unit}

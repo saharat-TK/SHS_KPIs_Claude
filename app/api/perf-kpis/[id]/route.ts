@@ -27,6 +27,7 @@ export async function GET(
     );
     const [progress] = await pool.query<RowDataPacket[]>(
       `SELECT year_no AS yearNo, quarter_no AS quarterNo, progress_value AS progressValue,
+              variable1_value AS variable1Value, variable2_value AS variable2Value,
               is_computed AS isComputed, issue, solution
        FROM perf_kpi_quarter_progress WHERE perf_kpi_id = ? ORDER BY year_no, quarter_no`,
       [params.id],
