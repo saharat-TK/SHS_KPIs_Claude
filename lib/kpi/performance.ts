@@ -1,6 +1,7 @@
 // Server-only helpers that copy a library strategic set into a performance
 // record and re-sync it later. Both run inside a caller-provided transaction.
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
+import type { QuarterlyTargetMode } from "@/lib/types";
 
 // Roll-up of child metric values for one quarter, per the KPI's calculation
 // type. Nulls (metrics not yet entered) are excluded. custom_formula is not
@@ -40,31 +41,38 @@ export async function recomputeKpiQuarter(
   quarterNo: number,
 ) {
   const [kpiRows] = await conn.query<RowDataPacket[]>(
-    "SELECT calculation_type, unit, has_children FROM perf_kpi WHERE id = ?",
+    "SELECT calculation_type, unit, quarterly_target_mode, has_children FROM perf_kpi WHERE id = ?",
     [perfKpiId],
   );
   if (kpiRows.length === 0 || !kpiRows[0].has_children) return;
 
+  // Metrics inherit the parent KPI's quarterly-target mode; the per-metric
+  // quarter target (used by the percent roll-up) is derived from it in JS.
+  const mode = kpiRows[0].quarterly_target_mode as QuarterlyTargetMode;
   const [metricRows] = await conn.query<RowDataPacket[]>(
     `SELECT m.weight AS weight,
             p.progress_value AS value,
-            CASE
-              WHEN t.target_value IS NULL THEN NULL
-              ELSE (t.target_value * ?) / 4
-            END AS target
+            t.target_value AS annualTarget
        FROM perf_metric m
        LEFT JOIN perf_metric_quarter_progress p
          ON p.perf_metric_id = m.id AND p.year_no = ? AND p.quarter_no = ?
        LEFT JOIN perf_metric_annual_target t
          ON t.perf_metric_id = m.id AND t.year_no = ?
       WHERE m.perf_kpi_id = ?`,
-    [quarterNo, yearNo, quarterNo, yearNo, perfKpiId],
+    [yearNo, quarterNo, yearNo, perfKpiId],
   );
-  const value = rollup(kpiRows[0].calculation_type, kpiRows[0].unit, metricRows.map((r) => ({
-    weight: Number(r.weight),
-    value: r.value == null ? null : Number(r.value),
-    target: r.target == null ? null : Number(r.target),
-  })));
+  const value = rollup(kpiRows[0].calculation_type, kpiRows[0].unit, metricRows.map((r) => {
+    // Mirror lib/kpi/progress.ts#quarterTargetFor. Kept inline (not imported)
+    // so this server module has no runtime cross-import for the test runner.
+    const annual = r.annualTarget == null ? null : Number(r.annualTarget);
+    const target =
+      annual == null ? null : mode === "use_annual" ? annual : (annual * quarterNo) / 4;
+    return {
+      weight: Number(r.weight),
+      value: r.value == null ? null : Number(r.value),
+      target,
+    };
+  }));
 
   await conn.query(
     `INSERT INTO perf_kpi_quarter_progress (perf_kpi_id, year_no, quarter_no, progress_value, is_computed)
@@ -77,7 +85,9 @@ export async function recomputeKpiQuarter(
 const PERF_KPI_INSERT_COLS = `record_id, source_kpi_id, name, description, category_id,
   kpi_type, data_collect_method, collection_period, data_source_url, committee_id,
   person_in_charge_id, weight, unit, five_year_target, calculation_type,
-  calculation_logic, formula_id, threshold_green, threshold_amber, sort_order, has_children`;
+  calculation_logic, formula_id, threshold_green, threshold_amber, quarterly_target_mode,
+  variable1_name, variable1_unit, variable2_name, variable2_unit,
+  sort_order, has_children`;
 
 const PERF_METRIC_INSERT_COLS = `perf_kpi_id, source_metric_id, name, description, category_id,
   data_collect_method, collection_period, data_source_url, committee_id,
@@ -88,7 +98,9 @@ const PERF_METRIC_INSERT_COLS = `perf_kpi_id, source_metric_id, name, descriptio
 const PERF_KPI_UPDATE = `name=?, description=?, category_id=?, kpi_type=?, data_collect_method=?,
   collection_period=?, data_source_url=?, committee_id=?, person_in_charge_id=?, weight=?,
   unit=?, five_year_target=?, calculation_type=?, calculation_logic=?, formula_id=?,
-  threshold_green=?, threshold_amber=?, sort_order=?, has_children=?`;
+  threshold_green=?, threshold_amber=?, quarterly_target_mode=?,
+  variable1_name=?, variable1_unit=?, variable2_name=?, variable2_unit=?,
+  sort_order=?, has_children=?`;
 
 const PERF_METRIC_UPDATE = `name=?, description=?, category_id=?, data_collect_method=?,
   collection_period=?, data_source_url=?, committee_id=?, person_in_charge_id=?, weight=?,
@@ -98,7 +110,9 @@ const kpiValues = (recordId: number, k: RowDataPacket, hasChildren: number) => [
   recordId, k.id, k.name, k.description, k.category_id, k.kpi_type, k.data_collect_method,
   k.collection_period, k.data_source_url, k.committee_id, k.person_in_charge_id, k.weight,
   k.unit, k.five_year_target, k.calculation_type, k.calculation_logic, k.formula_id,
-  k.threshold_green, k.threshold_amber, k.sort_order, hasChildren,
+  k.threshold_green, k.threshold_amber, k.quarterly_target_mode,
+  k.variable1_name, k.variable1_unit, k.variable2_name, k.variable2_unit,
+  k.sort_order, hasChildren,
 ];
 
 const metricValues = (perfKpiId: number, m: RowDataPacket) => [
@@ -141,7 +155,7 @@ export async function copySetIntoRecord(
   for (const k of kpis) {
     const hasChildren = await kpiHasChildren(conn, k.id);
     const [ins] = await conn.query<ResultSetHeader>(
-      `INSERT INTO perf_kpi (${PERF_KPI_INSERT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO perf_kpi (${PERF_KPI_INSERT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       kpiValues(recordId, k, hasChildren),
     );
     const perfKpiId = ins.insertId;
@@ -193,7 +207,9 @@ export async function syncRecordFromLibrary(conn: PoolConnection, recordId: numb
         k.name, k.description, k.category_id, k.kpi_type, k.data_collect_method,
         k.collection_period, k.data_source_url, k.committee_id, k.person_in_charge_id,
         k.weight, k.unit, k.five_year_target, k.calculation_type, k.calculation_logic,
-        k.formula_id, k.threshold_green, k.threshold_amber, k.sort_order, hasChildren,
+        k.formula_id, k.threshold_green, k.threshold_amber, k.quarterly_target_mode,
+        k.variable1_name, k.variable1_unit, k.variable2_name, k.variable2_unit,
+        k.sort_order, hasChildren,
         perfKpiId,
       ]);
       await conn.query("DELETE FROM perf_kpi_annual_target WHERE perf_kpi_id = ?", [perfKpiId]);
@@ -204,7 +220,7 @@ export async function syncRecordFromLibrary(conn: PoolConnection, recordId: numb
       );
     } else {
       const [ins] = await conn.query<ResultSetHeader>(
-        `INSERT INTO perf_kpi (${PERF_KPI_INSERT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO perf_kpi (${PERF_KPI_INSERT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         kpiValues(recordId, k, hasChildren),
       );
       perfKpiId = ins.insertId;

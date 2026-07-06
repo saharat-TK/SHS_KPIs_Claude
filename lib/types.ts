@@ -274,6 +274,11 @@ export interface StrategicSet {
   kpiCount?: number; // populated in list views
 }
 
+/** How a KPI's quarterly target is derived from its annual target.
+ *  divide_equally → cumulative annual*q/4 (Q1 25% … Q4 100%);
+ *  use_annual     → each quarter's target equals the full annual target. */
+export type QuarterlyTargetMode = "divide_equally" | "use_annual";
+
 export interface LibraryKpi {
   id: number;
   setId: number;
@@ -294,6 +299,16 @@ export interface LibraryKpi {
   formulaId: number | null;
   thresholdGreen: number | null;
   thresholdAmber: number | null;
+  /** How quarterly targets are derived for this KPI (and, inherited, its
+   *  metrics): cumulative annual*q/4, or the full annual target each quarter. */
+  quarterlyTargetMode: QuarterlyTargetMode;
+  /** KPI-variable definitions used for leaf-KPI data entry. Variable 1
+   *  (Dividend) is required; Variable 2 (Divisor) is used only when the unit is
+   *  Percent/Ratio. Value = V1, or (V1/V2)*100 for Percent, V1/V2 for Ratio. */
+  variable1Name: string | null;
+  variable1Unit: string | null;
+  variable2Name: string | null;
+  variable2Unit: string | null;
   sortOrder: number;
   annualTargets?: AnnualTarget[];
   metricCount?: number; // populated in list views
@@ -401,6 +416,9 @@ export interface QuarterProgress {
   yearNo: number; // 1..5
   quarterNo: number; // 1..4
   progressValue: number | null;
+  /** Raw KPI-variable inputs for leaf KPIs; progressValue is derived from them. */
+  variable1Value?: number | null;
+  variable2Value?: number | null;
   isComputed?: boolean;
   issue: string | null;
   solution: string | null;

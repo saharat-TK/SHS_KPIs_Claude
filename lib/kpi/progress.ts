@@ -2,7 +2,38 @@
 // performance pages. Status colour/label come from healthOf(pct, thresholds) +
 // HEALTH_LABEL (components/ui/ThresholdBar) — green/amber are treated as PERCENT
 // cutoffs of the target.
-import type { AnnualTarget, QuarterProgress } from "@/lib/types";
+import type { AnnualTarget, QuarterlyTargetMode, QuarterProgress } from "@/lib/types";
+
+/** The target for a given quarter, derived from the annual target per the KPI's
+ *  quarterly-target mode. divide_equally → cumulative annual*q/4 (Q1 25% … Q4
+ *  100%); use_annual → the full annual target every quarter. */
+export function quarterTargetFor(
+  annualTarget: number | null,
+  quarter: number,
+  mode: QuarterlyTargetMode = "divide_equally",
+): number | null {
+  if (annualTarget == null) return null;
+  return mode === "use_annual" ? annualTarget : (annualTarget * quarter) / 4;
+}
+
+/** True when a KPI's unit needs a second variable (Divisor): Percent or Ratio. */
+export function unitNeedsDivisor(unit: string | null): boolean {
+  const u = unit?.trim().toLowerCase();
+  return u === "percent" || u === "ratio";
+}
+
+/** Derive a leaf KPI's value from its entered variables per its unit:
+ *  Percent → (V1/V2)*100, Ratio → V1/V2, any other unit → V1 (single variable). */
+export function kpiValueFromVariables(
+  unit: string | null,
+  v1: number | null,
+  v2: number | null,
+): number | null {
+  if (v1 == null) return null;
+  if (!unitNeedsDivisor(unit)) return v1;
+  if (v2 == null || v2 === 0) return null;
+  return unit!.trim().toLowerCase() === "percent" ? (v1 / v2) * 100 : v1 / v2;
+}
 
 /** Latest quarter (highest q) with a non-null entered/computed value for a year. */
 export function currentValueForYear(

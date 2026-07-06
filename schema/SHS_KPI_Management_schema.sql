@@ -123,6 +123,14 @@ CREATE TABLE library_kpi (
   -- Threshold setting
   threshold_green     DECIMAL(14,4) NULL,                   -- >= green  => healthy
   threshold_amber     DECIMAL(14,4) NULL,                   -- >= amber  => watch
+  -- Quarterly target derivation (applies to this KPI and, inherited, its metrics)
+  quarterly_target_mode ENUM('divide_equally','use_annual') NOT NULL DEFAULT 'divide_equally',
+                                                            -- divide_equally: cumulative annual*q/4; use_annual: each quarter = annual target
+  -- KPI variables (leaf-KPI data entry): value = V1 (or (V1/V2)*100 for Percent, V1/V2 for Ratio)
+  variable1_name      VARCHAR(255) NULL,                    -- Variable 1 (Dividend) display name
+  variable1_unit      VARCHAR(50)  NULL,                    -- Variable 1 unit
+  variable2_name      VARCHAR(255) NULL,                    -- Variable 2 (Divisor); required when unit is Percent/Ratio
+  variable2_unit      VARCHAR(50)  NULL,                    -- Variable 2 unit
   sort_order          INT NOT NULL DEFAULT 0,
   created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -248,6 +256,11 @@ CREATE TABLE perf_kpi (
   formula_id          BIGINT UNSIGNED NULL,               -- copied FK -> formula.id (formulas are global, not snapshotted)
   threshold_green     DECIMAL(14,4) NULL,
   threshold_amber     DECIMAL(14,4) NULL,
+  quarterly_target_mode ENUM('divide_equally','use_annual') NOT NULL DEFAULT 'divide_equally',
+  variable1_name      VARCHAR(255) NULL,                  -- copied KPI-variable definitions (leaf entry)
+  variable1_unit      VARCHAR(50)  NULL,
+  variable2_name      VARCHAR(255) NULL,
+  variable2_unit      VARCHAR(50)  NULL,
   sort_order          INT NOT NULL DEFAULT 0,
   has_children        BOOLEAN NOT NULL DEFAULT 0,          -- true => progress is auto-calculated from metrics
   created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -280,7 +293,9 @@ CREATE TABLE perf_kpi_quarter_progress (
   perf_kpi_id    BIGINT UNSIGNED NOT NULL,
   year_no        TINYINT UNSIGNED NOT NULL CHECK (year_no BETWEEN 1 AND 5),
   quarter_no     TINYINT UNSIGNED NOT NULL CHECK (quarter_no BETWEEN 1 AND 4),
-  progress_value DECIMAL(14,4) NULL,                       -- accumulated current value
+  progress_value DECIMAL(14,4) NULL,                       -- accumulated current value (computed from variables for leaf KPIs)
+  variable1_value DECIMAL(14,4) NULL,                      -- raw Variable 1 (Dividend) entered this quarter
+  variable2_value DECIMAL(14,4) NULL,                      -- raw Variable 2 (Divisor); used when unit is Percent/Ratio
   is_computed    BOOLEAN NOT NULL DEFAULT 0,               -- 1 => derived from metrics, not entered
   issue          TEXT NULL,                                -- required: problem/difficulty getting the data
   solution       TEXT NULL,                                -- required: how it will be addressed

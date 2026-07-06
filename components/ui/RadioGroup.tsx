@@ -21,12 +21,15 @@ export function RadioGroup<T extends string>({
   className?: string;
   orientation?: "vertical" | "horizontal";
 }) {
+  const horizontalCols =
+    options.length <= 2 ? "sm:grid-cols-2" : options.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-4";
+
   return (
     <div
       role="radiogroup"
       className={cn(
         orientation === "horizontal"
-          ? "grid grid-cols-1 sm:grid-cols-3 gap-xs"
+          ? `grid grid-cols-1 ${horizontalCols} gap-xs`
           : "flex flex-col gap-xs",
         className,
       )}

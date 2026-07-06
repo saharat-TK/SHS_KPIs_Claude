@@ -3,8 +3,13 @@
 import { useState, type MouseEvent } from "react";
 
 import { Card, CardBody, CardHeader, Badge, healthOf } from "@/components/ui";
-import { currentValueForYear, percentOfTarget, targetForYear } from "@/lib/kpi/progress";
-import type { PerfKpi, PerfMetric, QuarterProgress } from "@/lib/types";
+import {
+  currentValueForYear,
+  percentOfTarget,
+  quarterTargetFor,
+  targetForYear,
+} from "@/lib/kpi/progress";
+import type { PerfKpi, PerfMetric, QuarterlyTargetMode, QuarterProgress } from "@/lib/types";
 import { cn, formatNumber } from "@/lib/utils";
 
 const QUARTERS = [1, 2, 3, 4] as const;
@@ -121,7 +126,7 @@ export function AnnualQuarterProgressMatrix({
             ))}
 
             {rows.map((row) => {
-              const cells = cellsForRow(row, year, kpiAnnualTarget);
+              const cells = cellsForRow(row, year, kpiAnnualTarget, kpi.quarterlyTargetMode);
               return (
                 <ProgressMatrixRow key={row.id} row={row} cells={cells} />
               );
@@ -192,14 +197,19 @@ function ProgressMatrixRow({ row, cells }: { row: MatrixRow; cells: CellData[] }
   );
 }
 
-function cellsForRow(row: MatrixRow, year: number, kpiAnnualTarget: number | null): CellData[] {
+function cellsForRow(
+  row: MatrixRow,
+  year: number,
+  kpiAnnualTarget: number | null,
+  mode: QuarterlyTargetMode,
+): CellData[] {
   const rowAnnualTarget = targetForYear(row.annualTargets, year);
   const rowTargetMissing = rowAnnualTarget == null || rowAnnualTarget === 0;
   const usesKpiFallback = !row.isParent && rowTargetMissing && kpiAnnualTarget != null;
   const annualTarget = row.isParent || !rowTargetMissing ? rowAnnualTarget : kpiAnnualTarget;
   const targetSource: TargetSource = usesKpiFallback ? "kpi-fallback" : "row";
   const quarterCells = QUARTERS.map((quarter) => {
-    const target = annualTarget == null ? null : (annualTarget * quarter) / 4;
+    const target = quarterTargetFor(annualTarget, quarter, mode);
     const rawProgress =
       row.progress?.find((p) => p.yearNo === year && p.quarterNo === quarter) ?? null;
     const value = rawProgress?.progressValue ?? null;
