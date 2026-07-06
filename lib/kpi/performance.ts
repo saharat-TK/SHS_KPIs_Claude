@@ -5,10 +5,19 @@ import type { PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/prom
 // Roll-up of child metric values for one quarter, per the KPI's calculation
 // type. Nulls (metrics not yet entered) are excluded. custom_formula is not
 // auto-computed here (its variables aren't tied to metrics) → returns null.
-function rollup(
+export function rollup(
   calcType: string,
-  rows: { weight: number; value: number | null }[],
+  unit: string | null,
+  rows: { weight: number; value: number | null; target?: number | null }[],
 ): number | null {
+  if (unit?.trim().toLowerCase() === "percent") {
+    const presentPercents = rows
+      .filter((r) => r.value != null && r.target != null && r.target !== 0)
+      .map((r) => (r.value! / r.target!) * 100);
+    if (presentPercents.length === 0) return null;
+    return presentPercents.reduce((a, value) => a + value, 0) / presentPercents.length;
+  }
+
   const present = rows.filter((r) => r.value != null) as { weight: number; value: number }[];
   if (present.length === 0) return null;
   if (calcType === "simple_average") {
@@ -31,22 +40,30 @@ export async function recomputeKpiQuarter(
   quarterNo: number,
 ) {
   const [kpiRows] = await conn.query<RowDataPacket[]>(
-    "SELECT calculation_type, has_children FROM perf_kpi WHERE id = ?",
+    "SELECT calculation_type, unit, has_children FROM perf_kpi WHERE id = ?",
     [perfKpiId],
   );
   if (kpiRows.length === 0 || !kpiRows[0].has_children) return;
 
   const [metricRows] = await conn.query<RowDataPacket[]>(
-    `SELECT m.weight AS weight, p.progress_value AS value
+    `SELECT m.weight AS weight,
+            p.progress_value AS value,
+            CASE
+              WHEN t.target_value IS NULL THEN NULL
+              ELSE (t.target_value * ?) / 4
+            END AS target
        FROM perf_metric m
        LEFT JOIN perf_metric_quarter_progress p
          ON p.perf_metric_id = m.id AND p.year_no = ? AND p.quarter_no = ?
+       LEFT JOIN perf_metric_annual_target t
+         ON t.perf_metric_id = m.id AND t.year_no = ?
       WHERE m.perf_kpi_id = ?`,
-    [yearNo, quarterNo, perfKpiId],
+    [quarterNo, yearNo, quarterNo, yearNo, perfKpiId],
   );
-  const value = rollup(kpiRows[0].calculation_type, metricRows.map((r) => ({
+  const value = rollup(kpiRows[0].calculation_type, kpiRows[0].unit, metricRows.map((r) => ({
     weight: Number(r.weight),
     value: r.value == null ? null : Number(r.value),
+    target: r.target == null ? null : Number(r.target),
   })));
 
   await conn.query(

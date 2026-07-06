@@ -13,6 +13,7 @@ const COLUMNS = ["Q1", "Q2", "Q3", "Q4", "Annual"] as const;
 type MatrixRow = {
   id: string;
   name: string;
+  displayLabel: string;
   unit: string | null;
   annualTargets?: PerfKpi["annualTargets"];
   progress?: QuarterProgress[];
@@ -53,6 +54,7 @@ export function AnnualQuarterProgressMatrix({
     {
       id: `kpi-${kpi.id}`,
       name: kpi.name,
+      displayLabel: "KPI",
       unit: kpi.unit,
       annualTargets: kpi.annualTargets,
       progress: kpi.progress,
@@ -60,9 +62,10 @@ export function AnnualQuarterProgressMatrix({
       thresholdAmber: kpi.thresholdAmber,
       isParent: true,
     },
-    ...metrics.map((metric) => ({
+    ...metrics.map((metric, index) => ({
       id: `metric-${metric.id}`,
       name: metric.name,
+      displayLabel: `M${index + 1}`,
       unit: metric.unit,
       annualTargets: metric.annualTargets,
       progress: metric.progress,
@@ -108,11 +111,11 @@ export function AnnualQuarterProgressMatrix({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <div className="grid min-w-[420px] grid-cols-[minmax(128px,1fr)_repeat(5,48px)] gap-xs">
-            <div className="text-caption-sm font-medium text-mute">KPI / Metrics</div>
+        <div className="overflow-visible">
+          <div className="grid w-full grid-cols-[32px_repeat(5,minmax(0,1fr))] gap-tiny">
+            <div className="text-center text-[9px] font-medium text-mute">Ref</div>
             {COLUMNS.map((column) => (
-              <div key={column} className="text-center text-caption-sm font-medium text-mute">
+              <div key={column} className="text-center text-[9px] font-medium text-mute">
                 {column}
               </div>
             ))}
@@ -144,15 +147,12 @@ function ProgressMatrixRow({ row, cells }: { row: MatrixRow; cells: CellData[] }
   return (
     <>
       <div
-        className={
-          row.isParent
-            ? "flex min-w-0 items-center gap-xs rounded bg-surface-soft px-xs py-xs text-caption-sm font-semibold text-on-surface"
-            : "min-w-0 px-xs py-xs text-caption-sm text-on-surface"
-        }
+        className="flex min-w-0 items-center justify-center py-tiny"
         title={row.name}
       >
-        <span className="truncate">{row.name}</span>
-        {row.isParent && <Badge tone="info">KPI</Badge>}
+        <Badge tone={row.isParent ? "info" : "neutral"} className="px-tiny text-[9px]">
+          {row.displayLabel}
+        </Badge>
       </div>
 
       {cells.map((cell) => {
@@ -161,7 +161,7 @@ function ProgressMatrixRow({ row, cells }: { row: MatrixRow; cells: CellData[] }
           <div
             key={cell.label}
             className={cn(
-              "relative flex h-9 items-center justify-center rounded-[5px] text-[11px] font-semibold",
+              "relative flex h-7 min-w-0 items-center justify-center rounded-[4px] px-tiny text-[9px] font-semibold",
               colorClassForCell(row, cell),
             )}
             aria-label={tooltip}

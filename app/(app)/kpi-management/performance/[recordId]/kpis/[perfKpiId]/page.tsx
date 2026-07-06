@@ -143,6 +143,7 @@ function PerfKpiProgress() {
                       <Table>
                         <thead>
                           <tr>
+                            <Th>Metric no.</Th>
                             <Th>Metrics</Th>
                             <Th align="right">Annual Target</Th>
                             <Th align="right">Q{quarter} Target</Th>
@@ -153,7 +154,7 @@ function PerfKpiProgress() {
                           </tr>
                         </thead>
                         <tbody>
-                          {metrics.map((m) => {
+                          {metrics.map((m, index) => {
                             const annualTarget = targetForYear(m.annualTargets, year);
                             const quarterTarget =
                               annualTarget == null ? null : (annualTarget * quarter) / 4;
@@ -170,6 +171,9 @@ function PerfKpiProgress() {
                             const go = () => setEditingMetricId(m.id);
                             return (
                               <Tr key={m.id} onClick={go}>
+                                <Td>
+                                  <Badge tone="neutral">M{index + 1}</Badge>
+                                </Td>
                                 <Td className="font-medium">{m.name}</Td>
                                 <Td align="right">
                                   {annualTarget == null

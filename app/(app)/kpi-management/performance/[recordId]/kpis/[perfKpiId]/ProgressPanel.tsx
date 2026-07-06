@@ -268,7 +268,7 @@ export function QuarterEntry({
   const canSave = !readOnly && issue.trim().length > 0 && solution.trim().length > 0;
 
   return (
-    <CardBody className="flex flex-col gap-lg">
+    <CardBody className="flex flex-col gap-lg border-b border-hairline bg-surface-soft">
       <div className="flex flex-col gap-sm sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-heading-md text-on-surface">Q{quarter} Data Entry</h3>
