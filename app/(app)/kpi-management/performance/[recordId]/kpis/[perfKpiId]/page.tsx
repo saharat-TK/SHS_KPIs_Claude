@@ -4,9 +4,6 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   PageHeader,
-  Card,
-  CardHeader,
-  CardBody,
   Button,
   Badge,
   Table,
@@ -31,7 +28,6 @@ import {
   useSaveKpiProgress,
 } from "@/lib/data/hooks";
 import {
-  currentValueForYear,
   targetForYear,
   percentOfTarget,
   HEALTH_TONE,
@@ -64,6 +60,9 @@ function PerfKpiProgress() {
   // Year selection is lifted here so the Sub-KPIs table stays in sync with the
   // ProgressPanel's Year tabs.
   const [year, setYear] = useState(1);
+  // Quarter selection is also lifted so sub-KPIs reflect and record only the
+  // quarter selected in the upper quarter tabs.
+  const [quarter, setQuarter] = useState(1);
   // Entering progress for a sub-KPI opens a pop-up instead of navigating away.
   // Store only the id (not the metric object) so the pop-up re-derives a fresh
   // metric from `metrics` after a save invalidates the list query — otherwise
@@ -117,27 +116,33 @@ function PerfKpiProgress() {
               saving={save.isPending}
               year={year}
               onYearChange={setYear}
+              quarter={quarter}
+              onQuarterChange={setQuarter}
               onSave={(yearNo, quarterNo, data) =>
                 save.mutate({ ...data, yearNo, quarterNo, recordedBy: user?.email })
               }
-              mainColumnFooter={
+              quarterContent={
                 kpi.hasChildren ? (
-                  <Card className="overflow-hidden">
-                    <CardHeader
-                      title="Sub-KPIs"
-                      subtitle={`Progress vs target · Year ${year}${kpi.startYear ? ` · ${kpi.startYear + year - 1}` : ""}`}
-                    />
+                  <div className="border-t border-hairline">
+                    <div className="flex flex-col gap-tiny px-md py-md">
+                      <h3 className="text-heading-md text-on-surface">Sub-KPIs/Metrics</h3>
+                      <p className="text-caption-sm text-mute">
+                        Year {year}
+                        {kpi.startYear ? ` · ${kpi.startYear + year - 1}` : ""} · Quarter {quarter}
+                      </p>
+                    </div>
                     {metrics.length === 0 ? (
-                      <CardBody>
+                      <div className="px-md pb-md">
                         <EmptyState title="No sub-KPIs" message="This KPI has no metrics." />
-                      </CardBody>
+                      </div>
                     ) : (
                       <Table>
                         <thead>
                           <tr>
-                            <Th>Sub-KPI</Th>
+                            <Th>Metrics</Th>
                             <Th align="right">Annual Target</Th>
-                            <Th align="right">Current</Th>
+                            <Th align="right">Q{quarter} Target</Th>
+                            <Th align="right">Recorded Q{quarter}</Th>
                             <Th>Progress</Th>
                             <Th align="center">Status</Th>
                             <Th align="right">Actions</Th>
@@ -145,9 +150,14 @@ function PerfKpiProgress() {
                         </thead>
                         <tbody>
                           {metrics.map((m) => {
-                            const target = targetForYear(m.annualTargets, year);
-                            const current = currentValueForYear(m.progress, year);
-                            const pct = percentOfTarget(current, target);
+                            const annualTarget = targetForYear(m.annualTargets, year);
+                            const quarterTarget =
+                              annualTarget == null ? null : (annualTarget * quarter) / 4;
+                            const selectedProgress = m.progress?.find(
+                              (p) => p.yearNo === year && p.quarterNo === quarter,
+                            );
+                            const current = selectedProgress?.progressValue ?? null;
+                            const pct = percentOfTarget(current, quarterTarget);
                             const hasTh = m.thresholdGreen != null && m.thresholdAmber != null;
                             const health =
                               hasTh && pct != null
@@ -158,7 +168,14 @@ function PerfKpiProgress() {
                               <Tr key={m.id} onClick={go}>
                                 <Td className="font-medium">{m.name}</Td>
                                 <Td align="right">
-                                  {target == null ? "—" : `${formatNumber(target, 2)} ${m.unit ?? ""}`}
+                                  {annualTarget == null
+                                    ? "—"
+                                    : `${formatNumber(annualTarget, 2)} ${m.unit ?? ""}`}
+                                </Td>
+                                <Td align="right">
+                                  {quarterTarget == null
+                                    ? "—"
+                                    : `${formatNumber(quarterTarget, 2)} ${m.unit ?? ""}`}
                                 </Td>
                                 <Td align="right">
                                   {current == null ? "—" : `${formatNumber(current, 2)} ${m.unit ?? ""}`}
@@ -212,7 +229,7 @@ function PerfKpiProgress() {
                         </tbody>
                       </Table>
                     )}
-                  </Card>
+                  </div>
                 ) : undefined
               }
             />
@@ -232,6 +249,7 @@ function PerfKpiProgress() {
                   metric={editingMetric}
                   perfKpiId={perfKpiId}
                   year={year}
+                  quarter={quarter}
                   periods={periodsQ.data ?? []}
                   periodsLoading={periodsQ.isLoading}
                   onClose={() => setEditingMetricId(null)}
