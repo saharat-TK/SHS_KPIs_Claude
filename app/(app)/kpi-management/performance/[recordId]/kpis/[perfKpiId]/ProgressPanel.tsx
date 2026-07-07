@@ -22,9 +22,11 @@ import {
   unitNeedsDivisor,
   HEALTH_TONE,
 } from "@/lib/kpi/progress";
+import { approvalLockForState, type ApprovalLockInfo } from "@/lib/kpi/approvalWorkflow";
 import { isPeriodOpen, openQuartersForYear } from "@/lib/kpi/performancePeriods";
 import type {
   AnnualTarget,
+  ApprovalState,
   PerformancePeriod,
   QuarterlyTargetMode,
   QuarterProgress,
@@ -44,9 +46,10 @@ export interface ProgressPanelProps {
   valueEditable: boolean;
   computedNote?: string;
   readOnly?: boolean;
-  /** When true, the currently-selected quarter is locked by a final approval
-   *  (only an admin can reverse it). Overrides period-open state. */
-  approvalLocked?: boolean;
+  /** Approval state for the selected quarter, used to lock data while under review. */
+  approvalState?: ApprovalState;
+  /** Approval states for the selected year, keyed by quarter number. */
+  approvalStatesByQuarter?: Partial<Record<number, ApprovalState>>;
   periods?: PerformancePeriod[];
   periodsLoading?: boolean;
   saving: boolean;
@@ -90,7 +93,8 @@ export function ProgressPanel({
   valueEditable,
   computedNote,
   readOnly = false,
-  approvalLocked = false,
+  approvalState,
+  approvalStatesByQuarter = {},
   periods,
   periodsLoading = false,
   saving,
@@ -133,15 +137,16 @@ export function ProgressPanel({
   const progressFor = (q: number) =>
     progress.find((p) => p.yearNo === year && p.quarterNo === q);
   const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
-  const effectiveReadOnly = readOnly || periodsLoading || periodLocked || approvalLocked;
+  const approvalLock = approvalLockForState(approvalState);
+  const effectiveReadOnly = readOnly || periodsLoading || periodLocked || !!approvalLock?.locked;
   // Only decorate quarter tabs once real period data has loaded (20 rows).
   const hasPeriods = !!periods && periods.length > 0 && !periodsLoading;
   const openThisYear = hasPeriods ? openQuartersForYear(periods!, year) : [];
   const openQuarterLabel = openThisYear.length
     ? `Open this year: ${openThisYear.map((q) => `Q${q}`).join(", ")}`
     : "No quarters open this year — ask an admin to open one.";
-  const readOnlyMessage = approvalLocked
-    ? `Year ${year} Quarter ${quarter} is locked after final approval. An admin must reverse the approval to edit.`
+  const readOnlyMessage = approvalLock?.locked
+    ? approvalLock.label
     : periodsLoading
       ? "Recording period status is loading. Data entry is temporarily disabled."
       : periodLocked
@@ -179,6 +184,7 @@ export function ProgressPanel({
           <div className="flex">
             {QUARTERS.map((q, i) => {
               const closed = hasPeriods && !isPeriodOpen(periods!, year, q);
+              const quarterApprovalLock = approvalLockForState(approvalStatesByQuarter[q]);
               return (
                 <button
                   key={q}
@@ -196,9 +202,17 @@ export function ProgressPanel({
                   )}
                 >
                   <span className="inline-flex items-center justify-center gap-tiny">
-                    {closed && <Icon name="lock" size={14} />}
+                    {quarterApprovalLock?.locked ? (
+                      <Icon name={quarterApprovalLock.icon} size={14} />
+                    ) : closed ? (
+                      <Icon name="lock" size={14} />
+                    ) : null}
                     Quarter {q}
-                    {closed && <span className="opacity-80">· Closed</span>}
+                    {quarterApprovalLock?.locked ? (
+                      <span className="opacity-80">· {quarterApprovalLock.tabLabel}</span>
+                    ) : closed ? (
+                      <span className="opacity-80">· Closed</span>
+                    ) : null}
                   </span>
                 </button>
               );
@@ -222,6 +236,7 @@ export function ProgressPanel({
             variables={variables}
             readOnly={effectiveReadOnly}
             readOnlyMessage={readOnlyMessage}
+            approvalLock={approvalLock?.locked ? approvalLock : null}
             saving={saving}
             onSave={(data) => onSave(year, quarter, data)}
           />
@@ -308,6 +323,7 @@ export function QuarterEntry({
   variables,
   readOnly,
   readOnlyMessage,
+  approvalLock,
   saving,
   onSave,
 }: {
@@ -321,6 +337,7 @@ export function QuarterEntry({
   variables?: QuarterEntryVariables | null;
   readOnly: boolean;
   readOnlyMessage?: string;
+  approvalLock?: ApprovalLockInfo | null;
   saving: boolean;
   onSave: (data: {
     progressValue: number | null;
@@ -380,14 +397,24 @@ export function QuarterEntry({
           </p>
         </div>
 
-        {!readOnly && (
+        {approvalLock?.locked ? (
+          <div
+            className={cn(
+              "inline-flex max-w-full items-center gap-sm self-start rounded-DEFAULT bg-surface-soft px-md py-sm text-body-sm sm:max-w-[420px] sm:self-start sm:text-right",
+              approvalLock.tone === "success" ? "text-[#2f6500]" : "text-[#8a4b00]",
+            )}
+          >
+            <Icon name={approvalLock.icon} size={18} className="shrink-0" />
+            <span>{approvalLock.label}</span>
+          </div>
+        ) : !readOnly ? (
           <Button icon="save" disabled={!canSave || saving} onClick={emitSave}>
             {saving ? "Saving…" : `Save Q${quarter}`}
           </Button>
-        )}
+        ) : null}
       </div>
 
-      {readOnlyMessage && (
+      {readOnlyMessage && !approvalLock?.locked && (
         <div className="rounded border border-hairline bg-surface-soft px-md py-sm text-body-sm text-mute">
           {readOnlyMessage}
         </div>

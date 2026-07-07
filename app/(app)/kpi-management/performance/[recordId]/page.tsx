@@ -14,6 +14,8 @@ import {
   Tabs,
   QueryBoundary,
   EmptyState,
+  Field,
+  Select,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
@@ -25,7 +27,9 @@ import {
   useKpiCategories,
   usePerformancePeriods,
   useSyncPerformanceRecord,
+  useRecordApprovals,
 } from "@/lib/data/hooks";
+import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
 import {
   openPeriodSummary,
   openQuartersForYear,
@@ -68,11 +72,28 @@ function PerformanceRecordDetail() {
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
 
   const [cat, setCat] = useState<string>("all");
+  const [approvalYear, setApprovalYear] = useState(1);
+  const [approvalQuarter, setApprovalQuarter] = useState(1);
 
   const record = recordQ.data;
   const categories = categoriesQ.data ?? [];
-  const kpis = kpisQ.data ?? [];
+  const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
   const isAdmin = can("configure_kpis");
+  const q1Approvals = useRecordApprovals(recordId, approvalYear, 1);
+  const q2Approvals = useRecordApprovals(recordId, approvalYear, 2);
+  const q3Approvals = useRecordApprovals(recordId, approvalYear, 3);
+  const q4Approvals = useRecordApprovals(recordId, approvalYear, 4);
+  const approvalQueries = [q1Approvals, q2Approvals, q3Approvals, q4Approvals];
+  const approvalsByQuarter = useMemo(
+    () => ({
+      1: new Map((q1Approvals.data ?? []).map((a) => [a.perfKpiId, a])),
+      2: new Map((q2Approvals.data ?? []).map((a) => [a.perfKpiId, a])),
+      3: new Map((q3Approvals.data ?? []).map((a) => [a.perfKpiId, a])),
+      4: new Map((q4Approvals.data ?? []).map((a) => [a.perfKpiId, a])),
+    }),
+    [q1Approvals.data, q2Approvals.data, q3Approvals.data, q4Approvals.data],
+  );
+  const approvalsLoading = approvalQueries.some((q) => q.isLoading);
 
   const periods = periodsQ.data ?? [];
   const { openCount } = openPeriodSummary(periods);
@@ -131,34 +152,65 @@ function PerformanceRecordDetail() {
         }
       />
 
-      <div className="flex items-start gap-sm rounded-lg border border-hairline bg-surface-soft px-md py-sm text-body-sm text-mute">
-        <Icon name="lock" size={18} className="mt-tiny text-stone" />
-        <p>
-          KPI and sub-KPI definitions here are read-only. Edit them in the{" "}
-          <button
-            className="text-link-blue hover:underline"
-            onClick={() => router.push("/kpi-management/library")}
-          >
-            KPIs Library
-          </button>
-          , then use <span className="font-medium">Sync from Library</span> to pull the changes in
-          (entered progress is preserved).
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-sm rounded-lg border border-hairline bg-surface-lowest px-md py-sm text-body-sm">
-        <Icon name="event_available" size={18} className="text-stone" />
-        <Badge tone={openCount > 0 ? "success" : "neutral"}>{openCount} / 20 open</Badge>
-        <span className="text-mute">
-          {openCount > 0
-            ? `Recording open: ${openByYear}`
-            : "No recording periods are open."}
-        </span>
-        {isAdmin && (
-          <span className="text-caption-sm text-stone">
-            Manage open/closed quarters from the Records list → Recording periods.
-          </span>
-        )}
+      <div className="flex flex-col gap-md rounded-lg border border-hairline bg-surface-lowest px-md py-sm lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-sm">
+          <div className="flex items-start gap-sm text-body-sm text-mute">
+            <Icon name="lock" size={18} className="mt-tiny shrink-0 text-stone" />
+            <span>
+              KPI and sub-KPI definitions here are read-only. Edit them in the{" "}
+              <button
+                className="text-link-blue hover:underline"
+                onClick={() => router.push("/kpi-management/library")}
+              >
+                KPIs Library
+              </button>
+              , then use <span className="font-medium">Sync from Library</span> to pull the changes in
+              (entered progress is preserved).
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-sm text-body-sm">
+            <Icon name="event_available" size={18} className="text-stone" />
+            <Badge tone={openCount > 0 ? "success" : "neutral"}>{openCount} / 20 open</Badge>
+            <span className="text-mute">
+              {openCount > 0
+                ? `Recording open: ${openByYear}`
+                : "No recording periods are open."}
+            </span>
+            {isAdmin && (
+              <span className="text-caption-sm text-stone">
+                Manage open/closed quarters from the Records list → Recording periods.
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-end gap-md lg:justify-end">
+          <Field label="Year">
+            <Select
+              value={String(approvalYear)}
+              onChange={(e) => setApprovalYear(Number(e.target.value))}
+              className="min-w-[160px]"
+            >
+              {[1, 2, 3, 4, 5].map((yearNo) => (
+                <option key={yearNo} value={yearNo}>
+                  {record ? `Year ${yearNo} · ${record.startYear + yearNo - 1}` : `Year ${yearNo}`}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Quarter">
+            <Select
+              value={String(approvalQuarter)}
+              onChange={(e) => setApprovalQuarter(Number(e.target.value))}
+              className="min-w-[120px]"
+            >
+              {[1, 2, 3, 4].map((quarterNo) => (
+                <option key={quarterNo} value={quarterNo}>
+                  Quarter {quarterNo}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
       </div>
 
       <Tabs items={tabs} active={cat} onChange={setCat} />
@@ -179,43 +231,71 @@ function PerformanceRecordDetail() {
                   <Th align="center">Weight</Th>
                   <Th align="center">Sub-KPIs</Th>
                   <Th align="center">Roll-up</Th>
+                  <Th>Approval Lock</Th>
                   <Th align="right">Actions</Th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((k) => (
-                  <Tr
-                    key={k.id}
-                    onClick={() =>
-                      router.push(`/kpi-management/performance/${recordId}/kpis/${k.id}`)
-                    }
-                  >
-                    <Td className="font-medium">{k.name}</Td>
-                    <Td align="center">
-                      <Badge tone={TYPE_TONE[k.kpiType]}>{k.kpiType}</Badge>
-                    </Td>
-                    <Td align="center">{k.weight}%</Td>
-                    <Td align="center">{k.metricCount ?? 0}</Td>
-                    <Td align="center">
-                      <Badge tone={k.hasChildren ? "info" : "neutral"}>
-                        {k.hasChildren ? "computed" : "direct entry"}
-                      </Badge>
-                    </Td>
-                    <Td align="right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconRight="chevron_right"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/kpi-management/performance/${recordId}/kpis/${k.id}`);
-                        }}
-                      >
-                        Record progress
-                      </Button>
-                    </Td>
-                  </Tr>
-                ))}
+                {rows.map((k) => {
+                  const selectedLock = approvalLockForState(
+                    approvalsByQuarter[approvalQuarter as 1 | 2 | 3 | 4].get(k.id)?.state,
+                  );
+                  const fallbackLock = ([1, 2, 3, 4] as const)
+                    .filter((q) => q !== approvalQuarter)
+                    .map((q) => ({
+                      quarter: q,
+                      lock: approvalLockForState(approvalsByQuarter[q].get(k.id)?.state),
+                    }))
+                    .find((item) => item.lock?.locked);
+                  const approvalLock = selectedLock?.locked
+                    ? { quarter: approvalQuarter, lock: selectedLock }
+                    : fallbackLock;
+                  return (
+                    <Tr
+                      key={k.id}
+                      onClick={() =>
+                        router.push(`/kpi-management/performance/${recordId}/kpis/${k.id}`)
+                      }
+                    >
+                      <Td className="font-medium">{k.name}</Td>
+                      <Td align="center">
+                        <Badge tone={TYPE_TONE[k.kpiType]}>{k.kpiType}</Badge>
+                      </Td>
+                      <Td align="center">{k.weight}%</Td>
+                      <Td align="center">{k.metricCount ?? 0}</Td>
+                      <Td align="center">
+                        <Badge tone={k.hasChildren ? "info" : "neutral"}>
+                          {k.hasChildren ? "computed" : "direct entry"}
+                        </Badge>
+                      </Td>
+                      <Td>
+                        {approvalsLoading ? (
+                          <span className="text-caption-sm text-mute">Loading…</span>
+                        ) : approvalLock?.lock?.locked ? (
+                          <Badge tone={approvalLock.lock.tone}>
+                            <Icon name={approvalLock.lock.icon} size={15} />
+                            Q{approvalLock.quarter}: {approvalLock.lock.label}
+                          </Badge>
+                        ) : (
+                          <span className="text-caption-sm text-mute">—</span>
+                        )}
+                      </Td>
+                      <Td align="right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconRight="chevron_right"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/kpi-management/performance/${recordId}/kpis/${k.id}`);
+                          }}
+                        >
+                          {approvalLock?.lock?.locked ? "View progress" : "Record progress"}
+                        </Button>
+                      </Td>
+                    </Tr>
+                  );
+                })}
               </tbody>
             </Table>
           )}

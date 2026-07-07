@@ -16,6 +16,16 @@ import type {
   StageRole,
 } from "@/lib/types";
 
+export type ApprovalLockTone = "warning" | "success";
+
+export interface ApprovalLockInfo {
+  locked: boolean;
+  icon: string;
+  tone: ApprovalLockTone;
+  label: string;
+  tabLabel: string;
+}
+
 /** A single legal transition in the workflow. */
 export interface TransitionRule {
   action: ApprovalAction;
@@ -31,9 +41,49 @@ export const TRANSITIONS: TransitionRule[] = [
   { action: "forward", from: ["submitted"], to: "forwarded", stage: "lead" },
   { action: "approve", from: ["forwarded"], to: "approved", stage: "counselor" },
   { action: "reject", from: ["forwarded"], to: "submitted", stage: "counselor" },
-  // Admin-only unlock: peel a finally-approved record back to a pre-approval state.
-  { action: "reverse", from: ["approved"], to: "forwarded", stage: "admin" },
+  // Admin-only unlock: send a finally-approved record back for correction.
+  { action: "reverse", from: ["approved"], to: "returned", stage: "admin" },
 ];
+
+export const APPROVAL_DATA_LOCKED_STATES: ApprovalState[] = [
+  "submitted",
+  "forwarded",
+  "approved",
+];
+
+const APPROVAL_LOCK: Partial<Record<ApprovalState, ApprovalLockInfo>> = {
+  submitted: {
+    locked: true,
+    icon: "schedule",
+    tone: "warning",
+    label: "Submitted, under the Committee lead reviewing",
+    tabLabel: "Submitted",
+  },
+  forwarded: {
+    locked: true,
+    icon: "schedule",
+    tone: "warning",
+    label: "Forwarded, under the Managerial final reviewing",
+    tabLabel: "Forwarded",
+  },
+  approved: {
+    locked: true,
+    icon: "approval",
+    tone: "success",
+    label: "Approved. Contact admin if reversal is needed",
+    tabLabel: "Approved",
+  },
+};
+
+export function isApprovalDataLocked(state: ApprovalState | null | undefined): boolean {
+  return !!state && APPROVAL_DATA_LOCKED_STATES.includes(state);
+}
+
+export function approvalLockForState(
+  state: ApprovalState | null | undefined,
+): ApprovalLockInfo | null {
+  return state ? APPROVAL_LOCK[state] ?? null : null;
+}
 
 /** Map a committee membership position (+ app role) to the acting stage role.
  *  Admin role always wins so an administrator can reverse locked records. */
