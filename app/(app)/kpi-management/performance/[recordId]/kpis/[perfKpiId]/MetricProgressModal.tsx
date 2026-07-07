@@ -26,6 +26,7 @@ export function MetricProgressModal({
   onClose,
   periods,
   periodsLoading = false,
+  approvalLocked = false,
 }: {
   metric: PerfMetric;
   perfKpiId: number;
@@ -36,6 +37,8 @@ export function MetricProgressModal({
   onClose: () => void;
   periods?: PerformancePeriod[];
   periodsLoading?: boolean;
+  /** Parent KPI's quarter is finally approved → this metric is locked too. */
+  approvalLocked?: boolean;
 }) {
   const { user } = useAuth();
   const save = useSaveMetricProgress(metric.id, perfKpiId);
@@ -54,11 +57,13 @@ export function MetricProgressModal({
   const pct = percentOfTarget(current, target);
   const hasThresholds = metric.thresholdGreen != null && metric.thresholdAmber != null;
   const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
-  const readOnlyMessage = periodsLoading
-    ? "Recording period status is loading. Data entry is temporarily disabled."
-    : periodLocked
-      ? `Year ${year} Quarter ${quarter} is closed for recording. Ask an admin to open it to enter progress.`
-      : undefined;
+  const readOnlyMessage = approvalLocked
+    ? `Year ${year} Quarter ${quarter} is locked after final approval. An admin must reverse the approval to edit.`
+    : periodsLoading
+      ? "Recording period status is loading. Data entry is temporarily disabled."
+      : periodLocked
+        ? `Year ${year} Quarter ${quarter} is closed for recording. Ask an admin to open it to enter progress.`
+        : undefined;
 
   return (
     <Modal
@@ -82,7 +87,7 @@ export function MetricProgressModal({
             existing={progressFor(quarter)}
             valueEditable
             unit={metric.unit}
-            readOnly={periodsLoading || periodLocked}
+            readOnly={periodsLoading || periodLocked || approvalLocked}
             readOnlyMessage={readOnlyMessage}
             saving={save.isPending}
             onSave={(data) =>

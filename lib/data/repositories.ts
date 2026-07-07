@@ -8,12 +8,15 @@ import type {
   FormulaRecord,
   FormulaVersionRecord,
   AnnualTarget,
+  ApprovalAction,
+  ApprovalEvent,
   Kpi,
   KpiCategoryRecord,
   LibraryKpi,
   LibraryMetric,
   Measurement,
   Metric,
+  PerfKpiApproval,
   PerformanceRecord,
   PerformancePeriod,
   PerformanceStatus,
@@ -601,6 +604,57 @@ export const performanceRecordsRepo = {
         body: JSON.stringify(input),
       }),
       "Failed to save progress",
+    ),
+};
+
+// ── Performance approval workflow (member → lead → counselor, DB-backed) ─────
+export interface ApprovalTransitionInput {
+  action: ApprovalAction;
+  yearNo: number;
+  quarterNo: number;
+  actorId?: string;
+  actorName?: string;
+  userRole?: string;
+  comment?: string;
+}
+
+export const approvalsRepo = {
+  // Queue listing: one row per KPI in a record for the given (year, quarter).
+  listByRecord: async (
+    recordId: number,
+    yearNo: number,
+    quarterNo: number,
+  ): Promise<PerfKpiApproval[]> =>
+    jsonOrThrow(
+      await fetch(
+        `/api/performance-records/${recordId}/approvals?yearNo=${yearNo}&quarterNo=${quarterNo}`,
+      ),
+      "Failed to load approvals",
+    ),
+  // A single KPI's approval + event thread for one quarter.
+  getForKpi: async (
+    perfKpiId: number,
+    yearNo: number,
+    quarterNo: number,
+  ): Promise<{ approval: PerfKpiApproval; events: ApprovalEvent[] }> =>
+    jsonOrThrow(
+      await fetch(
+        `/api/perf-kpis/${perfKpiId}/approval?yearNo=${yearNo}&quarterNo=${quarterNo}`,
+      ),
+      "Failed to load approval",
+    ),
+  // Perform a workflow transition (submit / return / forward / approve / reject / reverse).
+  transition: async (
+    perfKpiId: number,
+    input: ApprovalTransitionInput,
+  ): Promise<{ approval: PerfKpiApproval; events: ApprovalEvent[] }> =>
+    jsonOrThrow(
+      await fetch(`/api/perf-kpis/${perfKpiId}/approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to update approval",
     ),
 };
 

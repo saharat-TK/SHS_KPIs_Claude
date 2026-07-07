@@ -28,6 +28,8 @@ import type {
   UnitRecord,
 } from "@/lib/types";
 import {
+  approvalsRepo,
+  type ApprovalTransitionInput,
   committeesRepo,
   committeeMembershipsRepo,
   facultyRepo,
@@ -83,6 +85,10 @@ export const qk = {
   perfKpis: (recordId: number) => ["perfKpis", recordId] as const,
   perfKpi: (id: number) => ["perfKpi", id] as const,
   perfMetrics: (perfKpiId: number) => ["perfMetrics", perfKpiId] as const,
+  approvals: (recordId: number, yearNo: number, quarterNo: number) =>
+    ["approvals", recordId, yearNo, quarterNo] as const,
+  kpiApproval: (perfKpiId: number, yearNo: number, quarterNo: number) =>
+    ["kpiApproval", perfKpiId, yearNo, quarterNo] as const,
 };
 
 // Queries --------------------------------------------------------------------
@@ -725,6 +731,68 @@ export function useSaveMetricProgress(perfMetricId: number, perfKpiId: number) {
       qc.invalidateQueries({ queryKey: qk.perfKpi(perfKpiId) });
       // The Sub-KPIs table (usePerfMetricsByKpi) reads this list query — refresh
       // it too so saving in the pop-up updates the table live, in place.
+      qc.invalidateQueries({ queryKey: qk.perfMetrics(perfKpiId) });
+    },
+  });
+}
+
+// ── Performance approval workflow (member → lead → counselor → locked) ───────
+export const useRecordApprovals = (
+  recordId: number,
+  yearNo: number,
+  quarterNo: number,
+) =>
+  useQuery({
+    queryKey: qk.approvals(recordId, yearNo, quarterNo),
+    queryFn: () => approvalsRepo.listByRecord(recordId, yearNo, quarterNo),
+    enabled: Number.isFinite(recordId) && recordId > 0 && yearNo >= 1 && quarterNo >= 1,
+  });
+
+export const useKpiApproval = (
+  perfKpiId: number,
+  yearNo: number,
+  quarterNo: number,
+) =>
+  useQuery({
+    queryKey: qk.kpiApproval(perfKpiId, yearNo, quarterNo),
+    queryFn: () => approvalsRepo.getForKpi(perfKpiId, yearNo, quarterNo),
+    enabled: Number.isFinite(perfKpiId) && perfKpiId > 0 && yearNo >= 1 && quarterNo >= 1,
+  });
+
+/** Perform a workflow transition. Invalidates the record queue, the KPI's own
+ *  approval thread, and its perf progress queries so the lock state refreshes. */
+export function useApprovalTransition(recordId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      perfKpiId,
+      input,
+    }: {
+      perfKpiId: number;
+      input: ApprovalTransitionInput;
+    }) => approvalsRepo.transition(perfKpiId, input),
+    meta: {
+      toast: (_d, v) => {
+        const action = (v as { input: ApprovalTransitionInput }).input.action;
+        const map: Record<string, string> = {
+          submit: "Submitted for review",
+          return: "Sent back for revision",
+          forward: "Forwarded for final approval",
+          approve: "Finally approved & locked",
+          reject: "Rejected back to committee lead",
+          reverse: "Approval reversed — record unlocked",
+        };
+        return map[action] ?? "Updated";
+      },
+    },
+    onSuccess: (_d, { perfKpiId, input }) => {
+      qc.invalidateQueries({
+        queryKey: qk.approvals(recordId, input.yearNo, input.quarterNo),
+      });
+      qc.invalidateQueries({
+        queryKey: qk.kpiApproval(perfKpiId, input.yearNo, input.quarterNo),
+      });
+      qc.invalidateQueries({ queryKey: qk.perfKpi(perfKpiId) });
       qc.invalidateQueries({ queryKey: qk.perfMetrics(perfKpiId) });
     },
   });

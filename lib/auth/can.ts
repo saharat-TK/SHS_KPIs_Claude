@@ -7,6 +7,7 @@ export type Action =
   | "configure_kpis" // KPIs, metrics, formulas
   | "submit_metrics"
   | "review_submissions" // approve / reject / request clarification
+  | "record_performance" // performance-approval workflow (member/lead/counselor queue)
   | "manage_faculty" // committees, faculty, roster export
   | "view_faculty";
 
@@ -16,11 +17,12 @@ const MATRIX: Record<Role, Action[]> = {
     "configure_kpis",
     "submit_metrics",
     "review_submissions",
+    "record_performance",
     "manage_faculty",
     "view_faculty",
   ],
-  reviewer: ["view_dashboards", "review_submissions", "view_faculty"],
-  committee: ["view_dashboards", "submit_metrics", "view_faculty"],
+  reviewer: ["view_dashboards", "review_submissions", "record_performance", "view_faculty"],
+  committee: ["view_dashboards", "submit_metrics", "record_performance", "view_faculty"],
   viewer: ["view_dashboards", "view_faculty"],
 };
 

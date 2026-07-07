@@ -3,14 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { ROLE_LABELS } from "@/lib/auth/can";
-import type { Role } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
 
-const ROLES: Role[] = ["admin", "reviewer", "committee", "viewer"];
-
 export function RoleSwitcher() {
-  const { user, role, setRole } = useAuth();
+  const { user, role, personaId, personas, setPersona } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -27,7 +24,7 @@ export function RoleSwitcher() {
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex h-[36px] items-center gap-sm rounded-DEFAULT border border-hairline bg-surface-lowest px-md hover:border-hairline-strong transition-colors"
-        title="Switch role (demo)"
+        title="Switch persona (demo)"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-container text-on-tertiary text-caption-sm font-medium">
           {user.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
@@ -40,24 +37,27 @@ export function RoleSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-xs w-[240px] rounded-lg border border-hairline bg-surface-lowest shadow-chrome z-[60] py-xs">
+        <div className="absolute right-0 mt-xs w-[280px] rounded-lg border border-hairline bg-surface-lowest shadow-chrome z-[60] py-xs">
           <p className="px-md py-xs text-utility-xs uppercase tracking-wider text-stone">
-            View as role (demo)
+            View as persona (demo)
           </p>
-          {ROLES.map((r) => (
+          {personas.map((p) => (
             <button
-              key={r}
+              key={p.personaId}
               onClick={() => {
-                setRole(r);
+                setPersona(p.personaId);
                 setOpen(false);
               }}
               className={cn(
-                "flex w-full items-center justify-between gap-sm px-md py-sm text-label-md hover:bg-surface-soft transition-colors",
-                r === role ? "text-primary-dark" : "text-on-surface",
+                "flex w-full items-start justify-between gap-sm px-md py-sm text-left hover:bg-surface-soft transition-colors",
+                p.personaId === personaId ? "text-primary-dark" : "text-on-surface",
               )}
             >
-              {ROLE_LABELS[r]}
-              {r === role && <Icon name="check" size={18} />}
+              <span className="flex flex-col leading-tight">
+                <span className="text-label-md">{p.name}</span>
+                {p.hint && <span className="text-caption-sm text-mute">{p.hint}</span>}
+              </span>
+              {p.personaId === personaId && <Icon name="check" size={18} className="mt-tiny shrink-0" />}
             </button>
           ))}
         </div>

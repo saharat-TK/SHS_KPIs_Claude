@@ -114,6 +114,12 @@ export const NAV: NavGroup[] = [
         icon: "fact_check",
         requires: "review_submissions",
       },
+      {
+        label: "Performance Approvals",
+        href: "/performance-approvals",
+        icon: "approval",
+        requires: "record_performance",
+      },
     ],
   },
 ];

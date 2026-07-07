@@ -225,6 +225,9 @@ export interface User {
   email: string;
   role: Role;
   committeeId?: string;
+  /** Links the app user to faculty.id so the performance-approval workflow can
+   *  resolve this person's committee_memberships.position (member/lead/counselor). */
+  facultyId?: string;
 }
 
 // ============================================================================
@@ -423,4 +426,64 @@ export interface QuarterProgress {
   issue: string | null;
   solution: string | null;
   quarterTarget?: number; // derived
+}
+
+// ── Approval workflow (LAYER C) ─────────────────────────────────────────────
+// Mirrors schema/SHS_KPI_Management_schema.sql perf_kpi_approval[_event].
+
+/** State machine states. A missing DB row is treated as "draft". */
+export type ApprovalState =
+  | "draft"
+  | "submitted"
+  | "returned"
+  | "forwarded"
+  | "approved";
+
+/** The stage a person acts as, resolved from committee position (+ admin role). */
+export type StageRole = "member" | "lead" | "counselor" | "admin";
+
+/** Transition verbs a user can invoke. */
+export type ApprovalAction =
+  | "submit"
+  | "return"
+  | "forward"
+  | "approve"
+  | "reject"
+  | "reverse";
+
+/** One approval record governing a perf KPI + its metrics for a (year, quarter). */
+export interface PerfKpiApproval {
+  id: number | null; // null when no row exists yet (implicit draft)
+  perfKpiId: number;
+  recordId: number;
+  committeeId: string | null;
+  yearNo: number;
+  quarterNo: number;
+  state: ApprovalState;
+  submittedBy: string | null;
+  submittedAt: string | null;
+  forwardedBy: string | null;
+  forwardedAt: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  // Joined/derived, present on the record-level queue listing:
+  kpiName?: string;
+  committeeName?: string;
+  unit?: string | null;
+  progressValue?: number | null;
+  hasChildren?: boolean;
+}
+
+/** One append-only audit/comment row in an approval's thread. */
+export interface ApprovalEvent {
+  id: number;
+  approvalId: number;
+  actorId: string | null;
+  actorName: string | null;
+  actorRole: string | null;
+  action: ApprovalAction;
+  fromState: ApprovalState | null;
+  toState: ApprovalState;
+  comment: string | null;
+  createdAt: string;
 }

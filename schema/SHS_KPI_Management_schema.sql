@@ -359,6 +359,55 @@ CREATE TABLE perf_metric_quarter_progress (
   CONSTRAINT fk_pmetqp FOREIGN KEY (perf_metric_id) REFERENCES perf_metric(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ##############   LAYER C — APPROVAL WORKFLOW (per KPI per quarter)   #########
+
+-- ── perf_kpi_approval ────────────────────────────────────────────────────────
+-- One approval record per (perf_kpi, year, quarter). It governs the KPI AND its
+-- child metrics for that quarter as a single unit (decision: a committee owns a
+-- KPI via perf_kpi.committee_id, so the KPI+metrics move through review together).
+-- Stage chain: draft -> submitted -> forwarded -> approved (LOCKED); 'returned' is
+-- a send-back state. Actors are resolved from committee_memberships.position for
+-- perf_kpi.committee_id (Committee/Committee and Secretary = member, Committee Lead
+-- = lead, Counselor = counselor). A missing row is treated by the app as 'draft'.
+CREATE TABLE perf_kpi_approval (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  perf_kpi_id    BIGINT UNSIGNED NOT NULL,
+  record_id      BIGINT UNSIGNED NOT NULL,          -- denormalized for record-scoped queries
+  committee_id   VARCHAR(30) NULL,                  -- denormalized from perf_kpi for scoping
+  year_no        TINYINT UNSIGNED NOT NULL CHECK (year_no BETWEEN 1 AND 5),
+  quarter_no     TINYINT UNSIGNED NOT NULL CHECK (quarter_no BETWEEN 1 AND 4),
+  state          ENUM('draft','submitted','returned','forwarded','approved') NOT NULL DEFAULT 'draft',
+  submitted_by   VARCHAR(20)  NULL, submitted_at TIMESTAMP NULL,   -- faculty ids
+  forwarded_by   VARCHAR(20)  NULL, forwarded_at TIMESTAMP NULL,
+  approved_by    VARCHAR(20)  NULL, approved_at TIMESTAMP NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_pkpi_approval (perf_kpi_id, year_no, quarter_no),
+  CONSTRAINT fk_pka_kpi    FOREIGN KEY (perf_kpi_id) REFERENCES perf_kpi(id)          ON DELETE CASCADE,
+  CONSTRAINT fk_pka_record FOREIGN KEY (record_id)   REFERENCES performance_record(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_pka_record ON perf_kpi_approval(record_id, year_no, quarter_no);
+
+-- ── perf_kpi_approval_event ──────────────────────────────────────────────────
+-- Append-only audit trail + comment thread for a KPI approval. Every transition
+-- writes one row; send-back / reject rows carry the reviewer's comment.
+CREATE TABLE perf_kpi_approval_event (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  approval_id   BIGINT UNSIGNED NOT NULL,
+  actor_id      VARCHAR(40)  NULL,            -- faculty id (or app user id for admin)
+  actor_name    VARCHAR(255) NULL,
+  actor_role    VARCHAR(40)  NULL,            -- 'member' | 'lead' | 'counselor' | 'admin'
+  action        VARCHAR(40)  NOT NULL,        -- 'submit'|'return'|'forward'|'approve'|'reject'|'reverse'
+  from_state    VARCHAR(20)  NULL,
+  to_state      VARCHAR(20)  NOT NULL,
+  comment       TEXT NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_pkae_appr FOREIGN KEY (approval_id) REFERENCES perf_kpi_approval(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_pkae_appr ON perf_kpi_approval_event(approval_id, created_at);
+
 -- =============================================================================
 --  NOTES / rules enforced in the application layer (not by DDL)
 --  Existing database migration for target inheritance mode:
@@ -384,4 +433,11 @@ CREATE TABLE perf_metric_quarter_progress (
 --    source_kpi_id / source_metric_id; INSERT new, UPDATE definitions + targets,
 --    and soft-handle library rows deleted after activation (recommend a
 --    `retired_at` column rather than hard delete if progress exists).
+--  * Approval lock (perf_kpi_approval, LAYER C): when a KPI's approval row for a
+--    (year, quarter) is state='approved', the quarter progress for that KPI and
+--    ALL its metrics is locked — the progress PUT routes reject writes with 409
+--    unless an admin first reverses the approval to a pre-approval state.
+--  * Transition legality is enforced in lib/kpi/approvalWorkflow.ts (state machine
+--    + position->stage mapping); the POST /api/perf-kpis/:id/approval route is the
+--    single writer of perf_kpi_approval / perf_kpi_approval_event.
 -- =============================================================================

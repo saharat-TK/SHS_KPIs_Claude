@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import { unitNeedsDivisor, kpiValueFromVariables } from "@/lib/kpi/progress";
+import { getApprovalState } from "@/lib/kpi/approvalServer";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,14 @@ export async function PUT(
     if (!kpiRows[0].isOpen) {
       return NextResponse.json(
         { error: "This recording period is closed" },
+        { status: 409 },
+      );
+    }
+    // Approval lock: once a KPI's quarter is finally approved, its data (and its
+    // metrics') is read-only until an admin reverses the approval.
+    if ((await getApprovalState(pool, params.id, yearNo, quarterNo)) === "approved") {
+      return NextResponse.json(
+        { error: "Locked after final approval — an admin must reverse the approval to edit." },
         { status: 409 },
       );
     }

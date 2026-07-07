@@ -44,6 +44,9 @@ export interface ProgressPanelProps {
   valueEditable: boolean;
   computedNote?: string;
   readOnly?: boolean;
+  /** When true, the currently-selected quarter is locked by a final approval
+   *  (only an admin can reverse it). Overrides period-open state. */
+  approvalLocked?: boolean;
   periods?: PerformancePeriod[];
   periodsLoading?: boolean;
   saving: boolean;
@@ -87,6 +90,7 @@ export function ProgressPanel({
   valueEditable,
   computedNote,
   readOnly = false,
+  approvalLocked = false,
   periods,
   periodsLoading = false,
   saving,
@@ -129,18 +133,20 @@ export function ProgressPanel({
   const progressFor = (q: number) =>
     progress.find((p) => p.yearNo === year && p.quarterNo === q);
   const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
-  const effectiveReadOnly = readOnly || periodsLoading || periodLocked;
+  const effectiveReadOnly = readOnly || periodsLoading || periodLocked || approvalLocked;
   // Only decorate quarter tabs once real period data has loaded (20 rows).
   const hasPeriods = !!periods && periods.length > 0 && !periodsLoading;
   const openThisYear = hasPeriods ? openQuartersForYear(periods!, year) : [];
   const openQuarterLabel = openThisYear.length
     ? `Open this year: ${openThisYear.map((q) => `Q${q}`).join(", ")}`
     : "No quarters open this year — ask an admin to open one.";
-  const readOnlyMessage = periodsLoading
-    ? "Recording period status is loading. Data entry is temporarily disabled."
-    : periodLocked
-      ? `Year ${year} Quarter ${quarter} is closed for recording. Ask an admin to open it to enter progress.`
-      : undefined;
+  const readOnlyMessage = approvalLocked
+    ? `Year ${year} Quarter ${quarter} is locked after final approval. An admin must reverse the approval to edit.`
+    : periodsLoading
+      ? "Recording period status is loading. Data entry is temporarily disabled."
+      : periodLocked
+        ? `Year ${year} Quarter ${quarter} is closed for recording. Ask an admin to open it to enter progress.`
+        : undefined;
 
   // Current value = latest quarter with an entered/computed value this year.
   const current = [...QUARTERS]

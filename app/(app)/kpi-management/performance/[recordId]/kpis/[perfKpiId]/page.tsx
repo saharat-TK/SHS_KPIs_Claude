@@ -26,6 +26,7 @@ import {
   usePerformancePeriods,
   usePerformanceRecord,
   useSaveKpiProgress,
+  useKpiApproval,
 } from "@/lib/data/hooks";
 import {
   targetForYear,
@@ -58,6 +59,7 @@ function PerfKpiProgress() {
   const periodsQ = usePerformancePeriods(recordId);
   const metricsQ = usePerfMetricsByKpi(perfKpiId);
   const save = useSaveKpiProgress(perfKpiId);
+  // Approval lock for the currently-selected quarter (defined after year/quarter).
 
   // Year selection is lifted here so the Sub-KPIs table stays in sync with the
   // ProgressPanel's Year tabs.
@@ -70,6 +72,11 @@ function PerfKpiProgress() {
   // metric from `metrics` after a save invalidates the list query — otherwise
   // the pop-up would keep showing the stale value it was opened with.
   const [editingMetricId, setEditingMetricId] = useState<number | null>(null);
+
+  // A finally-approved quarter locks this KPI and all its metrics until an admin
+  // reverses the approval. Backend enforces it; this drives the read-only UI.
+  const approvalQ = useKpiApproval(perfKpiId, year, quarter);
+  const approvalLocked = approvalQ.data?.approval.state === "approved";
 
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}/kpis`, "KPIs");
@@ -115,6 +122,7 @@ function PerfKpiProgress() {
               }
               periods={periodsQ.data ?? []}
               periodsLoading={periodsQ.isLoading}
+              approvalLocked={approvalLocked}
               saving={save.isPending}
               year={year}
               onYearChange={setYear}
@@ -270,6 +278,7 @@ function PerfKpiProgress() {
                   quarterlyTargetMode={kpi.quarterlyTargetMode}
                   periods={periodsQ.data ?? []}
                   periodsLoading={periodsQ.isLoading}
+                  approvalLocked={approvalLocked}
                   onClose={() => setEditingMetricId(null)}
                 />
               ) : null;

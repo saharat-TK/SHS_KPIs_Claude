@@ -1,5 +1,5 @@
 import { Badge } from "./Badge";
-import type { EntityStatus, ValidationStatus } from "@/lib/types";
+import type { ApprovalState, EntityStatus, ValidationStatus } from "@/lib/types";
 
 const ENTITY: Record<EntityStatus, { tone: "success" | "neutral" | "warning"; label: string }> = {
   active: { tone: "success", label: "Active" },
@@ -17,17 +17,30 @@ const VALIDATION: Record<
   clarification: { tone: "info", label: "Clarification" },
 };
 
+const APPROVAL: Record<
+  ApprovalState,
+  { tone: "neutral" | "warning" | "error" | "info" | "success"; label: string }
+> = {
+  draft: { tone: "neutral", label: "Draft" },
+  submitted: { tone: "warning", label: "Submitted" },
+  returned: { tone: "error", label: "Returned" },
+  forwarded: { tone: "info", label: "Forwarded" },
+  approved: { tone: "success", label: "Approved" },
+};
+
 export function StatusPill({
   status,
   kind = "entity",
 }: {
-  status: EntityStatus | ValidationStatus;
-  kind?: "entity" | "validation";
+  status: EntityStatus | ValidationStatus | ApprovalState;
+  kind?: "entity" | "validation" | "approval";
 }) {
   const cfg =
     kind === "validation"
       ? VALIDATION[status as ValidationStatus]
-      : ENTITY[status as EntityStatus];
+      : kind === "approval"
+        ? APPROVAL[status as ApprovalState]
+        : ENTITY[status as EntityStatus];
   if (!cfg) return <Badge>{status}</Badge>;
   return (
     <Badge tone={cfg.tone} uppercase>
