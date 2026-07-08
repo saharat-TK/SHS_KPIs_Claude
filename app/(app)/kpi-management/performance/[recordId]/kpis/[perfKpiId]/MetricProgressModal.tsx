@@ -28,6 +28,7 @@ export function MetricProgressModal({
   periods,
   periodsLoading = false,
   approvalState,
+  allowApprovalLockedEditing = false,
 }: {
   metric: PerfMetric;
   perfKpiId: number;
@@ -40,6 +41,7 @@ export function MetricProgressModal({
   periodsLoading?: boolean;
   /** Parent KPI's quarter approval state; submitted/forwarded/approved lock metrics too. */
   approvalState?: ApprovalState;
+  allowApprovalLockedEditing?: boolean;
 }) {
   const { user } = useAuth();
   const save = useSaveMetricProgress(metric.id, perfKpiId);
@@ -89,11 +91,19 @@ export function MetricProgressModal({
             existing={progressFor(quarter)}
             valueEditable
             unit={metric.unit}
-            readOnly={periodsLoading || periodLocked || !!approvalLock?.locked}
-            readOnlyMessage={readOnlyMessage}
+            readOnly={periodsLoading || periodLocked || (!!approvalLock?.locked && !allowApprovalLockedEditing)}
+            readOnlyMessage={allowApprovalLockedEditing ? undefined : readOnlyMessage}
+            approvalLock={approvalLock?.locked && !allowApprovalLockedEditing ? approvalLock : null}
             saving={save.isPending}
             onSave={(data) =>
-              save.mutate({ ...data, yearNo: year, quarterNo: quarter, recordedBy: user?.email })
+              save.mutate({
+                ...data,
+                yearNo: year,
+                quarterNo: quarter,
+                recordedBy: user?.email,
+                actorId: user.facultyId,
+                userRole: user.role,
+              })
             }
           />
         </div>

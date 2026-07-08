@@ -708,6 +708,8 @@ type ProgressInput = {
   issue: string;
   solution: string;
   recordedBy?: string;
+  actorId?: string;
+  userRole?: string;
 };
 
 export function useSaveKpiProgress(perfKpiId: number) {

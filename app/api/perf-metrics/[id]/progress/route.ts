@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
+import type { ApprovalState, Role } from "@/lib/types";
 import { recomputeKpiQuarter } from "@/lib/kpi/performance";
-import { getApprovalState } from "@/lib/kpi/approvalServer";
-import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
+import { getApprovalState, resolvePosition } from "@/lib/kpi/approvalServer";
+import { approvalLockForState, resolveStageRole } from "@/lib/kpi/approvalWorkflow";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,8 @@ export async function PUT(
       await conn.beginTransaction();
 
       const [metricRows] = await conn.query<RowDataPacket[]>(
-        `SELECT m.perf_kpi_id, k.record_id AS recordId, COALESCE(p.is_open, 0) AS isOpen
+        `SELECT m.perf_kpi_id, k.record_id AS recordId, k.committee_id AS committeeId,
+                COALESCE(p.is_open, 0) AS isOpen
          FROM perf_metric m
          JOIN perf_kpi k ON k.id = m.perf_kpi_id
          LEFT JOIN performance_record_period p
@@ -50,10 +52,17 @@ export async function PUT(
         );
       }
       // Approval lock: a metric inherits its parent KPI's review/final lock.
-      const approvalLock = approvalLockForState(
-        await getApprovalState(conn, metricRows[0].perf_kpi_id, yearNo, quarterNo),
-      );
-      if (approvalLock?.locked) {
+      const approvalState = await getApprovalState(conn, metricRows[0].perf_kpi_id, yearNo, quarterNo);
+      const approvalLock = approvalLockForState(approvalState);
+      const actorId: string | null = b.actorId ?? null;
+      const userRole = b.userRole as Role | undefined;
+      const position = actorId
+        ? await resolvePosition(conn, actorId, metricRows[0].committeeId)
+        : null;
+      const canLeadEditSubmitted =
+        approvalState === ("submitted" as ApprovalState) &&
+        resolveStageRole(position, userRole) === "lead";
+      if (approvalLock?.locked && !canLeadEditSubmitted) {
         await conn.rollback();
         return NextResponse.json(
           { error: approvalLock.label },

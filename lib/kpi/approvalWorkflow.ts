@@ -11,6 +11,7 @@
 import type {
   ApprovalAction,
   ApprovalState,
+  CommitteeMembership,
   Position,
   Role,
   StageRole,
@@ -103,6 +104,29 @@ export function resolveStageRole(
     default:
       return null;
   }
+}
+
+/** Resolve a user's position for a target committee from loaded memberships.
+ *  Exact committee membership wins. The fallback keeps demo data usable when a
+ *  KPI references a committee that has no membership rows yet: in that case, a
+ *  faculty member's single real membership supplies their position only. */
+export function resolvePositionFromMemberships(
+  memberships: CommitteeMembership[] | null | undefined,
+  facultyId: string | null | undefined,
+  committeeId: string | null | undefined,
+): Position | null {
+  if (!memberships?.length || !facultyId || !committeeId) return null;
+
+  const exact = memberships.find(
+    (m) => m.facultyId === facultyId && m.committeeId === committeeId,
+  );
+  if (exact) return exact.position;
+
+  const targetCommitteeRows = memberships.filter((m) => m.committeeId === committeeId);
+  if (targetCommitteeRows.length > 0) return null;
+
+  const actorRows = memberships.filter((m) => m.facultyId === facultyId);
+  return actorRows.length === 1 ? actorRows[0].position : null;
 }
 
 /** The rule for a given action, if any. */

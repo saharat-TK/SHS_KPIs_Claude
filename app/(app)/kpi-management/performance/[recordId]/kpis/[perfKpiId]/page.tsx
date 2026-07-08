@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   PageHeader,
   Button,
   Badge,
+  Modal,
+  Field,
+  Input,
   Table,
   Th,
   Td,
@@ -27,6 +30,8 @@ import {
   usePerformanceRecord,
   useSaveKpiProgress,
   useKpiApproval,
+  useCommitteeMemberships,
+  useApprovalTransition,
 } from "@/lib/data/hooks";
 import {
   targetForYear,
@@ -34,12 +39,34 @@ import {
   quarterTargetFor,
   HEALTH_TONE,
 } from "@/lib/kpi/progress";
-import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
+import {
+  approvalLockForState,
+  actionRequiresComment,
+  availableActions,
+  resolvePositionFromMemberships,
+  resolveStageRole,
+} from "@/lib/kpi/approvalWorkflow";
 import { formatNumber } from "@/lib/utils";
-import type { ApprovalState } from "@/lib/types";
-import { ProgressPanel } from "./ProgressPanel";
+import type { ApprovalAction, ApprovalState } from "@/lib/types";
+import { ProgressPanel, type QuarterEntryAction } from "./ProgressPanel";
 import { MetricProgressModal } from "./MetricProgressModal";
 import { AnnualQuarterProgressMatrix } from "./AnnualQuarterProgressMatrix";
+
+const DIRECT_ACTION_LABEL: Partial<Record<ApprovalAction, string>> = {
+  submit: "Submit to Committee lead",
+  return: "Send back",
+  forward: "Forward to counselor",
+  reject: "Reject",
+  approve: "Approve",
+};
+
+const DIRECT_ACTION_ICON: Partial<Record<ApprovalAction, string>> = {
+  submit: "send",
+  return: "undo",
+  forward: "forward",
+  reject: "close",
+  approve: "approval",
+};
 
 export default function PerfKpiProgressPage() {
   return (
@@ -61,6 +88,8 @@ function PerfKpiProgress() {
   const periodsQ = usePerformancePeriods(recordId);
   const metricsQ = usePerfMetricsByKpi(perfKpiId);
   const save = useSaveKpiProgress(perfKpiId);
+  const membershipsQ = useCommitteeMemberships();
+  const approvalTransition = useApprovalTransition(recordId);
   // Approval lock for the currently-selected quarter (defined after year/quarter).
 
   // Year selection is lifted here so the Sub-KPIs table stays in sync with the
@@ -74,21 +103,94 @@ function PerfKpiProgress() {
   // metric from `metrics` after a save invalidates the list query — otherwise
   // the pop-up would keep showing the stale value it was opened with.
   const [editingMetricId, setEditingMetricId] = useState<number | null>(null);
+  const [noteAction, setNoteAction] = useState<ApprovalAction | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ApprovalAction | null>(null);
 
   // Review/final approval states lock this KPI and all its metrics. Backend
   // enforces it; this drives the read-only UI and quarter-tab labels.
+  const kpi = kpiQ.data;
+  const metrics = metricsQ.data ?? [];
   const q1Approval = useKpiApproval(perfKpiId, year, 1);
   const q2Approval = useKpiApproval(perfKpiId, year, 2);
   const q3Approval = useKpiApproval(perfKpiId, year, 3);
   const q4Approval = useKpiApproval(perfKpiId, year, 4);
+  const selectedApprovalQuery =
+    quarter === 1 ? q1Approval : quarter === 2 ? q2Approval : quarter === 3 ? q3Approval : q4Approval;
   const approvalStatesByQuarter: Partial<Record<number, ApprovalState>> = {
     1: q1Approval.data?.approval.state,
     2: q2Approval.data?.approval.state,
     3: q3Approval.data?.approval.state,
     4: q4Approval.data?.approval.state,
   };
-  const selectedApprovalState = approvalStatesByQuarter[quarter];
+  const selectedApprovalState: ApprovalState = approvalStatesByQuarter[quarter] ?? "draft";
   const selectedApprovalLock = approvalLockForState(selectedApprovalState);
+  const stageRole = useMemo(() => {
+    const position = resolvePositionFromMemberships(
+      membershipsQ.data,
+      user.facultyId,
+      kpi?.committeeId,
+    );
+    return resolveStageRole(position, user.role);
+  }, [kpi?.committeeId, membershipsQ.data, user.facultyId, user.role]);
+  const directActions = useMemo(
+    () =>
+      selectedApprovalState
+        ? availableActions(stageRole, selectedApprovalState).filter((action) => action !== "reverse")
+        : [],
+    [selectedApprovalState, stageRole],
+  );
+  const approvalActionBusy =
+    selectedApprovalQuery.isLoading ||
+    selectedApprovalQuery.isFetching ||
+    membershipsQ.isLoading ||
+    membershipsQ.isFetching ||
+    approvalTransition.isPending;
+  const runApprovalAction = (action: ApprovalAction, comment?: string) =>
+    approvalTransition.mutate({
+      perfKpiId,
+      input: {
+        action,
+        yearNo: year,
+        quarterNo: quarter,
+        actorId: user.facultyId,
+        actorName: user.name,
+        userRole: user.role,
+        comment,
+      },
+    });
+  const handleApprovalAction = (action: ApprovalAction) => {
+    if (actionRequiresComment(action)) {
+      setNoteAction(action);
+      return;
+    }
+    if (action === "approve") {
+      setConfirmAction(action);
+      return;
+    }
+    runApprovalAction(action);
+  };
+  const toQuarterAction = (action: ApprovalAction): QuarterEntryAction => ({
+    key: action,
+    label: DIRECT_ACTION_LABEL[action] ?? action,
+    icon: DIRECT_ACTION_ICON[action],
+    variant: action === "return" || action === "reject" ? "danger" : action === "approve" ? "primary" : "outline",
+    className: "rounded-DEFAULT",
+    disabled: approvalActionBusy,
+    requiresSavedData: action === "submit",
+    onClick: () => handleApprovalAction(action),
+  });
+  const approvalActionsBeforeSave = directActions
+    .filter((action) => action === "return" || action === "reject")
+    .map(toQuarterAction);
+  const approvalActionsAfterSave = directActions
+    .filter((action) => action === "submit" || action === "forward" || action === "approve")
+    .map(toQuarterAction);
+  const allowSubmittedLeadEditing = selectedApprovalState === "submitted" && stageRole === "lead";
+  const hideApprovalLockMessage =
+    (selectedApprovalState === "forwarded" &&
+      directActions.includes("reject") &&
+      directActions.includes("approve")) ||
+    allowSubmittedLeadEditing;
 
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}/kpis`, "KPIs");
@@ -96,9 +198,6 @@ function PerfKpiProgress() {
     `/kpi-management/performance/${recordId}/kpis/${perfKpiId}`,
     kpiQ.data?.name,
   );
-
-  const kpi = kpiQ.data;
-  const metrics = metricsQ.data ?? [];
 
   return (
     <>
@@ -136,6 +235,10 @@ function PerfKpiProgress() {
               periodsLoading={periodsQ.isLoading}
               approvalState={selectedApprovalState}
               approvalStatesByQuarter={approvalStatesByQuarter}
+              approvalActionsBeforeSave={approvalActionsBeforeSave}
+              approvalActionsAfterSave={approvalActionsAfterSave}
+              hideApprovalLockMessage={hideApprovalLockMessage}
+              allowApprovalLockedEditing={allowSubmittedLeadEditing}
               saving={save.isPending}
               year={year}
               onYearChange={setYear}
@@ -147,7 +250,14 @@ function PerfKpiProgress() {
               variable2Name={kpi.variable2Name}
               variable2Unit={kpi.variable2Unit}
               onSave={(yearNo, quarterNo, data) =>
-                save.mutate({ ...data, yearNo, quarterNo, recordedBy: user?.email })
+                save.mutate({
+                  ...data,
+                  yearNo,
+                  quarterNo,
+                  recordedBy: user?.email,
+                  actorId: user.facultyId,
+                  userRole: user.role,
+                })
               }
               rightColumnContent={
                 <AnnualQuarterProgressMatrix kpi={kpi} metrics={metrics} year={year} />
@@ -198,7 +308,7 @@ function PerfKpiProgress() {
                               hasTh && pct != null
                                 ? healthOf(pct, { green: m.thresholdGreen!, amber: m.thresholdAmber! })
                                 : null;
-                            const metricLocked = !!selectedApprovalLock?.locked;
+                            const metricLocked = !!selectedApprovalLock?.locked && !allowSubmittedLeadEditing;
                             const go = () => setEditingMetricId(m.id);
                             return (
                               <Tr key={m.id} onClick={go}>
@@ -300,13 +410,140 @@ function PerfKpiProgress() {
                   periods={periodsQ.data ?? []}
                   periodsLoading={periodsQ.isLoading}
                   approvalState={selectedApprovalState}
+                  allowApprovalLockedEditing={allowSubmittedLeadEditing}
                   onClose={() => setEditingMetricId(null)}
                 />
               ) : null;
             })()}
+
+            {noteAction && (
+              <ApprovalNoteModal
+                action={noteAction}
+                kpiName={kpi.name}
+                periodLabel={`Year ${year} · Quarter ${quarter}`}
+                submitting={approvalTransition.isPending}
+                onClose={() => setNoteAction(null)}
+                onSend={(text) => {
+                  runApprovalAction(noteAction, text);
+                  setNoteAction(null);
+                }}
+              />
+            )}
+
+            {confirmAction === "approve" && (
+              <ApproveConfirmModal
+                kpiName={kpi.name}
+                periodLabel={`Year ${year} · Quarter ${quarter}`}
+                submitting={approvalTransition.isPending}
+                onClose={() => setConfirmAction(null)}
+                onApprove={() => {
+                  runApprovalAction("approve");
+                  setConfirmAction(null);
+                }}
+              />
+            )}
           </>
         )}
       </QueryBoundary>
     </>
+  );
+}
+
+function ApprovalNoteModal({
+  action,
+  kpiName,
+  periodLabel,
+  submitting,
+  onClose,
+  onSend,
+}: {
+  action: ApprovalAction;
+  kpiName: string;
+  periodLabel: string;
+  submitting: boolean;
+  onClose: () => void;
+  onSend: (text: string) => void;
+}) {
+  const [text, setText] = useState("");
+  const title = DIRECT_ACTION_LABEL[action] ?? action;
+  const hint =
+    action === "return"
+      ? "The submission moves to Returned for the committee member or secretary to revise."
+      : "The submission moves back to Submitted for the committee lead to review again.";
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={title}
+      subtitle={`${kpiName} · ${periodLabel}`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            icon="send"
+            className="rounded-DEFAULT"
+            disabled={text.trim().length < 3 || submitting}
+            onClick={() => onSend(text.trim())}
+          >
+            {title}
+          </Button>
+        </>
+      }
+    >
+      <Field label="Note to recipient" hint={hint}>
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="What needs to change?"
+          autoFocus
+        />
+      </Field>
+    </Modal>
+  );
+}
+
+function ApproveConfirmModal({
+  kpiName,
+  periodLabel,
+  submitting,
+  onClose,
+  onApprove,
+}: {
+  kpiName: string;
+  periodLabel: string;
+  submitting: boolean;
+  onClose: () => void;
+  onApprove: () => void;
+}) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Approve KPI performance?"
+      subtitle={`${kpiName} · ${periodLabel}`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            icon="approval"
+            className="rounded-DEFAULT"
+            disabled={submitting}
+            onClick={onApprove}
+          >
+            Approve
+          </Button>
+        </>
+      }
+    >
+      <p className="text-body-sm text-mute">
+        Approval will lock this KPI and all of its metrics for the selected quarter.
+        Contact an admin if reversal is needed after approval.
+      </p>
+    </Modal>
   );
 }

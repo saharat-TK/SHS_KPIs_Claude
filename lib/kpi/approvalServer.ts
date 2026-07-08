@@ -40,5 +40,17 @@ export async function resolvePosition(
      WHERE faculty_id = ? AND committee_id = ?`,
     [facultyId, committeeId],
   );
-  return (rows[0]?.position as Position) ?? null;
+  if (rows[0]?.position) return rows[0].position as Position;
+
+  const [committeeRows] = await db.query<RowDataPacket[]>(
+    `SELECT 1 FROM committee_memberships WHERE committee_id = ? LIMIT 1`,
+    [committeeId],
+  );
+  if (committeeRows.length > 0) return null;
+
+  const [actorRows] = await db.query<RowDataPacket[]>(
+    `SELECT position FROM committee_memberships WHERE faculty_id = ?`,
+    [facultyId],
+  );
+  return actorRows.length === 1 ? (actorRows[0].position as Position) : null;
 }
