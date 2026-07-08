@@ -50,6 +50,14 @@ type ParentTargets = {
   years: (number | null)[];
 };
 
+type ParentDefaults = {
+  categoryId: string;
+  collectionPeriod: CollectionPeriod;
+  committeeId: string;
+  dataCollectMethod: string;
+  dataSourceUrl: string;
+};
+
 const ZERO_YEARS: (number | null)[] = [0, 0, 0, 0, 0];
 
 const TARGET_MODE_OPTIONS: {
@@ -77,12 +85,16 @@ const TARGET_MODE_OPTIONS: {
 export function MetricEditor({
   kpiId,
   parentTargets,
+  parentDefaults,
+  canAddMetric = true,
   categories,
   committees,
   faculty,
 }: {
   kpiId: number;
   parentTargets: ParentTargets;
+  parentDefaults: ParentDefaults;
+  canAddMetric?: boolean;
   categories: { id: string; label: string }[];
   committees: Committee[];
   faculty: FacultyRecord[];
@@ -100,7 +112,13 @@ export function MetricEditor({
         title="Sub-KPIs (Metrics)"
         subtitle="Component metrics that roll up into this KPI."
         actions={
-          <Button size="sm" icon="add" onClick={() => setCreating(true)}>
+          <Button
+            size="sm"
+            icon="add"
+            disabled={!canAddMetric}
+            title={!canAddMetric ? "Save the parent KPI before adding a sub-KPI" : undefined}
+            onClick={() => setCreating(true)}
+          >
             Add Sub-KPI
           </Button>
         }
@@ -169,6 +187,7 @@ export function MetricEditor({
           kpiId={kpiId}
           metric={editing}
           parentTargets={parentTargets}
+          parentDefaults={parentDefaults}
           categories={categories}
           committees={committees}
           faculty={faculty}
@@ -186,6 +205,7 @@ function MetricModal({
   kpiId,
   metric,
   parentTargets,
+  parentDefaults,
   categories,
   committees,
   faculty,
@@ -194,6 +214,7 @@ function MetricModal({
   kpiId: number;
   metric: LibraryMetric | null;
   parentTargets: ParentTargets;
+  parentDefaults: ParentDefaults;
   categories: { id: string; label: string }[];
   committees: Committee[];
   faculty: FacultyRecord[];
@@ -204,16 +225,20 @@ function MetricModal({
   const saveTargets = useSaveLibraryMetricTargets(kpiId);
 
   const [name, setName] = useState(metric?.name ?? "");
-  const [categoryId, setCategoryId] = useState(metric?.categoryId ?? "");
+  const [categoryId, setCategoryId] = useState(metric?.categoryId ?? parentDefaults.categoryId);
   const [weight, setWeight] = useState(metric?.weight ?? 100);
   const [unit, setUnit] = useState(metric?.unit?.trim() || "Item");
   const [collectionPeriod, setCollectionPeriod] = useState<CollectionPeriod>(
-    metric?.collectionPeriod ?? "every_quarter",
+    metric?.collectionPeriod ?? parentDefaults.collectionPeriod,
   );
-  const [committeeId, setCommitteeId] = useState(metric?.committeeId ?? "");
+  const [committeeId, setCommitteeId] = useState(metric?.committeeId ?? parentDefaults.committeeId);
   const [personInChargeId, setPersonInChargeId] = useState(metric?.personInChargeId ?? "");
-  const [dataCollectMethod, setDataCollectMethod] = useState(metric?.dataCollectMethod ?? "");
-  const [dataSourceUrl, setDataSourceUrl] = useState(metric?.dataSourceUrl ?? "");
+  const [dataCollectMethod, setDataCollectMethod] = useState(
+    metric?.dataCollectMethod ?? parentDefaults.dataCollectMethod,
+  );
+  const [dataSourceUrl, setDataSourceUrl] = useState(
+    metric?.dataSourceUrl ?? parentDefaults.dataSourceUrl,
+  );
   const [description, setDescription] = useState(metric?.description ?? "");
   const [fiveYearTarget, setFiveYearTarget] = useState<number | null>(
     metric?.fiveYearTarget ?? null,
