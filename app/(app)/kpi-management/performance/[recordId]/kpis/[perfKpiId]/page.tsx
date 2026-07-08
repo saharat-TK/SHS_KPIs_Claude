@@ -68,6 +68,11 @@ const DIRECT_ACTION_ICON: Partial<Record<ApprovalAction, string>> = {
   approve: "approval",
 };
 
+const POSITIVE_APPROVAL_BUTTON_CLASS =
+  "rounded-xl border-transparent bg-lime-400 text-slate-950 hover:bg-lime-500 disabled:bg-lime-400 disabled:text-slate-950 disabled:opacity-60";
+const NEGATIVE_APPROVAL_BUTTON_CLASS =
+  "rounded-xl border-transparent bg-red-400 text-slate-950 hover:bg-red-500 disabled:bg-red-400 disabled:text-slate-950 disabled:opacity-60";
+
 export default function PerfKpiProgressPage() {
   return (
     <RequirePermission action="submit_metrics">
@@ -174,7 +179,10 @@ function PerfKpiProgress() {
     label: DIRECT_ACTION_LABEL[action] ?? action,
     icon: DIRECT_ACTION_ICON[action],
     variant: action === "return" || action === "reject" ? "danger" : action === "approve" ? "primary" : "outline",
-    className: "rounded-DEFAULT",
+    className:
+      action === "return" || action === "reject"
+        ? NEGATIVE_APPROVAL_BUTTON_CLASS
+        : POSITIVE_APPROVAL_BUTTON_CLASS,
     disabled: approvalActionBusy,
     requiresSavedData: action === "submit",
     onClick: () => handleApprovalAction(action),
@@ -186,6 +194,9 @@ function PerfKpiProgress() {
     .filter((action) => action === "submit" || action === "forward" || action === "approve")
     .map(toQuarterAction);
   const allowSubmittedLeadEditing = selectedApprovalState === "submitted" && stageRole === "lead";
+  const allowForwardedCounselorEditing =
+    selectedApprovalState === "forwarded" && stageRole === "counselor";
+  const allowApprovalLockedEditing = allowSubmittedLeadEditing || allowForwardedCounselorEditing;
   const hideApprovalLockMessage =
     (selectedApprovalState === "forwarded" &&
       directActions.includes("reject") &&
@@ -238,7 +249,7 @@ function PerfKpiProgress() {
               approvalActionsBeforeSave={approvalActionsBeforeSave}
               approvalActionsAfterSave={approvalActionsAfterSave}
               hideApprovalLockMessage={hideApprovalLockMessage}
-              allowApprovalLockedEditing={allowSubmittedLeadEditing}
+              allowApprovalLockedEditing={allowApprovalLockedEditing}
               saving={save.isPending}
               year={year}
               onYearChange={setYear}
@@ -308,7 +319,7 @@ function PerfKpiProgress() {
                               hasTh && pct != null
                                 ? healthOf(pct, { green: m.thresholdGreen!, amber: m.thresholdAmber! })
                                 : null;
-                            const metricLocked = !!selectedApprovalLock?.locked && !allowSubmittedLeadEditing;
+                            const metricLocked = !!selectedApprovalLock?.locked && !allowApprovalLockedEditing;
                             const go = () => setEditingMetricId(m.id);
                             return (
                               <Tr key={m.id} onClick={go}>
@@ -410,7 +421,7 @@ function PerfKpiProgress() {
                   periods={periodsQ.data ?? []}
                   periodsLoading={periodsQ.isLoading}
                   approvalState={selectedApprovalState}
-                  allowApprovalLockedEditing={allowSubmittedLeadEditing}
+                  allowApprovalLockedEditing={allowApprovalLockedEditing}
                   onClose={() => setEditingMetricId(null)}
                 />
               ) : null;

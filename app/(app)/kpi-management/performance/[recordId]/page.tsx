@@ -189,7 +189,7 @@ function PerformanceRecordDetail() {
             <Select
               value={String(approvalYear)}
               onChange={(e) => setApprovalYear(Number(e.target.value))}
-              className="min-w-[160px]"
+              className="min-w-[160px] rounded-xl"
             >
               {[1, 2, 3, 4, 5].map((yearNo) => (
                 <option key={yearNo} value={yearNo}>
@@ -202,7 +202,7 @@ function PerformanceRecordDetail() {
             <Select
               value={String(approvalQuarter)}
               onChange={(e) => setApprovalQuarter(Number(e.target.value))}
-              className="min-w-[120px]"
+              className="min-w-[120px] rounded-xl"
             >
               {[1, 2, 3, 4].map((quarterNo) => (
                 <option key={quarterNo} value={quarterNo}>

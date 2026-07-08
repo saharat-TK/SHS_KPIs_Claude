@@ -480,7 +480,7 @@ export function QuarterEntry({
             ) : !readOnly ? (
               <Button
                 icon="save"
-                className="rounded-DEFAULT"
+                className="rounded-xl bg-sky-400 text-slate-950 hover:bg-sky-500 disabled:bg-sky-400 disabled:text-slate-950 disabled:opacity-60"
                 disabled={!canSave || saving}
                 onClick={emitSave}
               >

@@ -62,7 +62,10 @@ export async function PUT(
       const canLeadEditSubmitted =
         approvalState === ("submitted" as ApprovalState) &&
         resolveStageRole(position, userRole) === "lead";
-      if (approvalLock?.locked && !canLeadEditSubmitted) {
+      const canCounselorEditForwarded =
+        approvalState === ("forwarded" as ApprovalState) &&
+        resolveStageRole(position, userRole) === "counselor";
+      if (approvalLock?.locked && !canLeadEditSubmitted && !canCounselorEditForwarded) {
         await conn.rollback();
         return NextResponse.json(
           { error: approvalLock.label },
