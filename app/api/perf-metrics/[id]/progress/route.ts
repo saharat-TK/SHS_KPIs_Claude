@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import { recomputeKpiQuarter } from "@/lib/kpi/performance";
 import { getApprovalState } from "@/lib/kpi/approvalServer";
+import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
 
 export const dynamic = "force-dynamic";
 
@@ -48,15 +49,14 @@ export async function PUT(
           { status: 409 },
         );
       }
-      // Approval lock: a metric inherits its parent KPI's lock — once that KPI's
-      // quarter is finally approved, the metric is read-only until admin reverses.
-      if (
-        (await getApprovalState(conn, metricRows[0].perf_kpi_id, yearNo, quarterNo)) ===
-        "approved"
-      ) {
+      // Approval lock: a metric inherits its parent KPI's review/final lock.
+      const approvalLock = approvalLockForState(
+        await getApprovalState(conn, metricRows[0].perf_kpi_id, yearNo, quarterNo),
+      );
+      if (approvalLock?.locked) {
         await conn.rollback();
         return NextResponse.json(
-          { error: "Locked after final approval — an admin must reverse the approval to edit." },
+          { error: approvalLock.label },
           { status: 409 },
         );
       }

@@ -107,8 +107,13 @@ function stampFor(action: ApprovalAction, actorId: string | null) {
     case "approve":
       return { approved_by: actorId, approved_at: "NOW" };
     case "reverse":
-      // Un-approve: drop the final-approval stamp so it's no longer locked.
-      return { approved_by: null, approved_at: null };
+      // Un-approve and un-forward so the returned record can be corrected.
+      return {
+        forwarded_by: null,
+        forwarded_at: null,
+        approved_by: null,
+        approved_at: null,
+      };
     default:
       return {};
   }

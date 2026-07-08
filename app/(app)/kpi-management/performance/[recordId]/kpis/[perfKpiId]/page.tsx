@@ -34,7 +34,9 @@ import {
   quarterTargetFor,
   HEALTH_TONE,
 } from "@/lib/kpi/progress";
+import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
 import { formatNumber } from "@/lib/utils";
+import type { ApprovalState } from "@/lib/types";
 import { ProgressPanel } from "./ProgressPanel";
 import { MetricProgressModal } from "./MetricProgressModal";
 import { AnnualQuarterProgressMatrix } from "./AnnualQuarterProgressMatrix";
@@ -73,10 +75,20 @@ function PerfKpiProgress() {
   // the pop-up would keep showing the stale value it was opened with.
   const [editingMetricId, setEditingMetricId] = useState<number | null>(null);
 
-  // A finally-approved quarter locks this KPI and all its metrics until an admin
-  // reverses the approval. Backend enforces it; this drives the read-only UI.
-  const approvalQ = useKpiApproval(perfKpiId, year, quarter);
-  const approvalLocked = approvalQ.data?.approval.state === "approved";
+  // Review/final approval states lock this KPI and all its metrics. Backend
+  // enforces it; this drives the read-only UI and quarter-tab labels.
+  const q1Approval = useKpiApproval(perfKpiId, year, 1);
+  const q2Approval = useKpiApproval(perfKpiId, year, 2);
+  const q3Approval = useKpiApproval(perfKpiId, year, 3);
+  const q4Approval = useKpiApproval(perfKpiId, year, 4);
+  const approvalStatesByQuarter: Partial<Record<number, ApprovalState>> = {
+    1: q1Approval.data?.approval.state,
+    2: q2Approval.data?.approval.state,
+    3: q3Approval.data?.approval.state,
+    4: q4Approval.data?.approval.state,
+  };
+  const selectedApprovalState = approvalStatesByQuarter[quarter];
+  const selectedApprovalLock = approvalLockForState(selectedApprovalState);
 
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}/kpis`, "KPIs");
@@ -122,7 +134,8 @@ function PerfKpiProgress() {
               }
               periods={periodsQ.data ?? []}
               periodsLoading={periodsQ.isLoading}
-              approvalLocked={approvalLocked}
+              approvalState={selectedApprovalState}
+              approvalStatesByQuarter={approvalStatesByQuarter}
               saving={save.isPending}
               year={year}
               onYearChange={setYear}
@@ -185,6 +198,7 @@ function PerfKpiProgress() {
                               hasTh && pct != null
                                 ? healthOf(pct, { green: m.thresholdGreen!, amber: m.thresholdAmber! })
                                 : null;
+                            const metricLocked = !!selectedApprovalLock?.locked;
                             const go = () => setEditingMetricId(m.id);
                             return (
                               <Tr key={m.id} onClick={go}>
@@ -235,18 +249,25 @@ function PerfKpiProgress() {
                                   )}
                                 </Td>
                                 <Td align="right">
-                                  <button
-                                    type="button"
-                                    aria-label="Enter progress"
-                                    title="Enter progress"
-                                    className="text-mute hover:text-on-surface"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      go();
-                                    }}
-                                  >
-                                    <Icon name="edit_note" size={20} />
-                                  </button>
+                                  {metricLocked && selectedApprovalLock ? (
+                                    <Badge tone={selectedApprovalLock.tone}>
+                                      <Icon name={selectedApprovalLock.icon} size={15} />
+                                      {selectedApprovalLock.tabLabel}
+                                    </Badge>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      aria-label="Enter progress"
+                                      title="Enter progress"
+                                      className="text-mute hover:text-on-surface"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        go();
+                                      }}
+                                    >
+                                      <Icon name="edit_note" size={20} />
+                                    </button>
+                                  )}
                                 </Td>
                               </Tr>
                             );
@@ -278,7 +299,7 @@ function PerfKpiProgress() {
                   quarterlyTargetMode={kpi.quarterlyTargetMode}
                   periods={periodsQ.data ?? []}
                   periodsLoading={periodsQ.isLoading}
-                  approvalLocked={approvalLocked}
+                  approvalState={selectedApprovalState}
                   onClose={() => setEditingMetricId(null)}
                 />
               ) : null;
