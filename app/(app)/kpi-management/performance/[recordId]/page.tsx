@@ -152,23 +152,24 @@ function PerformanceRecordDetail() {
         }
       />
 
+      <div className="flex items-start gap-sm text-caption-sm text-mute">
+        <Icon name="lock" size={16} className="mt-tiny shrink-0 text-stone" />
+        <span>
+          KPI and sub-KPI definitions here are read-only. Edit them in the{" "}
+          <button
+            className="text-link-blue hover:underline"
+            onClick={() => router.push("/kpi-management/library")}
+          >
+            KPIs Library
+          </button>
+          , then use <span className="font-medium">Sync from Library</span> to pull the changes in
+          (entered progress is preserved).
+        </span>
+      </div>
+
       <div className="flex flex-col gap-md rounded-lg border border-hairline bg-surface-lowest px-md py-sm lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-sm">
-          <div className="flex items-start gap-sm text-body-sm text-mute">
-            <Icon name="lock" size={18} className="mt-tiny shrink-0 text-stone" />
-            <span>
-              KPI and sub-KPI definitions here are read-only. Edit them in the{" "}
-              <button
-                className="text-link-blue hover:underline"
-                onClick={() => router.push("/kpi-management/library")}
-              >
-                KPIs Library
-              </button>
-              , then use <span className="font-medium">Sync from Library</span> to pull the changes in
-              (entered progress is preserved).
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-sm text-body-sm">
+          <div className="flex flex-wrap items-center gap-sm text-label-md">
             <Icon name="event_available" size={18} className="text-stone" />
             <Badge tone={openCount > 0 ? "success" : "neutral"}>{openCount} / 20 open</Badge>
             <span className="text-mute">
@@ -177,7 +178,7 @@ function PerformanceRecordDetail() {
                 : "No recording periods are open."}
             </span>
             {isAdmin && (
-              <span className="text-caption-sm text-stone">
+              <span className="text-body-sm text-stone">
                 Manage open/closed quarters from the Records list → Recording periods.
               </span>
             )}
