@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
+import type { ApprovalState, Role } from "@/lib/types";
 import { unitNeedsDivisor, kpiValueFromVariables } from "@/lib/kpi/progress";
-import { getApprovalState } from "@/lib/kpi/approvalServer";
-import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
+import { getApprovalState, resolvePosition } from "@/lib/kpi/approvalServer";
+import { approvalLockForState, resolveStageRole } from "@/lib/kpi/approvalWorkflow";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,8 @@ export async function PUT(
 
     const [kpiRows] = await pool.query<RowDataPacket[]>(
       `SELECT k.has_children, k.unit, k.variable1_name AS variable1Name,
-              k.record_id AS recordId, COALESCE(p.is_open, 0) AS isOpen
+              k.record_id AS recordId, k.committee_id AS committeeId,
+              COALESCE(p.is_open, 0) AS isOpen
        FROM perf_kpi k
        LEFT JOIN performance_record_period p
          ON p.record_id = k.record_id AND p.year_no = ? AND p.quarter_no = ?
@@ -52,10 +54,20 @@ export async function PUT(
     }
     // Approval lock: once a KPI quarter is under review or approved, its data
     // (and its metrics') is read-only until it is sent back or reversed.
-    const approvalLock = approvalLockForState(
-      await getApprovalState(pool, params.id, yearNo, quarterNo),
-    );
-    if (approvalLock?.locked) {
+    const approvalState = await getApprovalState(pool, params.id, yearNo, quarterNo);
+    const approvalLock = approvalLockForState(approvalState);
+    const actorId: string | null = b.actorId ?? null;
+    const userRole = b.userRole as Role | undefined;
+    const position = actorId
+      ? await resolvePosition(pool, actorId, kpiRows[0].committeeId)
+      : null;
+    const canLeadEditSubmitted =
+      approvalState === ("submitted" as ApprovalState) &&
+      resolveStageRole(position, userRole) === "lead";
+    const canCounselorEditForwarded =
+      approvalState === ("forwarded" as ApprovalState) &&
+      resolveStageRole(position, userRole) === "counselor";
+    if (approvalLock?.locked && !canLeadEditSubmitted && !canCounselorEditForwarded) {
       return NextResponse.json(
         { error: approvalLock.label },
         { status: 409 },

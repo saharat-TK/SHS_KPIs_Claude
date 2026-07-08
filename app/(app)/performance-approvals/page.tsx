@@ -31,6 +31,7 @@ import {
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
   availableActions,
+  resolvePositionFromMemberships,
   resolveStageRole,
   actionRequiresComment,
   ACTION_LABELS,
@@ -83,7 +84,7 @@ function ApprovalQueue() {
   const [recordId, setRecordId] = useState(0);
   const [yearNo, setYearNo] = useState(1);
   const [quarterNo, setQuarterNo] = useState(1);
-  const [tab, setTab] = useState("submitted");
+  const [tab, setTab] = useState("all");
   const [actOn, setActOn] = useState<{ row: PerfKpiApproval; action: ApprovalAction } | null>(null);
   const [detail, setDetail] = useState<PerfKpiApproval | null>(null);
 
@@ -99,9 +100,11 @@ function ApprovalQueue() {
   // Resolve the acting persona's stage role for a given KPI's committee.
   const stageRoleFor = (committeeId: string | null): StageRole | null => {
     if (user.role === "admin") return "admin";
-    const position = memberships.data?.find(
-      (m) => m.facultyId === user.facultyId && m.committeeId === committeeId,
-    )?.position;
+    const position = resolvePositionFromMemberships(
+      memberships.data,
+      user.facultyId,
+      committeeId,
+    );
     return resolveStageRole(position, user.role);
   };
 

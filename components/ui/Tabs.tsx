@@ -40,7 +40,7 @@ export function Tabs({
             {typeof t.count === "number" && (
               <span
                 className={cn(
-                  "rounded-DEFAULT px-xs text-utility-xs",
+                  "rounded-xl px-xs text-utility-xs",
                   on ? "bg-primary-container text-on-tertiary" : "bg-surface-container-high text-mute",
                 )}
               >

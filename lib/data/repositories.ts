@@ -583,6 +583,8 @@ export const performanceRecordsRepo = {
       issue: string;
       solution: string;
       recordedBy?: string;
+      actorId?: string;
+      userRole?: string;
     },
   ): Promise<QuarterProgress[]> =>
     jsonOrThrow(
@@ -595,7 +597,16 @@ export const performanceRecordsRepo = {
     ),
   saveMetricProgress: async (
     perfMetricId: number,
-    input: { yearNo: number; quarterNo: number; progressValue: number | null; issue: string; solution: string; recordedBy?: string },
+    input: {
+      yearNo: number;
+      quarterNo: number;
+      progressValue: number | null;
+      issue: string;
+      solution: string;
+      recordedBy?: string;
+      actorId?: string;
+      userRole?: string;
+    },
   ): Promise<QuarterProgress[]> =>
     jsonOrThrow(
       await fetch(`/api/perf-metrics/${perfMetricId}/progress`, {

@@ -35,6 +35,18 @@ import type {
 const QUARTERS = [1, 2, 3, 4];
 const YEARS = [1, 2, 3, 4, 5];
 
+export interface QuarterEntryAction {
+  key: string;
+  label: string;
+  icon?: string;
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger";
+  className?: string;
+  disabled?: boolean;
+  title?: string;
+  requiresSavedData?: boolean;
+  onClick: () => void;
+}
+
 export interface ProgressPanelProps {
   startYear?: number;
   annualTargets?: AnnualTarget[];
@@ -68,6 +80,10 @@ export interface ProgressPanelProps {
   variable1Unit?: string | null;
   variable2Name?: string | null;
   variable2Unit?: string | null;
+  approvalActionsBeforeSave?: QuarterEntryAction[];
+  approvalActionsAfterSave?: QuarterEntryAction[];
+  hideApprovalLockMessage?: boolean;
+  allowApprovalLockedEditing?: boolean;
   quarterContent?: React.ReactNode;
   rightColumnContent?: React.ReactNode;
   onSave: (
@@ -107,6 +123,10 @@ export function ProgressPanel({
   variable1Unit,
   variable2Name,
   variable2Unit,
+  approvalActionsBeforeSave = [],
+  approvalActionsAfterSave = [],
+  hideApprovalLockMessage = false,
+  allowApprovalLockedEditing = false,
   quarterContent,
   rightColumnContent,
   onSave,
@@ -138,7 +158,8 @@ export function ProgressPanel({
     progress.find((p) => p.yearNo === year && p.quarterNo === q);
   const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
   const approvalLock = approvalLockForState(approvalState);
-  const effectiveReadOnly = readOnly || periodsLoading || periodLocked || !!approvalLock?.locked;
+  const effectiveReadOnly =
+    readOnly || periodsLoading || periodLocked || (!!approvalLock?.locked && !allowApprovalLockedEditing);
   // Only decorate quarter tabs once real period data has loaded (20 rows).
   const hasPeriods = !!periods && periods.length > 0 && !periodsLoading;
   const openThisYear = hasPeriods ? openQuartersForYear(periods!, year) : [];
@@ -237,6 +258,9 @@ export function ProgressPanel({
             readOnly={effectiveReadOnly}
             readOnlyMessage={readOnlyMessage}
             approvalLock={approvalLock?.locked ? approvalLock : null}
+            approvalActionsBeforeSave={approvalActionsBeforeSave}
+            approvalActionsAfterSave={approvalActionsAfterSave}
+            hideApprovalLockMessage={hideApprovalLockMessage}
             saving={saving}
             onSave={(data) => onSave(year, quarter, data)}
           />
@@ -324,6 +348,9 @@ export function QuarterEntry({
   readOnly,
   readOnlyMessage,
   approvalLock,
+  approvalActionsBeforeSave = [],
+  approvalActionsAfterSave = [],
+  hideApprovalLockMessage = false,
   saving,
   onSave,
 }: {
@@ -338,6 +365,9 @@ export function QuarterEntry({
   readOnly: boolean;
   readOnlyMessage?: string;
   approvalLock?: ApprovalLockInfo | null;
+  approvalActionsBeforeSave?: QuarterEntryAction[];
+  approvalActionsAfterSave?: QuarterEntryAction[];
+  hideApprovalLockMessage?: boolean;
   saving: boolean;
   onSave: (data: {
     progressValue: number | null;
@@ -359,6 +389,10 @@ export function QuarterEntry({
   const [issue, setIssue] = useState(existing?.issue ?? "");
   const [solution, setSolution] = useState(existing?.solution ?? "");
 
+  const normalizeSavedNumber = (n: number | null | undefined) => n ?? null;
+  const numbersMatch = (a: number | null, b: number | null | undefined) =>
+    a === normalizeSavedNumber(b);
+
   const v1Num = var1Str === "" ? null : Number(var1Str);
   const v2Num = var2Str === "" ? null : Number(var2Str);
   const computedValue = variables ? kpiValueFromVariables(variables.kpiUnit, v1Num, v2Num) : null;
@@ -368,6 +402,21 @@ export function QuarterEntry({
     (var1Str.trim() !== "" && (!variables.needsDivisor || var2Str.trim() !== ""));
   const canSave =
     !readOnly && issue.trim().length > 0 && solution.trim().length > 0 && variablesFilled;
+  const textMatchesSaved =
+    issue.trim() === (existing?.issue ?? "").trim() &&
+    solution.trim() === (existing?.solution ?? "").trim();
+  const valuesMatchSaved = variables
+    ? numbersMatch(v1Num, existing?.variable1Value) &&
+      (!variables.needsDivisor || numbersMatch(v2Num, existing?.variable2Value))
+    : !valueEditable || numbersMatch(value === "" ? null : Number(value), existing?.progressValue);
+  const savedDataComplete =
+    !!existing &&
+    (existing.issue ?? "").trim().length > 0 &&
+    (existing.solution ?? "").trim().length > 0 &&
+    (!variables ||
+      (existing.variable1Value != null &&
+        (!variables.needsDivisor || existing.variable2Value != null)));
+  const readyForApprovalAction = savedDataComplete && textMatchesSaved && valuesMatchSaved;
 
   const emitSave = () =>
     onSave(
@@ -386,6 +435,24 @@ export function QuarterEntry({
             solution: solution.trim(),
           },
     );
+  const renderAction = (action: QuarterEntryAction) => {
+    const needsSavedData = action.requiresSavedData && !readyForApprovalAction;
+    return (
+      <Button
+        key={action.key}
+        icon={action.icon}
+        variant={action.variant ?? "outline"}
+        className={action.className}
+        disabled={action.disabled || needsSavedData}
+        title={needsSavedData ? "Save the current quarter data before submitting." : action.title}
+        onClick={action.onClick}
+      >
+        {action.label}
+      </Button>
+    );
+  };
+  const hasApprovalActions =
+    approvalActionsBeforeSave.length > 0 || approvalActionsAfterSave.length > 0;
 
   return (
     <CardBody className="flex flex-col gap-lg border-b border-hairline bg-surface-soft">
@@ -397,21 +464,32 @@ export function QuarterEntry({
           </p>
         </div>
 
-        {approvalLock?.locked ? (
-          <div
-            className={cn(
-              "inline-flex max-w-full items-center gap-sm self-start rounded-DEFAULT bg-surface-soft px-md py-sm text-body-sm sm:max-w-[420px] sm:self-start sm:text-right",
-              approvalLock.tone === "success" ? "text-[#2f6500]" : "text-[#8a4b00]",
-            )}
-          >
-            <Icon name={approvalLock.icon} size={18} className="shrink-0" />
-            <span>{approvalLock.label}</span>
+        {(approvalLock?.locked || !readOnly || hasApprovalActions) && (
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-sm sm:max-w-[680px]">
+            {approvalActionsBeforeSave.map(renderAction)}
+            {approvalLock?.locked && !hideApprovalLockMessage ? (
+              <div
+                className={cn(
+                  "inline-flex max-w-full items-center gap-sm rounded-DEFAULT bg-surface-soft px-md py-sm text-body-sm sm:max-w-[420px] sm:text-right",
+                  approvalLock.tone === "success" ? "text-[#2f6500]" : "text-[#8a4b00]",
+                )}
+              >
+                <Icon name={approvalLock.icon} size={18} className="shrink-0" />
+                <span>{approvalLock.label}</span>
+              </div>
+            ) : !readOnly ? (
+              <Button
+                icon="save"
+                className="rounded-xl bg-sky-400 text-slate-950 hover:bg-sky-500 disabled:bg-sky-400 disabled:text-slate-950 disabled:opacity-60"
+                disabled={!canSave || saving}
+                onClick={emitSave}
+              >
+                {saving ? "Saving…" : `Save Q${quarter}`}
+              </Button>
+            ) : null}
+            {approvalActionsAfterSave.map(renderAction)}
           </div>
-        ) : !readOnly ? (
-          <Button icon="save" disabled={!canSave || saving} onClick={emitSave}>
-            {saving ? "Saving…" : `Save Q${quarter}`}
-          </Button>
-        ) : null}
+        )}
       </div>
 
       {readOnlyMessage && !approvalLock?.locked && (
