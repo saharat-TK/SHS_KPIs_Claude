@@ -10,7 +10,13 @@ import {
   healthOf,
 } from "@/components/ui";
 import { formatNumber } from "@/lib/utils";
-import { targetForYear, percentOfTarget, quarterTargetFor, HEALTH_TONE } from "@/lib/kpi/progress";
+import {
+  targetForYear,
+  percentOfTarget,
+  quarterTargetFor,
+  previousQuarterProgress,
+  HEALTH_TONE,
+} from "@/lib/kpi/progress";
 import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
 import { isPeriodOpen } from "@/lib/kpi/performancePeriods";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -89,6 +95,7 @@ export function MetricProgressModal({
             target={target}
             targetLabel={targetLabel}
             existing={progressFor(quarter)}
+            prefill={previousQuarterProgress(metric.progress, year, quarter)}
             valueEditable
             unit={metric.unit}
             readOnly={periodsLoading || periodLocked || (!!approvalLock?.locked && !allowApprovalLockedEditing)}

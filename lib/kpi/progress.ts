@@ -48,6 +48,34 @@ export function currentValueForYear(
   return null;
 }
 
+/**
+ * The nearest earlier *saved* quarter within the same year, used to pre-fill an
+ * empty quarter's entry form. Q1 has no source. Parent computed-only rows (a
+ * value but no user-entered context) are skipped so we land on a quarter the
+ * recorder actually filled.
+ */
+export function previousQuarterProgress(
+  progress: QuarterProgress[] | undefined,
+  year: number,
+  quarter: number,
+): QuarterProgress | undefined {
+  if (!progress || quarter <= 1) return undefined;
+  for (let q = quarter - 1; q >= 1; q--) {
+    const row = progress.find((p) => p.yearNo === year && p.quarterNo === q);
+    if (
+      row &&
+      ((row.issue ?? "").trim() !== "" ||
+        (row.solution ?? "").trim() !== "" ||
+        row.variable1Value != null ||
+        row.variable2Value != null ||
+        (row.progressValue != null && !row.isComputed))
+    ) {
+      return row;
+    }
+  }
+  return undefined;
+}
+
 /** The target for a given year (null if unset). */
 export function targetForYear(
   targets: AnnualTarget[] | undefined,

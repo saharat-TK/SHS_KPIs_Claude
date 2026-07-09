@@ -20,6 +20,7 @@ import {
   quarterTargetFor,
   kpiValueFromVariables,
   unitNeedsDivisor,
+  previousQuarterProgress,
   HEALTH_TONE,
 } from "@/lib/kpi/progress";
 import { approvalLockForState, type ApprovalLockInfo } from "@/lib/kpi/approvalWorkflow";
@@ -252,6 +253,7 @@ export function ProgressPanel({
             target={quarterTarget(quarter)}
             targetLabel={targetLabel}
             existing={progressFor(quarter)}
+            prefill={previousQuarterProgress(progress, year, quarter)}
             valueEditable={valueEditable}
             unit={unit}
             variables={variables}
@@ -342,6 +344,7 @@ export function QuarterEntry({
   target,
   targetLabel = "Cumulative Target",
   existing,
+  prefill,
   valueEditable,
   unit,
   variables,
@@ -358,6 +361,9 @@ export function QuarterEntry({
   target: number | null;
   targetLabel?: string;
   existing?: QuarterProgress;
+  /** Previous saved quarter (same year) used to pre-fill empty fields as an
+   *  unsaved draft. Ignored when the field already has saved data or read-only. */
+  prefill?: QuarterProgress | null;
   valueEditable: boolean;
   unit: string | null;
   /** When set (leaf KPI with defined variables), value is entered as V1 (+V2). */
@@ -377,17 +383,39 @@ export function QuarterEntry({
     solution: string;
   }) => void;
 }) {
+  // Pre-fill empty fields from the previous saved quarter (unsaved draft). Never
+  // seed a locked/closed quarter. `existing` remains the real saved row for all
+  // "matches saved" checks below, so Save/Submit gating is unaffected.
+  const seedFrom = readOnly ? null : prefill ?? null;
+  const seedNum = (own: number | null | undefined, fallback: number | null | undefined) =>
+    own != null ? String(own) : fallback != null ? String(fallback) : "";
+  const seedText = (own: string | null | undefined, fallback: string | null | undefined) =>
+    own?.trim() ? own : fallback ?? "";
+
   const [value, setValue] = useState<string>(
-    existing?.progressValue != null ? String(existing.progressValue) : "",
+    seedNum(existing?.progressValue, seedFrom?.progressValue),
   );
   const [var1Str, setVar1Str] = useState<string>(
-    existing?.variable1Value != null ? String(existing.variable1Value) : "",
+    seedNum(existing?.variable1Value, seedFrom?.variable1Value),
   );
   const [var2Str, setVar2Str] = useState<string>(
-    existing?.variable2Value != null ? String(existing.variable2Value) : "",
+    seedNum(existing?.variable2Value, seedFrom?.variable2Value),
   );
-  const [issue, setIssue] = useState(existing?.issue ?? "");
-  const [solution, setSolution] = useState(existing?.solution ?? "");
+  const [issue, setIssue] = useState(seedText(existing?.issue, seedFrom?.issue));
+  const [solution, setSolution] = useState(seedText(existing?.solution, seedFrom?.solution));
+
+  // True when the previous quarter actually populated a currently-unsaved field.
+  const prefilledFromQuarter =
+    seedFrom &&
+    ((!existing?.issue?.trim() && !!seedFrom.issue?.trim()) ||
+      (!existing?.solution?.trim() && !!seedFrom.solution?.trim()) ||
+      (valueEditable &&
+        existing?.progressValue == null &&
+        (seedFrom.progressValue != null ||
+          seedFrom.variable1Value != null ||
+          seedFrom.variable2Value != null)))
+      ? seedFrom.quarterNo
+      : null;
 
   const normalizeSavedNumber = (n: number | null | undefined) => n ?? null;
   const numbersMatch = (a: number | null, b: number | null | undefined) =>
@@ -495,6 +523,14 @@ export function QuarterEntry({
       {readOnlyMessage && !approvalLock?.locked && (
         <div className="rounded border border-hairline bg-surface-soft px-md py-sm text-body-sm text-mute">
           {readOnlyMessage}
+        </div>
+      )}
+
+      {prefilledFromQuarter != null && (
+        <div className="flex items-center gap-sm rounded-DEFAULT border border-hairline bg-surface-soft px-md py-sm text-caption-sm text-mute">
+          <Badge tone="info">draft</Badge>
+          Pre-filled from Q{prefilledFromQuarter} — review, adjust, and Save. Nothing is
+          recorded until you save.
         </div>
       )}
 
