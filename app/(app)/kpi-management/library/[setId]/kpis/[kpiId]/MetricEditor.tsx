@@ -32,11 +32,13 @@ import {
   COLLECTION_PERIODS,
   type CollectionPeriod,
   type Committee,
+  type CommitteeMembership,
   type FacultyRecord,
   type LibraryMetric,
   type AnnualTarget,
   type MetricTargetMode,
 } from "@/lib/types";
+import { personsForCommittee } from "@/lib/kpi/committee";
 
 function toYearSlots(targets: AnnualTarget[] | undefined): (number | null)[] {
   const slots: (number | null)[] = [null, null, null, null, null];
@@ -116,6 +118,7 @@ export function MetricEditor({
   canAddMetric = true,
   categories,
   committees,
+  committeeMemberships,
   faculty,
 }: {
   kpiId: number;
@@ -126,6 +129,7 @@ export function MetricEditor({
   canAddMetric?: boolean;
   categories: { id: string; label: string }[];
   committees: Committee[];
+  committeeMemberships: CommitteeMembership[];
   faculty: FacultyRecord[];
 }) {
   const metricsQ = useLibraryMetrics(kpiId);
@@ -256,6 +260,7 @@ export function MetricEditor({
           parentDefaults={parentDefaults}
           categories={categories}
           committees={committees}
+          committeeMemberships={committeeMemberships}
           faculty={faculty}
           onClose={() => {
             setCreating(false);
@@ -389,6 +394,7 @@ function MetricModal({
   parentDefaults,
   categories,
   committees,
+  committeeMemberships,
   faculty,
   onClose,
 }: {
@@ -398,6 +404,7 @@ function MetricModal({
   parentDefaults: ParentDefaults;
   categories: { id: string; label: string }[];
   committees: Committee[];
+  committeeMemberships: CommitteeMembership[];
   faculty: FacultyRecord[];
   onClose: () => void;
 }) {
@@ -565,15 +572,29 @@ function MetricModal({
               ))}
             </Select>
           </Field>
-          <Field label="Person in Charge">
+          <Field
+            label="Person in Charge"
+            hint={
+              !committeeId
+                ? "Select a committee in charge first to choose a person."
+                : undefined
+            }
+          >
             <Select
               value={personInChargeId}
+              disabled={!committeeId}
               onChange={(e) => setPersonInChargeId(e.target.value)}
             >
               <option value="">Unassigned</option>
-              {faculty.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
+              {personsForCommittee(
+                faculty,
+                committeeMemberships,
+                committeeId,
+                personInChargeId,
+              ).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                  {p.inCommittee ? "" : " — not in committee"}
                 </option>
               ))}
             </Select>
