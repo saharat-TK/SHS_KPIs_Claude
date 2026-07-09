@@ -235,6 +235,23 @@ function KpiDetail() {
     () => ({ fiveYearTarget: draft?.fiveYearTarget ?? null, years }),
     [draft?.fiveYearTarget, years],
   );
+  const parentDefaults = useMemo(
+    () => ({
+      categoryId: kpiQ.data?.categoryId ?? "",
+      collectionPeriod: kpiQ.data?.collectionPeriod ?? "every_quarter",
+      committeeId: kpiQ.data?.committeeId ?? "",
+      dataCollectMethod: kpiQ.data?.dataCollectMethod ?? "",
+      dataSourceUrl: kpiQ.data?.dataSourceUrl ?? "",
+    }),
+    [
+      kpiQ.data?.categoryId,
+      kpiQ.data?.collectionPeriod,
+      kpiQ.data?.committeeId,
+      kpiQ.data?.dataCollectMethod,
+      kpiQ.data?.dataSourceUrl,
+    ],
+  );
+  const canAddMetric = !dirty && !update.isPending && !saveTargets.isPending;
 
   return (
     <>
@@ -579,7 +596,11 @@ function KpiDetail() {
               {/* Sub-KPIs (Metrics) */}
               <MetricEditor
                 kpiId={kpiId}
+                parentName={draft.name}
+                parentUnit={draft.unit}
                 parentTargets={parentTargets}
+                parentDefaults={parentDefaults}
+                canAddMetric={canAddMetric}
                 categories={categories}
                 committees={committees}
                 faculty={faculty}

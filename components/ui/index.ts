@@ -16,3 +16,9 @@ export { PageHeader } from "./PageHeader";
 export { QueryBoundary, Spinner } from "./QueryBoundary";
 export { TransferList, type TransferListItem } from "./TransferList";
 export { ToastProvider, useToast, type ToastTone } from "./Toast";
+export {
+  ConfirmProvider,
+  useConfirm,
+  type ConfirmOptions,
+  type ConfirmTone,
+} from "./ConfirmDialog";

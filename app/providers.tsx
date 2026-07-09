@@ -7,14 +7,16 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { AuthProvider } from "@/lib/auth/AuthContext";
-import { ToastProvider, useToast } from "@/components/ui";
+import { ToastProvider, ConfirmProvider, useToast } from "@/components/ui";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
-      <QueryProvider>
-        <AuthProvider>{children}</AuthProvider>
-      </QueryProvider>
+      <ConfirmProvider>
+        <QueryProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </QueryProvider>
+      </ConfirmProvider>
     </ToastProvider>
   );
 }

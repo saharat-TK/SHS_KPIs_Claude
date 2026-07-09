@@ -17,6 +17,7 @@ import {
   Modal,
   QueryBoundary,
   EmptyState,
+  useConfirm,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
@@ -44,6 +45,7 @@ function MetricsManagement() {
   const kpis = useKpis();
   const upsert = useUpsertMetric();
   const del = useDeleteMetric();
+  const confirm = useConfirm();
 
   const [kpiFilter, setKpiFilter] = useState("all");
   const [q, setQ] = useState("");
@@ -140,7 +142,17 @@ function MetricsManagement() {
                         <button
                           aria-label="Delete metric"
                           className="text-mute hover:text-error p-xs rounded hover:bg-surface-soft"
-                          onClick={() => del.mutate(m.id)}
+                          onClick={async () => {
+                            if (
+                              await confirm({
+                                title: "Delete metric",
+                                message: `Delete metric "${m.name}"? This can't be undone.`,
+                                confirmLabel: "Delete",
+                              })
+                            ) {
+                              del.mutate(m.id);
+                            }
+                          }}
                         >
                           <Icon name="delete" size={18} />
                         </button>

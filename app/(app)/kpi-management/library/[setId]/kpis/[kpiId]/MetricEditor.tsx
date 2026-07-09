@@ -18,6 +18,7 @@ import {
   RadioGroup,
   QueryBoundary,
   EmptyState,
+  useConfirm,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import {
@@ -50,7 +51,39 @@ type ParentTargets = {
   years: (number | null)[];
 };
 
+type ParentDefaults = {
+  categoryId: string;
+  collectionPeriod: CollectionPeriod;
+  committeeId: string;
+  dataCollectMethod: string;
+  dataSourceUrl: string;
+};
+
 const ZERO_YEARS: (number | null)[] = [0, 0, 0, 0, 0];
+
+// Batch presets — each entry prefixes `${abbr}-` onto the parent KPI's name.
+// `label` is the Thai program/curriculum name, shown for reference in the dialog.
+type BatchEntry = { abbr: string; label: string };
+
+const PROGRAM_BATCH: BatchEntry[] = [
+  { abbr: "PH", label: "สาขาวิชาสาธารณสุขศาสตร์" },
+  { abbr: "SHS", label: "สาขาวิชาวิทยาศาสตร์การกีฬาและสุขภาพ" },
+  { abbr: "OHS", label: "สาขาวิชาอาชีวอนามัยและความปลอดภัย" },
+  { abbr: "EnvH", label: "สาขาวิชาอนามัยสิ่งแวดล้อม" },
+  { abbr: "BM", label: "สาขาวิชาเทคโนโลยีชีวการแพทย์และสารสนเทศสุขภาพ" },
+];
+
+const CURRICULUM_BATCH: BatchEntry[] = [
+  { abbr: "PHB", label: "สาธารณสุขศาสตร์" },
+  { abbr: "PHM", label: "การจัดการสุขภาพชายแดน" },
+  { abbr: "PHD", label: "ระบาดและวัคซีนวิทยา" },
+  { abbr: "SHSB", label: "วิทยาศาสตร์การกีฬาและสุขภาพ" },
+  { abbr: "SHSM", label: "วิทยาศาสตร์และเทคโนโลยีการกีฬาประยุกต์" },
+  { abbr: "OHSB", label: "อาชีวอนามัยและความปลอดภัย" },
+  { abbr: "EnvHB", label: "อนามัยสิ่งแวดล้อม" },
+  { abbr: "EnvHM", label: "เทคโนโลยีการจัดการสิ่งแวดล้อมอย่างยั่งยืน" },
+  { abbr: "BMM", label: "เทคโนโลยีชีวการแพทย์และสารสนเทศสุขภาพ" },
+];
 
 const TARGET_MODE_OPTIONS: {
   value: MetricTargetMode;
@@ -76,23 +109,36 @@ const TARGET_MODE_OPTIONS: {
 
 export function MetricEditor({
   kpiId,
+  parentName,
+  parentUnit,
   parentTargets,
+  parentDefaults,
+  canAddMetric = true,
   categories,
   committees,
   faculty,
 }: {
   kpiId: number;
+  parentName: string;
+  parentUnit: string;
   parentTargets: ParentTargets;
+  parentDefaults: ParentDefaults;
+  canAddMetric?: boolean;
   categories: { id: string; label: string }[];
   committees: Committee[];
   faculty: FacultyRecord[];
 }) {
   const metricsQ = useLibraryMetrics(kpiId);
   const del = useDeleteLibraryMetric(kpiId);
+  const confirm = useConfirm();
   const [editing, setEditing] = useState<LibraryMetric | null>(null);
   const [creating, setCreating] = useState(false);
+  const [batch, setBatch] = useState<{ title: string; entries: BatchEntry[] } | null>(null);
 
   const metrics = metricsQ.data ?? [];
+  const batchTooltip = !canAddMetric
+    ? "Save the parent KPI before adding sub-KPIs"
+    : undefined;
 
   return (
     <Card>
@@ -100,9 +146,39 @@ export function MetricEditor({
         title="Sub-KPIs (Metrics)"
         subtitle="Component metrics that roll up into this KPI."
         actions={
-          <Button size="sm" icon="add" onClick={() => setCreating(true)}>
-            Add Sub-KPI
-          </Button>
+          <div className="flex flex-wrap items-center gap-sm">
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="groups"
+              disabled={!canAddMetric}
+              title={batchTooltip}
+              onClick={() => setBatch({ title: "Batch: 5 Programs", entries: PROGRAM_BATCH })}
+            >
+              Batch: 5 Programs
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="school"
+              disabled={!canAddMetric}
+              title={batchTooltip}
+              onClick={() =>
+                setBatch({ title: "Batch: 9 Curriculums", entries: CURRICULUM_BATCH })
+              }
+            >
+              Batch: 9 Curriculums
+            </Button>
+            <Button
+              size="sm"
+              icon="add"
+              disabled={!canAddMetric}
+              title={batchTooltip}
+              onClick={() => setCreating(true)}
+            >
+              Add Sub-KPI
+            </Button>
+          </div>
         }
       />
       <CardBody className="p-0">
@@ -148,8 +224,16 @@ export function MetricEditor({
                           type="button"
                           aria-label="Delete"
                           className="text-mute hover:text-error"
-                          onClick={() => {
-                            if (confirm(`Delete sub-KPI "${m.name}"?`)) del.mutate(m.id);
+                          onClick={async () => {
+                            if (
+                              await confirm({
+                                title: "Delete sub-KPI",
+                                message: `Delete sub-KPI "${m.name}"? This can't be undone.`,
+                                confirmLabel: "Delete",
+                              })
+                            ) {
+                              del.mutate(m.id);
+                            }
                           }}
                         >
                           <Icon name="delete" size={18} />
@@ -169,6 +253,7 @@ export function MetricEditor({
           kpiId={kpiId}
           metric={editing}
           parentTargets={parentTargets}
+          parentDefaults={parentDefaults}
           categories={categories}
           committees={committees}
           faculty={faculty}
@@ -178,7 +263,122 @@ export function MetricEditor({
           }}
         />
       )}
+
+      {batch && (
+        <BatchConfirmModal
+          kpiId={kpiId}
+          title={batch.title}
+          entries={batch.entries}
+          parentName={parentName}
+          parentUnit={parentUnit}
+          parentDefaults={parentDefaults}
+          existingNames={metrics.map((m) => m.name)}
+          onClose={() => setBatch(null)}
+        />
+      )}
     </Card>
+  );
+}
+
+function BatchConfirmModal({
+  kpiId,
+  title,
+  entries,
+  parentName,
+  parentUnit,
+  parentDefaults,
+  existingNames,
+  onClose,
+}: {
+  kpiId: number;
+  title: string;
+  entries: BatchEntry[];
+  parentName: string;
+  parentUnit: string;
+  parentDefaults: ParentDefaults;
+  existingNames: string[];
+  onClose: () => void;
+}) {
+  const create = useCreateLibraryMetric();
+  const existing = new Set(existingNames);
+
+  const rows = entries.map((e) => {
+    const name = `${e.abbr}-${parentName}`;
+    return { ...e, name, duplicate: existing.has(name) };
+  });
+  const toCreate = rows.filter((r) => !r.duplicate);
+
+  const onCreate = async () => {
+    for (const row of toCreate) {
+      await create.mutateAsync({
+        kpiId,
+        name: row.name,
+        categoryId: parentDefaults.categoryId || null,
+        weight: 100,
+        unit: parentUnit,
+        collectionPeriod: parentDefaults.collectionPeriod,
+        committeeId: parentDefaults.committeeId || null,
+        personInChargeId: null,
+        dataCollectMethod: parentDefaults.dataCollectMethod,
+        dataSourceUrl: parentDefaults.dataSourceUrl,
+        description: "",
+        fiveYearTarget: null,
+        targetMode: "manual",
+        thresholdGreen: null,
+        thresholdAmber: null,
+      });
+    }
+    onClose();
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={title}
+      subtitle={`Each sub-KPI is named “${parentName}” prefixed with its abbreviation. Inherits the parent's category, committee, collection period, data method, source and unit; weight 100, blank targets.`}
+      size="mdWide"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={create.isPending}>
+            Cancel
+          </Button>
+          <Button
+            disabled={toCreate.length === 0 || create.isPending}
+            onClick={onCreate}
+          >
+            {create.isPending
+              ? "Creating…"
+              : `Create ${toCreate.length} Sub-KPI${toCreate.length === 1 ? "" : "s"}`}
+          </Button>
+        </>
+      }
+    >
+      <Table>
+        <thead>
+          <tr>
+            <Th>Sub-KPI name</Th>
+            <Th>Program / Curriculum</Th>
+            <Th align="right">Status</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <Tr key={r.abbr}>
+              <Td className={r.duplicate ? "text-mute" : "font-medium"}>{r.name}</Td>
+              <Td className="text-mute">{r.label}</Td>
+              <Td align="right">
+                {r.duplicate ? (
+                  <span className="text-caption-sm text-mute">already exists — skipped</span>
+                ) : (
+                  <span className="text-caption-sm text-success">will be created</span>
+                )}
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </Table>
+    </Modal>
   );
 }
 
@@ -186,6 +386,7 @@ function MetricModal({
   kpiId,
   metric,
   parentTargets,
+  parentDefaults,
   categories,
   committees,
   faculty,
@@ -194,6 +395,7 @@ function MetricModal({
   kpiId: number;
   metric: LibraryMetric | null;
   parentTargets: ParentTargets;
+  parentDefaults: ParentDefaults;
   categories: { id: string; label: string }[];
   committees: Committee[];
   faculty: FacultyRecord[];
@@ -204,16 +406,20 @@ function MetricModal({
   const saveTargets = useSaveLibraryMetricTargets(kpiId);
 
   const [name, setName] = useState(metric?.name ?? "");
-  const [categoryId, setCategoryId] = useState(metric?.categoryId ?? "");
+  const [categoryId, setCategoryId] = useState(metric?.categoryId ?? parentDefaults.categoryId);
   const [weight, setWeight] = useState(metric?.weight ?? 100);
   const [unit, setUnit] = useState(metric?.unit?.trim() || "Item");
   const [collectionPeriod, setCollectionPeriod] = useState<CollectionPeriod>(
-    metric?.collectionPeriod ?? "every_quarter",
+    metric?.collectionPeriod ?? parentDefaults.collectionPeriod,
   );
-  const [committeeId, setCommitteeId] = useState(metric?.committeeId ?? "");
+  const [committeeId, setCommitteeId] = useState(metric?.committeeId ?? parentDefaults.committeeId);
   const [personInChargeId, setPersonInChargeId] = useState(metric?.personInChargeId ?? "");
-  const [dataCollectMethod, setDataCollectMethod] = useState(metric?.dataCollectMethod ?? "");
-  const [dataSourceUrl, setDataSourceUrl] = useState(metric?.dataSourceUrl ?? "");
+  const [dataCollectMethod, setDataCollectMethod] = useState(
+    metric?.dataCollectMethod ?? parentDefaults.dataCollectMethod,
+  );
+  const [dataSourceUrl, setDataSourceUrl] = useState(
+    metric?.dataSourceUrl ?? parentDefaults.dataSourceUrl,
+  );
   const [description, setDescription] = useState(metric?.description ?? "");
   const [fiveYearTarget, setFiveYearTarget] = useState<number | null>(
     metric?.fiveYearTarget ?? null,

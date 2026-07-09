@@ -20,6 +20,7 @@ import {
   Select,
   TransferList,
   useToast,
+  useConfirm,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import {
@@ -125,6 +126,7 @@ export default function CommitteePage() {
   const createMembership = useCreateCommitteeMembership();
   const updateMembership = useUpdateCommitteeMembership();
   const deleteMembership = useDeleteCommitteeMembership();
+  const confirm = useConfirm();
   const [selected, setSelected] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -266,12 +268,20 @@ export default function CommitteePage() {
                                 <button
                                   aria-label="Remove membership"
                                   className="text-mute hover:text-error p-xs rounded hover:bg-surface-soft"
-                                  onClick={() =>
-                                    deleteMembership.mutate({
-                                      facultyId: m.facultyId,
-                                      committeeId: m.committeeId,
-                                    })
-                                  }
+                                  onClick={async () => {
+                                    if (
+                                      await confirm({
+                                        title: "Remove membership",
+                                        message: `Remove "${m.facultyName}" from this committee?`,
+                                        confirmLabel: "Remove",
+                                      })
+                                    ) {
+                                      deleteMembership.mutate({
+                                        facultyId: m.facultyId,
+                                        committeeId: m.committeeId,
+                                      });
+                                    }
+                                  }}
                                 >
                                   <Icon name="delete" size={18} />
                                 </button>
