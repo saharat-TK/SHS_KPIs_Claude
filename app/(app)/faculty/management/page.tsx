@@ -19,6 +19,7 @@ import {
   Modal,
   Field,
   Input,
+  useConfirm,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
@@ -49,6 +50,7 @@ function FacultyManagement() {
   const create = useCreateFacultyRecord();
   const update = useUpdateFacultyRecord();
   const del = useDeleteFacultyRecord();
+  const confirm = useConfirm();
 
   const [q, setQ] = useState("");
   const [program, setProgram] = useState("all");
@@ -190,7 +192,17 @@ function FacultyManagement() {
                           <button
                             aria-label="Remove faculty member"
                             className="text-mute hover:text-error p-xs rounded hover:bg-surface-soft"
-                            onClick={() => del.mutate(f.id)}
+                            onClick={async () => {
+                              if (
+                                await confirm({
+                                  title: "Remove faculty member",
+                                  message: `Remove "${f.name}" from the faculty roster? This can't be undone.`,
+                                  confirmLabel: "Remove",
+                                })
+                              ) {
+                                del.mutate(f.id);
+                              }
+                            }}
                           >
                             <Icon name="delete" size={18} />
                           </button>

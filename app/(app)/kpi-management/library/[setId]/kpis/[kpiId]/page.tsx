@@ -596,6 +596,8 @@ function KpiDetail() {
               {/* Sub-KPIs (Metrics) */}
               <MetricEditor
                 kpiId={kpiId}
+                parentName={draft.name}
+                parentUnit={draft.unit}
                 parentTargets={parentTargets}
                 parentDefaults={parentDefaults}
                 canAddMetric={canAddMetric}

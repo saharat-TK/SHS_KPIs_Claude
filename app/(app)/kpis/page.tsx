@@ -21,6 +21,7 @@ import {
   ThresholdBar,
   HEALTH_LABEL,
   healthOf,
+  useConfirm,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
 import {
@@ -326,6 +327,7 @@ function CategoryRow({
 }) {
   const updateCat = useUpdateKpiCategory();
   const deleteCat = useDeleteKpiCategory();
+  const confirm = useConfirm();
   const [label, setLabel] = useState(category.label);
   const [description, setDescription] = useState(category.description ?? "");
 
@@ -401,7 +403,17 @@ function CategoryRow({
               : "Remove category"
           }
           disabled={inUse > 0 || deleteCat.isPending}
-          onClick={() => deleteCat.mutate(category.id)}
+          onClick={async () => {
+            if (
+              await confirm({
+                title: "Remove category",
+                message: `Remove category "${category.label}"? This can't be undone.`,
+                confirmLabel: "Remove",
+              })
+            ) {
+              deleteCat.mutate(category.id);
+            }
+          }}
           className="flex h-[30px] w-[30px] items-center justify-center rounded-DEFAULT text-mute transition-colors enabled:hover:bg-error/10 enabled:hover:text-error disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Icon name="delete" size={18} />

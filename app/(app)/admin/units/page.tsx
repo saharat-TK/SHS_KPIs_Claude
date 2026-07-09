@@ -15,6 +15,7 @@ import {
   Modal,
   Field,
   Input,
+  useConfirm,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
@@ -41,6 +42,7 @@ function UnitsManager() {
   const create = useCreateUnit();
   const update = useUpdateUnit();
   const del = useDeleteUnit();
+  const confirm = useConfirm();
 
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Editing>(null);
@@ -130,8 +132,16 @@ function UnitsManager() {
                           title="Remove unit"
                           disabled={del.isPending}
                           className="text-mute hover:text-error p-xs rounded hover:bg-surface-soft disabled:opacity-50"
-                          onClick={() => {
-                            if (confirm(`Delete unit "${u.unitNameEn}"?`)) del.mutate(u.id);
+                          onClick={async () => {
+                            if (
+                              await confirm({
+                                title: "Delete unit",
+                                message: `Delete unit "${u.unitNameEn}"? This can't be undone.`,
+                                confirmLabel: "Delete",
+                              })
+                            ) {
+                              del.mutate(u.id);
+                            }
                           }}
                         >
                           <Icon name="delete" size={18} />
