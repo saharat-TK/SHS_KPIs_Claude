@@ -24,6 +24,7 @@ import {
   useStrategicSet,
   useKpiCategories,
   useCommittees,
+  useCommitteeMemberships,
   useFacultyRecords,
   useFormulas,
   useUpdateLibraryKpi,
@@ -45,6 +46,7 @@ import {
 } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
 import { unitNeedsDivisor } from "@/lib/kpi/progress";
+import { personsForCommittee } from "@/lib/kpi/committee";
 import { MetricEditor } from "./MetricEditor";
 
 // Normalise the sparse annual-target rows into a fixed 5-slot array.
@@ -132,6 +134,7 @@ function KpiDetail() {
   useBreadcrumbLabel(`/kpi-management/library/${setId}/kpis`, "KPIs");
   useBreadcrumbLabel(`/kpi-management/library/${setId}/kpis/${kpiId}`, kpiQ.data?.name);
   const committeesQ = useCommittees();
+  const membershipsQ = useCommitteeMemberships();
   const facultyQ = useFacultyRecords();
   const formulasQ = useFormulas();
   const metricsQ = useLibraryMetrics(kpiId);
@@ -227,6 +230,7 @@ function KpiDetail() {
 
   const categories = categoriesQ.data ?? [];
   const committees = committeesQ.data ?? [];
+  const memberships = membershipsQ.data ?? [];
   const faculty = facultyQ.data ?? [];
   const formulas = formulasQ.data ?? [];
   const metrics = metricsQ.data ?? [];
@@ -355,15 +359,29 @@ function KpiDetail() {
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Person in Charge">
+                  <Field
+                    label="Person in Charge"
+                    hint={
+                      !draft.committeeId
+                        ? "Select a committee in charge first to choose a person."
+                        : undefined
+                    }
+                  >
                     <Select
                       value={draft.personInChargeId}
+                      disabled={!draft.committeeId}
                       onChange={(e) => set("personInChargeId", e.target.value)}
                     >
                       <option value="">Unassigned</option>
-                      {faculty.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
+                      {personsForCommittee(
+                        faculty,
+                        memberships,
+                        draft.committeeId,
+                        draft.personInChargeId,
+                      ).map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                          {p.inCommittee ? "" : " — not in committee"}
                         </option>
                       ))}
                     </Select>
@@ -603,6 +621,7 @@ function KpiDetail() {
                 canAddMetric={canAddMetric}
                 categories={categories}
                 committees={committees}
+                committeeMemberships={memberships}
                 faculty={faculty}
               />
             </div>
