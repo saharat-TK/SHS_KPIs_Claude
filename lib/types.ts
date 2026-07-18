@@ -9,7 +9,8 @@ export type Role = "admin" | "reviewer" | "committee" | "viewer";
 export type KpiCategory = string;
 
 export interface KpiCategoryRecord {
-  id: string; // stable slug, e.g. "student_success"
+  id: string; // stable, globally-unique slug, e.g. "student_success"
+  setId?: number | null; // owning strategic set (null = legacy/global)
   label: string; // display name (DB column `name`, aliased on read)
   description?: string;
   sortOrder: number;

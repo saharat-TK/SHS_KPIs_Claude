@@ -173,12 +173,15 @@ export const committeeMembershipsRepo = {
 // Fetch-based like facultyRecordsRepo. Note: deletion of an in-use category is
 // blocked in the UI against the in-memory KPIs, since KPIs aren't in MySQL yet.
 export const kpiCategoriesRepo = {
-  list: async (): Promise<KpiCategoryRecord[]> => {
-    const res = await fetch("/api/kpi-categories");
+  list: async (setId?: number): Promise<KpiCategoryRecord[]> => {
+    const res = await fetch(
+      setId == null ? "/api/kpi-categories" : `/api/kpi-categories?setId=${setId}`,
+    );
     if (!res.ok) throw new Error("Failed to load categories");
     return res.json();
   },
   create: async (input: {
+    setId?: number;
     label: string;
     description?: string;
     sortOrder?: number;
@@ -186,7 +189,12 @@ export const kpiCategoriesRepo = {
     const res = await fetch("/api/kpi-categories", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: input.label, description: input.description, sortOrder: input.sortOrder }),
+      body: JSON.stringify({
+        name: input.label,
+        description: input.description,
+        sortOrder: input.sortOrder,
+        setId: input.setId,
+      }),
     });
     if (!res.ok) throw new Error("Failed to create category");
     return res.json();
