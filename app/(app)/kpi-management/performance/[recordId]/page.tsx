@@ -65,7 +65,8 @@ function PerformanceRecordDetail() {
 
   const recordQ = usePerformanceRecord(recordId);
   const kpisQ = usePerfKpis(recordId);
-  const categoriesQ = useKpiCategories();
+  const record = recordQ.data;
+  const categoriesQ = useKpiCategories(record?.sourceSetId, { enabled: !!record });
   const periodsQ = usePerformancePeriods(recordId);
   const sync = useSyncPerformanceRecord();
 
@@ -75,7 +76,6 @@ function PerformanceRecordDetail() {
   const [approvalYear, setApprovalYear] = useState(1);
   const [approvalQuarter, setApprovalQuarter] = useState(1);
 
-  const record = recordQ.data;
   const categories = categoriesQ.data ?? [];
   const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
   const isAdmin = can("configure_kpis");
