@@ -111,10 +111,11 @@ export const useKpis = () =>
 export const useKpi = (id: string) =>
   useQuery({ queryKey: qk.kpi(id), queryFn: () => kpisRepo.get(id), enabled: !!id });
 
-export const useKpiCategories = (setId?: number) =>
+export const useKpiCategories = (setId?: number, opts?: { enabled?: boolean }) =>
   useQuery({
     queryKey: qk.kpiCategoriesFor(setId),
     queryFn: () => kpiCategoriesRepo.list(setId),
+    enabled: opts?.enabled ?? true,
   });
 
 export const useMetrics = () =>
