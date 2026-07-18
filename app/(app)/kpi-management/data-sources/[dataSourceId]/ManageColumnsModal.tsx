@@ -7,6 +7,8 @@ import { useSaveDataSourceColumns } from "@/lib/data/hooks";
 import {
   COLUMN_TYPE_LABELS,
   DATA_SOURCE_COLUMN_TYPES,
+  DERIVED_OPTION_SOURCE,
+  isDerivedOptionType,
   slugifyColumnKey,
 } from "@/lib/kpi/dataSources";
 import type { DataSourceColumn, DataSourceColumnType } from "@/lib/types";
@@ -250,6 +252,13 @@ function ColumnRow({
             />
           </Field>
         </div>
+      )}
+
+      {isDerivedOptionType(draft.dataType) && (
+        <p className="mt-sm flex items-center gap-xs text-caption-sm text-mute">
+          <Icon name="auto_awesome" className="text-[16px]" />
+          {DERIVED_OPTION_SOURCE[draft.dataType]} They stay up to date on their own.
+        </p>
       )}
 
       <p className="mt-xs text-caption-sm text-mute">

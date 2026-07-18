@@ -9,6 +9,7 @@ import {
   errorResponse,
   loadSourceShape,
   mapEntryRow,
+  resolveColumnOptions,
 } from "@/lib/kpi/dataSourcesServer";
 import { normalizeEntryPeriod, validateEntryValues } from "@/lib/kpi/dataSources";
 
@@ -53,8 +54,9 @@ export async function PATCH(
       values.push(period.year, period.quarter);
     }
     if ("values" in b) {
+      const columns = await resolveColumnOptions(pool, source.columns);
       setClauses.push("values_json = ?");
-      values.push(JSON.stringify(validateEntryValues(source.columns, b.values ?? {})));
+      values.push(JSON.stringify(validateEntryValues(columns, b.values ?? {})));
     }
     if ("note" in b) {
       setClauses.push("note = ?");

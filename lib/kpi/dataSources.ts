@@ -11,6 +11,8 @@ export const DATA_SOURCE_COLUMN_TYPES: DataSourceColumnType[] = [
   "date",
   "select",
   "boolean",
+  "faculty",
+  "program",
 ];
 
 export const COLUMN_TYPE_LABELS: Record<DataSourceColumnType, string> = {
@@ -19,6 +21,24 @@ export const COLUMN_TYPE_LABELS: Record<DataSourceColumnType, string> = {
   date: "Date",
   select: "Choice",
   boolean: "Yes / No",
+  faculty: "Faculties",
+  program: "5 Programs",
+};
+
+/** Types whose allowed values come from elsewhere (the faculty roster, the program
+ *  list) rather than from options the admin types. Their `options` column stays NULL;
+ *  the server fills the allowed set in before validating, and the UI renders the
+ *  choices from a hook or a constant. */
+export const DERIVED_OPTION_TYPES: DataSourceColumnType[] = ["faculty", "program"];
+
+export const isDerivedOptionType = (t: DataSourceColumnType) =>
+  DERIVED_OPTION_TYPES.includes(t);
+
+/** Where a derived type's choices come from — shown in the columns editor in place
+ *  of the options input. */
+export const DERIVED_OPTION_SOURCE: Partial<Record<DataSourceColumnType, string>> = {
+  faculty: "Options come from the faculty roster (active staff).",
+  program: "Options are the five academic programs.",
 };
 
 /** Column definition as far as validation cares — lets callers pass either a
@@ -95,11 +115,21 @@ export function coerceCellValue(
       }
       return s;
     }
-    case "select": {
+    // faculty/program validate identically to select — the difference is only where
+    // `options` came from (resolveColumnOptions fills them server-side).
+    case "select":
+    case "faculty":
+    case "program": {
       const s = String(raw);
       const options = column.options ?? [];
       if (options.length > 0 && !options.includes(s)) {
-        throw invalid(`"${column.label}" must be one of: ${options.join(", ")}`);
+        // Listing 64 faculty ids helps nobody, so derived types name their source
+        // instead of enumerating the allowed values.
+        throw invalid(
+          isDerivedOptionType(column.dataType)
+            ? `"${column.label}": "${s}" is not a valid choice. ${DERIVED_OPTION_SOURCE[column.dataType]}`
+            : `"${column.label}" must be one of: ${options.join(", ")}`,
+        );
       }
       return s;
     }
@@ -160,14 +190,26 @@ export function normalizeEntryPeriod(
   return { year: y, quarter: q };
 }
 
-/** Format a stored cell for display in a table. */
+/** Format a stored cell for display in a table or CSV export.
+ *
+ *  Derived types store a code (a faculty id, a program abbr); `labels` maps those
+ *  codes to human text — build it with buildCellLabels(). A lookup miss falls back
+ *  to the raw stored value, never "—", so a faculty member leaving the roster does
+ *  not make historical rows unreadable (the same instinct as personsForCommittee
+ *  keeping a stale selection rather than dropping it).
+ *
+ *  This module stays free of runtime imports so tests can load it directly under
+ *  node's type-stripping, which is why the labels arrive as an argument. */
 export function formatCellValue(
   column: ColumnSpec,
   value: DataSourceCellValue,
+  labels?: Record<string, string>,
 ): string {
   if (value === null || value === undefined) return "—";
   if (column.dataType === "boolean") return value ? "Yes" : "No";
-  return String(value);
+
+  const raw = String(value);
+  return isDerivedOptionType(column.dataType) ? (labels?.[raw] ?? raw) : raw;
 }
 
 /** Label for an entry's period, e.g. "2568 Q3" or "2568". */

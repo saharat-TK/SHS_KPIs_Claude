@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { DataSourceColumn, DataSourceEntry, Role } from "@/lib/types";
 import { DataSourceValidationError } from "@/lib/kpi/dataSources";
+import { PROGRAM_CODES } from "@/lib/kpi/programs";
 
 type Db = Pool | PoolConnection;
 
@@ -109,6 +110,32 @@ export const LINK_FROM = `
   LEFT JOIN library_kpi    k ON k.id = COALESCE(l.library_kpi_id, m.kpi_id)
   LEFT JOIN strategic_set  s ON s.id = k.set_id
 `;
+
+/** Fill in `options` for derived-option columns so validateEntryValues can check them
+ *  the same way it checks a `select`. Faculty ids come from the live roster (active
+ *  staff only); program codes from the shared PROGRAMS list. Nothing here is
+ *  persisted — data_source_column.options stays NULL for these types.
+ *
+ *  Call this immediately before validating an entry write. */
+export async function resolveColumnOptions(
+  db: Db,
+  columns: DataSourceColumn[],
+): Promise<DataSourceColumn[]> {
+  // Only pay for the roster query when a faculty column is actually present.
+  let facultyIds: string[] | null = null;
+  if (columns.some((c) => c.dataType === "faculty")) {
+    const [rows] = await db.query<RowDataPacket[]>(
+      "SELECT id FROM faculty WHERE status = 'active'",
+    );
+    facultyIds = rows.map((r) => String(r.id));
+  }
+
+  return columns.map((c) => {
+    if (c.dataType === "faculty") return { ...c, options: facultyIds ?? [] };
+    if (c.dataType === "program") return { ...c, options: PROGRAM_CODES };
+    return c;
+  });
+}
 
 /** Load a data source's shape (grain + columns), or null when it doesn't exist. */
 export async function loadSourceShape(

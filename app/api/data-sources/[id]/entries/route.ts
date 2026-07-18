@@ -9,6 +9,7 @@ import {
   errorResponse,
   loadSourceShape,
   mapEntryRow,
+  resolveColumnOptions,
 } from "@/lib/kpi/dataSourcesServer";
 import { normalizeEntryPeriod, validateEntryValues } from "@/lib/kpi/dataSources";
 
@@ -76,7 +77,8 @@ export async function POST(
       b.year,
       b.quarter,
     );
-    const values = validateEntryValues(source.columns, b.values ?? {});
+    const columns = await resolveColumnOptions(pool, source.columns);
+    const values = validateEntryValues(columns, b.values ?? {});
 
     const [ins] = await pool.query<ResultSetHeader>(
       `INSERT INTO data_source_entry

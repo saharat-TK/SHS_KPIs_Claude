@@ -500,7 +500,11 @@ export type DataSourceColumnType =
   | "number"
   | "date"
   | "select"
-  | "boolean";
+  | "boolean"
+  // Derived-option types: the user does not author their options, so `options`
+  // stays NULL in the DB and is resolved at validation/render time instead.
+  | "faculty" // stores a faculty.id ("fac-001")
+  | "program"; // stores a PROGRAMS abbr ("PH")
 
 /** A cell value as stored in data_source_entry.values_json. */
 export type DataSourceCellValue = string | number | boolean | null;

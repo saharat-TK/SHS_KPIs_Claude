@@ -24,8 +24,10 @@ import {
   useDataSourceLinks,
   useDeleteDataSourceEntry,
   useDeleteDataSourceLink,
+  useFacultyRecords,
 } from "@/lib/data/hooks";
 import { formatCellValue, formatEntryPeriod } from "@/lib/kpi/dataSources";
+import { buildCellLabels } from "@/lib/kpi/programs";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { Icon } from "@/components/ui/Icon";
 import type { DataSourceColumn, DataSourceEntry, DataSourceLink } from "@/lib/types";
@@ -72,12 +74,20 @@ function DataSourceDetail({ id }: { id: number }) {
   const entriesQ = useDataSourceEntries(id);
   const entries = entriesQ.data ?? [];
 
+  // Derived cells store a code (faculty id, program abbr); the table and the CSV
+  // both resolve it through this one map so the two always agree.
+  const facultyQ = useFacultyRecords();
+  const cellLabels = useMemo(
+    () => buildCellLabels(facultyQ.data ?? []),
+    [facultyQ.data],
+  );
+
   const exportCsv = () => {
     if (!source) return;
     const headers = ["Period", ...columns.map((c) => c.label), "Note", "Recorded by"];
     const rows = entries.map((e) => [
       formatEntryPeriod(e.year, e.quarter),
-      ...columns.map((c) => formatCellValue(c, e.values[c.colKey] ?? null)),
+      ...columns.map((c) => formatCellValue(c, e.values[c.colKey] ?? null, cellLabels)),
       e.note ?? "",
       e.recordedByName ?? "",
     ]);
@@ -180,6 +190,7 @@ function DataSourceDetail({ id }: { id: number }) {
                     canRecord={canRecord}
                     dataSourceId={id}
                     actor={{ actorId: user?.facultyId, userRole: user?.role }}
+                    cellLabels={cellLabels}
                     onEdit={setEditing}
                   />
                 )}
@@ -296,6 +307,7 @@ function EntriesTable({
   canRecord,
   dataSourceId,
   actor,
+  cellLabels,
   onEdit,
 }: {
   columns: DataSourceColumn[];
@@ -303,6 +315,7 @@ function EntriesTable({
   canRecord: boolean;
   dataSourceId: number;
   actor: { actorId?: string; userRole?: string };
+  cellLabels: Record<string, string>;
   onEdit: (entry: DataSourceEntry) => void;
 }) {
   const confirm = useConfirm();
@@ -333,7 +346,7 @@ function EntriesTable({
               </Td>
               {columns.map((c) => (
                 <Td key={c.id} align={c.dataType === "number" ? "right" : "left"}>
-                  {formatCellValue(c, e.values[c.colKey] ?? null)}
+                  {formatCellValue(c, e.values[c.colKey] ?? null, cellLabels)}
                 </Td>
               ))}
               <Td className="text-mute">{e.note ?? "—"}</Td>

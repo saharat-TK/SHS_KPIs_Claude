@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal, Button, Field, Input, Select } from "@/components/ui";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
   useCreateDataSourceEntry,
+  useFacultyRecords,
   useUpdateDataSourceEntry,
 } from "@/lib/data/hooks";
 import { COLUMN_TYPE_LABELS } from "@/lib/kpi/dataSources";
+import { PROGRAMS } from "@/lib/kpi/programs";
 import type {
   DataSourceCellValue,
   DataSourceColumn,
   DataSourceEntry,
   DataSourcePeriodGrain,
+  FacultyRecord,
 } from "@/lib/types";
 
 /** Add or edit one row of raw data. Values are held as strings while editing and
@@ -35,6 +38,19 @@ export function EntryModal({
   const { user } = useAuth();
   const create = useCreateDataSourceEntry();
   const update = useUpdateDataSourceEntry();
+
+  // Only fetch the roster when a faculty column is actually on this source.
+  const needsFaculty = columns.some((c) => c.dataType === "faculty");
+  const facultyQ = useFacultyRecords();
+  const faculty = useMemo(
+    () =>
+      needsFaculty
+        ? (facultyQ.data ?? [])
+            .filter((f) => f.status === "active")
+            .sort((a, b) => a.name.localeCompare(b.name, "th"))
+        : [],
+    [needsFaculty, facultyQ.data],
+  );
 
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(String(thisYear));
@@ -137,6 +153,7 @@ export function EntryModal({
             <CellInput
               column={c}
               value={values[c.colKey] ?? ""}
+              faculty={faculty}
               onChange={(v) => setValues((prev) => ({ ...prev, [c.colKey]: v }))}
             />
           </Field>
@@ -154,10 +171,12 @@ function CellInput({
   column,
   value,
   onChange,
+  faculty,
 }: {
   column: DataSourceColumn;
   value: string;
   onChange: (value: string) => void;
+  faculty: FacultyRecord[];
 }) {
   switch (column.dataType) {
     case "select":
@@ -167,6 +186,33 @@ function CellInput({
           {(column.options ?? []).map((o) => (
             <option key={o} value={o}>
               {o}
+            </option>
+          ))}
+        </Select>
+      );
+    case "faculty":
+      return (
+        <Select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">—</option>
+          {faculty.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name} — {f.program}
+            </option>
+          ))}
+          {/* Keep a stored person who has since left the roster visible, rather
+              than silently blanking the field on edit. */}
+          {value && !faculty.some((f) => f.id === value) && (
+            <option value={value}>{value} — no longer on the roster</option>
+          )}
+        </Select>
+      );
+    case "program":
+      return (
+        <Select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">—</option>
+          {PROGRAMS.map((p) => (
+            <option key={p.abbr} value={p.abbr}>
+              {p.abbr} — {p.label}
             </option>
           ))}
         </Select>

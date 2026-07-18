@@ -461,9 +461,14 @@ CREATE TABLE data_source_column (
   data_source_id BIGINT UNSIGNED NOT NULL,
   col_key        VARCHAR(40)  NOT NULL,                -- slug, e.g. "student_count"
   label          VARCHAR(255) NOT NULL,
-  data_type      ENUM('text','number','date','select','boolean') NOT NULL DEFAULT 'text',
+  data_type      ENUM('text','number','date','select','boolean',
+                      'faculty','program') NOT NULL DEFAULT 'text',
+                                                       -- faculty: stores a faculty.id ("fac-001")
+                                                       -- program: stores a PROGRAMS abbr ("PH")
   unit           VARCHAR(50)  NULL,                    -- free text, same convention as library_kpi.unit
-  options        JSON NULL,                            -- string[] of allowed values; only for data_type='select'
+  options        JSON NULL,                            -- string[] of allowed values; only for data_type='select'.
+                                                       -- NULL for faculty/program: their options are DERIVED
+                                                       -- (roster / lib/kpi/programs.ts), never authored or stored.
   is_required    TINYINT(1) NOT NULL DEFAULT 0,
   sort_order     INT NOT NULL DEFAULT 0,
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -566,4 +571,10 @@ CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id);
 --  * data_source_entry.quarter must be NULL when the source's period_grain is
 --    'annual' and 1..4 when it is 'quarterly'. The CHECK only bounds the range;
 --    the NULL-vs-not rule is app-enforced because it depends on the parent row.
+--  * Derived-option column types ('faculty','program'): allowed values are NOT in
+--    data_source_column.options (it stays NULL). resolveColumnOptions() in
+--    lib/kpi/dataSourcesServer.ts fills them from the faculty roster / PROGRAMS
+--    before each entry write, so the stored id or code is validated but there is
+--    no FK — deleting a faculty row will NOT cascade into values_json. Display
+--    falls back to the raw id when a lookup misses, by design.
 -- =============================================================================
