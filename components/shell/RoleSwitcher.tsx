@@ -44,19 +44,19 @@ export function RoleSwitcher() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex h-[36px] items-center gap-sm rounded-DEFAULT border border-hairline bg-surface-lowest px-md hover:border-hairline-strong transition-colors"
+        className="flex h-[36px] items-center gap-sm rounded-DEFAULT border border-[#272727] bg-black px-md hover:border-[#3a3a3a] transition-colors"
         title="Switch persona (demo)"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-container text-on-tertiary text-caption-sm font-medium">
           {user.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
         </span>
         <span className="hidden sm:flex flex-col items-start leading-tight">
-          <span className="text-label-md text-on-surface">{user.name}</span>
-          <span className="max-w-[220px] truncate text-caption-sm text-mute">
+          <span className="max-w-[220px] truncate text-label-md text-white">{user.name}</span>
+          <span className="max-w-[220px] truncate text-caption-sm text-[#8a8a8a]">
             {memberships.isLoading && user.facultyId ? "Loading membership…" : activeDetail}
           </span>
         </span>
-        <Icon name="expand_more" size={18} className="text-mute" />
+        <Icon name="expand_more" size={18} className="text-[#8a8a8a]" />
       </button>
 
       {open && (
