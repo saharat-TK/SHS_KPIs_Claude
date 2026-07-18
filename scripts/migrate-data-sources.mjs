@@ -32,6 +32,40 @@ async function columnType(conn, table, column) {
 // Each entry is guarded by its own check, so re-running is a no-op.
 const COLUMN_TYPE_DDL = `ENUM('text','number','date','select','boolean','faculty','program') NOT NULL DEFAULT 'text'`;
 
+async function columnExists(conn, table, column) {
+  return (await columnType(conn, table, column)) != null;
+}
+
+/** Links moved from three reserved single-purpose columns to one `mappings` JSON
+ *  that can express filters and two slots. Nothing ever read the old columns. */
+async function ensureLinkMappings(conn) {
+  if (!(await columnExists(conn, "data_source_link", "mappings"))) {
+    console.log("Adding data_source_link.mappings…");
+    await conn.query(
+      "ALTER TABLE data_source_link ADD COLUMN mappings JSON NULL AFTER library_metric_id",
+    );
+  }
+  for (const dead of ["column_key", "variable_slot", "aggregation"]) {
+    if (await columnExists(conn, "data_source_link", dead)) {
+      console.log(`Dropping superseded data_source_link.${dead}…`);
+      await conn.query(`ALTER TABLE data_source_link DROP COLUMN ${dead}`);
+    }
+  }
+}
+
+/** Metric progress needs to distinguish a fed value from a typed one. */
+async function ensureMetricIsComputed(conn) {
+  if (await columnExists(conn, "perf_metric_quarter_progress", "is_computed")) {
+    console.log("perf_metric_quarter_progress.is_computed already exists — skipping.");
+    return;
+  }
+  console.log("Adding perf_metric_quarter_progress.is_computed…");
+  await conn.query(
+    `ALTER TABLE perf_metric_quarter_progress
+       ADD COLUMN is_computed TINYINT(1) NOT NULL DEFAULT 0 AFTER progress_value`,
+  );
+}
+
 async function ensureDerivedColumnTypes(conn) {
   const current = await columnType(conn, "data_source_column", "data_type");
   if (current == null) return; // table was just created with the full ENUM
@@ -106,9 +140,7 @@ const TABLES = [
        data_source_id    BIGINT UNSIGNED NOT NULL,
        library_kpi_id    BIGINT UNSIGNED NULL,
        library_metric_id BIGINT UNSIGNED NULL,
-       column_key        VARCHAR(40) NULL,
-       variable_slot     ENUM('variable1','variable2') NULL,
-       aggregation       ENUM('sum','avg','count','latest') NULL,
+       mappings          JSON NULL,
        note              VARCHAR(1000) NULL,
        target_key        VARCHAR(32) AS (CONCAT(IF(library_kpi_id IS NULL, 'm', 'k'),
                                                 COALESCE(library_kpi_id, library_metric_id))) STORED,
@@ -147,6 +179,8 @@ async function main() {
     }
 
     await ensureDerivedColumnTypes(conn);
+    await ensureLinkMappings(conn);
+    await ensureMetricIsComputed(conn);
     console.log("Migration complete.");
   } catch (err) {
     console.error("Migration failed:", err);

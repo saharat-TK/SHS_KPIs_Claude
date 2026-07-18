@@ -553,17 +553,44 @@ export interface DataSourceEntry {
   recordedByName?: string;
 }
 
-/** Evidence edge from a data source to a library KPI or metric. Exactly one of
- *  libraryKpiId / libraryMetricId is set. The columnKey / variableSlot /
- *  aggregation fields are the phase-2 auto-feed hook and are null for now. */
+/** Which rows of a data source count, and how they turn into a number. */
+export type FilterOperator = "eq" | "gte" | "lte" | "between";
+
+/** One condition. `field` is a data_source_column.col_key, or PERIOD_FIELD
+ *  ("__period") for the entry's own year/quarter. `valueTo` is set only for
+ *  "between", where both bounds are inclusive. */
+export interface DataSourceFilter {
+  field: string;
+  operator: FilterOperator;
+  /** Same shape as a stored cell, so a boolean column's filter is a boolean. */
+  value: DataSourceCellValue;
+  valueTo?: DataSourceCellValue;
+}
+
+export type AggregationKind = "sum" | "avg" | "count" | "latest";
+
+/** Where the aggregated number lands on the target. A percent/ratio KPI takes
+ *  two mappings (variable1 = dividend, variable2 = divisor); everything else
+ *  takes one "value". */
+export type MappingSlot = "value" | "variable1" | "variable2";
+
+export interface DataSourceLinkMapping {
+  slot: MappingSlot;
+  aggregation: AggregationKind;
+  /** The column being aggregated. Null (and unused) when aggregation is "count". */
+  columnKey: string | null;
+  filters: DataSourceFilter[];
+}
+
+/** Feed edge from a data source to a library KPI or metric. Exactly one of
+ *  libraryKpiId / libraryMetricId is set. `mappings` says which rows produce the
+ *  target's quarterly value; an empty array means the link is evidence only. */
 export interface DataSourceLink {
   id: number;
   dataSourceId: number;
   libraryKpiId: number | null;
   libraryMetricId: number | null;
-  columnKey: string | null;
-  variableSlot: "variable1" | "variable2" | null;
-  aggregation: "sum" | "avg" | "count" | "latest" | null;
+  mappings: DataSourceLinkMapping[];
   note: string | null;
   // Joined for display:
   kpiName?: string;

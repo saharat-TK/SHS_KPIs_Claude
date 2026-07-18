@@ -343,13 +343,15 @@ CREATE TABLE perf_metric_annual_target (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── perf_metric_quarter_progress ─────────────────────────────────────────────
--- Metrics are always entered directly (leaf level), each with its Issue section.
+-- Metrics are entered directly (leaf level), each with its Issue section, OR fed
+-- from a data source (is_computed = 1, see LAYER D decision D3).
 CREATE TABLE perf_metric_quarter_progress (
   id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   perf_metric_id BIGINT UNSIGNED NOT NULL,
   year_no        TINYINT UNSIGNED NOT NULL CHECK (year_no BETWEEN 1 AND 5),
   quarter_no     TINYINT UNSIGNED NOT NULL CHECK (quarter_no BETWEEN 1 AND 4),
   progress_value DECIMAL(14,4) NULL,
+  is_computed    TINYINT(1) NOT NULL DEFAULT 0,        -- 1 = written by the data-source feed
   issue          TEXT NULL,
   solution       TEXT NULL,
   recorded_by    VARCHAR(255) NULL,
@@ -421,14 +423,22 @@ CREATE INDEX idx_pkae_appr ON perf_kpi_approval_event(approval_id, created_at);
 --        display-oriented data.
 --    D2. Rows carry calendar year + optional quarter and are INDEPENDENT of any
 --        performance_record, so raw data survives across 5-year cycles.
---    D3. Linking is EVIDENCE ONLY in phase 1: data_source_link records that a
---        source justifies a KPI/metric; it does NOT feed values. The nullable
---        column_key / variable_slot / aggregation columns are the phase-2 hook
---        for auto-feeding perf_kpi variables, and stay NULL for now.
+--    D3. Links FEED VALUES (implemented; superseded the phase-1 "evidence only"
+--        rule). data_source_link.mappings says which rows count and how they
+--        aggregate; lib/kpi/dataSourceFeed.ts writes the result into
+--        perf_*_quarter_progress. The old reserved column_key / variable_slot /
+--        aggregation columns were dropped in favour of the JSON — they could not
+--        express filters or two mappings, and "column_key" was ambiguous between
+--        "supplies the value" and "is filtered on".
 --    D4. A link targets EXACTLY ONE of library_kpi / library_metric. Enforced by
 --        the CHECK below plus the generated `target_key` used for uniqueness
 --        (a plain UNIQUE over nullable columns would not catch duplicates,
 --        because MySQL treats NULLs as distinct in unique indexes).
+--    D5. A fed quarter value is CUMULATIVE WITHIN ITS YEAR: Q3 aggregates matching
+--        rows from Q1..Q3 of that year, matching progress_value's existing meaning
+--        and quarterTargetFor's annual*q/4. The window resets each year.
+--        Annual-grain sources have quarter IS NULL; those rows count from Q1 of
+--        their year, since the figure describes the whole year.
 --
 --  Note: library_kpi.data_source_url (a free-text link) predates this layer and
 --  remains as an informal pointer; data_source is the structured replacement.
@@ -501,17 +511,19 @@ CREATE TABLE data_source_entry (
 CREATE INDEX idx_dse_period ON data_source_entry(data_source_id, year, quarter);
 
 -- ── data_source_link ─────────────────────────────────────────────────────────
--- Traceability edge: "this data source is the evidence for that KPI / metric".
+-- Feed edge: "these rows of this data source produce that KPI's / metric's value".
 -- Exactly one of library_kpi_id / library_metric_id is set (decision D4).
 CREATE TABLE data_source_link (
   id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   data_source_id    BIGINT UNSIGNED NOT NULL,
   library_kpi_id    BIGINT UNSIGNED NULL,
   library_metric_id BIGINT UNSIGNED NULL,
-  -- Phase-2 auto-feed hook (decision D3): unused and NULL in phase 1.
-  column_key        VARCHAR(40) NULL,                  -- which column supplies the value
-  variable_slot     ENUM('variable1','variable2') NULL,-- which KPI variable it feeds
-  aggregation       ENUM('sum','avg','count','latest') NULL,
+  -- How the matching rows become a number (decision D5). Array of 1-2 mappings:
+  --   [{ slot, aggregation, columnKey, filters: [{ field, operator, value, valueTo }] }]
+  -- slot: 'value' | 'variable1' | 'variable2'  (two slots feed a percent/ratio KPI)
+  -- field: a data_source_column.col_key, or '__period' for the entry's own year/quarter
+  -- Validated by validateMappings() in lib/kpi/dataSourceFilters.ts before write.
+  mappings          JSON NULL,
   note              VARCHAR(1000) NULL,
   -- Stable non-null discriminator so uniqueness actually holds (decision D4).
   target_key        VARCHAR(32) AS (CONCAT(IF(library_kpi_id IS NULL, 'm', 'k'),
@@ -571,6 +583,13 @@ CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id);
 --  * data_source_entry.quarter must be NULL when the source's period_grain is
 --    'annual' and 1..4 when it is 'quarterly'. The CHECK only bounds the range;
 --    the NULL-vs-not rule is app-enforced because it depends on the parent row.
+--  * The data-source FEED (decision D3/D5, lib/kpi/dataSourceFeed.ts) writes
+--    perf_*_quarter_progress.progress_value with is_computed = 1. Like the metric
+--    roll-up it bypasses the HTTP routes (which demand issue+solution) and never
+--    touches issue / solution / recorded_by, so a human's narrative survives.
+--    UNLIKE the roll-up it RESPECTS the guards: a closed recording period or an
+--    approval-locked quarter (submitted/forwarded/approved) is skipped and
+--    reported, never overwritten.
 --  * Derived-option column types ('faculty','program'): allowed values are NOT in
 --    data_source_column.options (it stays NULL). resolveColumnOptions() in
 --    lib/kpi/dataSourcesServer.ts fills them from the faculty roster / PROGRAMS

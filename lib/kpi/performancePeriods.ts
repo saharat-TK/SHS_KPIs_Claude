@@ -1,6 +1,20 @@
 export const PERFORMANCE_YEAR_COUNT = 5;
 export const PERFORMANCE_QUARTER_COUNT = 4;
 
+/** Calendar (Buddhist-era) year for a record's yearNo. yearNo 1..5 maps to
+ *  startYear..startYear+4 — the arithmetic that was inlined across the UI. */
+export function yearForYearNo(startYear: number, yearNo: number): number {
+  return startYear + yearNo - 1;
+}
+
+/** Inverse of yearForYearNo: which yearNo a calendar year falls on, or null when
+ *  it lies outside the record's five-year span. The data-source feed needs this
+ *  to place a raw entry on the right performance year. */
+export function yearNoForYear(startYear: number, year: number): number | null {
+  const yearNo = year - startYear + 1;
+  return yearNo >= 1 && yearNo <= PERFORMANCE_YEAR_COUNT ? yearNo : null;
+}
+
 export interface PerformancePeriod {
   yearNo: number;
   quarterNo: number;
