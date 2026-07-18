@@ -21,21 +21,22 @@
 -- =============================================================================
 
 -- ── kpi_categories ───────────────────────────────────────────────────────────
+--  Scoped per strategic set: each set owns its own categories (set_id). `id`
+--  stays a globally-unique slug (so KPI/metric FKs and the reorder/[id] routes
+--  need no structural change). A NULL set_id row is a legacy/global category.
 CREATE TABLE kpi_categories (
-  id          VARCHAR(40)  PRIMARY KEY,             -- stable slug, e.g. "student_success"
+  id          VARCHAR(40)  PRIMARY KEY,             -- stable, globally-unique slug
+  set_id      BIGINT UNSIGNED NULL,                 -- owning strategic set (NULL = legacy/global)
   name        VARCHAR(255) NOT NULL,                -- display label, e.g. "Student Success"
   description VARCHAR(500) NULL,                     -- optional blurb shown in the manage modal
-  sort_order  INT          NOT NULL DEFAULT 0,       -- controls left-to-right tab order
+  sort_order  INT          NOT NULL DEFAULT 0,       -- controls left-to-right tab order (per set)
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_kpi_categories_set FOREIGN KEY (set_id)
+    REFERENCES strategic_set(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_kpi_categories_sort ON kpi_categories(sort_order);
+CREATE INDEX idx_kpi_categories_set_sort ON kpi_categories(set_id, sort_order);
 
--- ── Seed data (mirrors the original KPI_CATEGORIES const) ────────────────────
-INSERT INTO kpi_categories (id, name, description, sort_order) VALUES
-  ('student_success',       'Student Success',        'Graduation, licensure and post-grad outcomes.', 1),
-  ('faculty_excellence',    'Faculty Excellence',     'Faculty qualifications and development.',        2),
-  ('research_output',       'Research Output',        'Publications, grants and research productivity.', 3),
-  ('operational_efficiency','Operational Efficiency', 'Ratios and resource utilisation.',               4),
-  ('financial_health',      'Financial Health',       'Cost and financial sustainability measures.',    5);
+-- No static seed: each strategic set seeds its own default categories when it is
+-- created (see app/api/strategic-sets/route.ts — seedDefaultCategories / clone).

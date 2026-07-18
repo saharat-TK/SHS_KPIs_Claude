@@ -32,8 +32,8 @@ import {
   KPI_TYPES,
   type KpiType,
   type LibraryKpi,
-  type StrategicSet,
 } from "@/lib/types";
+import { ManageCategoriesModal } from "./ManageCategoriesModal";
 
 const TYPE_TONE: Record<KpiType, "primary" | "info" | "neutral"> = {
   strategic: "primary",
@@ -56,7 +56,7 @@ function SetDetail() {
 
   const setQ = useStrategicSet(setId);
   const kpisQ = useLibraryKpis(setId);
-  const categoriesQ = useKpiCategories();
+  const categoriesQ = useKpiCategories(setId);
   const create = useCreateLibraryKpi();
 
   // Show the set's name (not its id) in the breadcrumb.
@@ -64,6 +64,7 @@ function SetDetail() {
 
   const [cat, setCat] = useState<string>("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [showManageCats, setShowManageCats] = useState(false);
 
   const categories = categoriesQ.data ?? [];
   const kpis = kpisQ.data ?? [];
@@ -104,6 +105,13 @@ function SetDetail() {
             </Button>
             <Button icon="add" onClick={() => setShowCreate(true)}>
               Add KPI
+            </Button>
+            <Button
+              variant="ghost"
+              icon="category"
+              onClick={() => setShowManageCats(true)}
+            >
+              Manage Categories
             </Button>
           </>
         }
@@ -187,6 +195,14 @@ function SetDetail() {
             },
           )
         }
+      />
+
+      <ManageCategoriesModal
+        open={showManageCats}
+        onClose={() => setShowManageCats(false)}
+        setId={setId}
+        categories={categories}
+        kpiCountFor={(id) => kpis.filter((k) => k.categoryId === id).length}
       />
     </>
   );

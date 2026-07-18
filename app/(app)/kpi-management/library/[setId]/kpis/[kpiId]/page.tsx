@@ -126,7 +126,7 @@ function KpiDetail() {
 
   const kpiQ = useLibraryKpi(kpiId);
   const setQ = useStrategicSet(setId);
-  const categoriesQ = useKpiCategories();
+  const categoriesQ = useKpiCategories(setId);
 
   // Keep the set name (parent crumb) and KPI name in the breadcrumb; relabel the
   // intermediate "kpis" crumb to "KPIs" (the static map reads it as "KPI Management").

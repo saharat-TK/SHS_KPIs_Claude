@@ -64,6 +64,7 @@ export const qk = {
   kpis: ["kpis"] as const,
   kpi: (id: string) => ["kpis", id] as const,
   kpiCategories: ["kpiCategories"] as const,
+  kpiCategoriesFor: (setId?: number) => ["kpiCategories", setId ?? null] as const,
   units: ["units"] as const,
   metrics: ["metrics"] as const,
   metricsByKpi: (id: string) => ["metrics", "byKpi", id] as const,
@@ -110,8 +111,11 @@ export const useKpis = () =>
 export const useKpi = (id: string) =>
   useQuery({ queryKey: qk.kpi(id), queryFn: () => kpisRepo.get(id), enabled: !!id });
 
-export const useKpiCategories = () =>
-  useQuery({ queryKey: qk.kpiCategories, queryFn: kpiCategoriesRepo.list });
+export const useKpiCategories = (setId?: number) =>
+  useQuery({
+    queryKey: qk.kpiCategoriesFor(setId),
+    queryFn: () => kpiCategoriesRepo.list(setId),
+  });
 
 export const useMetrics = () =>
   useQuery({ queryKey: qk.metrics, queryFn: metricsRepo.list });
@@ -248,8 +252,12 @@ export function useDeleteCommitteeMembership() {
 export function useCreateKpiCategory() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { label: string; description?: string; sortOrder?: number }) =>
-      kpiCategoriesRepo.create(input),
+    mutationFn: (input: {
+      setId?: number;
+      label: string;
+      description?: string;
+      sortOrder?: number;
+    }) => kpiCategoriesRepo.create(input),
     meta: { toast: (d) => `Category "${(d as KpiCategoryRecord).label}" added` },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.kpiCategories }),
   });
@@ -320,13 +328,14 @@ export function useDeleteUnit() {
 // Drag-to-reorder: applies the new order to the cache immediately (so the
 // dragged row doesn't snap back while the request is in flight) and rolls
 // back on failure. No toast — the row settling into place is the feedback.
-export function useReorderKpiCategories() {
+export function useReorderKpiCategories(setId?: number) {
   const qc = useQueryClient();
+  const key = qk.kpiCategoriesFor(setId);
   return useMutation({
     mutationFn: (order: string[]) => kpiCategoriesRepo.reorder(order),
     onMutate: async (order: string[]) => {
-      await qc.cancelQueries({ queryKey: qk.kpiCategories });
-      const previous = qc.getQueryData<KpiCategoryRecord[]>(qk.kpiCategories);
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<KpiCategoryRecord[]>(key);
       if (previous) {
         const byId = new Map(previous.map((c) => [c.id, c]));
         const reordered = order
@@ -335,12 +344,12 @@ export function useReorderKpiCategories() {
             return c ? { ...c, sortOrder: i + 1 } : undefined;
           })
           .filter((c): c is KpiCategoryRecord => !!c);
-        qc.setQueryData(qk.kpiCategories, reordered);
+        qc.setQueryData(key, reordered);
       }
       return { previous };
     },
     onError: (_err, _order, context) => {
-      if (context?.previous) qc.setQueryData(qk.kpiCategories, context.previous);
+      if (context?.previous) qc.setQueryData(key, context.previous);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: qk.kpiCategories }),
   });
