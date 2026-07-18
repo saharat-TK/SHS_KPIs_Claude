@@ -1,0 +1,131 @@
+// Migration: add LAYER D — data sources (committee-owned raw data).
+//
+//   node --env-file=.env.local scripts/migrate-data-sources.mjs
+//
+// Idempotent: each CREATE TABLE is guarded by an information_schema check, so
+// re-running is a no-op. Mirrors the DDL in
+// schema/SHS_KPI_Management_schema.sql (LAYER D) — keep the two in sync.
+//
+// DDL auto-commits in MySQL/MariaDB, so this script does not open a transaction;
+// the guards are what make it safe to re-run.
+import mysql from "mysql2/promise";
+
+async function tableExists(conn, table) {
+  const [rows] = await conn.query(
+    `SELECT 1 FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = ?`,
+    [table],
+  );
+  return rows.length > 0;
+}
+
+const TABLES = [
+  [
+    "data_source",
+    `CREATE TABLE data_source (
+       id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+       name          VARCHAR(255) NOT NULL,
+       description   VARCHAR(1000) NULL,
+       committee_id  VARCHAR(30)  NOT NULL,
+       period_grain  ENUM('quarterly','annual') NOT NULL DEFAULT 'quarterly',
+       status        ENUM('active','archived') NOT NULL DEFAULT 'active',
+       created_by    VARCHAR(20)  NULL,
+       created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+       CONSTRAINT fk_ds_committee FOREIGN KEY (committee_id) REFERENCES committees(id) ON DELETE RESTRICT,
+       CONSTRAINT fk_ds_creator   FOREIGN KEY (created_by)   REFERENCES faculty(id)    ON DELETE SET NULL
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ["CREATE INDEX idx_ds_committee ON data_source(committee_id, status)"],
+  ],
+  [
+    "data_source_column",
+    `CREATE TABLE data_source_column (
+       id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+       data_source_id BIGINT UNSIGNED NOT NULL,
+       col_key        VARCHAR(40)  NOT NULL,
+       label          VARCHAR(255) NOT NULL,
+       data_type      ENUM('text','number','date','select','boolean') NOT NULL DEFAULT 'text',
+       unit           VARCHAR(50)  NULL,
+       options        JSON NULL,
+       is_required    TINYINT(1) NOT NULL DEFAULT 0,
+       sort_order     INT NOT NULL DEFAULT 0,
+       created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+       UNIQUE KEY uq_ds_col (data_source_id, col_key),
+       CONSTRAINT fk_dsc_source FOREIGN KEY (data_source_id) REFERENCES data_source(id) ON DELETE CASCADE
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ["CREATE INDEX idx_dsc_sort ON data_source_column(data_source_id, sort_order)"],
+  ],
+  [
+    "data_source_entry",
+    `CREATE TABLE data_source_entry (
+       id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+       data_source_id BIGINT UNSIGNED NOT NULL,
+       year           SMALLINT NOT NULL,
+       quarter        TINYINT UNSIGNED NULL CHECK (quarter IS NULL OR quarter BETWEEN 1 AND 4),
+       values_json    JSON NOT NULL,
+       note           TEXT NULL,
+       recorded_by    VARCHAR(20) NULL,
+       created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+       CONSTRAINT fk_dse_source   FOREIGN KEY (data_source_id) REFERENCES data_source(id) ON DELETE CASCADE,
+       CONSTRAINT fk_dse_recorder FOREIGN KEY (recorded_by)    REFERENCES faculty(id)     ON DELETE SET NULL
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ["CREATE INDEX idx_dse_period ON data_source_entry(data_source_id, year, quarter)"],
+  ],
+  [
+    "data_source_link",
+    `CREATE TABLE data_source_link (
+       id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+       data_source_id    BIGINT UNSIGNED NOT NULL,
+       library_kpi_id    BIGINT UNSIGNED NULL,
+       library_metric_id BIGINT UNSIGNED NULL,
+       column_key        VARCHAR(40) NULL,
+       variable_slot     ENUM('variable1','variable2') NULL,
+       aggregation       ENUM('sum','avg','count','latest') NULL,
+       note              VARCHAR(1000) NULL,
+       target_key        VARCHAR(32) AS (CONCAT(IF(library_kpi_id IS NULL, 'm', 'k'),
+                                                COALESCE(library_kpi_id, library_metric_id))) STORED,
+       created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+       UNIQUE KEY uq_ds_link (data_source_id, target_key),
+       CONSTRAINT chk_dsl_one_target CHECK ((library_kpi_id IS NULL) <> (library_metric_id IS NULL)),
+       CONSTRAINT fk_dsl_source FOREIGN KEY (data_source_id)    REFERENCES data_source(id)    ON DELETE CASCADE,
+       CONSTRAINT fk_dsl_kpi    FOREIGN KEY (library_kpi_id)    REFERENCES library_kpi(id)    ON DELETE CASCADE,
+       CONSTRAINT fk_dsl_metric FOREIGN KEY (library_metric_id) REFERENCES library_metric(id) ON DELETE CASCADE
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    [
+      "CREATE INDEX idx_dsl_kpi    ON data_source_link(library_kpi_id)",
+      "CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id)",
+    ],
+  ],
+];
+
+async function main() {
+  const conn = await mysql.createConnection({
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT ?? 3306),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+  });
+  try {
+    for (const [table, ddl, indexes] of TABLES) {
+      if (await tableExists(conn, table)) {
+        console.log(`${table} already exists — skipping.`);
+        continue;
+      }
+      console.log(`Creating ${table}…`);
+      await conn.query(ddl);
+      for (const idx of indexes) await conn.query(idx);
+    }
+    console.log("Migration complete.");
+  } catch (err) {
+    console.error("Migration failed:", err);
+    process.exitCode = 1;
+  } finally {
+    await conn.end();
+  }
+}
+
+main();

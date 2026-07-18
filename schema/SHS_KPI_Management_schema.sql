@@ -408,6 +408,121 @@ CREATE TABLE perf_kpi_approval_event (
 
 CREATE INDEX idx_pkae_appr ON perf_kpi_approval_event(approval_id, created_at);
 
+-- ##############   LAYER D — DATA SOURCES (committee raw data)   ###############
+--
+--  A data source is a committee-owned, schema-defined table of RAW data — the
+--  evidence behind a KPI number. The admin defines the source and its columns;
+--  members of the owning committee record rows against those columns.
+--
+--  Decisions locked with the product owner (2026-07-18):
+--    D1. Columns are per-source and user-defined (data_source_column); row values
+--        are stored as a JSON object keyed by data_source_column.col_key. This
+--        avoids a table-per-source or a wide EAV join for what is low-volume,
+--        display-oriented data.
+--    D2. Rows carry calendar year + optional quarter and are INDEPENDENT of any
+--        performance_record, so raw data survives across 5-year cycles.
+--    D3. Linking is EVIDENCE ONLY in phase 1: data_source_link records that a
+--        source justifies a KPI/metric; it does NOT feed values. The nullable
+--        column_key / variable_slot / aggregation columns are the phase-2 hook
+--        for auto-feeding perf_kpi variables, and stay NULL for now.
+--    D4. A link targets EXACTLY ONE of library_kpi / library_metric. Enforced by
+--        the CHECK below plus the generated `target_key` used for uniqueness
+--        (a plain UNIQUE over nullable columns would not catch duplicates,
+--        because MySQL treats NULLs as distinct in unique indexes).
+--
+--  Note: library_kpi.data_source_url (a free-text link) predates this layer and
+--  remains as an informal pointer; data_source is the structured replacement.
+
+-- ── data_source ──────────────────────────────────────────────────────────────
+-- One row per committee-owned raw-data table.
+CREATE TABLE data_source (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name          VARCHAR(255) NOT NULL,
+  description   VARCHAR(1000) NULL,
+  committee_id  VARCHAR(30)  NOT NULL,                 -- FK -> committees.id (owning committee)
+  period_grain  ENUM('quarterly','annual') NOT NULL DEFAULT 'quarterly',
+                                                       -- quarterly: entries carry year + quarter 1..4
+                                                       -- annual:    entries carry year, quarter IS NULL
+  status        ENUM('active','archived') NOT NULL DEFAULT 'active',
+  created_by    VARCHAR(20)  NULL,                     -- FK -> faculty.id
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_ds_committee FOREIGN KEY (committee_id) REFERENCES committees(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_ds_creator   FOREIGN KEY (created_by)   REFERENCES faculty(id)    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_ds_committee ON data_source(committee_id, status);
+
+-- ── data_source_column ───────────────────────────────────────────────────────
+-- The user-defined schema of one data source. col_key is the stable slug used
+-- as the key inside data_source_entry.values_json; label is what the UI shows.
+CREATE TABLE data_source_column (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  data_source_id BIGINT UNSIGNED NOT NULL,
+  col_key        VARCHAR(40)  NOT NULL,                -- slug, e.g. "student_count"
+  label          VARCHAR(255) NOT NULL,
+  data_type      ENUM('text','number','date','select','boolean') NOT NULL DEFAULT 'text',
+  unit           VARCHAR(50)  NULL,                    -- free text, same convention as library_kpi.unit
+  options        JSON NULL,                            -- string[] of allowed values; only for data_type='select'
+  is_required    TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order     INT NOT NULL DEFAULT 0,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_ds_col (data_source_id, col_key),
+  CONSTRAINT fk_dsc_source FOREIGN KEY (data_source_id) REFERENCES data_source(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_dsc_sort ON data_source_column(data_source_id, sort_order);
+
+-- ── data_source_entry ────────────────────────────────────────────────────────
+-- One recorded row of raw data. values_json is an object keyed by col_key;
+-- the API validates it against data_source_column before writing (decision D1).
+-- ("values" is a reserved word in MySQL, hence values_json.)
+CREATE TABLE data_source_entry (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  data_source_id BIGINT UNSIGNED NOT NULL,
+  year           SMALLINT NOT NULL,                    -- Buddhist-era calendar year, e.g. 2568
+  quarter        TINYINT UNSIGNED NULL CHECK (quarter IS NULL OR quarter BETWEEN 1 AND 4),
+                                                       -- NULL iff the source's period_grain = 'annual'
+  values_json    JSON NOT NULL,
+  note           TEXT NULL,
+  recorded_by    VARCHAR(20) NULL,                     -- FK -> faculty.id
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_dse_source   FOREIGN KEY (data_source_id) REFERENCES data_source(id) ON DELETE CASCADE,
+  CONSTRAINT fk_dse_recorder FOREIGN KEY (recorded_by)    REFERENCES faculty(id)     ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_dse_period ON data_source_entry(data_source_id, year, quarter);
+
+-- ── data_source_link ─────────────────────────────────────────────────────────
+-- Traceability edge: "this data source is the evidence for that KPI / metric".
+-- Exactly one of library_kpi_id / library_metric_id is set (decision D4).
+CREATE TABLE data_source_link (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  data_source_id    BIGINT UNSIGNED NOT NULL,
+  library_kpi_id    BIGINT UNSIGNED NULL,
+  library_metric_id BIGINT UNSIGNED NULL,
+  -- Phase-2 auto-feed hook (decision D3): unused and NULL in phase 1.
+  column_key        VARCHAR(40) NULL,                  -- which column supplies the value
+  variable_slot     ENUM('variable1','variable2') NULL,-- which KPI variable it feeds
+  aggregation       ENUM('sum','avg','count','latest') NULL,
+  note              VARCHAR(1000) NULL,
+  -- Stable non-null discriminator so uniqueness actually holds (decision D4).
+  target_key        VARCHAR(32) AS (CONCAT(IF(library_kpi_id IS NULL, 'm', 'k'),
+                                           COALESCE(library_kpi_id, library_metric_id))) STORED,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_ds_link (data_source_id, target_key),
+  CONSTRAINT chk_dsl_one_target CHECK ((library_kpi_id IS NULL) <> (library_metric_id IS NULL)),
+  CONSTRAINT fk_dsl_source FOREIGN KEY (data_source_id)    REFERENCES data_source(id)    ON DELETE CASCADE,
+  CONSTRAINT fk_dsl_kpi    FOREIGN KEY (library_kpi_id)    REFERENCES library_kpi(id)    ON DELETE CASCADE,
+  CONSTRAINT fk_dsl_metric FOREIGN KEY (library_metric_id) REFERENCES library_metric(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_dsl_kpi    ON data_source_link(library_kpi_id);
+CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id);
+
 -- =============================================================================
 --  NOTES / rules enforced in the application layer (not by DDL)
 --  Existing database migration for target inheritance mode:
@@ -440,4 +555,15 @@ CREATE INDEX idx_pkae_appr ON perf_kpi_approval_event(approval_id, created_at);
 --  * Transition legality is enforced in lib/kpi/approvalWorkflow.ts (state machine
 --    + position->stage mapping); the POST /api/perf-kpis/:id/approval route is the
 --    single writer of perf_kpi_approval / perf_kpi_approval_event.
+--  * Data sources (LAYER D): existing databases are upgraded by
+--      node --env-file=.env.local scripts/migrate-data-sources.mjs
+--    (idempotent; creates data_source, data_source_column, data_source_entry,
+--    data_source_link).
+--  * data_source_entry.values_json is validated in the application layer against
+--    that source's data_source_column rows (lib/kpi/dataSources.ts): unknown keys
+--    rejected, required columns present, number/date/select values coercible.
+--    No DDL can express this — the column set is per-row data, not schema.
+--  * data_source_entry.quarter must be NULL when the source's period_grain is
+--    'annual' and 1..4 when it is 'quarterly'. The CHECK only bounds the range;
+--    the NULL-vs-not rule is app-enforced because it depends on the parent row.
 -- =============================================================================

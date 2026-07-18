@@ -488,3 +488,82 @@ export interface ApprovalEvent {
   comment: string | null;
   createdAt: string;
 }
+
+// ── Data sources (LAYER D) ──────────────────────────────────────────────────
+// Mirrors schema/SHS_KPI_Management_schema.sql data_source[_column|_entry|_link].
+// Committee-owned raw data; linked to library KPIs/metrics as evidence.
+
+export type DataSourcePeriodGrain = "quarterly" | "annual";
+export type DataSourceStatus = "active" | "archived";
+export type DataSourceColumnType =
+  | "text"
+  | "number"
+  | "date"
+  | "select"
+  | "boolean";
+
+/** A cell value as stored in data_source_entry.values_json. */
+export type DataSourceCellValue = string | number | boolean | null;
+
+export interface DataSource {
+  id: number;
+  name: string;
+  description: string | null;
+  committeeId: string;
+  periodGrain: DataSourcePeriodGrain;
+  status: DataSourceStatus;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Joined/derived on the list endpoint:
+  committeeName?: string;
+  columnCount?: number;
+  entryCount?: number;
+  linkCount?: number;
+}
+
+export interface DataSourceColumn {
+  id: number;
+  dataSourceId: number;
+  colKey: string;
+  label: string;
+  dataType: DataSourceColumnType;
+  unit: string | null;
+  /** Allowed values; only meaningful when dataType is "select". */
+  options: string[] | null;
+  isRequired: boolean;
+  sortOrder: number;
+}
+
+/** One recorded row. `quarter` is null when the source's grain is "annual". */
+export interface DataSourceEntry {
+  id: number;
+  dataSourceId: number;
+  year: number;
+  quarter: number | null;
+  values: Record<string, DataSourceCellValue>;
+  note: string | null;
+  recordedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  recordedByName?: string;
+}
+
+/** Evidence edge from a data source to a library KPI or metric. Exactly one of
+ *  libraryKpiId / libraryMetricId is set. The columnKey / variableSlot /
+ *  aggregation fields are the phase-2 auto-feed hook and are null for now. */
+export interface DataSourceLink {
+  id: number;
+  dataSourceId: number;
+  libraryKpiId: number | null;
+  libraryMetricId: number | null;
+  columnKey: string | null;
+  variableSlot: "variable1" | "variable2" | null;
+  aggregation: "sum" | "avg" | "count" | "latest" | null;
+  note: string | null;
+  // Joined for display:
+  kpiName?: string;
+  metricName?: string;
+  setName?: string;
+  dataSourceName?: string;
+}
