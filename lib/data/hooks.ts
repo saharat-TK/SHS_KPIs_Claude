@@ -19,6 +19,7 @@ import type {
 import type {
   AnnualTarget,
   DataSource,
+  DataSourceLinkMapping,
   DataSourceStatus,
   LibraryKpi,
   LibraryMetric,
@@ -37,6 +38,7 @@ import {
   dataSourcesRepo,
   type DataSourceColumnInput,
   type DataSourceEntryInput,
+  type DataSourceLinkInput,
   facultyRepo,
   facultyRecordsRepo,
   formulasRepo,
@@ -990,16 +992,30 @@ export function useDeleteDataSourceEntry() {
 export function useCreateDataSourceLink() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      input,
-    }: {
-      id: number;
-      input: { libraryKpiId?: number; libraryMetricId?: number; note?: string };
-    }) => dataSourcesRepo.createLink(id, input),
+    mutationFn: ({ id, input }: { id: number; input: DataSourceLinkInput }) =>
+      dataSourcesRepo.createLink(id, input),
     meta: { toast: "Linked" },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: qk.dataSourceLinks(id) });
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
+    },
+  });
+}
+
+export function useUpdateDataSourceLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      linkId,
+      patch,
+    }: {
+      dataSourceId: number;
+      linkId: number;
+      patch: { mappings?: DataSourceLinkMapping[]; note?: string | null };
+    }) => dataSourcesRepo.updateLink(linkId, patch),
+    meta: { toast: "Link updated" },
+    onSuccess: (_d, { dataSourceId }) => {
+      qc.invalidateQueries({ queryKey: qk.dataSourceLinks(dataSourceId) });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
     },
   });

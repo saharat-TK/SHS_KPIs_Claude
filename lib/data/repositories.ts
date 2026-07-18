@@ -7,6 +7,7 @@ import type {
   DataSourceColumnType,
   DataSourceEntry,
   DataSourceLink,
+  DataSourceLinkMapping,
   DataSourcePeriodGrain,
   DataSourceStatus,
   FacultyMember,
@@ -800,10 +801,7 @@ export const dataSourcesRepo = {
 
   links: async (id: number): Promise<DataSourceLink[]> =>
     jsonOrThrow(await fetch(`/api/data-sources/${id}/links`), "Failed to load links"),
-  createLink: async (
-    id: number,
-    input: { libraryKpiId?: number; libraryMetricId?: number; note?: string },
-  ): Promise<DataSourceLink> =>
+  createLink: async (id: number, input: DataSourceLinkInput): Promise<DataSourceLink> =>
     jsonOrThrow(
       await fetch(`/api/data-sources/${id}/links`, {
         method: "POST",
@@ -811,6 +809,18 @@ export const dataSourcesRepo = {
         body: JSON.stringify(input),
       }),
       "Failed to link data source",
+    ),
+  updateLink: async (
+    linkId: number,
+    patch: { mappings?: DataSourceLinkMapping[]; note?: string | null },
+  ): Promise<DataSourceLink> =>
+    jsonOrThrow(
+      await fetch(`/api/data-source-links/${linkId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update link",
     ),
   removeLink: async (linkId: number): Promise<{ id: number }> =>
     jsonOrThrow(
@@ -828,6 +838,15 @@ export interface DataSourceColumnInput {
   unit?: string | null;
   options?: string[] | null;
   isRequired?: boolean;
+}
+
+/** One shared shape for creating a link, so the route body, the repo and the
+ *  hook cannot drift apart. */
+export interface DataSourceLinkInput {
+  libraryKpiId?: number;
+  libraryMetricId?: number;
+  mappings?: DataSourceLinkMapping[];
+  note?: string;
 }
 
 export interface DataSourceEntryInput {

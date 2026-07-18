@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
-import { LINK_FROM, LINK_SELECT, errorResponse } from "@/lib/kpi/dataSourcesServer";
+import {
+  LINK_FROM,
+  LINK_SELECT,
+  errorResponse,
+  mapLinkRow,
+  validateLinkMappings,
+} from "@/lib/kpi/dataSourcesServer";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +22,15 @@ export async function GET(
         ORDER BY s.start_year DESC, k.sort_order, m.sort_order, l.id`,
       [params.id],
     );
-    return NextResponse.json(rows);
+    return NextResponse.json(rows.map(mapLinkRow));
   } catch (err) {
     return errorResponse(err, "Failed to load links");
   }
 }
 
-/** Link a data source to exactly one library KPI or metric (evidence only —
- *  see decision D3 in the schema; this does not feed any value). */
+/** Link a data source to exactly one library KPI or metric. `mappings` says which
+ *  rows produce the target's value (decision D3); an empty list keeps the link as
+ *  evidence only. */
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -40,17 +47,27 @@ export async function POST(
       );
     }
 
+    // Authoritative regardless of what the UI offered.
+    const mappings = await validateLinkMappings(pool, params.id, b.mappings);
+
     const [ins] = await pool.query<ResultSetHeader>(
-      `INSERT INTO data_source_link (data_source_id, library_kpi_id, library_metric_id, note)
-       VALUES (?, ?, ?, ?)`,
-      [params.id, libraryKpiId, libraryMetricId, b.note?.trim() || null],
+      `INSERT INTO data_source_link
+         (data_source_id, library_kpi_id, library_metric_id, mappings, note)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        params.id,
+        libraryKpiId,
+        libraryMetricId,
+        mappings.length > 0 ? JSON.stringify(mappings) : null,
+        b.note?.trim() || null,
+      ],
     );
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${LINK_SELECT} ${LINK_FROM} WHERE l.id = ?`,
       [ins.insertId],
     );
-    return NextResponse.json(rows[0], { status: 201 });
+    return NextResponse.json(mapLinkRow(rows[0]), { status: 201 });
   } catch (err) {
     // uq_ds_link (data_source_id, target_key) — the same target twice.
     if (err instanceof Error && "code" in err && err.code === "ER_DUP_ENTRY") {

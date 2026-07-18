@@ -2,8 +2,15 @@
 // component — it pulls in the MySQL pool.
 import { NextResponse } from "next/server";
 import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
-import type { DataSourceColumn, DataSourceEntry, Role } from "@/lib/types";
+import type {
+  DataSourceColumn,
+  DataSourceEntry,
+  DataSourceLink,
+  DataSourceLinkMapping,
+  Role,
+} from "@/lib/types";
 import { DataSourceValidationError } from "@/lib/kpi/dataSources";
+import { validateMappings } from "@/lib/kpi/dataSourceFilters";
 import { PROGRAM_CODES } from "@/lib/kpi/programs";
 
 type Db = Pool | PoolConnection;
@@ -96,8 +103,7 @@ export function mapEntryRow(row: RowDataPacket): DataSourceEntry {
 export const LINK_SELECT = `
   l.id, l.data_source_id AS dataSourceId,
   l.library_kpi_id AS libraryKpiId, l.library_metric_id AS libraryMetricId,
-  l.column_key AS columnKey, l.variable_slot AS variableSlot,
-  l.aggregation, l.note,
+  l.mappings, l.note,
   k.name AS kpiName, m.name AS metricName, s.name AS setName,
   d.name AS dataSourceName
 `;
@@ -110,6 +116,41 @@ export const LINK_FROM = `
   LEFT JOIN library_kpi    k ON k.id = COALESCE(l.library_kpi_id, m.kpi_id)
   LEFT JOIN strategic_set  s ON s.id = k.set_id
 `;
+
+export function mapLinkRow(row: RowDataPacket): DataSourceLink {
+  return {
+    id: Number(row.id),
+    dataSourceId: Number(row.dataSourceId),
+    libraryKpiId: row.libraryKpiId == null ? null : Number(row.libraryKpiId),
+    libraryMetricId: row.libraryMetricId == null ? null : Number(row.libraryMetricId),
+    mappings: parseJsonColumn<DataSourceLinkMapping[]>(row.mappings, []),
+    note: row.note ?? null,
+    kpiName: row.kpiName ?? undefined,
+    metricName: row.metricName ?? undefined,
+    setName: row.setName ?? undefined,
+    dataSourceName: row.dataSourceName ?? undefined,
+  };
+}
+
+/** Validate a link's mappings against the source's own columns and grain.
+ *  Rethrows as DataSourceValidationError so errorResponse answers 400. */
+export async function validateLinkMappings(
+  db: Db,
+  dataSourceId: number | string,
+  raw: unknown,
+): Promise<DataSourceLinkMapping[]> {
+  const source = await loadSourceShape(db, dataSourceId);
+  if (!source) throw new DataSourceValidationError("Data source not found");
+
+  const columns = await resolveColumnOptions(db, source.columns);
+  try {
+    return validateMappings(columns, source.periodGrain, raw);
+  } catch (err) {
+    throw new DataSourceValidationError(
+      err instanceof Error ? err.message : "Invalid filter",
+    );
+  }
+}
 
 /** Fill in `options` for derived-option columns so validateEntryValues can check them
  *  the same way it checks a `select`. Faculty ids come from the live roster (active

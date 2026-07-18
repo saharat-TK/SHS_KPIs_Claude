@@ -27,6 +27,7 @@ import {
   useFacultyRecords,
 } from "@/lib/data/hooks";
 import { formatCellValue, formatEntryPeriod } from "@/lib/kpi/dataSources";
+import { describeMapping } from "@/lib/kpi/dataSourceFilters";
 import { buildCellLabels } from "@/lib/kpi/programs";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { Icon } from "@/components/ui/Icon";
@@ -56,6 +57,7 @@ function DataSourceDetail({ id }: { id: number }) {
   const [showColumns, setShowColumns] = useState(false);
   const [showLink, setShowLink] = useState(false);
   const [editing, setEditing] = useState<DataSourceEntry | null>(null);
+  const [editingLink, setEditingLink] = useState<DataSourceLink | null>(null);
   const [adding, setAdding] = useState(false);
 
   const source = sourceQ.data;
@@ -263,7 +265,14 @@ function DataSourceDetail({ id }: { id: number }) {
                     }
                   />
                 ) : (
-                  <LinksTable dataSourceId={id} links={links} isAdmin={isAdmin} />
+                  <LinksTable
+                    dataSourceId={id}
+                    links={links}
+                    columns={columns}
+                    cellLabels={cellLabels}
+                    isAdmin={isAdmin}
+                    onEdit={setEditingLink}
+                  />
                 )}
               </QueryBoundary>
             </Card>
@@ -277,9 +286,13 @@ function DataSourceDetail({ id }: { id: number }) {
           />
 
           <LinkKpiModal
-            open={showLink}
-            onClose={() => setShowLink(false)}
+            open={showLink || !!editingLink}
+            onClose={() => {
+              setShowLink(false);
+              setEditingLink(null);
+            }}
             dataSourceId={id}
+            link={editingLink}
           />
 
           {(adding || editing) && (
@@ -394,57 +407,94 @@ function EntriesTable({
 function LinksTable({
   dataSourceId,
   links,
+  columns,
+  cellLabels,
   isAdmin,
+  onEdit,
 }: {
   dataSourceId: number;
   links: DataSourceLink[];
+  columns: DataSourceColumn[];
+  cellLabels: Record<string, string>;
   isAdmin: boolean;
+  onEdit: (link: DataSourceLink) => void;
 }) {
   const confirm = useConfirm();
   const remove = useDeleteDataSourceLink();
 
   return (
-    <Table>
-      <thead>
-        <tr>
-          <Th>Strategic Set</Th>
-          <Th>KPI</Th>
-          <Th>Metric</Th>
-          <Th>Note</Th>
-          {isAdmin && <Th align="right">Actions</Th>}
-        </tr>
-      </thead>
-      <tbody>
-        {links.map((l) => (
-          <tr key={l.id} className="border-t border-hairline">
-            <Td className="text-mute">{l.setName ?? "—"}</Td>
-            <Td className="font-medium">{l.kpiName ?? "—"}</Td>
-            <Td>{l.metricName ?? "—"}</Td>
-            <Td className="text-mute">{l.note ?? "—"}</Td>
-            {isAdmin && (
-              <Td align="right">
-                <button
-                  type="button"
-                  aria-label="Remove link"
-                  title="Remove link"
-                  onClick={async () => {
-                    const ok = await confirm({
-                      title: "Remove this link?",
-                      message: "The raw data stays; only the link to the KPI is removed.",
-                      tone: "danger",
-                      confirmLabel: "Remove",
-                    });
-                    if (ok) remove.mutate({ dataSourceId, linkId: l.id });
-                  }}
-                  className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
-                >
-                  <Icon name="link_off" className="text-[18px]" />
-                </button>
-              </Td>
-            )}
+    <div className="overflow-x-auto">
+      <Table>
+        <thead>
+          <tr>
+            <Th>Strategic Set</Th>
+            <Th>KPI</Th>
+            <Th>Metric</Th>
+            <Th>Feeds</Th>
+            <Th>Note</Th>
+            {isAdmin && <Th align="right">Actions</Th>}
           </tr>
-        ))}
-      </tbody>
-    </Table>
+        </thead>
+        <tbody>
+          {links.map((l) => (
+            <tr key={l.id} className="border-t border-hairline">
+              <Td className="text-mute">{l.setName ?? "—"}</Td>
+              <Td className="font-medium">{l.kpiName ?? "—"}</Td>
+              <Td>{l.metricName ?? "—"}</Td>
+              <Td>
+                {l.mappings.length === 0 ? (
+                  <span className="text-caption-sm text-mute">evidence only</span>
+                ) : (
+                  <div className="flex flex-col gap-xxs">
+                    {l.mappings.map((m, i) => (
+                      <span key={i} className="text-caption-sm">
+                        {m.slot !== "value" && (
+                          <Badge tone="neutral">{m.slot}</Badge>
+                        )}{" "}
+                        {describeMapping(m, columns, cellLabels)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </Td>
+              <Td className="text-mute">{l.note ?? "—"}</Td>
+              {isAdmin && (
+                <Td align="right">
+                  <div className="inline-flex items-center gap-xxs">
+                    <button
+                      type="button"
+                      aria-label="Edit link"
+                      title="Edit link"
+                      onClick={() => onEdit(l)}
+                      className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
+                    >
+                      <Icon name="edit" className="text-[18px]" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Remove link"
+                      title="Remove link"
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Remove this link?",
+                          message:
+                            "The raw data stays; only the link to the KPI is removed. Values it already fed keep their last computed number.",
+                          tone: "danger",
+                          confirmLabel: "Remove",
+                        });
+                        if (ok) remove.mutate({ dataSourceId, linkId: l.id });
+                      }}
+                      className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
+                    >
+                      <Icon name="link_off" className="text-[18px]" />
+                    </button>
+                  </div>
+                </Td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </div>
   );
 }
