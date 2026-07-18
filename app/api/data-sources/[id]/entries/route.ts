@@ -12,6 +12,7 @@ import {
   resolveColumnOptions,
 } from "@/lib/kpi/dataSourcesServer";
 import { normalizeEntryPeriod, validateEntryValues } from "@/lib/kpi/dataSources";
+import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -80,23 +81,38 @@ export async function POST(
     const columns = await resolveColumnOptions(pool, source.columns);
     const values = validateEntryValues(columns, b.values ?? {});
 
-    const [ins] = await pool.query<ResultSetHeader>(
-      `INSERT INTO data_source_entry
-         (data_source_id, year, quarter, values_json, note, recorded_by)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        params.id,
-        year,
-        quarter,
-        JSON.stringify(values),
-        b.note?.trim() || null,
-        b.actorId ?? null,
-      ],
-    );
+    // Write and re-feed in one transaction: a feed failure must not leave the
+    // entry saved but the KPIs it feeds stale.
+    const conn = await pool.getConnection();
+    let insertId: number;
+    try {
+      await conn.beginTransaction();
+      const [ins] = await conn.query<ResultSetHeader>(
+        `INSERT INTO data_source_entry
+           (data_source_id, year, quarter, values_json, note, recorded_by)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          params.id,
+          year,
+          quarter,
+          JSON.stringify(values),
+          b.note?.trim() || null,
+          b.actorId ?? null,
+        ],
+      );
+      insertId = ins.insertId;
+      await feedFromDataSource(conn, Number(params.id));
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${ENTRY_SELECT} ${ENTRY_FROM} WHERE e.id = ?`,
-      [ins.insertId],
+      [insertId],
     );
     return NextResponse.json(mapEntryRow(rows[0]), { status: 201 });
   } catch (err) {

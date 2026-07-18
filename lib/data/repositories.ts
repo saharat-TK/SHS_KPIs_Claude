@@ -565,6 +565,15 @@ export const performanceRecordsRepo = {
       await fetch(`/api/performance-records/${id}/sync`, { method: "POST" }),
       "Failed to sync performance record",
     ),
+  recomputeFromSources: async (
+    id: number,
+  ): Promise<{ updated: number; skipped: unknown[]; summary: string }> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}/recompute-from-sources`, {
+        method: "POST",
+      }),
+      "Failed to recompute from data sources",
+    ),
   periods: async (id: number): Promise<PerformancePeriod[]> =>
     jsonOrThrow(
       await fetch(`/api/performance-records/${id}/periods`),

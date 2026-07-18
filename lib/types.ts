@@ -402,6 +402,8 @@ export interface PerfKpi extends Omit<LibraryKpi, "id" | "setId" | "annualTarget
   annualTargets?: AnnualTarget[];
   progress?: QuarterProgress[];
   startYear?: number; // from the parent performance_record (detail view)
+  /** Set when a data source computes this KPI's value (derived, not stored). */
+  fedBy?: { dataSourceId: number; dataSourceName: string } | null;
 }
 
 export interface PerfMetric extends Omit<LibraryMetric, "id" | "kpiId" | "annualTargets" | "targetMode"> {

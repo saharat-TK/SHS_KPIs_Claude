@@ -679,6 +679,20 @@ export function useSyncPerformanceRecord() {
   });
 }
 
+export function useRecomputeFromDataSources() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => performanceRecordsRepo.recomputeFromSources(id),
+    // The outcome is the message — it says what was skipped and why.
+    meta: { toast: (d) => (d as { summary: string }).summary },
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: qk.perfKpis(id) });
+      qc.invalidateQueries({ queryKey: ["perfKpi"] });
+      qc.invalidateQueries({ queryKey: ["perfMetrics"] });
+    },
+  });
+}
+
 export function useDeletePerformanceRecord() {
   const qc = useQueryClient();
   return useMutation({

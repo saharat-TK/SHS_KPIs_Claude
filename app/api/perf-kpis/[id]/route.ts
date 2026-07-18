@@ -32,7 +32,25 @@ export async function GET(
        FROM perf_kpi_quarter_progress WHERE perf_kpi_id = ? ORDER BY year_no, quarter_no`,
       [params.id],
     );
-    return NextResponse.json({ ...rows[0], annualTargets: targets, progress });
+    // Provenance is derived, not stored: a KPI is "fed" when a data source is
+    // linked to the library KPI it was snapshotted from, with a mapping on it.
+    const [fed] = await pool.query<RowDataPacket[]>(
+      `SELECT d.id AS dataSourceId, d.name AS dataSourceName
+         FROM data_source_link l
+         JOIN data_source d ON d.id = l.data_source_id
+        WHERE l.library_kpi_id = ? AND l.mappings IS NOT NULL
+        LIMIT 1`,
+      [rows[0].sourceKpiId],
+    );
+
+    return NextResponse.json({
+      ...rows[0],
+      annualTargets: targets,
+      progress,
+      fedBy: fed[0]
+        ? { dataSourceId: Number(fed[0].dataSourceId), dataSourceName: fed[0].dataSourceName }
+        : null,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load performance KPI" },

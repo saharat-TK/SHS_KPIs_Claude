@@ -12,6 +12,7 @@ import {
   resolveColumnOptions,
 } from "@/lib/kpi/dataSourcesServer";
 import { normalizeEntryPeriod, validateEntryValues } from "@/lib/kpi/dataSources";
+import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -67,10 +68,21 @@ export async function PATCH(
     }
     values.push(params.id);
 
-    await pool.query<ResultSetHeader>(
-      `UPDATE data_source_entry SET ${setClauses.join(", ")} WHERE id = ?`,
-      values,
-    );
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query<ResultSetHeader>(
+        `UPDATE data_source_entry SET ${setClauses.join(", ")} WHERE id = ?`,
+        values,
+      );
+      await feedFromDataSource(conn, source.id);
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${ENTRY_SELECT} ${ENTRY_FROM} WHERE e.id = ?`,
@@ -100,12 +112,25 @@ export async function DELETE(
     const denied = await checkEntryWriteAccess(pool, source, actorId, userRole);
     if (denied) return NextResponse.json({ error: denied }, { status: 403 });
 
-    const [result] = await pool.query<ResultSetHeader>(
-      "DELETE FROM data_source_entry WHERE id = ?",
-      [params.id],
-    );
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [result] = await conn.query<ResultSetHeader>(
+        "DELETE FROM data_source_entry WHERE id = ?",
+        [params.id],
+      );
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+      }
+      // Removing a row changes what the KPIs it fed should say.
+      await feedFromDataSource(conn, source.id);
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
     }
     return NextResponse.json({ id: Number(params.id) });
   } catch (err) {
