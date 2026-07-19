@@ -7,6 +7,7 @@ import type {
 
 export const DATA_SOURCE_COLUMN_TYPES: DataSourceColumnType[] = [
   "text",
+  "url",
   "number",
   "date",
   "select",
@@ -17,6 +18,7 @@ export const DATA_SOURCE_COLUMN_TYPES: DataSourceColumnType[] = [
 
 export const COLUMN_TYPE_LABELS: Record<DataSourceColumnType, string> = {
   text: "Text",
+  url: "URL",
   number: "Number",
   date: "Date",
   select: "Choice",
@@ -50,6 +52,18 @@ export type ColumnSpec = Pick<
 
 const COL_KEY_RE = /^[a-z][a-z0-9_]*$/;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Only web URLs may be opened from the data table. Keeping this check shared
+ * between the write path and renderer prevents unsafe protocols from reaching
+ * an anchor tag. */
+export function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 /** Thrown for user-fixable input problems, so route handlers can answer 400
  *  (and surface the message) rather than mistaking a DB failure for bad input. */
@@ -112,6 +126,13 @@ export function coerceCellValue(
       const s = String(raw);
       if (!ISO_DATE_RE.test(s) || Number.isNaN(Date.parse(s))) {
         throw invalid(`"${column.label}" must be a date (YYYY-MM-DD)`);
+      }
+      return s;
+    }
+    case "url": {
+      const s = String(raw).trim();
+      if (!isHttpUrl(s)) {
+        throw invalid(`"${column.label}" must be a valid HTTP or HTTPS URL`);
       }
       return s;
     }

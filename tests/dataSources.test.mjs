@@ -70,6 +70,15 @@ test("coerceCellValue requires ISO dates", () => {
   assert.throws(() => coerceCellValue(c, "2026-13-40"), /YYYY-MM-DD/);
 });
 
+test("coerceCellValue accepts HTTP(S) URLs and rejects unsafe or malformed URLs", () => {
+  const c = col({ dataType: "url", label: "Evidence" });
+  assert.equal(coerceCellValue(c, "https://example.com/report?q=1"), "https://example.com/report?q=1");
+  assert.equal(coerceCellValue(c, " http://example.com "), "http://example.com");
+  assert.throws(() => coerceCellValue(c, "ftp://example.com"), /valid HTTP or HTTPS URL/);
+  assert.throws(() => coerceCellValue(c, "javascript:alert(1)"), /valid HTTP or HTTPS URL/);
+  assert.throws(() => coerceCellValue(c, "not a URL"), /valid HTTP or HTTPS URL/);
+});
+
 test("coerceCellValue constrains select columns to their options", () => {
   const c = col({ dataType: "select", label: "Program", options: ["BSc", "MSc"] });
   assert.equal(coerceCellValue(c, "MSc"), "MSc");

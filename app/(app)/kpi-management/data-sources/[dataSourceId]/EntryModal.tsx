@@ -229,6 +229,16 @@ function CellInput({
       return (
         <Input type="date" value={value} onChange={(e) => onChange(e.target.value)} />
       );
+    case "url":
+      return (
+        <Input
+          type="url"
+          inputMode="url"
+          placeholder="https://example.com"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
     case "number":
       return (
         <Input

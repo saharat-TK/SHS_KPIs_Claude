@@ -3,10 +3,20 @@
 import { cn } from "@/lib/utils";
 import { Icon } from "./Icon";
 
-export function Table({ children }: { children: React.ReactNode }) {
+export function Table({
+  children,
+  className,
+  style,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <div className="overflow-x-auto scroll-thin">
-      <table className="w-full border-collapse text-body-sm">{children}</table>
+      <table className={cn("w-full border-collapse text-body-sm", className)} style={style}>
+        {children}
+      </table>
     </div>
   );
 }
