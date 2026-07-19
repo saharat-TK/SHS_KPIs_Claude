@@ -8,6 +8,11 @@ import {
   mapLinkRow,
   validateLinkMappings,
 } from "@/lib/kpi/dataSourcesServer";
+import {
+  describeOutcome,
+  feedFromDataSource,
+  type FeedOutcome,
+} from "@/lib/kpi/dataSourceFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -49,16 +54,31 @@ export async function PATCH(
     }
     values.push(params.id);
 
-    await pool.query<ResultSetHeader>(
-      `UPDATE data_source_link SET ${setClauses.join(", ")} WHERE id = ?`,
-      values,
-    );
+    // Re-feed in the same transaction. Without this the target keeps the value
+    // computed under the OLD filter, so the number on screen would contradict
+    // the filter shown beside it.
+    const conn = await pool.getConnection();
+    let outcome: FeedOutcome;
+    try {
+      await conn.beginTransaction();
+      await conn.query<ResultSetHeader>(
+        `UPDATE data_source_link SET ${setClauses.join(", ")} WHERE id = ?`,
+        values,
+      );
+      outcome = await feedFromDataSource(conn, Number(existing[0].dataSourceId));
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${LINK_SELECT} ${LINK_FROM} WHERE l.id = ?`,
       [params.id],
     );
-    return NextResponse.json(mapLinkRow(rows[0]));
+    return NextResponse.json({ ...mapLinkRow(rows[0]), feed: describeOutcome(outcome) });
   } catch (err) {
     return errorResponse(err, "Failed to update link");
   }

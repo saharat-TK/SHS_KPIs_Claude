@@ -66,22 +66,32 @@ export const AGGREGATION_LABELS: Record<AggregationKind, string> = {
 
 export const OPERATOR_LABELS: Record<FilterOperator, string> = {
   eq: "is",
+  in: "is any of",
   gte: "is at least",
   lte: "is at most",
   between: "is between",
 };
 
+/** Operators that take a list of values rather than a single one. */
+export const isMultiValueOperator = (op: FilterOperator) => op === "in";
+
 /** "count" needs no column to aggregate; everything else does. */
 export const aggregationNeedsColumn = (kind: AggregationKind) => kind !== "count";
 
-/** Operators offered for a column type. Deliberately minimal — a date is always
- *  a range, and choice-like columns only ever make sense as equality. */
+/** Operators offered for a column type. Deliberately minimal: a date is always a
+ *  range, numbers get comparisons, and only choice-like columns get "is any of"
+ *  — free text would invite an exact-match OR where people expect "contains",
+ *  and a boolean's two values make a list pointless. */
 export function operatorsFor(dataType: DataSourceColumnType): FilterOperator[] {
   switch (dataType) {
     case "number":
       return ["eq", "gte", "lte", "between"];
     case "date":
       return ["between"];
+    case "select":
+    case "faculty":
+    case "program":
+      return ["eq", "in"];
     default:
       return ["eq"];
   }
@@ -169,6 +179,14 @@ function cellMatches(
   switch (filter.operator) {
     case "eq":
       return cmp(left, normalizeOperand(column, filter.value, "Value")) === 0;
+    case "in": {
+      // OR within this one field. An empty list matches nothing rather than
+      // everything — validateFilter rejects it, so this is only a guard.
+      const options = filter.values ?? [];
+      return options.some(
+        (v) => cmp(left, normalizeOperand(column, v, "Value")) === 0,
+      );
+    }
     case "gte":
       return cmp(left, normalizeOperand(column, filter.value, "Value")) >= 0;
     case "lte":
@@ -346,6 +364,25 @@ function validateFilter(
     );
   }
 
+  if (operator === "in") {
+    const raw = Array.isArray(f.values) ? f.values : [];
+    // An empty list would silently match nothing and zero the KPI with no
+    // explanation — the worst failure mode here, so reject it outright.
+    if (raw.length === 0) {
+      throw invalid(`"${column.label}" needs at least one value to match`);
+    }
+    const seen = new Set<string>();
+    const values: DataSourceCellValue[] = [];
+    for (const entry of raw) {
+      const normalised = normalizeOperand(column, entry, `"${column.label}"`);
+      const dedupeKey = String(normalised);
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      values.push(normalised);
+    }
+    return { field: column.colKey, operator, values };
+  }
+
   const value = normalizeOperand(column, f.value, `"${column.label}"`);
   if (operator === "between") {
     const valueTo = normalizeOperand(column, f.valueTo, `"${column.label}" range end`);
@@ -376,9 +413,13 @@ export function describeFilter(
   const name = column?.label ?? filter.field;
   const op = OPERATOR_LABELS[filter.operator] ?? filter.operator;
 
-  return filter.operator === "between"
-    ? `${name} ${op} ${show(filter.value)} → ${show(filter.valueTo)}`
-    : `${name} ${op} ${show(filter.value)}`;
+  if (filter.operator === "between") {
+    return `${name} ${op} ${show(filter.value)} → ${show(filter.valueTo)}`;
+  }
+  if (filter.operator === "in") {
+    return `${name} ${op} ${(filter.values ?? []).map(show).join(", ")}`;
+  }
+  return `${name} ${op} ${show(filter.value)}`;
 }
 
 /** Human summary of a whole mapping, for the Linked KPIs table. */

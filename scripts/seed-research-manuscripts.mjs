@@ -1,0 +1,55 @@
+import { seedDataSource } from "./data-source-seed-utils.mjs";
+
+const EXPECTED_COLUMNS = {
+  title: { dataType: "text", isRequired: true },
+  status: { dataType: "select", isRequired: true, options: ["Manuscript", "Submitted", "Accepted", "Published"] },
+  status_s_date: { dataType: "date", isRequired: true },
+  doi_link: { dataType: "text", isRequired: false },
+  journal_name: { dataType: "text", isRequired: true },
+  quartile: { dataType: "select", isRequired: false, options: ["Q1-Tier", "Q1", "Q2", "Q3", "Q4", "TCI1", "TCI2", "TCI3"] },
+  first_author: { dataType: "faculty", isRequired: true },
+  corresponding_author: { dataType: "faculty", isRequired: true },
+  citation_count: { dataType: "number", isRequired: false },
+};
+
+const ROWS = [
+  { year: 2566, quarter: 1, values: { title: "Community-Based Screening for Hypertension Risk", status: "Published", status_s_date: "2566-01-12", doi_link: "https://example.com/doi/mfu-shs-2566-01", journal_name: "Journal of Community Health Practice", quartile: "Q2", first_author: "fac-001", corresponding_author: "fac-031", citation_count: 18 } },
+  { year: 2566, quarter: 1, values: { title: "Nutrition Literacy Among First-Year University Students", status: "Published", status_s_date: "2566-02-03", doi_link: "https://example.com/doi/mfu-shs-2566-02", journal_name: "Asian Journal of Public Health", quartile: "Q1", first_author: "fac-002", corresponding_author: "fac-032", citation_count: 24 } },
+  { year: 2566, quarter: 2, values: { title: "Ergonomic Risk Assessment in Community Health Workers", status: "Accepted", status_s_date: "2566-04-19", doi_link: "https://example.com/doi/mfu-shs-2566-03", journal_name: "International Journal of Occupational Safety", quartile: "Q1-Tier", first_author: "fac-003", corresponding_author: "fac-033", citation_count: 7 } },
+  { year: 2566, quarter: 2, values: { title: "Mobile Reminders for Medication Adherence in Older Adults", status: "Submitted", status_s_date: "2566-05-08", doi_link: null, journal_name: "Digital Health and Care", quartile: "Q2", first_author: "fac-004", corresponding_author: "fac-034", citation_count: 0 } },
+  { year: 2566, quarter: 2, values: { title: "Air Quality Perceptions Around University Campuses", status: "Manuscript", status_s_date: "2566-06-01", doi_link: null, journal_name: "Environmental Health Review", quartile: "Q3", first_author: "fac-005", corresponding_author: "fac-035", citation_count: 0 } },
+  { year: 2566, quarter: 3, values: { title: "Simulation Training for Nursing Handover Communication", status: "Published", status_s_date: "2566-07-14", doi_link: "https://example.com/doi/mfu-shs-2566-06", journal_name: "Nursing Education Perspectives", quartile: "Q1", first_author: "fac-006", corresponding_author: "fac-036", citation_count: 31 } },
+  { year: 2566, quarter: 3, values: { title: "Herbal Compress Use for Musculoskeletal Discomfort", status: "Accepted", status_s_date: "2566-08-10", doi_link: "https://example.com/doi/mfu-shs-2566-07", journal_name: "Thai Journal of Integrative Medicine", quartile: "TCI1", first_author: "fac-007", corresponding_author: "fac-037", citation_count: 5 } },
+  { year: 2566, quarter: 3, values: { title: "Predictors of Sleep Quality in Shift-Working Staff", status: "Submitted", status_s_date: "2566-09-05", doi_link: null, journal_name: "Occupational Wellbeing Journal", quartile: "Q2", first_author: "fac-008", corresponding_author: "fac-038", citation_count: 0 } },
+  { year: 2566, quarter: 4, values: { title: "Food Safety Practices of Small Community Vendors", status: "Published", status_s_date: "2566-10-11", doi_link: "https://example.com/doi/mfu-shs-2566-09", journal_name: "Food Protection Research", quartile: "Q3", first_author: "fac-009", corresponding_author: "fac-039", citation_count: 12 } },
+  { year: 2566, quarter: 4, values: { title: "Health Promotion Needs of Borderland Adolescents", status: "Manuscript", status_s_date: "2566-11-22", doi_link: null, journal_name: "Regional Health Studies", quartile: "TCI2", first_author: "fac-010", corresponding_author: "fac-040", citation_count: 0 } },
+  { year: 2567, quarter: 1, values: { title: "Teleconsultation Readiness in Rural Primary Care", status: "Published", status_s_date: "2567-01-09", doi_link: "https://example.com/doi/mfu-shs-2567-01", journal_name: "Primary Care Innovation", quartile: "Q1", first_author: "fac-011", corresponding_author: "fac-041", citation_count: 21 } },
+  { year: 2567, quarter: 1, values: { title: "Water Sanitation Knowledge in Remote Villages", status: "Accepted", status_s_date: "2567-02-15", doi_link: "https://example.com/doi/mfu-shs-2567-02", journal_name: "Journal of Water and Health", quartile: "Q2", first_author: "fac-012", corresponding_author: "fac-042", citation_count: 4 } },
+  { year: 2567, quarter: 2, values: { title: "Physical Activity Patterns of Health Sciences Students", status: "Submitted", status_s_date: "2567-04-04", doi_link: null, journal_name: "University Health Journal", quartile: "TCI1", first_author: "fac-013", corresponding_author: "fac-043", citation_count: 0 } },
+  { year: 2567, quarter: 2, values: { title: "Waste Segregation Compliance in Clinical Laboratories", status: "Published", status_s_date: "2567-05-17", doi_link: "https://example.com/doi/mfu-shs-2567-04", journal_name: "Laboratory Safety Science", quartile: "Q2", first_author: "fac-014", corresponding_author: "fac-044", citation_count: 16 } },
+  { year: 2567, quarter: 2, values: { title: "Developing a Culturally Adapted Mental Health Toolkit", status: "Manuscript", status_s_date: "2567-06-12", doi_link: null, journal_name: "Mental Health Promotion Review", quartile: "Q3", first_author: "fac-015", corresponding_author: "fac-045", citation_count: 0 } },
+  { year: 2567, quarter: 3, values: { title: "Outcomes of Peer-Led First Aid Education", status: "Accepted", status_s_date: "2567-07-08", doi_link: "https://example.com/doi/mfu-shs-2567-06", journal_name: "Emergency Care Education", quartile: "Q4", first_author: "fac-016", corresponding_author: "fac-046", citation_count: 2 } },
+  { year: 2567, quarter: 3, values: { title: "Health Literacy and Dengue Prevention Behavior", status: "Published", status_s_date: "2567-08-23", doi_link: "https://example.com/doi/mfu-shs-2567-07", journal_name: "Tropical Public Health", quartile: "Q1", first_author: "fac-017", corresponding_author: "fac-047", citation_count: 27 } },
+  { year: 2567, quarter: 3, values: { title: "Occupational Stress in University Support Personnel", status: "Submitted", status_s_date: "2567-09-18", doi_link: null, journal_name: "Workplace Health Review", quartile: "TCI2", first_author: "fac-018", corresponding_author: "fac-048", citation_count: 0 } },
+  { year: 2567, quarter: 4, values: { title: "Digital Storytelling for Community Health Volunteers", status: "Published", status_s_date: "2567-10-03", doi_link: "https://example.com/doi/mfu-shs-2567-09", journal_name: "Health Communication Quarterly", quartile: "Q2", first_author: "fac-019", corresponding_author: "fac-049", citation_count: 9 } },
+  { year: 2567, quarter: 4, values: { title: "Assessment of Emergency Preparedness in Schools", status: "Manuscript", status_s_date: "2567-11-27", doi_link: null, journal_name: "School Health Management", quartile: "TCI3", first_author: "fac-020", corresponding_author: "fac-050", citation_count: 0 } },
+  { year: 2568, quarter: 1, values: { title: "Climate Resilience Practices in Local Food Systems", status: "Accepted", status_s_date: "2568-01-16", doi_link: "https://example.com/doi/mfu-shs-2568-01", journal_name: "Sustainable Food Systems", quartile: "Q1-Tier", first_author: "fac-021", corresponding_author: "fac-051", citation_count: 3 } },
+  { year: 2568, quarter: 1, values: { title: "Usability of a Bilingual Patient Education Portal", status: "Published", status_s_date: "2568-02-11", doi_link: "https://example.com/doi/mfu-shs-2568-02", journal_name: "Journal of Digital Patient Care", quartile: "Q1", first_author: "fac-022", corresponding_author: "fac-052", citation_count: 14 } },
+  { year: 2568, quarter: 2, values: { title: "Community Mapping of Heat-Related Health Risks", status: "Submitted", status_s_date: "2568-04-07", doi_link: null, journal_name: "Climate and Health Research", quartile: "Q2", first_author: "fac-023", corresponding_author: "fac-053", citation_count: 0 } },
+  { year: 2568, quarter: 2, values: { title: "Family Caregiver Burden After Stroke Rehabilitation", status: "Published", status_s_date: "2568-05-20", doi_link: "https://example.com/doi/mfu-shs-2568-04", journal_name: "Rehabilitation Science Today", quartile: "Q2", first_author: "fac-024", corresponding_author: "fac-054", citation_count: 11 } },
+  { year: 2568, quarter: 2, values: { title: "Validation of a Thai Food Label Reading Scale", status: "Accepted", status_s_date: "2568-06-14", doi_link: "https://example.com/doi/mfu-shs-2568-05", journal_name: "Nutrition Measurement Journal", quartile: "Q3", first_author: "fac-025", corresponding_author: "fac-055", citation_count: 1 } },
+  { year: 2568, quarter: 3, values: { title: "Cross-Border Health Referral Experiences", status: "Manuscript", status_s_date: "2568-07-02", doi_link: null, journal_name: "International Border Health", quartile: "TCI2", first_author: "fac-026", corresponding_author: "fac-056", citation_count: 0 } },
+  { year: 2568, quarter: 3, values: { title: "Safety Culture in Student-Led Health Clinics", status: "Published", status_s_date: "2568-08-18", doi_link: "https://example.com/doi/mfu-shs-2568-07", journal_name: "Clinical Education and Safety", quartile: "Q1", first_author: "fac-027", corresponding_author: "fac-057", citation_count: 6 } },
+  { year: 2568, quarter: 3, values: { title: "Social Support and Wellbeing of Graduate Students", status: "Submitted", status_s_date: "2568-09-09", doi_link: null, journal_name: "Higher Education Wellbeing", quartile: "Q4", first_author: "fac-028", corresponding_author: "fac-058", citation_count: 0 } },
+  { year: 2568, quarter: 4, values: { title: "Antimicrobial Stewardship Knowledge in Clinics", status: "Accepted", status_s_date: "2568-10-21", doi_link: "https://example.com/doi/mfu-shs-2568-09", journal_name: "Infection Prevention Journal", quartile: "Q2", first_author: "fac-029", corresponding_author: "fac-059", citation_count: 2 } },
+  { year: 2568, quarter: 4, values: { title: "Public Trust in Community Health Messaging", status: "Published", status_s_date: "2568-11-13", doi_link: "https://example.com/doi/mfu-shs-2568-10", journal_name: "Public Health Communication", quartile: "TCI1", first_author: "fac-030", corresponding_author: "fac-060", citation_count: 8 } },
+];
+
+await seedDataSource({
+  sourceName: "Research manuscripts and articles",
+  displayName: "Research manuscripts and articles",
+  expectedCount: 30,
+  expectedColumns: EXPECTED_COLUMNS,
+  rows: ROWS,
+  notePrefix: "Seed: Research manuscript demo row ",
+});

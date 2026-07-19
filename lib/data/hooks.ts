@@ -39,6 +39,7 @@ import {
   type DataSourceColumnInput,
   type DataSourceEntryInput,
   type DataSourceLinkInput,
+  type LinkWriteResult,
   facultyRepo,
   facultyRecordsRepo,
   formulasRepo,
@@ -963,6 +964,7 @@ export function useCreateDataSourceEntry() {
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: ["dataSourceEntries", id] });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
+      invalidatePerformanceValues(qc);
     },
   });
 }
@@ -979,8 +981,10 @@ export function useUpdateDataSourceEntry() {
       input: Partial<DataSourceEntryInput>;
     }) => dataSourcesRepo.updateEntry(entryId, input),
     meta: { toast: "Entry updated" },
-    onSuccess: (_d, { dataSourceId }) =>
-      qc.invalidateQueries({ queryKey: ["dataSourceEntries", dataSourceId] }),
+    onSuccess: (_d, { dataSourceId }) => {
+      qc.invalidateQueries({ queryKey: ["dataSourceEntries", dataSourceId] });
+      invalidatePerformanceValues(qc);
+    },
   });
 }
 
@@ -999,8 +1003,24 @@ export function useDeleteDataSourceEntry() {
     onSuccess: (_d, { dataSourceId }) => {
       qc.invalidateQueries({ queryKey: ["dataSourceEntries", dataSourceId] });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
+      invalidatePerformanceValues(qc);
     },
   });
+}
+
+/** Writing a link or an entry recomputes performance values, which can belong to
+ *  any record — drop the whole perf slice rather than guess which. */
+function invalidatePerformanceValues(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["perfKpis"] });
+  qc.invalidateQueries({ queryKey: ["perfKpi"] });
+  qc.invalidateQueries({ queryKey: ["perfMetrics"] });
+}
+
+/** "Linked · 12 quarters updated · 4 skipped (4 period closed)". The feed summary
+ *  is omitted for an evidence-only link, which computes nothing. */
+function linkToast(head: string, data: unknown): string {
+  const { feed } = (data ?? {}) as LinkWriteResult;
+  return feed && !feed.startsWith("0 quarters") ? `${head} · ${feed}` : head;
 }
 
 export function useCreateDataSourceLink() {
@@ -1008,10 +1028,12 @@ export function useCreateDataSourceLink() {
   return useMutation({
     mutationFn: ({ id, input }: { id: number; input: DataSourceLinkInput }) =>
       dataSourcesRepo.createLink(id, input),
-    meta: { toast: "Linked" },
+    // The link immediately recomputes what it feeds; say what that did.
+    meta: { toast: (d) => linkToast("Linked", d) },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: qk.dataSourceLinks(id) });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
+      invalidatePerformanceValues(qc);
     },
   });
 }
@@ -1027,10 +1049,11 @@ export function useUpdateDataSourceLink() {
       linkId: number;
       patch: { mappings?: DataSourceLinkMapping[]; note?: string | null };
     }) => dataSourcesRepo.updateLink(linkId, patch),
-    meta: { toast: "Link updated" },
+    meta: { toast: (d) => linkToast("Link updated", d) },
     onSuccess: (_d, { dataSourceId }) => {
       qc.invalidateQueries({ queryKey: qk.dataSourceLinks(dataSourceId) });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
+      invalidatePerformanceValues(qc);
     },
   });
 }
