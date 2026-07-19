@@ -117,7 +117,7 @@ CREATE TABLE library_kpi (
   unit                VARCHAR(50)  NULL,                    -- "%", "score", "ratio", "จำนวน"
   five_year_target    DECIMAL(14,4) NULL,                   -- per-year cap for each annual target (decision #5)
   -- Calculation logic + roll-up (decision #7: BOTH simple type AND optional formula)
-  calculation_type    ENUM('weighted_sum','simple_average','custom_formula') NOT NULL DEFAULT 'weighted_sum',
+  calculation_type    ENUM('weighted_sum','simple_average','percent_of_total','ratio_of_total','custom_formula') NOT NULL DEFAULT 'weighted_sum',
   calculation_logic   TEXT NULL,                            -- free-text notes / description of the logic
   formula_id          BIGINT UNSIGNED NULL,                 -- FK -> formula.id; used when calculation_type='custom_formula'
   -- Threshold setting
@@ -251,7 +251,7 @@ CREATE TABLE perf_kpi (
   weight              DECIMAL(6,2) NOT NULL DEFAULT 0,
   unit                VARCHAR(50)  NULL,
   five_year_target    DECIMAL(14,4) NULL,
-  calculation_type    ENUM('weighted_sum','simple_average','custom_formula') NOT NULL DEFAULT 'weighted_sum',
+  calculation_type    ENUM('weighted_sum','simple_average','percent_of_total','ratio_of_total','custom_formula') NOT NULL DEFAULT 'weighted_sum',
   calculation_logic   TEXT NULL,
   formula_id          BIGINT UNSIGNED NULL,               -- copied FK -> formula.id (formulas are global, not snapshotted)
   threshold_green     DECIMAL(14,4) NULL,
@@ -552,7 +552,18 @@ CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id);
 --    (A CHECK can't compare annual target rows with parent target rows.)
 --  * custom_formula KPIs (decision #7): when calculation_type='custom_formula',
 --    formula_id must be set; the roll-up evaluates formula.expression (mathjs)
---    over the child metric values. weighted_sum/simple_average ignore formula_id.
+--    over the child metric values. weighted_sum/simple_average/percent_of_total/
+--    ratio_of_total ignore formula_id.
+--  * percent_of_total: pooled percentage roll-up,
+--    SUM(child progress) / SUM(child quarter target) * 100. A child with no
+--    progress value or no usable target is excluded from BOTH sums. This
+--    replaced an older implicit rule that rolled up any unit='Percent' KPI as
+--    the unweighted mean of each child's own progress percentage.
+--  * ratio_of_total: the same pooled roll-up without the * 100, i.e.
+--    SUM(child progress) / SUM(child quarter target). Same both-sides-usable
+--    exclusion rule. Unlike percent_of_total this was NOT backfilled onto
+--    existing unit='Ratio' KPIs — they were never on the old implicit percent
+--    path, so flipping them would change results rather than preserve them.
 --  * Metric thresholds (decision #6): threshold_green/amber now exist on
 --    library_metric & perf_metric — drive the metric's current-value bar the
 --    same way KPI thresholds drive the KPI bar.

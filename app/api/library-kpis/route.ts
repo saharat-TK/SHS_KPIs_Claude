@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { LIBRARY_KPI_FIELDS } from "@/lib/kpi/fields";
 import { syncActiveRecordsForSet } from "@/lib/kpi/performance";
+import { isCalculationType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,12 @@ export async function POST(req: NextRequest) {
     }
     if (!b.name || !b.name.trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
+    }
+    if (b.calculationType && !isCalculationType(b.calculationType)) {
+      return NextResponse.json(
+        { error: `Unknown calculationType: ${b.calculationType}` },
+        { status: 400 },
+      );
     }
 
     const conn = await pool.getConnection();
