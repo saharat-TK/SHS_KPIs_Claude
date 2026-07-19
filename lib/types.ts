@@ -98,6 +98,18 @@ export type Rank =
   | "Lecturer"
   | "Support Staff";
 
+export const RANKS: Rank[] = [
+  "Professor",
+  "Associate Professor",
+  "Assistant Professor",
+  "Lecturer",
+  "Support Staff",
+];
+
+/** The teaching/research ranks — the default population for a per-head metric,
+ *  which is almost never meant to include administrative staff. */
+export const ACADEMIC_RANKS: Rank[] = RANKS.filter((r) => r !== "Support Staff");
+
 export type Position = "Counselor" | "Committee Lead" | "Committee" | "Committee and Secretary";
 
 export interface FacultyMember {
@@ -593,19 +605,41 @@ export interface DataSourceFilter {
   values?: DataSourceCellValue[];
 }
 
-export type AggregationKind = "sum" | "avg" | "count" | "latest";
+export type AggregationKind =
+  | "sum"
+  | "avg"
+  | "count"
+  | "latest"
+  | "percent_of"
+  | "ratio_of";
 
 /** Where the aggregated number lands on the target. A percent/ratio KPI takes
  *  two mappings (variable1 = dividend, variable2 = divisor); everything else
  *  takes one "value". */
 export type MappingSlot = "value" | "variable1" | "variable2";
 
+/** Where a proportion's denominator comes from. Absent ⇒ "rows". */
+export type DenominatorSource = "rows" | "faculty";
+
 export interface DataSourceLinkMapping {
   slot: MappingSlot;
   aggregation: AggregationKind;
-  /** The column being aggregated. Null (and unused) when aggregation is "count". */
+  /** The column being aggregated. Null (and unused) when aggregation is "count".
+   *  Optional for percent_of / ratio_of, which fall back to counting rows. */
   columnKey: string | null;
+  /** Which rows count. Under percent_of / ratio_of with denominatorSource
+   *  "rows", this set doubles as the population (the denominator) and
+   *  numeratorFilters narrows the top within it; under "faculty" the divisor
+   *  comes from the roster, so this selects the numerator rows directly. */
   filters: DataSourceFilter[];
+  /** Narrows the numerator inside the population. percent_of / ratio_of with
+   *  denominatorSource "rows" only; absent otherwise. */
+  numeratorFilters?: DataSourceFilter[];
+  /** percent_of / ratio_of only. */
+  denominatorSource?: DenominatorSource;
+  /** Which ranks count toward the headcount, always further restricted to
+   *  active staff. denominatorSource === "faculty" only. */
+  facultyRanks?: Rank[];
 }
 
 /** Feed edge from a data source to a library KPI or metric. Exactly one of

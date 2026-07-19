@@ -5,8 +5,10 @@ import type {
   DataSourceFilter,
   DataSourceLinkMapping,
   DataSourcePeriodGrain,
+  DenominatorSource,
   FilterOperator,
   MappingSlot,
+  Rank,
 } from "@/lib/types";
 
 // Which rows of a data source count toward a KPI, and how they become a number.
@@ -27,6 +29,16 @@ const PERIOD_RE = /^(\d{4})-([1-4])$/;
 // imported because of the no-runtime-imports rule above; both must agree, since a
 // date bound is compared against a cell that coerceCellValue already validated.
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Mirrors RANKS in lib/types.ts, duplicated for the same no-runtime-imports
+// reason. Both must agree with the faculty.rank ENUM in the schema.
+const VALID_RANKS: Rank[] = [
+  "Professor",
+  "Associate Professor",
+  "Assistant Professor",
+  "Lecturer",
+  "Support Staff",
+];
 
 /** Thrown for user-fixable filter problems. Mirrors DataSourceValidationError in
  *  lib/kpi/dataSources.ts (same reason it is not imported). */
@@ -55,14 +67,28 @@ export interface FilterableEntry {
   values: Record<string, DataSourceCellValue>;
 }
 
-export const AGGREGATION_KINDS: AggregationKind[] = ["sum", "avg", "count", "latest"];
+export const AGGREGATION_KINDS: AggregationKind[] = [
+  "sum",
+  "avg",
+  "count",
+  "latest",
+  "percent_of",
+  "ratio_of",
+];
 
 export const AGGREGATION_LABELS: Record<AggregationKind, string> = {
   sum: "Sum of",
   avg: "Average of",
   count: "Count of rows",
   latest: "Latest value of",
+  percent_of: "Percent of",
+  ratio_of: "Ratio of",
 };
+
+/** The kinds that split a population into a numerator and a denominator, and so
+ *  carry a second condition list. */
+export const isProportionKind = (kind: AggregationKind) =>
+  kind === "percent_of" || kind === "ratio_of";
 
 export const OPERATOR_LABELS: Record<FilterOperator, string> = {
   eq: "is",
@@ -75,8 +101,14 @@ export const OPERATOR_LABELS: Record<FilterOperator, string> = {
 /** Operators that take a list of values rather than a single one. */
 export const isMultiValueOperator = (op: FilterOperator) => op === "in";
 
-/** "count" needs no column to aggregate; everything else does. */
-export const aggregationNeedsColumn = (kind: AggregationKind) => kind !== "count";
+/** Whether a column may be aggregated at all — "count" never does. Drives
+ *  whether the UI offers a column picker. */
+export const aggregationAllowsColumn = (kind: AggregationKind) => kind !== "count";
+
+/** Whether a column is mandatory. The proportion kinds merely allow one: with no
+ *  column they count rows instead. Drives validation. */
+export const aggregationNeedsColumn = (kind: AggregationKind) =>
+  aggregationAllowsColumn(kind) && !isProportionKind(kind);
 
 /** Operators offered for a column type. Deliberately minimal: a date is always a
  *  range, numbers get comparisons, and only choice-like columns get "is any of"
@@ -245,12 +277,47 @@ function numericCells(
  *
  *  `count` always yields a number (zero rows is a meaningful zero). The others
  *  yield null when no row carries a usable value, so the KPI shows "—" rather
- *  than a misleading 0 for "nothing recorded yet". */
+ *  than a misleading 0 for "nothing recorded yet".
+ *
+ *  percent_of / ratio_of are the only kinds needing more than one input, supplied
+ *  via `proportion`:
+ *   - `numerator` — a subset of `entries`, which is itself the denominator.
+ *     Callers must derive it from the already-matched population, so the result
+ *     can't exceed 100%.
+ *   - `denominator` — a fixed divisor (a faculty headcount) that replaces
+ *     `entries` on the bottom; then `entries` IS the numerator, because the
+ *     mapping's filters selected those rows directly. Wins over `numerator`. */
 export function aggregate(
   kind: AggregationKind,
   columnKey: string | null,
   entries: FilterableEntry[],
+  proportion?: {
+    numerator?: FilterableEntry[];
+    denominator?: number | null;
+  },
 ): number | null {
+  if (kind === "percent_of" || kind === "ratio_of") {
+    // No column → proportion of rows; with one → proportion of its total.
+    const total = (rows: FilterableEntry[]) =>
+      columnKey ? numericCells(rows, columnKey).reduce((s, n) => s + n, 0) : rows.length;
+
+    const fixed = proportion?.denominator;
+    if (fixed !== undefined) {
+      // Nobody to divide by is "—", not a divide-by-zero or a misleading 0.
+      if (fixed == null || fixed === 0) return null;
+      const ratio = total(entries) / fixed;
+      return kind === "percent_of" ? ratio * 100 : ratio;
+    }
+
+    const numerator = proportion?.numerator;
+    if (!numerator) return null;
+    const denom = total(entries);
+    // An empty population — or a column summing to zero — has no proportion.
+    if (denom === 0) return null;
+    const ratio = total(numerator) / denom;
+    return kind === "percent_of" ? ratio * 100 : ratio;
+  }
+
   if (kind === "count") return entries.length;
   if (!columnKey) return null;
 
@@ -304,21 +371,24 @@ export function validateMappings(
     }
 
     let columnKey: string | null = m?.columnKey?.trim() || null;
-    if (aggregationNeedsColumn(aggregation)) {
-      if (!columnKey) {
+    if (!aggregationAllowsColumn(aggregation)) {
+      columnKey = null; // count ignores it; don't store a misleading value
+    } else if (!columnKey) {
+      // Only mandatory for the kinds that have nothing to fall back on; the
+      // proportion kinds count rows instead.
+      if (aggregationNeedsColumn(aggregation)) {
         throw invalid(`"${AGGREGATION_LABELS[aggregation]}" needs a column to aggregate`);
       }
+    } else {
       const col = byKey.get(columnKey);
       if (!col) throw invalid(`Unknown column "${columnKey}"`);
       if (col.dataType !== "number") {
         throw invalid(`"${col.label}" is not a number column, so it cannot be aggregated`);
       }
-    } else {
-      columnKey = null; // count ignores it; don't store a misleading value
     }
 
     const filters = Array.isArray(m?.filters) ? m.filters : [];
-    return {
+    const mapping: DataSourceLinkMapping = {
       slot,
       aggregation,
       columnKey,
@@ -326,6 +396,42 @@ export function validateMappings(
         validateFilter(byKey, grain, f),
       ),
     };
+
+    const source = (m?.denominatorSource ?? "rows") as DenominatorSource;
+    if (!isProportionKind(aggregation)) {
+      if (m?.denominatorSource) {
+        throw invalid(
+          `"${AGGREGATION_LABELS[aggregation]}" has no denominator to choose a source for`,
+        );
+      }
+    } else if (source === "faculty") {
+      // The roster supplies the divisor, so `filters` selects the numerator rows
+      // directly and a second list would have nothing to narrow.
+      const ranks = Array.isArray(m?.facultyRanks) ? m.facultyRanks : [];
+      if (ranks.length === 0) {
+        throw invalid("Pick at least one faculty rank to count");
+      }
+      const unknown = ranks.find((r: string) => !VALID_RANKS.includes(r as Rank));
+      if (unknown) throw invalid(`Unknown faculty rank "${unknown}"`);
+      mapping.denominatorSource = "faculty";
+      mapping.facultyRanks = ranks as Rank[];
+    } else if (source === "rows") {
+      const raw2 = Array.isArray(m?.numeratorFilters) ? m.numeratorFilters : [];
+      // With no numerator condition the numerator IS the population, so the
+      // mapping would always return exactly 100 (or 1) — never intended.
+      if (raw2.length === 0) {
+        throw invalid(
+          `"${AGGREGATION_LABELS[aggregation]}" needs at least one condition saying which rows to count`,
+        );
+      }
+      mapping.numeratorFilters = raw2.map((f: DataSourceFilter) =>
+        validateFilter(byKey, grain, f),
+      );
+    } else {
+      throw invalid(`Unknown denominator source "${m?.denominatorSource}"`);
+    }
+
+    return mapping;
   });
 }
 
@@ -429,13 +535,33 @@ export function describeMapping(
   labels?: Record<string, string>,
 ): string {
   const column = columns.find((c) => c.colKey === mapping.columnKey);
-  const head =
-    mapping.aggregation === "count"
+  const list = (fs: DataSourceFilter[]) =>
+    fs.map((f) => describeFilter(f, columns, labels)).join(" and ");
+  // No column to name → the kind is measuring rows themselves.
+  const head = mapping.columnKey
+    ? `${AGGREGATION_LABELS[mapping.aggregation]} ${column?.label ?? mapping.columnKey}`
+    : mapping.aggregation === "count"
       ? AGGREGATION_LABELS.count
-      : `${AGGREGATION_LABELS[mapping.aggregation]} ${column?.label ?? mapping.columnKey}`;
+      : `${AGGREGATION_LABELS[mapping.aggregation]} rows`;
 
-  if (mapping.filters.length === 0) return head;
-  return `${head} where ${mapping.filters
-    .map((f) => describeFilter(f, columns, labels))
-    .join(" and ")}`;
+  const scoped = mapping.filters.length === 0 ? head : `${head} where ${list(mapping.filters)}`;
+
+  if (mapping.denominatorSource === "faculty") {
+    const ranks = mapping.facultyRanks ?? [];
+    const excluded = VALID_RANKS.filter((r) => !ranks.includes(r));
+    // "excluding X" reads better than relisting four of five ranks.
+    const who =
+      excluded.length === 0
+        ? ""
+        : excluded.length < ranks.length
+          ? ` (excluding ${excluded.join(", ")})`
+          : ` (${ranks.join(", ")} only)`;
+    // "current" is load-bearing: the roster has no history, so every period is
+    // divided by today's headcount.
+    return `${scoped} · per current active faculty member${who}`;
+  }
+
+  const numerator = mapping.numeratorFilters ?? [];
+  if (numerator.length === 0) return scoped;
+  return `${scoped} · counting ${list(numerator)}`;
 }
