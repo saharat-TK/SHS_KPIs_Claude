@@ -178,6 +178,55 @@ test("latest takes the newest period, breaking ties by id", () => {
   assert.equal(aggregate("latest", "citations", []), null);
 });
 
+// ── proportions ─────────────────────────────────────────────────────────────
+
+// A population of 4, of which 1 is in the numerator.
+const POP = [
+  entry({ id: 1, values: { quartile: "Q1", citations: 10 } }),
+  entry({ id: 2, values: { quartile: "Q2", citations: 20 } }),
+  entry({ id: 3, values: { quartile: "Q2", citations: 30 } }),
+  entry({ id: 4, values: { quartile: "Q2", citations: 40 } }),
+];
+const NUM = [POP[0]];
+
+test("percent_of and ratio_of compare row counts when given no column", () => {
+  assert.equal(aggregate("percent_of", null, POP, NUM), 25);
+  assert.equal(aggregate("ratio_of", null, POP, NUM), 0.25);
+});
+
+test("percent_of is exactly ratio_of × 100 on the same rows", () => {
+  assert.equal(
+    aggregate("percent_of", null, POP, NUM),
+    aggregate("ratio_of", null, POP, NUM) * 100,
+  );
+  assert.equal(
+    aggregate("percent_of", "citations", POP, NUM),
+    aggregate("ratio_of", "citations", POP, NUM) * 100,
+  );
+});
+
+test("a column switches the proportion from row counts to that column's totals", () => {
+  // 10 of (10+20+30+40) — deliberately different from the 25% by row count.
+  assert.equal(aggregate("percent_of", "citations", POP, NUM), 10);
+  assert.equal(aggregate("ratio_of", "citations", POP, NUM), 0.1);
+});
+
+test("a proportion with nothing to divide by is null, not zero", () => {
+  // Empty population.
+  assert.equal(aggregate("percent_of", null, [], []), null);
+  // Column present but summing to zero.
+  const zeros = [entry({ id: 1, values: { citations: 0 } })];
+  assert.equal(aggregate("percent_of", "citations", zeros, zeros), null);
+  // No numerator supplied at all — the caller didn't narrow anything.
+  assert.equal(aggregate("percent_of", null, POP), null);
+});
+
+test("a numerator equal to its population is 100 percent", () => {
+  // Documents the case validateMappings rejects at save time.
+  assert.equal(aggregate("percent_of", null, POP, POP), 100);
+  assert.equal(aggregate("ratio_of", null, POP, POP), 1);
+});
+
 // ── validation ──────────────────────────────────────────────────────────────
 
 const mapping = (over = {}) => ({
@@ -301,6 +350,72 @@ test("validateMappings widens a period range to whole years for annual sources",
   });
 });
 
+test("validateMappings treats a column as optional for the proportion kinds", () => {
+  const numer = { numeratorFilters: [F("quartile", "eq", "Q1")] };
+  // No column is fine — it counts rows.
+  assert.equal(
+    validateMappings(COLUMNS, "quarterly", [mapping({ aggregation: "percent_of", ...numer })])[0]
+      .columnKey,
+    null,
+  );
+  // A column is kept, and still has to be numeric.
+  assert.equal(
+    validateMappings(COLUMNS, "quarterly", [
+      mapping({ aggregation: "ratio_of", columnKey: "citations", ...numer }),
+    ])[0].columnKey,
+    "citations",
+  );
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "percent_of", columnKey: "title", ...numer }),
+      ]),
+    /"Title" is not a number column/,
+  );
+});
+
+test("validateMappings rejects a proportion with no numerator condition", () => {
+  // Without one the numerator is the whole population — always 100%.
+  assert.throws(
+    () => validateMappings(COLUMNS, "quarterly", [mapping({ aggregation: "percent_of" })]),
+    /at least one condition saying which rows to count/,
+  );
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "ratio_of", numeratorFilters: [] }),
+      ]),
+    /at least one condition saying which rows to count/,
+  );
+});
+
+test("validateMappings keeps numeratorFilters off the non-proportion kinds", () => {
+  const out = validateMappings(COLUMNS, "quarterly", [
+    mapping({ aggregation: "sum", columnKey: "citations", numeratorFilters: [F("quartile", "eq", "Q1")] }),
+  ]);
+  assert.equal(out[0].numeratorFilters, undefined);
+});
+
+test("validateMappings validates numerator conditions like any other", () => {
+  const out = validateMappings(COLUMNS, "quarterly", [
+    mapping({
+      aggregation: "percent_of",
+      filters: [F("citations", "gte", 5)],
+      numeratorFilters: [F("quartile", "eq", "Q1")],
+    }),
+  ]);
+  assert.deepEqual(out[0].numeratorFilters, [
+    { field: "quartile", operator: "eq", value: "Q1" },
+  ]);
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "percent_of", numeratorFilters: [F("nope", "eq", "x")] }),
+      ]),
+    /nope/,
+  );
+});
+
 test("validateMappings tolerates an absent mapping list", () => {
   assert.deepEqual(validateMappings(COLUMNS, "quarterly", null), []);
   assert.deepEqual(validateMappings(COLUMNS, "quarterly", undefined), []);
@@ -326,6 +441,34 @@ test("describeMapping reads as a sentence and resolves derived codes", () => {
       "fac-002": "ผศ.ดร.จงกล สายสิงห์",
     }),
     "Count of rows where Author is ผศ.ดร.จงกล สายสิงห์",
+  );
+});
+
+test("describeMapping spells out both sides of a proportion", () => {
+  const numer = { numeratorFilters: [F("quartile", "eq", "Q1")] };
+  // No column → the kind is measuring rows themselves.
+  assert.equal(
+    describeMapping(mapping({ aggregation: "percent_of", ...numer }), COLUMNS),
+    "Percent of rows · counting Quartile is Q1",
+  );
+  assert.equal(
+    describeMapping(
+      mapping({
+        aggregation: "ratio_of",
+        filters: [F("citations", "gte", 5)],
+        ...numer,
+      }),
+      COLUMNS,
+    ),
+    "Ratio of rows where Citations is at least 5 · counting Quartile is Q1",
+  );
+  // With a column it names the column instead.
+  assert.equal(
+    describeMapping(
+      mapping({ aggregation: "percent_of", columnKey: "citations", ...numer }),
+      COLUMNS,
+    ),
+    "Percent of Citations · counting Quartile is Q1",
   );
 });
 

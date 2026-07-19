@@ -593,7 +593,13 @@ export interface DataSourceFilter {
   values?: DataSourceCellValue[];
 }
 
-export type AggregationKind = "sum" | "avg" | "count" | "latest";
+export type AggregationKind =
+  | "sum"
+  | "avg"
+  | "count"
+  | "latest"
+  | "percent_of"
+  | "ratio_of";
 
 /** Where the aggregated number lands on the target. A percent/ratio KPI takes
  *  two mappings (variable1 = dividend, variable2 = divisor); everything else
@@ -603,9 +609,15 @@ export type MappingSlot = "value" | "variable1" | "variable2";
 export interface DataSourceLinkMapping {
   slot: MappingSlot;
   aggregation: AggregationKind;
-  /** The column being aggregated. Null (and unused) when aggregation is "count". */
+  /** The column being aggregated. Null (and unused) when aggregation is "count".
+   *  Optional for percent_of / ratio_of, which fall back to counting rows. */
   columnKey: string | null;
+  /** Which rows count. For percent_of / ratio_of these define the population —
+   *  the denominator — and numeratorFilters narrows the top within it. */
   filters: DataSourceFilter[];
+  /** Narrows the numerator inside the population. percent_of / ratio_of only;
+   *  absent for every other kind. */
+  numeratorFilters?: DataSourceFilter[];
 }
 
 /** Feed edge from a data source to a library KPI or metric. Exactly one of

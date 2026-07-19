@@ -232,7 +232,15 @@ async function applyLink(
         const values = new Map<string, number | null>();
         for (const mapping of link.mappings) {
           const matched = rows.filter((e) => matchesFilters(e, columns, mapping.filters));
-          values.set(mapping.slot, aggregate(mapping.aggregation, mapping.columnKey, matched));
+          // Narrow within the matched population, not the whole window, so the
+          // numerator is always a subset of the denominator.
+          const numerator = mapping.numeratorFilters?.length
+            ? matched.filter((e) => matchesFilters(e, columns, mapping.numeratorFilters!))
+            : undefined;
+          values.set(
+            mapping.slot,
+            aggregate(mapping.aggregation, mapping.columnKey, matched, numerator),
+          );
         }
 
         if (target.perfMetricId != null) {

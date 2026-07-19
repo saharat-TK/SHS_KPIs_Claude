@@ -55,14 +55,28 @@ export interface FilterableEntry {
   values: Record<string, DataSourceCellValue>;
 }
 
-export const AGGREGATION_KINDS: AggregationKind[] = ["sum", "avg", "count", "latest"];
+export const AGGREGATION_KINDS: AggregationKind[] = [
+  "sum",
+  "avg",
+  "count",
+  "latest",
+  "percent_of",
+  "ratio_of",
+];
 
 export const AGGREGATION_LABELS: Record<AggregationKind, string> = {
   sum: "Sum of",
   avg: "Average of",
   count: "Count of rows",
   latest: "Latest value of",
+  percent_of: "Percent of",
+  ratio_of: "Ratio of",
 };
+
+/** The kinds that split a population into a numerator and a denominator, and so
+ *  carry a second condition list. */
+export const isProportionKind = (kind: AggregationKind) =>
+  kind === "percent_of" || kind === "ratio_of";
 
 export const OPERATOR_LABELS: Record<FilterOperator, string> = {
   eq: "is",
@@ -75,8 +89,14 @@ export const OPERATOR_LABELS: Record<FilterOperator, string> = {
 /** Operators that take a list of values rather than a single one. */
 export const isMultiValueOperator = (op: FilterOperator) => op === "in";
 
-/** "count" needs no column to aggregate; everything else does. */
-export const aggregationNeedsColumn = (kind: AggregationKind) => kind !== "count";
+/** Whether a column may be aggregated at all — "count" never does. Drives
+ *  whether the UI offers a column picker. */
+export const aggregationAllowsColumn = (kind: AggregationKind) => kind !== "count";
+
+/** Whether a column is mandatory. The proportion kinds merely allow one: with no
+ *  column they count rows instead. Drives validation. */
+export const aggregationNeedsColumn = (kind: AggregationKind) =>
+  aggregationAllowsColumn(kind) && !isProportionKind(kind);
 
 /** Operators offered for a column type. Deliberately minimal: a date is always a
  *  range, numbers get comparisons, and only choice-like columns get "is any of"
@@ -245,12 +265,31 @@ function numericCells(
  *
  *  `count` always yields a number (zero rows is a meaningful zero). The others
  *  yield null when no row carries a usable value, so the KPI shows "—" rather
- *  than a misleading 0 for "nothing recorded yet". */
+ *  than a misleading 0 for "nothing recorded yet".
+ *
+ *  percent_of / ratio_of are the only kinds that need two row sets: `entries` is
+ *  the population (denominator) and `numerator` its subset. Callers must derive
+ *  the subset from the already-matched population, so the result can't exceed
+ *  100%. */
 export function aggregate(
   kind: AggregationKind,
   columnKey: string | null,
   entries: FilterableEntry[],
+  numerator?: FilterableEntry[],
 ): number | null {
+  if (kind === "percent_of" || kind === "ratio_of") {
+    if (!numerator) return null;
+    // No column → proportion of rows; with one → proportion of its total.
+    const total = (rows: FilterableEntry[]) =>
+      columnKey ? numericCells(rows, columnKey).reduce((s, n) => s + n, 0) : rows.length;
+    const denom = total(entries);
+    // An empty population — or a column summing to zero — has no proportion.
+    // Null so the KPI shows "—" rather than a misleading 0.
+    if (denom === 0) return null;
+    const ratio = total(numerator) / denom;
+    return kind === "percent_of" ? ratio * 100 : ratio;
+  }
+
   if (kind === "count") return entries.length;
   if (!columnKey) return null;
 
@@ -304,21 +343,24 @@ export function validateMappings(
     }
 
     let columnKey: string | null = m?.columnKey?.trim() || null;
-    if (aggregationNeedsColumn(aggregation)) {
-      if (!columnKey) {
+    if (!aggregationAllowsColumn(aggregation)) {
+      columnKey = null; // count ignores it; don't store a misleading value
+    } else if (!columnKey) {
+      // Only mandatory for the kinds that have nothing to fall back on; the
+      // proportion kinds count rows instead.
+      if (aggregationNeedsColumn(aggregation)) {
         throw invalid(`"${AGGREGATION_LABELS[aggregation]}" needs a column to aggregate`);
       }
+    } else {
       const col = byKey.get(columnKey);
       if (!col) throw invalid(`Unknown column "${columnKey}"`);
       if (col.dataType !== "number") {
         throw invalid(`"${col.label}" is not a number column, so it cannot be aggregated`);
       }
-    } else {
-      columnKey = null; // count ignores it; don't store a misleading value
     }
 
     const filters = Array.isArray(m?.filters) ? m.filters : [];
-    return {
+    const mapping: DataSourceLinkMapping = {
       slot,
       aggregation,
       columnKey,
@@ -326,6 +368,22 @@ export function validateMappings(
         validateFilter(byKey, grain, f),
       ),
     };
+
+    if (isProportionKind(aggregation)) {
+      const raw2 = Array.isArray(m?.numeratorFilters) ? m.numeratorFilters : [];
+      // With no numerator condition the numerator IS the population, so the
+      // mapping would always return exactly 100 (or 1) — never intended.
+      if (raw2.length === 0) {
+        throw invalid(
+          `"${AGGREGATION_LABELS[aggregation]}" needs at least one condition saying which rows to count`,
+        );
+      }
+      mapping.numeratorFilters = raw2.map((f: DataSourceFilter) =>
+        validateFilter(byKey, grain, f),
+      );
+    }
+
+    return mapping;
   });
 }
 
@@ -429,13 +487,18 @@ export function describeMapping(
   labels?: Record<string, string>,
 ): string {
   const column = columns.find((c) => c.colKey === mapping.columnKey);
-  const head =
-    mapping.aggregation === "count"
+  const list = (fs: DataSourceFilter[]) =>
+    fs.map((f) => describeFilter(f, columns, labels)).join(" and ");
+  // No column to name → the kind is measuring rows themselves.
+  const head = mapping.columnKey
+    ? `${AGGREGATION_LABELS[mapping.aggregation]} ${column?.label ?? mapping.columnKey}`
+    : mapping.aggregation === "count"
       ? AGGREGATION_LABELS.count
-      : `${AGGREGATION_LABELS[mapping.aggregation]} ${column?.label ?? mapping.columnKey}`;
+      : `${AGGREGATION_LABELS[mapping.aggregation]} rows`;
 
-  if (mapping.filters.length === 0) return head;
-  return `${head} where ${mapping.filters
-    .map((f) => describeFilter(f, columns, labels))
-    .join(" and ")}`;
+  const scoped = mapping.filters.length === 0 ? head : `${head} where ${list(mapping.filters)}`;
+
+  const numerator = mapping.numeratorFilters ?? [];
+  if (numerator.length === 0) return scoped;
+  return `${scoped} · counting ${list(numerator)}`;
 }
