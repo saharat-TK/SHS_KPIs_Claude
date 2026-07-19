@@ -190,41 +190,59 @@ const POP = [
 const NUM = [POP[0]];
 
 test("percent_of and ratio_of compare row counts when given no column", () => {
-  assert.equal(aggregate("percent_of", null, POP, NUM), 25);
-  assert.equal(aggregate("ratio_of", null, POP, NUM), 0.25);
+  assert.equal(aggregate("percent_of", null, POP, { numerator: NUM }), 25);
+  assert.equal(aggregate("ratio_of", null, POP, { numerator: NUM }), 0.25);
 });
 
 test("percent_of is exactly ratio_of × 100 on the same rows", () => {
   assert.equal(
-    aggregate("percent_of", null, POP, NUM),
-    aggregate("ratio_of", null, POP, NUM) * 100,
+    aggregate("percent_of", null, POP, { numerator: NUM }),
+    aggregate("ratio_of", null, POP, { numerator: NUM }) * 100,
   );
   assert.equal(
-    aggregate("percent_of", "citations", POP, NUM),
-    aggregate("ratio_of", "citations", POP, NUM) * 100,
+    aggregate("percent_of", "citations", POP, { numerator: NUM }),
+    aggregate("ratio_of", "citations", POP, { numerator: NUM }) * 100,
   );
 });
 
 test("a column switches the proportion from row counts to that column's totals", () => {
   // 10 of (10+20+30+40) — deliberately different from the 25% by row count.
-  assert.equal(aggregate("percent_of", "citations", POP, NUM), 10);
-  assert.equal(aggregate("ratio_of", "citations", POP, NUM), 0.1);
+  assert.equal(aggregate("percent_of", "citations", POP, { numerator: NUM }), 10);
+  assert.equal(aggregate("ratio_of", "citations", POP, { numerator: NUM }), 0.1);
 });
 
 test("a proportion with nothing to divide by is null, not zero", () => {
   // Empty population.
-  assert.equal(aggregate("percent_of", null, [], []), null);
+  assert.equal(aggregate("percent_of", null, [], { numerator: [] }), null);
   // Column present but summing to zero.
   const zeros = [entry({ id: 1, values: { citations: 0 } })];
-  assert.equal(aggregate("percent_of", "citations", zeros, zeros), null);
+  assert.equal(aggregate("percent_of", "citations", zeros, { numerator: zeros }), null);
   // No numerator supplied at all — the caller didn't narrow anything.
   assert.equal(aggregate("percent_of", null, POP), null);
 });
 
 test("a numerator equal to its population is 100 percent", () => {
   // Documents the case validateMappings rejects at save time.
-  assert.equal(aggregate("percent_of", null, POP, POP), 100);
-  assert.equal(aggregate("ratio_of", null, POP, POP), 1);
+  assert.equal(aggregate("percent_of", null, POP, { numerator: POP }), 100);
+  assert.equal(aggregate("ratio_of", null, POP, { numerator: POP }), 1);
+});
+
+test("a fixed denominator divides the matched rows by a headcount", () => {
+  // POP is the numerator outright here — the mapping's filters selected it.
+  assert.equal(aggregate("ratio_of", null, POP, { denominator: 8 }), 0.5);
+  assert.equal(aggregate("percent_of", null, POP, { denominator: 8 }), 50);
+  // With a column it divides that column's total instead of the row count.
+  assert.equal(aggregate("ratio_of", "citations", POP, { denominator: 10 }), 10);
+});
+
+test("a fixed denominator of zero or null is null, not a division by zero", () => {
+  assert.equal(aggregate("ratio_of", null, POP, { denominator: 0 }), null);
+  assert.equal(aggregate("ratio_of", null, POP, { denominator: null }), null);
+});
+
+test("a fixed denominator wins over a numerator subset", () => {
+  // Guard: the two are mutually exclusive, and faculty-mode never sets numerator.
+  assert.equal(aggregate("ratio_of", null, POP, { denominator: 8, numerator: NUM }), 0.5);
 });
 
 // ── validation ──────────────────────────────────────────────────────────────
@@ -416,6 +434,53 @@ test("validateMappings validates numerator conditions like any other", () => {
   );
 });
 
+test("validateMappings requires ranks for a faculty denominator and drops the numerator list", () => {
+  const out = validateMappings(COLUMNS, "quarterly", [
+    mapping({
+      aggregation: "ratio_of",
+      denominatorSource: "faculty",
+      facultyRanks: ["Lecturer", "Professor"],
+      filters: [F("quartile", "eq", "Q1")],
+      // Meaningless once the roster supplies the divisor.
+      numeratorFilters: [F("citations", "gte", 5)],
+    }),
+  ]);
+  assert.equal(out[0].denominatorSource, "faculty");
+  assert.deepEqual(out[0].facultyRanks, ["Lecturer", "Professor"]);
+  assert.equal(out[0].numeratorFilters, undefined);
+  // The rows-mode "needs a numerator condition" rule must not fire here.
+  assert.deepEqual(out[0].filters, [{ field: "quartile", operator: "eq", value: "Q1" }]);
+
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "ratio_of", denominatorSource: "faculty", facultyRanks: [] }),
+      ]),
+    /at least one faculty rank/,
+  );
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({
+          aggregation: "ratio_of",
+          denominatorSource: "faculty",
+          facultyRanks: ["Dean"],
+        }),
+      ]),
+    /Unknown faculty rank "Dean"/,
+  );
+});
+
+test("validateMappings rejects a denominator source on a kind that has no denominator", () => {
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "sum", columnKey: "citations", denominatorSource: "faculty" }),
+      ]),
+    /no denominator to choose a source for/,
+  );
+});
+
 test("validateMappings tolerates an absent mapping list", () => {
   assert.deepEqual(validateMappings(COLUMNS, "quarterly", null), []);
   assert.deepEqual(validateMappings(COLUMNS, "quarterly", undefined), []);
@@ -469,6 +534,30 @@ test("describeMapping spells out both sides of a proportion", () => {
       COLUMNS,
     ),
     "Percent of Citations · counting Quartile is Q1",
+  );
+});
+
+test("describeMapping names the roster and its currentness for a faculty denominator", () => {
+  const base = {
+    aggregation: "ratio_of",
+    denominatorSource: "faculty",
+    filters: [F("quartile", "eq", "Q1")],
+  };
+  // The default academic selection reads as an exclusion.
+  assert.equal(
+    describeMapping(
+      mapping({
+        ...base,
+        facultyRanks: ["Professor", "Associate Professor", "Assistant Professor", "Lecturer"],
+      }),
+      COLUMNS,
+    ),
+    "Ratio of rows where Quartile is Q1 · per current active faculty member (excluding Support Staff)",
+  );
+  // A narrow selection is listed instead.
+  assert.equal(
+    describeMapping(mapping({ ...base, facultyRanks: ["Lecturer"] }), COLUMNS),
+    "Ratio of rows where Quartile is Q1 · per current active faculty member (Lecturer only)",
   );
 });
 

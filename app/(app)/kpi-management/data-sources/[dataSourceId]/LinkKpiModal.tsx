@@ -29,14 +29,19 @@ import { unitNeedsDivisor } from "@/lib/kpi/progress";
 import { buildCellLabels } from "@/lib/kpi/programs";
 import { PROGRAMS } from "@/lib/kpi/programs";
 import { formatNumber } from "@/lib/utils";
+import { ACADEMIC_RANKS, RANKS } from "@/lib/types";
+import { facultyHeadcount } from "@/lib/kpi/facultyHeadcount";
 import type {
   AggregationKind,
   DataSourceColumn,
   DataSourceFilter,
   DataSourceLink,
   DataSourceLinkMapping,
+  DenominatorSource,
+  FacultyRecord,
   FilterOperator,
   MappingSlot,
+  Rank,
 } from "@/lib/types";
 
 const SLOT_LABELS: Record<MappingSlot, string> = {
@@ -63,10 +68,14 @@ interface DraftMapping {
   slot: MappingSlot;
   aggregation: AggregationKind;
   columnKey: string;
-  /** The population — the denominator for the proportion kinds. */
+  /** Which rows count. Doubles as the population under a "rows" denominator. */
   filters: DraftFilter[];
-  /** Narrows the numerator within it. Proportion kinds only. */
+  /** Narrows the numerator within it. Proportion kinds, "rows" denominator only. */
   numeratorFilters: DraftFilter[];
+  /** Proportion kinds only. */
+  denominatorSource: DenominatorSource;
+  /** Which ranks the headcount counts, when the denominator is the roster. */
+  facultyRanks: Rank[];
 }
 
 const newFilter = (field = ""): DraftFilter => ({
@@ -94,6 +103,8 @@ const newMapping = (slot: MappingSlot = "value"): DraftMapping => ({
   columnKey: "",
   filters: [],
   numeratorFilters: [],
+  denominatorSource: "rows",
+  facultyRanks: ACADEMIC_RANKS,
 });
 
 const filterToDraft = (f: DataSourceFilter): DraftFilter => ({
@@ -113,6 +124,8 @@ function toDraft(m: DataSourceLinkMapping): DraftMapping {
     columnKey: m.columnKey ?? "",
     filters: (m.filters ?? []).map(filterToDraft),
     numeratorFilters: (m.numeratorFilters ?? []).map(filterToDraft),
+    denominatorSource: m.denominatorSource ?? "rows",
+    facultyRanks: m.facultyRanks ?? ACADEMIC_RANKS,
   };
 }
 
@@ -137,10 +150,12 @@ const toPayload = (d: DraftMapping): DataSourceLinkMapping => ({
   aggregation: d.aggregation,
   columnKey: aggregationAllowsColumn(d.aggregation) ? d.columnKey || null : null,
   filters: filtersToPayload(d.filters),
-  // Only the proportion kinds carry a numerator list; omit it elsewhere so a
-  // leftover from switching kinds can't be stored.
+  // Only the proportion kinds carry the denominator fields, and each mode
+  // carries only its own — so a leftover from switching can't be stored.
   ...(isProportionKind(d.aggregation)
-    ? { numeratorFilters: filtersToPayload(d.numeratorFilters) }
+    ? d.denominatorSource === "faculty"
+      ? { denominatorSource: "faculty" as const, facultyRanks: d.facultyRanks }
+      : { numeratorFilters: filtersToPayload(d.numeratorFilters) }
     : {}),
 });
 
@@ -326,6 +341,7 @@ export function LinkKpiModal({
                   columns={columns}
                   entries={entries}
                   labels={labels}
+                  faculty={facultyQ.data ?? []}
                   allowsVariables={allowsVariables}
                   onChange={(patch) => updateMapping(m.key, patch)}
                   onRemove={() =>
@@ -417,6 +433,7 @@ function MappingCard({
   columns,
   entries,
   labels,
+  faculty,
   allowsVariables,
   onChange,
   onRemove,
@@ -425,6 +442,7 @@ function MappingCard({
   columns: DataSourceColumn[];
   entries: { id: number; year: number; quarter: number | null; values: Record<string, unknown> }[];
   labels: Record<string, string>;
+  faculty: FacultyRecord[];
   allowsVariables: boolean;
   onChange: (patch: Partial<DraftMapping>) => void;
   onRemove: () => void;
@@ -432,6 +450,10 @@ function MappingCard({
   const numberColumns = columns.filter((c) => c.dataType === "number");
 
   const isProportion = isProportionKind(mapping.aggregation);
+  const byFaculty = isProportion && mapping.denominatorSource === "faculty";
+  // Same helper the server feeds with, so the preview can't disagree with the
+  // number that ends up stored.
+  const headcount = facultyHeadcount(faculty, mapping.facultyRanks);
 
   // Live preview. Filters that are still half-typed throw inside matchesFilters,
   // so treat any error as "not previewable yet" rather than crashing the modal.
@@ -448,29 +470,30 @@ function MappingCard({
         matchesFilters(e as never, columns, payload.filters),
       );
       // Mirror the server: narrow within the matched population, not the window.
-      const numerator = isProportion
-        ? matched.filter((e) =>
-            matchesFilters(e as never, columns, payload.numeratorFilters ?? []),
-          )
-        : undefined;
+      const numerator =
+        isProportion && !byFaculty
+          ? matched.filter((e) =>
+              matchesFilters(e as never, columns, payload.numeratorFilters ?? []),
+            )
+          : undefined;
+      const proportion = byFaculty
+        ? { denominator: headcount }
+        : numerator
+          ? { numerator: numerator as never }
+          : undefined;
       return {
         matched: matched.length,
         total: entries.length,
         numerator: numerator?.length ?? null,
-        value: aggregate(
-          mapping.aggregation,
-          payload.columnKey,
-          matched as never,
-          numerator as never,
-        ),
+        value: aggregate(mapping.aggregation, payload.columnKey, matched as never, proportion),
         pending:
           ready.length !== mapping.filters.length ||
-          readyNum.length !== mapping.numeratorFilters.length,
+          (!byFaculty && readyNum.length !== mapping.numeratorFilters.length),
       };
     } catch {
       return null;
     }
-  }, [mapping, columns, entries, isProportion]);
+  }, [mapping, columns, entries, isProportion, byFaculty, headcount]);
 
   return (
     <div className="rounded-md border border-hairline p-md">
@@ -544,12 +567,38 @@ function MappingCard({
       </div>
 
       <div className="mt-md flex flex-col gap-sm border-t border-hairline pt-md">
+        {isProportion && (
+          <div className="flex flex-wrap items-center gap-md pb-sm">
+            <span className="text-label-md text-on-surface">Out of</span>
+            {(
+              [
+                ["rows", "Rows of this data source"],
+                ["faculty", "Faculty headcount"],
+              ] as [DenominatorSource, string][]
+            ).map(([value, label]) => (
+              <label key={value} className="flex items-center gap-xs text-body-sm">
+                <input
+                  type="radio"
+                  name={`denom-${mapping.key}`}
+                  checked={mapping.denominatorSource === value}
+                  onChange={() => onChange({ denominatorSource: value })}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        )}
+
         <ConditionList
-          heading={isProportion ? "Out of rows where…" : undefined}
+          heading={
+            byFaculty ? "Count rows where…" : isProportion ? "Out of rows where…" : undefined
+          }
           emptyText={
-            isProportion
-              ? "No conditions — every row of this data source is the denominator."
-              : "No conditions — every row of this data source counts."
+            byFaculty
+              ? "No conditions — every row of this data source counts toward the top."
+              : isProportion
+                ? "No conditions — every row of this data source is the denominator."
+                : "No conditions — every row of this data source counts."
           }
           filters={mapping.filters}
           columns={columns}
@@ -557,7 +606,7 @@ function MappingCard({
           onChange={(filters) => onChange({ filters })}
         />
 
-        {isProportion && (
+        {isProportion && !byFaculty && (
           <div className="mt-sm border-t border-hairline pt-md">
             <ConditionList
               heading="Of those, count rows where…"
@@ -570,13 +619,46 @@ function MappingCard({
           </div>
         )}
 
+        {byFaculty && (
+          <div className="mt-sm flex flex-col gap-xs border-t border-hairline pt-md">
+            <span className="text-label-md text-on-surface">Divide by active faculty</span>
+            <div className="flex flex-wrap gap-md">
+              {RANKS.map((rank) => (
+                <label key={rank} className="flex items-center gap-xs text-body-sm">
+                  <input
+                    type="checkbox"
+                    checked={mapping.facultyRanks.includes(rank)}
+                    onChange={(e) =>
+                      onChange({
+                        // Keep RANKS order rather than click order, so the
+                        // stored list and the description read consistently.
+                        facultyRanks: RANKS.filter((r) =>
+                          r === rank ? e.target.checked : mapping.facultyRanks.includes(r),
+                        ),
+                      })
+                    }
+                  />
+                  {rank}
+                </label>
+              ))}
+            </div>
+            <p className="text-caption-sm text-mute">
+              {mapping.facultyRanks.length === 0
+                ? "Pick at least one rank — there is nothing to divide by."
+                : `${headcount} active ${headcount === 1 ? "person" : "people"}. Uses the current roster, so earlier quarters are divided by today's headcount.`}
+            </p>
+          </div>
+        )}
+
         {preview && (
           <div className="flex justify-end">
             <span className="text-caption-sm text-mute">
               <Badge tone={preview.matched > 0 ? "success" : "warning"}>
-                {isProportion
-                  ? `${preview.numerator} of ${preview.matched} rows`
-                  : `${preview.matched} of ${preview.total} rows`}
+                {byFaculty
+                  ? `${preview.matched} rows ÷ ${headcount} faculty`
+                  : isProportion
+                    ? `${preview.numerator} of ${preview.matched} rows`
+                    : `${preview.matched} of ${preview.total} rows`}
               </Badge>{" "}
               {preview.pending
                 ? "· finish the condition to preview"
