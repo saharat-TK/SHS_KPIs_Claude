@@ -28,7 +28,7 @@ const EXPECTED_COLUMNS = {
   published_date: { dataType: "date", isRequired: true },
   end_date: { dataType: "date", isRequired: false },
   owner: { dataType: "faculty", isRequired: true },
-  link: { dataType: "text", isRequired: true },
+  link: { dataType: "url", isRequired: true },
 };
 
 const ROWS = [

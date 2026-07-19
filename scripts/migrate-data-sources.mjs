@@ -30,7 +30,7 @@ async function columnType(conn, table, column) {
 
 // Column-level upgrades for databases created before a given feature landed.
 // Each entry is guarded by its own check, so re-running is a no-op.
-const COLUMN_TYPE_DDL = `ENUM('text','number','date','select','boolean','faculty','program') NOT NULL DEFAULT 'text'`;
+const COLUMN_TYPE_DDL = `ENUM('text','url','number','date','select','boolean','faculty','program') NOT NULL DEFAULT 'text'`;
 
 async function columnExists(conn, table, column) {
   return (await columnType(conn, table, column)) != null;
@@ -66,14 +66,18 @@ async function ensureMetricIsComputed(conn) {
   );
 }
 
-async function ensureDerivedColumnTypes(conn) {
+async function ensureColumnTypes(conn) {
   const current = await columnType(conn, "data_source_column", "data_type");
   if (current == null) return; // table was just created with the full ENUM
-  if (current.includes("'faculty'") && current.includes("'program'")) {
-    console.log("data_source_column.data_type already has faculty/program — skipping.");
+  if (
+    current.includes("'url'") &&
+    current.includes("'faculty'") &&
+    current.includes("'program'")
+  ) {
+    console.log("data_source_column.data_type already has all column types — skipping.");
     return;
   }
-  console.log("Adding 'faculty' and 'program' to data_source_column.data_type…");
+  console.log("Adding missing data_source_column.data_type values…");
   await conn.query(
     `ALTER TABLE data_source_column MODIFY COLUMN data_type ${COLUMN_TYPE_DDL}`,
   );
@@ -104,7 +108,7 @@ const TABLES = [
        data_source_id BIGINT UNSIGNED NOT NULL,
        col_key        VARCHAR(40)  NOT NULL,
        label          VARCHAR(255) NOT NULL,
-       data_type      ENUM('text','number','date','select','boolean','faculty','program') NOT NULL DEFAULT 'text',
+       data_type      ENUM('text','url','number','date','select','boolean','faculty','program') NOT NULL DEFAULT 'text',
        unit           VARCHAR(50)  NULL,
        options        JSON NULL,
        is_required    TINYINT(1) NOT NULL DEFAULT 0,
@@ -178,7 +182,7 @@ async function main() {
       for (const idx of indexes) await conn.query(idx);
     }
 
-    await ensureDerivedColumnTypes(conn);
+    await ensureColumnTypes(conn);
     await ensureLinkMappings(conn);
     await ensureMetricIsComputed(conn);
     console.log("Migration complete.");

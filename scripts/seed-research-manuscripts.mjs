@@ -4,7 +4,7 @@ const EXPECTED_COLUMNS = {
   title: { dataType: "text", isRequired: true },
   status: { dataType: "select", isRequired: true, options: ["Manuscript", "Submitted", "Accepted", "Published"] },
   status_s_date: { dataType: "date", isRequired: true },
-  doi_link: { dataType: "text", isRequired: false },
+  doi_link: { dataType: "url", isRequired: false },
   journal_name: { dataType: "text", isRequired: true },
   quartile: { dataType: "select", isRequired: false, options: ["Q1-Tier", "Q1", "Q2", "Q3", "Q4", "TCI1", "TCI2", "TCI3"] },
   first_author: { dataType: "faculty", isRequired: true },

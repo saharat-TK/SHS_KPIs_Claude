@@ -471,7 +471,7 @@ CREATE TABLE data_source_column (
   data_source_id BIGINT UNSIGNED NOT NULL,
   col_key        VARCHAR(40)  NOT NULL,                -- slug, e.g. "student_count"
   label          VARCHAR(255) NOT NULL,
-  data_type      ENUM('text','number','date','select','boolean',
+  data_type      ENUM('text','url','number','date','select','boolean',
                       'faculty','program') NOT NULL DEFAULT 'text',
                                                        -- faculty: stores a faculty.id ("fac-001")
                                                        -- program: stores a PROGRAMS abbr ("PH")

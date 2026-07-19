@@ -499,6 +499,7 @@ export type DataSourcePeriodGrain = "quarterly" | "annual";
 export type DataSourceStatus = "active" | "archived";
 export type DataSourceColumnType =
   | "text"
+  | "url"
   | "number"
   | "date"
   | "select"
