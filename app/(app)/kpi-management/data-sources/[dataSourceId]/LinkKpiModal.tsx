@@ -497,7 +497,9 @@ function MappingCard({
 
   return (
     <div className="rounded-md border border-hairline p-md">
-      <div className="flex flex-wrap items-end gap-sm">
+      {/* Top-aligned: the Column field's hint makes it taller than its
+          neighbours, and bottom-alignment would push their labels out of line. */}
+      <div className="flex flex-wrap items-start gap-sm">
         {allowsVariables && (
           <div className="w-48">
             <Field label="Feeds">
@@ -560,7 +562,9 @@ function MappingCard({
           aria-label="Remove mapping"
           title="Remove mapping"
           onClick={onRemove}
-          className="mb-xs grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
+          // mt-xl skips past the Field-label row, so this lines up with the
+          // inputs now that the group is top- rather than bottom-aligned.
+          className="mt-xl grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
         >
           <Icon name="delete" className="text-[18px]" />
         </button>
