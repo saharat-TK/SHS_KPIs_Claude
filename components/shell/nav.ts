@@ -56,6 +56,11 @@ export const NAV: NavGroup[] = [
             icon: "assessment",
           },
           {
+            label: "Data Sources",
+            href: "/kpi-management/data-sources",
+            icon: "database",
+          },
+          {
             label: "KPIs Library",
             href: "/kpi-management/library",
             icon: "library_books",

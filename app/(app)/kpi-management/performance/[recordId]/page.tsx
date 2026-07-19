@@ -27,6 +27,7 @@ import {
   useKpiCategories,
   usePerformancePeriods,
   useSyncPerformanceRecord,
+  useRecomputeFromDataSources,
   useRecordApprovals,
 } from "@/lib/data/hooks";
 import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
@@ -69,6 +70,7 @@ function PerformanceRecordDetail() {
   const categoriesQ = useKpiCategories(record?.sourceSetId, { enabled: !!record });
   const periodsQ = usePerformancePeriods(recordId);
   const sync = useSyncPerformanceRecord();
+  const recompute = useRecomputeFromDataSources();
 
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
 
@@ -146,6 +148,17 @@ function PerformanceRecordDetail() {
                 onClick={() => sync.mutate(recordId)}
               >
                 {sync.isPending ? "Syncing…" : "Sync from Library"}
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                variant="outline"
+                icon="database"
+                disabled={recompute.isPending}
+                title="Recompute the values that data sources feed into this record"
+                onClick={() => recompute.mutate(recordId)}
+              >
+                {recompute.isPending ? "Recomputing…" : "Recompute from Data Sources"}
               </Button>
             )}
           </>

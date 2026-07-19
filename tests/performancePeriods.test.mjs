@@ -7,7 +7,21 @@ import {
   normalizePerformancePeriodInput,
   openPeriodSummary,
   openQuartersForYear,
+  yearForYearNo,
+  yearNoForYear,
 } from "../lib/kpi/performancePeriods.ts";
+
+test("yearForYearNo and yearNoForYear are inverses across the span", () => {
+  assert.equal(yearForYearNo(2568, 1), 2568);
+  assert.equal(yearForYearNo(2568, 5), 2572);
+  assert.equal(yearNoForYear(2568, 2568), 1);
+  assert.equal(yearNoForYear(2568, 2572), 5);
+});
+
+test("yearNoForYear returns null outside the five-year span", () => {
+  assert.equal(yearNoForYear(2568, 2567), null);
+  assert.equal(yearNoForYear(2568, 2573), null);
+});
 
 test("buildPerformancePeriodMatrix returns twenty closed periods by default", () => {
   const periods = buildPerformancePeriodMatrix([]);

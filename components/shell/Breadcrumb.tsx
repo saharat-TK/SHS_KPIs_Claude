@@ -15,6 +15,7 @@ const LABELS: Record<string, string> = {
   "kpi-management": "KPI Management",
   library: "KPIs Library",
   performance: "Performance Records",
+  "data-sources": "Data Sources",
   metrics: "Metrics",
   formulas: "Formulas",
   builder: "Formula Builder",

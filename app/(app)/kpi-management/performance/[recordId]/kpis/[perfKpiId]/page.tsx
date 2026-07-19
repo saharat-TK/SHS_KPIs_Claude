@@ -236,11 +236,15 @@ function PerfKpiProgress() {
               thresholdGreen={kpi.thresholdGreen}
               thresholdAmber={kpi.thresholdAmber}
               unit={kpi.unit}
-              valueEditable={!kpi.hasChildren}
+              // A fed KPI is as computed as a rolled-up one — typing over it
+              // would just be overwritten by the next feed.
+              valueEditable={!kpi.hasChildren && !kpi.fedBy}
               computedNote={
                 kpi.hasChildren
                   ? "This KPI's quarterly value is computed from its sub-KPIs. Enter each sub-KPI's progress below."
-                  : undefined
+                  : kpi.fedBy
+                    ? `This KPI's quarterly value is computed from the data source “${kpi.fedBy.dataSourceName}”. Edit the raw data there to change it.`
+                    : undefined
               }
               periods={periodsQ.data ?? []}
               periodsLoading={periodsQ.isLoading}
@@ -401,7 +405,7 @@ function PerfKpiProgress() {
               }
             />
 
-            {!kpi.hasChildren && (
+            {!kpi.hasChildren && !kpi.fedBy && (
               <div className="flex items-center gap-sm text-caption-sm text-mute">
                 <Badge tone="neutral">leaf KPI</Badge>
                 Values are entered directly per quarter above.

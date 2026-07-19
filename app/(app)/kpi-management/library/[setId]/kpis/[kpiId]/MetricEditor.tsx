@@ -39,6 +39,7 @@ import {
   type MetricTargetMode,
 } from "@/lib/types";
 import { personsForCommittee } from "@/lib/kpi/committee";
+import { PROGRAMS } from "@/lib/kpi/programs";
 
 function toYearSlots(targets: AnnualTarget[] | undefined): (number | null)[] {
   const slots: (number | null)[] = [null, null, null, null, null];
@@ -65,15 +66,9 @@ const ZERO_YEARS: (number | null)[] = [0, 0, 0, 0, 0];
 
 // Batch presets — each entry prefixes `${abbr}-` onto the parent KPI's name.
 // `label` is the Thai program/curriculum name, shown for reference in the dialog.
+// The program list lives in lib/kpi/programs.ts because the `program` data-source
+// column type shares it; curriculums are used only here.
 type BatchEntry = { abbr: string; label: string };
-
-const PROGRAM_BATCH: BatchEntry[] = [
-  { abbr: "PH", label: "สาขาวิชาสาธารณสุขศาสตร์" },
-  { abbr: "SHS", label: "สาขาวิชาวิทยาศาสตร์การกีฬาและสุขภาพ" },
-  { abbr: "OHS", label: "สาขาวิชาอาชีวอนามัยและความปลอดภัย" },
-  { abbr: "EnvH", label: "สาขาวิชาอนามัยสิ่งแวดล้อม" },
-  { abbr: "BM", label: "สาขาวิชาเทคโนโลยีชีวการแพทย์และสารสนเทศสุขภาพ" },
-];
 
 const CURRICULUM_BATCH: BatchEntry[] = [
   { abbr: "PHB", label: "สาธารณสุขศาสตร์" },
@@ -157,7 +152,7 @@ export function MetricEditor({
               icon="groups"
               disabled={!canAddMetric}
               title={batchTooltip}
-              onClick={() => setBatch({ title: "Batch: 5 Programs", entries: PROGRAM_BATCH })}
+              onClick={() => setBatch({ title: "Batch: 5 Programs", entries: PROGRAMS })}
             >
               Batch: 5 Programs
             </Button>

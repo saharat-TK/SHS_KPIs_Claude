@@ -1,6 +1,15 @@
 import type {
   Committee,
   CommitteeMembership,
+  DataSource,
+  DataSourceCellValue,
+  DataSourceColumn,
+  DataSourceColumnType,
+  DataSourceEntry,
+  DataSourceLink,
+  DataSourceLinkMapping,
+  DataSourcePeriodGrain,
+  DataSourceStatus,
   FacultyMember,
   FacultyRecord,
   Formula,
@@ -556,6 +565,15 @@ export const performanceRecordsRepo = {
       await fetch(`/api/performance-records/${id}/sync`, { method: "POST" }),
       "Failed to sync performance record",
     ),
+  recomputeFromSources: async (
+    id: number,
+  ): Promise<{ updated: number; skipped: unknown[]; summary: string }> =>
+    jsonOrThrow(
+      await fetch(`/api/performance-records/${id}/recompute-from-sources`, {
+        method: "POST",
+      }),
+      "Failed to recompute from data sources",
+    ),
   periods: async (id: number): Promise<PerformancePeriod[]> =>
     jsonOrThrow(
       await fetch(`/api/performance-records/${id}/periods`),
@@ -676,6 +694,178 @@ export const approvalsRepo = {
       "Failed to update approval",
     ),
 };
+
+// ── KPI Management — Data sources (committee raw data, DB-backed) ────────────
+export const dataSourcesRepo = {
+  list: async (filter?: { committeeId?: string; status?: DataSourceStatus }): Promise<DataSource[]> => {
+    const qs = new URLSearchParams();
+    if (filter?.committeeId) qs.set("committeeId", filter.committeeId);
+    if (filter?.status) qs.set("status", filter.status);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return jsonOrThrow(await fetch(`/api/data-sources${suffix}`), "Failed to load data sources");
+  },
+  get: async (id: number): Promise<DataSource> =>
+    jsonOrThrow(await fetch(`/api/data-sources/${id}`), "Failed to load data source"),
+  create: async (input: {
+    name: string;
+    description?: string;
+    committeeId: string;
+    periodGrain: DataSourcePeriodGrain;
+    createdBy?: string;
+  }): Promise<DataSource> =>
+    jsonOrThrow(
+      await fetch("/api/data-sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to create data source",
+    ),
+  update: async (
+    id: number,
+    patch: {
+      name?: string;
+      description?: string | null;
+      committeeId?: string;
+      periodGrain?: DataSourcePeriodGrain;
+      status?: DataSourceStatus;
+    },
+  ): Promise<DataSource> =>
+    jsonOrThrow(
+      await fetch(`/api/data-sources/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update data source",
+    ),
+  remove: async (id: number): Promise<{ id: number }> =>
+    jsonOrThrow(
+      await fetch(`/api/data-sources/${id}`, { method: "DELETE" }),
+      "Failed to delete data source",
+    ),
+
+  columns: async (id: number): Promise<DataSourceColumn[]> =>
+    jsonOrThrow(await fetch(`/api/data-sources/${id}/columns`), "Failed to load columns"),
+  saveColumns: async (
+    id: number,
+    columns: DataSourceColumnInput[],
+  ): Promise<DataSourceColumn[]> =>
+    jsonOrThrow(
+      await fetch(`/api/data-sources/${id}/columns`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columns }),
+      }),
+      "Failed to save columns",
+    ),
+
+  entries: async (
+    id: number,
+    filter?: { year?: number; quarter?: number },
+  ): Promise<DataSourceEntry[]> => {
+    const qs = new URLSearchParams();
+    if (filter?.year) qs.set("year", String(filter.year));
+    if (filter?.quarter) qs.set("quarter", String(filter.quarter));
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return jsonOrThrow(
+      await fetch(`/api/data-sources/${id}/entries${suffix}`),
+      "Failed to load entries",
+    );
+  },
+  createEntry: async (id: number, input: DataSourceEntryInput): Promise<DataSourceEntry> =>
+    jsonOrThrow(
+      await fetch(`/api/data-sources/${id}/entries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to record entry",
+    ),
+  updateEntry: async (
+    entryId: number,
+    input: Partial<DataSourceEntryInput>,
+  ): Promise<DataSourceEntry> =>
+    jsonOrThrow(
+      await fetch(`/api/data-source-entries/${entryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to update entry",
+    ),
+  // The actor rides in the query string: these DELETEs carry no body.
+  removeEntry: async (
+    entryId: number,
+    actor: { actorId?: string; userRole?: string },
+  ): Promise<{ id: number }> => {
+    const qs = new URLSearchParams();
+    if (actor.actorId) qs.set("actorId", actor.actorId);
+    if (actor.userRole) qs.set("userRole", actor.userRole);
+    return jsonOrThrow(
+      await fetch(`/api/data-source-entries/${entryId}?${qs}`, { method: "DELETE" }),
+      "Failed to delete entry",
+    );
+  },
+
+  links: async (id: number): Promise<DataSourceLink[]> =>
+    jsonOrThrow(await fetch(`/api/data-sources/${id}/links`), "Failed to load links"),
+  createLink: async (id: number, input: DataSourceLinkInput): Promise<DataSourceLink> =>
+    jsonOrThrow(
+      await fetch(`/api/data-sources/${id}/links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to link data source",
+    ),
+  updateLink: async (
+    linkId: number,
+    patch: { mappings?: DataSourceLinkMapping[]; note?: string | null },
+  ): Promise<DataSourceLink> =>
+    jsonOrThrow(
+      await fetch(`/api/data-source-links/${linkId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update link",
+    ),
+  removeLink: async (linkId: number): Promise<{ id: number }> =>
+    jsonOrThrow(
+      await fetch(`/api/data-source-links/${linkId}`, { method: "DELETE" }),
+      "Failed to remove link",
+    ),
+};
+
+/** A column as sent to saveColumns: `id` present = keep (and keep its col_key). */
+export interface DataSourceColumnInput {
+  id?: number;
+  colKey?: string;
+  label: string;
+  dataType: DataSourceColumnType;
+  unit?: string | null;
+  options?: string[] | null;
+  isRequired?: boolean;
+}
+
+/** One shared shape for creating a link, so the route body, the repo and the
+ *  hook cannot drift apart. */
+export interface DataSourceLinkInput {
+  libraryKpiId?: number;
+  libraryMetricId?: number;
+  mappings?: DataSourceLinkMapping[];
+  note?: string;
+}
+
+export interface DataSourceEntryInput {
+  year: number;
+  quarter: number | null;
+  values: Record<string, DataSourceCellValue>;
+  note?: string | null;
+  actorId?: string;
+  userRole?: string;
+}
 
 export type {
   Committee,

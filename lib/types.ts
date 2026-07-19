@@ -402,6 +402,8 @@ export interface PerfKpi extends Omit<LibraryKpi, "id" | "setId" | "annualTarget
   annualTargets?: AnnualTarget[];
   progress?: QuarterProgress[];
   startYear?: number; // from the parent performance_record (detail view)
+  /** Set when a data source computes this KPI's value (derived, not stored). */
+  fedBy?: { dataSourceId: number; dataSourceName: string } | null;
 }
 
 export interface PerfMetric extends Omit<LibraryMetric, "id" | "kpiId" | "annualTargets" | "targetMode"> {
@@ -487,4 +489,114 @@ export interface ApprovalEvent {
   toState: ApprovalState;
   comment: string | null;
   createdAt: string;
+}
+
+// ── Data sources (LAYER D) ──────────────────────────────────────────────────
+// Mirrors schema/SHS_KPI_Management_schema.sql data_source[_column|_entry|_link].
+// Committee-owned raw data; linked to library KPIs/metrics as evidence.
+
+export type DataSourcePeriodGrain = "quarterly" | "annual";
+export type DataSourceStatus = "active" | "archived";
+export type DataSourceColumnType =
+  | "text"
+  | "number"
+  | "date"
+  | "select"
+  | "boolean"
+  // Derived-option types: the user does not author their options, so `options`
+  // stays NULL in the DB and is resolved at validation/render time instead.
+  | "faculty" // stores a faculty.id ("fac-001")
+  | "program"; // stores a PROGRAMS abbr ("PH")
+
+/** A cell value as stored in data_source_entry.values_json. */
+export type DataSourceCellValue = string | number | boolean | null;
+
+export interface DataSource {
+  id: number;
+  name: string;
+  description: string | null;
+  committeeId: string;
+  periodGrain: DataSourcePeriodGrain;
+  status: DataSourceStatus;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Joined/derived on the list endpoint:
+  committeeName?: string;
+  columnCount?: number;
+  entryCount?: number;
+  linkCount?: number;
+}
+
+export interface DataSourceColumn {
+  id: number;
+  dataSourceId: number;
+  colKey: string;
+  label: string;
+  dataType: DataSourceColumnType;
+  unit: string | null;
+  /** Allowed values; only meaningful when dataType is "select". */
+  options: string[] | null;
+  isRequired: boolean;
+  sortOrder: number;
+}
+
+/** One recorded row. `quarter` is null when the source's grain is "annual". */
+export interface DataSourceEntry {
+  id: number;
+  dataSourceId: number;
+  year: number;
+  quarter: number | null;
+  values: Record<string, DataSourceCellValue>;
+  note: string | null;
+  recordedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  recordedByName?: string;
+}
+
+/** Which rows of a data source count, and how they turn into a number. */
+export type FilterOperator = "eq" | "gte" | "lte" | "between";
+
+/** One condition. `field` is a data_source_column.col_key, or PERIOD_FIELD
+ *  ("__period") for the entry's own year/quarter. `valueTo` is set only for
+ *  "between", where both bounds are inclusive. */
+export interface DataSourceFilter {
+  field: string;
+  operator: FilterOperator;
+  /** Same shape as a stored cell, so a boolean column's filter is a boolean. */
+  value: DataSourceCellValue;
+  valueTo?: DataSourceCellValue;
+}
+
+export type AggregationKind = "sum" | "avg" | "count" | "latest";
+
+/** Where the aggregated number lands on the target. A percent/ratio KPI takes
+ *  two mappings (variable1 = dividend, variable2 = divisor); everything else
+ *  takes one "value". */
+export type MappingSlot = "value" | "variable1" | "variable2";
+
+export interface DataSourceLinkMapping {
+  slot: MappingSlot;
+  aggregation: AggregationKind;
+  /** The column being aggregated. Null (and unused) when aggregation is "count". */
+  columnKey: string | null;
+  filters: DataSourceFilter[];
+}
+
+/** Feed edge from a data source to a library KPI or metric. Exactly one of
+ *  libraryKpiId / libraryMetricId is set. `mappings` says which rows produce the
+ *  target's quarterly value; an empty array means the link is evidence only. */
+export interface DataSourceLink {
+  id: number;
+  dataSourceId: number;
+  libraryKpiId: number | null;
+  libraryMetricId: number | null;
+  mappings: DataSourceLinkMapping[];
+  note: string | null;
+  // Joined for display:
+  kpiName?: string;
+  metricName?: string;
+  setName?: string;
+  dataSourceName?: string;
 }

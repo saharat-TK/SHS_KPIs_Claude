@@ -18,6 +18,9 @@ import type {
 } from "@/lib/types";
 import type {
   AnnualTarget,
+  DataSource,
+  DataSourceLinkMapping,
+  DataSourceStatus,
   LibraryKpi,
   LibraryMetric,
   PerformancePeriod,
@@ -32,6 +35,10 @@ import {
   type ApprovalTransitionInput,
   committeesRepo,
   committeeMembershipsRepo,
+  dataSourcesRepo,
+  type DataSourceColumnInput,
+  type DataSourceEntryInput,
+  type DataSourceLinkInput,
   facultyRepo,
   facultyRecordsRepo,
   formulasRepo,
@@ -90,6 +97,13 @@ export const qk = {
     ["approvals", recordId, yearNo, quarterNo] as const,
   kpiApproval: (perfKpiId: number, yearNo: number, quarterNo: number) =>
     ["kpiApproval", perfKpiId, yearNo, quarterNo] as const,
+  dataSources: (committeeId?: string, status?: string) =>
+    ["dataSources", committeeId ?? null, status ?? null] as const,
+  dataSource: (id: number) => ["dataSource", id] as const,
+  dataSourceColumns: (id: number) => ["dataSourceColumns", id] as const,
+  dataSourceEntries: (id: number, year?: number, quarter?: number) =>
+    ["dataSourceEntries", id, year ?? null, quarter ?? null] as const,
+  dataSourceLinks: (id: number) => ["dataSourceLinks", id] as const,
 };
 
 // Queries --------------------------------------------------------------------
@@ -665,6 +679,20 @@ export function useSyncPerformanceRecord() {
   });
 }
 
+export function useRecomputeFromDataSources() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => performanceRecordsRepo.recomputeFromSources(id),
+    // The outcome is the message — it says what was skipped and why.
+    meta: { toast: (d) => (d as { summary: string }).summary },
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: qk.perfKpis(id) });
+      qc.invalidateQueries({ queryKey: ["perfKpi"] });
+      qc.invalidateQueries({ queryKey: ["perfMetrics"] });
+    },
+  });
+}
+
 export function useDeletePerformanceRecord() {
   const qc = useQueryClient();
   return useMutation({
@@ -830,5 +858,192 @@ export function useDecideValidation() {
       },
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.validations }),
+  });
+}
+
+// ── Data sources (committee raw data) ───────────────────────────────────────
+export const useDataSources = (filter?: {
+  committeeId?: string;
+  status?: DataSourceStatus;
+}) =>
+  useQuery({
+    queryKey: qk.dataSources(filter?.committeeId, filter?.status),
+    queryFn: () => dataSourcesRepo.list(filter),
+  });
+
+export const useDataSource = (id: number) =>
+  useQuery({
+    queryKey: qk.dataSource(id),
+    queryFn: () => dataSourcesRepo.get(id),
+    enabled: Number.isFinite(id) && id > 0,
+  });
+
+export const useDataSourceColumns = (id: number) =>
+  useQuery({
+    queryKey: qk.dataSourceColumns(id),
+    queryFn: () => dataSourcesRepo.columns(id),
+    enabled: Number.isFinite(id) && id > 0,
+  });
+
+export const useDataSourceEntries = (
+  id: number,
+  filter?: { year?: number; quarter?: number },
+) =>
+  useQuery({
+    queryKey: qk.dataSourceEntries(id, filter?.year, filter?.quarter),
+    queryFn: () => dataSourcesRepo.entries(id, filter),
+    enabled: Number.isFinite(id) && id > 0,
+  });
+
+export const useDataSourceLinks = (id: number) =>
+  useQuery({
+    queryKey: qk.dataSourceLinks(id),
+    queryFn: () => dataSourcesRepo.links(id),
+    enabled: Number.isFinite(id) && id > 0,
+  });
+
+export function useCreateDataSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof dataSourcesRepo.create>[0]) =>
+      dataSourcesRepo.create(input),
+    meta: { toast: (d) => `Data source "${(d as DataSource).name}" created` },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["dataSources"] }),
+  });
+}
+
+export function useUpdateDataSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: number;
+      patch: Parameters<typeof dataSourcesRepo.update>[1];
+    }) => dataSourcesRepo.update(id, patch),
+    meta: { toast: "Data source updated" },
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
+      qc.invalidateQueries({ queryKey: qk.dataSource(id) });
+    },
+  });
+}
+
+export function useDeleteDataSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => dataSourcesRepo.remove(id),
+    meta: { toast: "Data source deleted" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["dataSources"] }),
+  });
+}
+
+export function useSaveDataSourceColumns() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, columns }: { id: number; columns: DataSourceColumnInput[] }) =>
+      dataSourcesRepo.saveColumns(id, columns),
+    meta: { toast: "Columns saved" },
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: qk.dataSourceColumns(id) });
+      // Entries render through the column set, so their view is stale too.
+      qc.invalidateQueries({ queryKey: ["dataSourceEntries", id] });
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
+    },
+  });
+}
+
+export function useCreateDataSourceEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: DataSourceEntryInput }) =>
+      dataSourcesRepo.createEntry(id, input),
+    meta: { toast: "Entry recorded" },
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: ["dataSourceEntries", id] });
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
+    },
+  });
+}
+
+export function useUpdateDataSourceEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      entryId,
+      input,
+    }: {
+      dataSourceId: number;
+      entryId: number;
+      input: Partial<DataSourceEntryInput>;
+    }) => dataSourcesRepo.updateEntry(entryId, input),
+    meta: { toast: "Entry updated" },
+    onSuccess: (_d, { dataSourceId }) =>
+      qc.invalidateQueries({ queryKey: ["dataSourceEntries", dataSourceId] }),
+  });
+}
+
+export function useDeleteDataSourceEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      entryId,
+      actor,
+    }: {
+      dataSourceId: number;
+      entryId: number;
+      actor: { actorId?: string; userRole?: string };
+    }) => dataSourcesRepo.removeEntry(entryId, actor),
+    meta: { toast: "Entry deleted" },
+    onSuccess: (_d, { dataSourceId }) => {
+      qc.invalidateQueries({ queryKey: ["dataSourceEntries", dataSourceId] });
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
+    },
+  });
+}
+
+export function useCreateDataSourceLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: DataSourceLinkInput }) =>
+      dataSourcesRepo.createLink(id, input),
+    meta: { toast: "Linked" },
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: qk.dataSourceLinks(id) });
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
+    },
+  });
+}
+
+export function useUpdateDataSourceLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      linkId,
+      patch,
+    }: {
+      dataSourceId: number;
+      linkId: number;
+      patch: { mappings?: DataSourceLinkMapping[]; note?: string | null };
+    }) => dataSourcesRepo.updateLink(linkId, patch),
+    meta: { toast: "Link updated" },
+    onSuccess: (_d, { dataSourceId }) => {
+      qc.invalidateQueries({ queryKey: qk.dataSourceLinks(dataSourceId) });
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
+    },
+  });
+}
+
+export function useDeleteDataSourceLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ linkId }: { dataSourceId: number; linkId: number }) =>
+      dataSourcesRepo.removeLink(linkId),
+    meta: { toast: "Link removed" },
+    onSuccess: (_d, { dataSourceId }) => {
+      qc.invalidateQueries({ queryKey: qk.dataSourceLinks(dataSourceId) });
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
+    },
   });
 }
