@@ -8,6 +8,7 @@ import {
   activeRecordsHaveKpiProgress,
 } from "@/lib/kpi/performance";
 import { syncInheritedMetricTargetsForKpi } from "@/lib/kpi/targetInheritance";
+import { isCalculationType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,12 @@ export async function PATCH(
 ) {
   try {
     const body = await req.json();
+    if ("calculationType" in body && !isCalculationType(body.calculationType)) {
+      return NextResponse.json(
+        { error: `Unknown calculationType: ${body.calculationType}` },
+        { status: 400 },
+      );
+    }
     const setClauses: string[] = [];
     const values: unknown[] = [];
     for (const [key, column] of Object.entries(COLUMN_MAP)) {

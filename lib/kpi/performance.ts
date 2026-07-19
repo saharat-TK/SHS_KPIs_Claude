@@ -3,20 +3,30 @@
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import type { QuarterlyTargetMode } from "@/lib/types";
 
+// Pooled ratio: totals on both sides, so a metric counts only if it has both a
+// progress value and a usable target — otherwise it would skew the ratio by
+// contributing to one side but not the other.
+function pooledRatio(
+  rows: { value: number | null; target?: number | null }[],
+): number | null {
+  const usable = rows.filter((r) => r.value != null && r.target != null && r.target !== 0);
+  if (usable.length === 0) return null;
+  const totalTarget = usable.reduce((a, r) => a + r.target!, 0);
+  if (totalTarget === 0) return null;
+  return usable.reduce((a, r) => a + r.value!, 0) / totalTarget;
+}
+
 // Roll-up of child metric values for one quarter, per the KPI's calculation
 // type. Nulls (metrics not yet entered) are excluded. custom_formula is not
 // auto-computed here (its variables aren't tied to metrics) → returns null.
 export function rollup(
   calcType: string,
-  unit: string | null,
   rows: { weight: number; value: number | null; target?: number | null }[],
 ): number | null {
-  if (unit?.trim().toLowerCase() === "percent") {
-    const presentPercents = rows
-      .filter((r) => r.value != null && r.target != null && r.target !== 0)
-      .map((r) => (r.value! / r.target!) * 100);
-    if (presentPercents.length === 0) return null;
-    return presentPercents.reduce((a, value) => a + value, 0) / presentPercents.length;
+  if (calcType === "ratio_of_total") return pooledRatio(rows);
+  if (calcType === "percent_of_total") {
+    const ratio = pooledRatio(rows);
+    return ratio === null ? null : ratio * 100;
   }
 
   const present = rows.filter((r) => r.value != null) as { weight: number; value: number }[];
@@ -41,13 +51,13 @@ export async function recomputeKpiQuarter(
   quarterNo: number,
 ) {
   const [kpiRows] = await conn.query<RowDataPacket[]>(
-    "SELECT calculation_type, unit, quarterly_target_mode, has_children FROM perf_kpi WHERE id = ?",
+    "SELECT calculation_type, quarterly_target_mode, has_children FROM perf_kpi WHERE id = ?",
     [perfKpiId],
   );
   if (kpiRows.length === 0 || !kpiRows[0].has_children) return;
 
   // Metrics inherit the parent KPI's quarterly-target mode; the per-metric
-  // quarter target (used by the percent roll-up) is derived from it in JS.
+  // quarter target (used by the percent_of_total roll-up) is derived from it in JS.
   const mode = kpiRows[0].quarterly_target_mode as QuarterlyTargetMode;
   const [metricRows] = await conn.query<RowDataPacket[]>(
     `SELECT m.weight AS weight,
@@ -61,7 +71,7 @@ export async function recomputeKpiQuarter(
       WHERE m.perf_kpi_id = ?`,
     [yearNo, quarterNo, yearNo, perfKpiId],
   );
-  const value = rollup(kpiRows[0].calculation_type, kpiRows[0].unit, metricRows.map((r) => {
+  const value = rollup(kpiRows[0].calculation_type, metricRows.map((r) => {
     // Mirror lib/kpi/progress.ts#quarterTargetFor. Kept inline (not imported)
     // so this server module has no runtime cross-import for the test runner.
     const annual = r.annualTarget == null ? null : Number(r.annualTarget);

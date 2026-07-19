@@ -40,6 +40,8 @@ export type EntityStatus = "active" | "inactive" | "draft";
 export type KpiCalculationType =
   | "weighted_sum"
   | "simple_average"
+  | "percent_of_total"
+  | "ratio_of_total"
   | "custom_formula";
 
 export const KPI_CALCULATION_TYPES: {
@@ -58,11 +60,27 @@ export const KPI_CALCULATION_TYPES: {
     hint: "Unweighted mean of sub-KPIs",
   },
   {
+    id: "percent_of_total",
+    label: "Percent of total",
+    hint: "Sum of sub-KPI progress ÷ sum of their targets × 100",
+  },
+  {
+    id: "ratio_of_total",
+    label: "Ratio of total",
+    hint: "Sum of sub-KPI progress ÷ sum of their targets",
+  },
+  {
     id: "custom_formula",
     label: "Custom formula",
     hint: "Evaluated from a linked formula",
   },
 ];
+
+// Guard for API bodies — the DB column is an ENUM, so an unrecognised value
+// would otherwise surface as a raw MySQL error rather than a 400.
+export function isCalculationType(v: unknown): v is KpiCalculationType {
+  return KPI_CALCULATION_TYPES.some((t) => t.id === v);
+}
 
 export interface Committee {
   id: string;
