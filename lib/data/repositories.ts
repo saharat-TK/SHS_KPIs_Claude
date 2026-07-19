@@ -810,7 +810,7 @@ export const dataSourcesRepo = {
 
   links: async (id: number): Promise<DataSourceLink[]> =>
     jsonOrThrow(await fetch(`/api/data-sources/${id}/links`), "Failed to load links"),
-  createLink: async (id: number, input: DataSourceLinkInput): Promise<DataSourceLink> =>
+  createLink: async (id: number, input: DataSourceLinkInput): Promise<LinkWriteResult> =>
     jsonOrThrow(
       await fetch(`/api/data-sources/${id}/links`, {
         method: "POST",
@@ -822,7 +822,7 @@ export const dataSourcesRepo = {
   updateLink: async (
     linkId: number,
     patch: { mappings?: DataSourceLinkMapping[]; note?: string | null },
-  ): Promise<DataSourceLink> =>
+  ): Promise<LinkWriteResult> =>
     jsonOrThrow(
       await fetch(`/api/data-source-links/${linkId}`, {
         method: "PATCH",
@@ -847,6 +847,12 @@ export interface DataSourceColumnInput {
   unit?: string | null;
   options?: string[] | null;
   isRequired?: boolean;
+}
+
+/** Writing a link immediately recomputes what it feeds; `feed` is that outcome,
+ *  already summarised by describeOutcome for the toast. */
+export interface LinkWriteResult extends DataSourceLink {
+  feed?: string;
 }
 
 /** One shared shape for creating a link, so the route body, the repo and the

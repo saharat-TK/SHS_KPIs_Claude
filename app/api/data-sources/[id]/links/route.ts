@@ -8,6 +8,11 @@ import {
   mapLinkRow,
   validateLinkMappings,
 } from "@/lib/kpi/dataSourcesServer";
+import {
+  describeOutcome,
+  feedFromDataSource,
+  type FeedOutcome,
+} from "@/lib/kpi/dataSourceFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -50,24 +55,43 @@ export async function POST(
     // Authoritative regardless of what the UI offered.
     const mappings = await validateLinkMappings(pool, params.id, b.mappings);
 
-    const [ins] = await pool.query<ResultSetHeader>(
-      `INSERT INTO data_source_link
-         (data_source_id, library_kpi_id, library_metric_id, mappings, note)
-       VALUES (?, ?, ?, ?, ?)`,
-      [
-        params.id,
-        libraryKpiId,
-        libraryMetricId,
-        mappings.length > 0 ? JSON.stringify(mappings) : null,
-        b.note?.trim() || null,
-      ],
-    );
+    // Write and feed in one transaction: a new link must not leave the KPIs it
+    // now governs reading whatever they said before it existed.
+    const conn = await pool.getConnection();
+    let insertId: number;
+    let outcome: FeedOutcome;
+    try {
+      await conn.beginTransaction();
+      const [ins] = await conn.query<ResultSetHeader>(
+        `INSERT INTO data_source_link
+           (data_source_id, library_kpi_id, library_metric_id, mappings, note)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          params.id,
+          libraryKpiId,
+          libraryMetricId,
+          mappings.length > 0 ? JSON.stringify(mappings) : null,
+          b.note?.trim() || null,
+        ],
+      );
+      insertId = ins.insertId;
+      outcome = await feedFromDataSource(conn, Number(params.id));
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${LINK_SELECT} ${LINK_FROM} WHERE l.id = ?`,
-      [ins.insertId],
+      [insertId],
     );
-    return NextResponse.json(mapLinkRow(rows[0]), { status: 201 });
+    return NextResponse.json(
+      { ...mapLinkRow(rows[0]), feed: describeOutcome(outcome) },
+      { status: 201 },
+    );
   } catch (err) {
     // uq_ds_link (data_source_id, target_key) — the same target twice.
     if (err instanceof Error && "code" in err && err.code === "ER_DUP_ENTRY") {
