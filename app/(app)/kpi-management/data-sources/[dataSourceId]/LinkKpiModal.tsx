@@ -20,6 +20,7 @@ import {
   PERIOD_FIELD,
   aggregate,
   aggregationNeedsColumn,
+  isMultiValueOperator,
   matchesFilters,
   operatorsFor,
 } from "@/lib/kpi/dataSourceFilters";
@@ -52,6 +53,8 @@ interface DraftFilter {
   operator: FilterOperator;
   value: string;
   valueTo: string;
+  /** Used only by the "in" operator. */
+  values: string[];
 }
 
 interface DraftMapping {
@@ -68,7 +71,17 @@ const newFilter = (field = ""): DraftFilter => ({
   operator: "eq",
   value: "",
   valueTo: "",
+  values: [],
 });
+
+/** A condition is only previewable once its operand is actually filled in —
+ *  which for "is any of" means at least one value picked, not a non-empty
+ *  `value` (which it never sets). */
+const isFilterReady = (f: DraftFilter) =>
+  !!f.field &&
+  (isMultiValueOperator(f.operator)
+    ? f.values.length > 0
+    : f.value !== "" && (f.operator !== "between" || f.valueTo !== ""));
 
 const newMapping = (slot: MappingSlot = "value"): DraftMapping => ({
   key: nextKey(),
@@ -90,6 +103,7 @@ function toDraft(m: DataSourceLinkMapping): DraftMapping {
       operator: f.operator,
       value: f.value == null ? "" : String(f.value),
       valueTo: f.valueTo == null ? "" : String(f.valueTo),
+      values: (f.values ?? []).map((v) => String(v)),
     })),
   };
 }
@@ -100,7 +114,11 @@ const toPayload = (d: DraftMapping): DataSourceLinkMapping => ({
   columnKey: aggregationNeedsColumn(d.aggregation) ? d.columnKey || null : null,
   filters: d.filters
     .filter((f) => f.field)
-    .map((f) => {
+    .map((f): DataSourceFilter => {
+      // Exactly one operand shape per operator — see DataSourceFilter.
+      if (isMultiValueOperator(f.operator)) {
+        return { field: f.field, operator: f.operator, values: f.values };
+      }
       const base: DataSourceFilter = {
         field: f.field,
         operator: f.operator,
@@ -400,12 +418,7 @@ function MappingCard({
   // Live preview. Filters that are still half-typed throw inside matchesFilters,
   // so treat any error as "not previewable yet" rather than crashing the modal.
   const preview = useMemo(() => {
-    const ready = mapping.filters.filter(
-      (f) =>
-        f.field &&
-        f.value !== "" &&
-        (f.operator !== "between" || f.valueTo !== ""),
-    );
+    const ready = mapping.filters.filter(isFilterReady);
     try {
       const payload = toPayload({ ...mapping, filters: ready });
       const matched = entries.filter((e) =>
@@ -564,7 +577,7 @@ function FilterRow({
       : ["eq"];
 
   return (
-    <div className="flex flex-wrap items-end gap-sm">
+    <div className="flex flex-wrap items-start gap-sm">
       <div className="min-w-[9rem] flex-1">
         <Field label="Field">
           <Select
@@ -577,7 +590,7 @@ function FilterRow({
                   : (operatorsFor(
                       columns.find((c) => c.colKey === field)?.dataType ?? "text",
                     )[0] ?? "eq");
-              onChange({ field, operator: next, value: "", valueTo: "" });
+              onChange({ field, operator: next, value: "", valueTo: "", values: [] });
             }}
           >
             <option value="">Select a field…</option>
@@ -597,7 +610,13 @@ function FilterRow({
             value={filter.operator}
             disabled={allowed.length === 1}
             onChange={(e) =>
-              onChange({ operator: e.target.value as FilterOperator, valueTo: "" })
+              // Operands don't carry across operator shapes — clear them all.
+              onChange({
+                operator: e.target.value as FilterOperator,
+                value: "",
+                valueTo: "",
+                values: [],
+              })
             }
           >
             {allowed.map((op) => (
@@ -614,6 +633,15 @@ function FilterRow({
           <PeriodBound label="From" value={filter.value} onChange={(v) => onChange({ value: v })} />
           <PeriodBound label="To" value={filter.valueTo} onChange={(v) => onChange({ valueTo: v })} />
         </>
+      ) : isMultiValueOperator(filter.operator) ? (
+        <div className="min-w-[14rem] flex-[2]">
+          <MultiValueInput
+            column={column}
+            labels={labels}
+            values={filter.values}
+            onChange={(values) => onChange({ values })}
+          />
+        </div>
       ) : (
         <>
           <div className="min-w-[9rem] flex-1">
@@ -646,7 +674,9 @@ function FilterRow({
         aria-label="Remove condition"
         title="Remove condition"
         onClick={onRemove}
-        className="mb-xs grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
+        // mt-xl skips past the Field-label row above, so this lines up with
+        // the input row now that the group is top- rather than bottom-aligned.
+        className="mt-xl grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
       >
         <Icon name="close" className="text-[18px]" />
       </button>
@@ -698,6 +728,102 @@ function PeriodBound({
   );
 }
 
+/** The pickable values of a choice-like column, as {value, label} pairs. Faculty
+ *  and program render a friendly label but store a code, exactly as EntryModal
+ *  does. Returns null for types that aren't a fixed list. */
+function choiceOptions(
+  column: DataSourceColumn | undefined,
+  labels: Record<string, string>,
+): { value: string; label: string }[] | null {
+  if (!column) return null;
+  switch (column.dataType) {
+    case "select":
+      return (column.options ?? []).map((o) => ({ value: o, label: o }));
+    case "program":
+      return PROGRAMS.map((p) => ({ value: p.abbr, label: `${p.abbr} — ${p.label}` }));
+    case "faculty":
+      return Object.entries(labels)
+        .filter(([k]) => k.startsWith("fac-"))
+        .sort((a, b) => a[1].localeCompare(b[1], "th"))
+        .map(([id, name]) => ({ value: id, label: name }));
+    default:
+      return null;
+  }
+}
+
+/** "is any of" picker: the dropdown adds a value, each pick becomes a removable
+ *  chip. Chosen values are hidden from the dropdown so it can't add duplicates,
+ *  and it stays usable for the 65-strong faculty list where a checkbox grid
+ *  would not. */
+function MultiValueInput({
+  column,
+  labels,
+  values,
+  onChange,
+}: {
+  column?: DataSourceColumn;
+  labels: Record<string, string>;
+  values: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const options = choiceOptions(column, labels) ?? [];
+  const remaining = options.filter((o) => !values.includes(o.value));
+  const labelFor = (v: string) => options.find((o) => o.value === v)?.label ?? v;
+
+  return (
+    <Field
+      label="Values"
+      hint={values.length === 0 ? "Pick one or more — a row matches any of them." : undefined}
+    >
+      <div className="flex flex-col gap-xs">
+        <Select
+          value=""
+          disabled={!column || remaining.length === 0}
+          onChange={(e) => {
+            if (e.target.value) onChange([...values, e.target.value]);
+          }}
+        >
+          <option value="">
+            {!column
+              ? "Pick a field first"
+              : remaining.length === 0
+                ? "All values added"
+                : "Add a value…"}
+          </option>
+          {remaining.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+
+        {values.length > 0 && (
+          <div className="flex flex-wrap gap-xs">
+            {values.map((v) => (
+              <span key={v} className="inline-flex items-center gap-xxs">
+                <Badge tone="neutral">
+                  <span className="inline-flex items-center gap-xxs">
+                    {labelFor(v)}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${labelFor(v)}`}
+                      title={`Remove ${labelFor(v)}`}
+                      onClick={() => onChange(values.filter((x) => x !== v))}
+                      className="text-mute hover:text-error"
+                    >
+                      <Icon name="close" className="text-[14px]" />
+                    </button>
+                  </span>
+                </Badge>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </Field>
+  );
+}
+
 /** The value control matches the column's type, so a faculty filter is picked by
  *  name and stored as an id — exactly as EntryModal does. */
 function ValueInput({
@@ -715,49 +841,28 @@ function ValueInput({
     return <Input value={value} disabled placeholder="Pick a field first" onChange={() => {}} />;
   }
 
+  // Choice-like types share their option list with the "is any of" picker.
+  const choices = choiceOptions(column, labels);
+  if (choices) {
+    return (
+      <Select value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">—</option>
+        {choices.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </Select>
+    );
+  }
+
   switch (column.dataType) {
-    case "select":
-      return (
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">—</option>
-          {(column.options ?? []).map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </Select>
-      );
     case "boolean":
       return (
         <Select value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">—</option>
           <option value="true">Yes</option>
           <option value="false">No</option>
-        </Select>
-      );
-    case "program":
-      return (
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">—</option>
-          {PROGRAMS.map((p) => (
-            <option key={p.abbr} value={p.abbr}>
-              {p.abbr} — {p.label}
-            </option>
-          ))}
-        </Select>
-      );
-    case "faculty":
-      return (
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">—</option>
-          {Object.entries(labels)
-            .filter(([k]) => k.startsWith("fac-"))
-            .sort((a, b) => a[1].localeCompare(b[1], "th"))
-            .map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
         </Select>
       );
     case "date":

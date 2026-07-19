@@ -33,9 +33,10 @@ const F = (field, operator, value, valueTo) => ({ field, operator, value, valueT
 test("operatorsFor is minimal and type-appropriate", () => {
   assert.deepEqual(operatorsFor("number"), ["eq", "gte", "lte", "between"]);
   assert.deepEqual(operatorsFor("date"), ["between"]);
-  assert.deepEqual(operatorsFor("select"), ["eq"]);
-  assert.deepEqual(operatorsFor("faculty"), ["eq"]);
-  assert.deepEqual(operatorsFor("program"), ["eq"]);
+  // Choice-like columns get "is any of"; free text and booleans do not.
+  assert.deepEqual(operatorsFor("select"), ["eq", "in"]);
+  assert.deepEqual(operatorsFor("faculty"), ["eq", "in"]);
+  assert.deepEqual(operatorsFor("program"), ["eq", "in"]);
   assert.deepEqual(operatorsFor("text"), ["eq"]);
   assert.deepEqual(operatorsFor("boolean"), ["eq"]);
 });
@@ -91,6 +92,41 @@ test("multiple filters are ANDed", () => {
   assert.equal(matchesFilters(entry(), COLUMNS, one), false);
   // No filters = everything matches.
   assert.equal(matchesFilters(entry(), COLUMNS, []), true);
+});
+
+// ── "is any of" (OR within one field) ───────────────────────────────────────
+
+const IN = (field, values) => ({ field, operator: "in", values });
+
+test("in matches when the cell is any of the listed values", () => {
+  const q1 = entry();
+  const q2 = entry({ values: { ...entry().values, quartile: "Q2" } });
+  const both = IN("quartile", ["Q1", "Q2"]);
+  assert.equal(matchesFilters(q1, COLUMNS, [both]), true);
+  assert.equal(matchesFilters(q2, COLUMNS, [both]), true);
+});
+
+test("in rejects a cell outside the list", () => {
+  const q2 = entry({ values: { ...entry().values, quartile: "Q2" } });
+  assert.equal(matchesFilters(q2, COLUMNS, [IN("quartile", ["Q1"])]), false);
+});
+
+test("in compares faculty codes, not display names", () => {
+  const e = entry();
+  assert.equal(matchesFilters(e, COLUMNS, [IN("author", ["fac-002", "fac-009"])]), true);
+  assert.equal(matchesFilters(e, COLUMNS, [IN("author", ["fac-001", "fac-003"])]), false);
+});
+
+test("a blank cell never matches in, and an empty list matches nothing", () => {
+  const blank = entry({ values: { ...entry().values, quartile: null } });
+  assert.equal(matchesFilters(blank, COLUMNS, [IN("quartile", ["Q1"])]), false);
+  // Guard only — validateMappings rejects an empty list before it can be stored.
+  assert.equal(matchesFilters(entry(), COLUMNS, [IN("quartile", [])]), false);
+});
+
+test("in still ANDs with conditions on other fields", () => {
+  const both = [IN("quartile", ["Q1", "Q2"]), F("citations", "gte", 50)];
+  assert.equal(matchesFilters(entry(), COLUMNS, both), false);
 });
 
 // ── period pseudo-field ─────────────────────────────────────────────────────
@@ -199,6 +235,46 @@ test("validateMappings enforces both bounds on a range, in order", () => {
   );
 });
 
+test("validateMappings requires a non-empty list for in", () => {
+  assert.throws(
+    () => validateMappings(COLUMNS, "quarterly", [mapping({ filters: [IN("quartile", [])] })]),
+    /"Quartile" needs at least one value to match/,
+  );
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ filters: [{ field: "quartile", operator: "in" }] }),
+      ]),
+    /needs at least one value to match/,
+  );
+});
+
+test("validateMappings dedupes in values and validates each against the options", () => {
+  const out = validateMappings(COLUMNS, "quarterly", [
+    mapping({ filters: [IN("quartile", ["Q1", "Q2", "Q1"])] }),
+  ]);
+  assert.deepEqual(out[0].filters[0], {
+    field: "quartile",
+    operator: "in",
+    values: ["Q1", "Q2"],
+  });
+  assert.throws(
+    () => validateMappings(COLUMNS, "quarterly", [mapping({ filters: [IN("quartile", ["Q1", "Q9"])] })]),
+    /must be one of: Q1, Q2/,
+  );
+});
+
+test("validateMappings refuses in on a column type that does not support it", () => {
+  assert.throws(
+    () => validateMappings(COLUMNS, "quarterly", [mapping({ filters: [IN("title", ["A", "B"])] })]),
+    /"Title" does not support "is any of"/,
+  );
+  assert.throws(
+    () => validateMappings(COLUMNS, "quarterly", [mapping({ filters: [IN("citations", [1, 2])] })]),
+    /"Citations" does not support "is any of"/,
+  );
+});
+
 test("validateMappings rejects two mappings feeding the same slot", () => {
   assert.throws(
     () => validateMappings(COLUMNS, "quarterly", [mapping(), mapping()]),
@@ -250,5 +326,19 @@ test("describeMapping reads as a sentence and resolves derived codes", () => {
       "fac-002": "ผศ.ดร.จงกล สายสิงห์",
     }),
     "Count of rows where Author is ผศ.ดร.จงกล สายสิงห์",
+  );
+});
+
+test("describeMapping lists every value of an in filter", () => {
+  assert.equal(
+    describeMapping(mapping({ filters: [IN("quartile", ["Q1", "Q2"])] }), COLUMNS),
+    "Count of rows where Quartile is any of Q1, Q2",
+  );
+  assert.equal(
+    describeMapping(mapping({ filters: [IN("author", ["fac-002", "fac-009"])] }), COLUMNS, {
+      "fac-002": "ผศ.ดร.จงกล สายสิงห์",
+      "fac-009": "อ.ดร.อ่อน ลายเงิน",
+    }),
+    "Count of rows where Author is any of ผศ.ดร.จงกล สายสิงห์, อ.ดร.อ่อน ลายเงิน",
   );
 });

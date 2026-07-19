@@ -556,17 +556,22 @@ export interface DataSourceEntry {
 }
 
 /** Which rows of a data source count, and how they turn into a number. */
-export type FilterOperator = "eq" | "gte" | "lte" | "between";
+export type FilterOperator = "eq" | "in" | "gte" | "lte" | "between";
 
 /** One condition. `field` is a data_source_column.col_key, or PERIOD_FIELD
- *  ("__period") for the entry's own year/quarter. `valueTo` is set only for
- *  "between", where both bounds are inclusive. */
+ *  ("__period") for the entry's own year/quarter. Exactly one of value / values
+ *  carries the operand, depending on the operator. */
 export interface DataSourceFilter {
   field: string;
   operator: FilterOperator;
-  /** Same shape as a stored cell, so a boolean column's filter is a boolean. */
-  value: DataSourceCellValue;
+  /** Same shape as a stored cell, so a boolean column's filter is a boolean.
+   *  Set for every operator except "in". */
+  value?: DataSourceCellValue;
+  /** Set only for "between", where both bounds are inclusive. */
   valueTo?: DataSourceCellValue;
+  /** Set only for "in" — the allowed values, deduped and non-empty. Gives OR
+   *  within a single field; conditions across fields remain ANDed. */
+  values?: DataSourceCellValue[];
 }
 
 export type AggregationKind = "sum" | "avg" | "count" | "latest";
