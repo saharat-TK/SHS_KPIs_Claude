@@ -1,0 +1,95 @@
+# How data-source rows become performance progress
+
+How a committee's raw data source (schema **LAYER D**) turns into the numbers shown
+on a performance record (**LAYER B**), and where the auto-computed vs. user-entered
+parts come from.
+
+## 1. Two layers, bridged by provenance columns
+
+- **Links are defined at the library layer.** `data_source_link` stores
+  `library_kpi_id` / `library_metric_id` plus its `mappings` (which rows count,
+  how they aggregate).
+- **Progress lives at the performance layer:** `perf_kpi_quarter_progress` /
+  `perf_metric_quarter_progress`.
+- **The bridge is the snapshot provenance columns** `perf_kpi.source_kpi_id` /
+  `perf_metric.source_metric_id`, populated when a strategic set is activated into
+  a record (`copySetIntoRecord` in `lib/kpi/performance.ts`).
+
+Because the join is on those columns filtered to `performance_record.status =
+'active'`, **one library link fans out to every currently-active record** that
+snapshotted that KPI/metric — producing one set of progress writes per record.
+
+## 2. Linking stores a definition; the *feed* writes progress (same transaction)
+
+`LinkKpiModal.tsx` → `useCreateDataSourceLink` / `useUpdateDataSourceLink` →
+`POST /api/data-sources/[id]/links` / `PATCH /api/data-source-links/[id]`.
+
+Those routes `INSERT`/`UPDATE` **`data_source_link` only** — no progress SQL of
+their own — then call `feedFromDataSource()` (`lib/kpi/dataSourceFeed.ts`) before
+commit. The route comment is explicit: a new link must not leave the KPIs it now
+governs reading whatever they said before it existed.
+
+So: a link with no matching entries writes no progress yet; once entries exist (or
+already exist at link time), progress rows are written synchronously in that same
+request.
+
+## 3. What the feed writes (`applyLink`, `lib/kpi/dataSourceFeed.ts`)
+
+- Target = **metric** → writes `perf_metric_quarter_progress` (`is_computed = 1`),
+  then calls `recomputeKpiQuarter()` so the change rolls up into the parent KPI's
+  `perf_kpi_quarter_progress`.
+- Target = **KPI** → writes `perf_kpi_quarter_progress` (`is_computed = 1`), but
+  **leaf KPIs only**. A `has_children` KPI is skipped — the roll-up owns its value,
+  and feeding it directly would be overwritten on the next roll-up.
+- The feed writes only `progress_value` (plus `variable1_value` / `variable2_value`
+  for two-variable KPIs). It **never** writes `issue` / `solution` — a computed
+  number has no narrative, so it bypasses the HTTP progress routes that require them.
+- The feed **respects guards** (unlike the roll-up): a closed recording period, an
+  approval-locked/under-review quarter, or a period with no rows is skipped and
+  reported, never stamped over.
+
+## 4. Feed triggers (all synchronous — there is no cron)
+
+| Trigger | Route |
+|---|---|
+| Link create | `app/api/data-sources/[id]/links/route.ts` |
+| Link update | `app/api/data-source-links/[id]/route.ts` |
+| Entry create | `app/api/data-sources/[id]/entries/route.ts` |
+| Entry update / delete | `app/api/data-source-entries/[id]/route.ts` |
+| Manual "recompute from sources" button | `app/api/performance-records/[id]/recompute-from-sources/route.ts` (uses `feedRecord`) |
+
+## 5. Parent-KPI computed value + save
+
+The computed parent value is written by a **recompute that runs when metric data
+changes — not when the user saves the parent's issue/solution.**
+
+- `recomputeKpiQuarter` (`lib/kpi/performance.ts`) upserts the parent's
+  `perf_kpi_quarter_progress.progress_value` via `rollup()` with `is_computed = 1`,
+  **leaving issue/solution untouched**. It runs from three places: a metric-progress
+  save (`app/api/perf-metrics/[id]/progress/route.ts`), the data-source feed, and
+  `recomputeRecordRollups` (library re-sync).
+- **UI:** `page.tsx` sets `valueEditable = !kpi.hasChildren && !kpi.fedBy`. For a
+  parent (or a directly-fed KPI), `ProgressPanel.tsx` / `QuarterEntry` renders the
+  value **read-only** as "Computed value (Cumulative)", or "— (awaiting sub-KPI
+  data)" when null. The number is read from the stored row — it is *not* recomputed
+  client-side.
+- **Save:** `PUT /api/perf-kpis/[id]/progress`, the `has_children` branch, upserts
+  **only issue/solution**; its `ON DUPLICATE KEY UPDATE` omits `progress_value`, so
+  the computed number is preserved. On a brand-new row it inserts
+  `progress_value = NULL, is_computed = 1`, and a later recompute fills the number
+  in. The two paths are order-independent and converge.
+
+## 6. Column provenance
+
+**Parent (`has_children`) KPI** — `perf_kpi_quarter_progress`:
+
+| Column | Source |
+|---|---|
+| `progress_value` | System — `rollup()` in `recomputeKpiQuarter` |
+| `is_computed` | `1` |
+| `issue` / `solution` | User — parent KPI `PUT` |
+
+**Leaf KPI** — `progress_value` (and `variable1/2_value`) are user-entered,
+`is_computed = 0`, and issue/solution are user-entered — all in one `PUT`. A leaf
+KPI fed by a data source instead gets `progress_value` from the feed
+(`is_computed = 1`) and is read-only in the UI.
