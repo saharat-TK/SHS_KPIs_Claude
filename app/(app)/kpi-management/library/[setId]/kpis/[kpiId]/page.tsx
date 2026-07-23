@@ -49,6 +49,22 @@ import { unitNeedsDivisor } from "@/lib/kpi/progress";
 import { personsForCommittee } from "@/lib/kpi/committee";
 import { MetricEditor } from "./MetricEditor";
 
+// The pooled calculation types: aggregated from live progress on performance
+// records, so the library (targets only) can't preview them. Presence in this
+// map is what marks a type as pooled — add an entry to introduce another.
+const POOLED_EXPLAINER: Partial<Record<KpiCalculationType, string>> = {
+  percent_of_total:
+    "Computed on performance records as total sub-KPI progress ÷ total sub-KPI target × 100 for the quarter.",
+  ratio_of_total:
+    "Computed on performance records as total sub-KPI progress ÷ total sub-KPI target for the quarter.",
+};
+
+// Units that imply a calculation type. Drives the soft default in setUnit.
+const DEFAULT_CALC_FOR_UNIT: Record<string, KpiCalculationType> = {
+  percent: "percent_of_total",
+  ratio: "ratio_of_total",
+};
+
 // Normalise the sparse annual-target rows into a fixed 5-slot array.
 function toYearSlots(targets: AnnualTarget[] | undefined): (number | null)[] {
   const slots: (number | null)[] = [null, null, null, null, null];
@@ -187,6 +203,24 @@ function KpiDetail() {
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => (d ? { ...d, [key]: value } : d));
+
+  // Percent/Ratio KPIs almost always want the matching pooled type, so picking
+  // that unit pre-selects it. A soft default: it bumps only when the incoming
+  // unit implies a *different* type than the outgoing one — so re-picking the
+  // same unit never undoes a deliberate override — and it never displaces a
+  // deliberately linked custom formula.
+  const setUnit = (value: string) =>
+    setDraft((d) => {
+      if (!d) return d;
+      const next = DEFAULT_CALC_FOR_UNIT[value.trim().toLowerCase()];
+      const prev = DEFAULT_CALC_FOR_UNIT[d.unit.trim().toLowerCase()];
+      const bumpCalc = next != null && next !== prev && d.calculationType !== "custom_formula";
+      return {
+        ...d,
+        unit: value,
+        calculationType: bumpCalc ? next : d.calculationType,
+      };
+    });
 
   const save = () => {
     if (!draft || capError || varError) return;
@@ -414,7 +448,7 @@ function KpiDetail() {
                       />
                     </Field>
                     <Field label="Unit">
-                      <UnitSelect value={draft.unit} onChange={(value) => set("unit", value)} />
+                      <UnitSelect value={draft.unit} onChange={setUnit} />
                     </Field>
                     <Field label="5-Year Target (cap)">
                       <Input
@@ -524,6 +558,11 @@ function KpiDetail() {
                         </p>
                       )}
                     </>
+                  ) : POOLED_EXPLAINER[draft.calculationType] ? (
+                    <p className="text-body-sm text-mute">
+                      {POOLED_EXPLAINER[draft.calculationType]} No preview here — the
+                      library holds targets only.
+                    </p>
                   ) : (
                     <AggregateSummary
                       unit={draft.unit}
@@ -693,7 +732,10 @@ function computeTargetPreview(
   type: KpiCalculationType,
   metrics: LibraryMetric[],
 ): number | null {
-  if (type === "custom_formula" || metrics.length === 0) return null;
+  // The pooled types have no meaningful target-only preview — pooling targets
+  // against themselves would always print 100 (or 1).
+  if (type === "custom_formula" || type in POOLED_EXPLAINER || metrics.length === 0)
+    return null;
   const vals = metrics.map((m) => ({ w: m.weight, v: m.fiveYearTarget ?? 0 }));
   if (type === "simple_average") {
     return vals.reduce((a, x) => a + x.v, 0) / vals.length;

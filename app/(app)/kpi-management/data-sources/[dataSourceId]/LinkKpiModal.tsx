@@ -19,8 +19,9 @@ import {
   OPERATOR_LABELS,
   PERIOD_FIELD,
   aggregate,
-  aggregationNeedsColumn,
+  aggregationAllowsColumn,
   isMultiValueOperator,
+  isProportionKind,
   matchesFilters,
   operatorsFor,
 } from "@/lib/kpi/dataSourceFilters";
@@ -28,14 +29,19 @@ import { unitNeedsDivisor } from "@/lib/kpi/progress";
 import { buildCellLabels } from "@/lib/kpi/programs";
 import { PROGRAMS } from "@/lib/kpi/programs";
 import { formatNumber } from "@/lib/utils";
+import { ACADEMIC_RANKS, RANKS } from "@/lib/types";
+import { facultyHeadcount } from "@/lib/kpi/facultyHeadcount";
 import type {
   AggregationKind,
   DataSourceColumn,
   DataSourceFilter,
   DataSourceLink,
   DataSourceLinkMapping,
+  DenominatorSource,
+  FacultyRecord,
   FilterOperator,
   MappingSlot,
+  Rank,
 } from "@/lib/types";
 
 const SLOT_LABELS: Record<MappingSlot, string> = {
@@ -62,7 +68,14 @@ interface DraftMapping {
   slot: MappingSlot;
   aggregation: AggregationKind;
   columnKey: string;
+  /** Which rows count. Doubles as the population under a "rows" denominator. */
   filters: DraftFilter[];
+  /** Narrows the numerator within it. Proportion kinds, "rows" denominator only. */
+  numeratorFilters: DraftFilter[];
+  /** Proportion kinds only. */
+  denominatorSource: DenominatorSource;
+  /** Which ranks the headcount counts, when the denominator is the roster. */
+  facultyRanks: Rank[];
 }
 
 const newFilter = (field = ""): DraftFilter => ({
@@ -89,6 +102,18 @@ const newMapping = (slot: MappingSlot = "value"): DraftMapping => ({
   aggregation: "count",
   columnKey: "",
   filters: [],
+  numeratorFilters: [],
+  denominatorSource: "rows",
+  facultyRanks: ACADEMIC_RANKS,
+});
+
+const filterToDraft = (f: DataSourceFilter): DraftFilter => ({
+  key: nextKey(),
+  field: f.field,
+  operator: f.operator,
+  value: f.value == null ? "" : String(f.value),
+  valueTo: f.valueTo == null ? "" : String(f.valueTo),
+  values: (f.values ?? []).map((v) => String(v)),
 });
 
 function toDraft(m: DataSourceLinkMapping): DraftMapping {
@@ -97,22 +122,15 @@ function toDraft(m: DataSourceLinkMapping): DraftMapping {
     slot: m.slot,
     aggregation: m.aggregation,
     columnKey: m.columnKey ?? "",
-    filters: (m.filters ?? []).map((f) => ({
-      key: nextKey(),
-      field: f.field,
-      operator: f.operator,
-      value: f.value == null ? "" : String(f.value),
-      valueTo: f.valueTo == null ? "" : String(f.valueTo),
-      values: (f.values ?? []).map((v) => String(v)),
-    })),
+    filters: (m.filters ?? []).map(filterToDraft),
+    numeratorFilters: (m.numeratorFilters ?? []).map(filterToDraft),
+    denominatorSource: m.denominatorSource ?? "rows",
+    facultyRanks: m.facultyRanks ?? ACADEMIC_RANKS,
   };
 }
 
-const toPayload = (d: DraftMapping): DataSourceLinkMapping => ({
-  slot: d.slot,
-  aggregation: d.aggregation,
-  columnKey: aggregationNeedsColumn(d.aggregation) ? d.columnKey || null : null,
-  filters: d.filters
+const filtersToPayload = (fs: DraftFilter[]): DataSourceFilter[] =>
+  fs
     .filter((f) => f.field)
     .map((f): DataSourceFilter => {
       // Exactly one operand shape per operator — see DataSourceFilter.
@@ -125,7 +143,20 @@ const toPayload = (d: DraftMapping): DataSourceLinkMapping => ({
         value: f.value,
       };
       return f.operator === "between" ? { ...base, valueTo: f.valueTo } : base;
-    }),
+    });
+
+const toPayload = (d: DraftMapping): DataSourceLinkMapping => ({
+  slot: d.slot,
+  aggregation: d.aggregation,
+  columnKey: aggregationAllowsColumn(d.aggregation) ? d.columnKey || null : null,
+  filters: filtersToPayload(d.filters),
+  // Only the proportion kinds carry the denominator fields, and each mode
+  // carries only its own — so a leftover from switching can't be stored.
+  ...(isProportionKind(d.aggregation)
+    ? d.denominatorSource === "faculty"
+      ? { denominatorSource: "faculty" as const, facultyRanks: d.facultyRanks }
+      : { numeratorFilters: filtersToPayload(d.numeratorFilters) }
+    : {}),
 });
 
 /** Link this data source to a library KPI or metric, and say which of its rows
@@ -310,6 +341,7 @@ export function LinkKpiModal({
                   columns={columns}
                   entries={entries}
                   labels={labels}
+                  faculty={facultyQ.data ?? []}
                   allowsVariables={allowsVariables}
                   onChange={(patch) => updateMapping(m.key, patch)}
                   onRemove={() =>
@@ -401,6 +433,7 @@ function MappingCard({
   columns,
   entries,
   labels,
+  faculty,
   allowsVariables,
   onChange,
   onRemove,
@@ -409,35 +442,64 @@ function MappingCard({
   columns: DataSourceColumn[];
   entries: { id: number; year: number; quarter: number | null; values: Record<string, unknown> }[];
   labels: Record<string, string>;
+  faculty: FacultyRecord[];
   allowsVariables: boolean;
   onChange: (patch: Partial<DraftMapping>) => void;
   onRemove: () => void;
 }) {
   const numberColumns = columns.filter((c) => c.dataType === "number");
 
+  const isProportion = isProportionKind(mapping.aggregation);
+  const byFaculty = isProportion && mapping.denominatorSource === "faculty";
+  // Same helper the server feeds with, so the preview can't disagree with the
+  // number that ends up stored.
+  const headcount = facultyHeadcount(faculty, mapping.facultyRanks);
+
   // Live preview. Filters that are still half-typed throw inside matchesFilters,
   // so treat any error as "not previewable yet" rather than crashing the modal.
   const preview = useMemo(() => {
     const ready = mapping.filters.filter(isFilterReady);
+    const readyNum = mapping.numeratorFilters.filter(isFilterReady);
     try {
-      const payload = toPayload({ ...mapping, filters: ready });
+      const payload = toPayload({
+        ...mapping,
+        filters: ready,
+        numeratorFilters: readyNum,
+      });
       const matched = entries.filter((e) =>
         matchesFilters(e as never, columns, payload.filters),
       );
+      // Mirror the server: narrow within the matched population, not the window.
+      const numerator =
+        isProportion && !byFaculty
+          ? matched.filter((e) =>
+              matchesFilters(e as never, columns, payload.numeratorFilters ?? []),
+            )
+          : undefined;
+      const proportion = byFaculty
+        ? { denominator: headcount }
+        : numerator
+          ? { numerator: numerator as never }
+          : undefined;
       return {
         matched: matched.length,
         total: entries.length,
-        value: aggregate(mapping.aggregation, payload.columnKey, matched as never),
-        pending: ready.length !== mapping.filters.length,
+        numerator: numerator?.length ?? null,
+        value: aggregate(mapping.aggregation, payload.columnKey, matched as never, proportion),
+        pending:
+          ready.length !== mapping.filters.length ||
+          (!byFaculty && readyNum.length !== mapping.numeratorFilters.length),
       };
     } catch {
       return null;
     }
-  }, [mapping, columns, entries]);
+  }, [mapping, columns, entries, isProportion, byFaculty, headcount]);
 
   return (
     <div className="rounded-md border border-hairline p-md">
-      <div className="flex flex-wrap items-end gap-sm">
+      {/* Top-aligned: the Column field's hint makes it taller than its
+          neighbours, and bottom-alignment would push their labels out of line. */}
+      <div className="flex flex-wrap items-start gap-sm">
         {allowsVariables && (
           <div className="w-48">
             <Field label="Feeds">
@@ -467,17 +529,25 @@ function MappingCard({
             </Select>
           </Field>
         </div>
-        {aggregationNeedsColumn(mapping.aggregation) && (
+        {aggregationAllowsColumn(mapping.aggregation) && (
           <div className="min-w-[10rem] flex-1">
             <Field
               label="Column"
-              hint={numberColumns.length === 0 ? "No number columns on this source." : undefined}
+              hint={
+                numberColumns.length === 0
+                  ? "No number columns on this source."
+                  : isProportion
+                    ? "Optional — leave blank to compare row counts."
+                    : undefined
+              }
             >
               <Select
                 value={mapping.columnKey}
                 onChange={(e) => onChange({ columnKey: e.target.value })}
               >
-                <option value="">Select a column…</option>
+                <option value="">
+                  {isProportion ? "Count rows" : "Select a column…"}
+                </option>
                 {numberColumns.map((c) => (
                   <option key={c.id} value={c.colKey}>
                     {c.label}
@@ -492,52 +562,107 @@ function MappingCard({
           aria-label="Remove mapping"
           title="Remove mapping"
           onClick={onRemove}
-          className="mb-xs grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
+          // mt-xl skips past the Field-label row, so this lines up with the
+          // inputs now that the group is top- rather than bottom-aligned.
+          className="mt-xl grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
         >
           <Icon name="delete" className="text-[18px]" />
         </button>
       </div>
 
       <div className="mt-md flex flex-col gap-sm border-t border-hairline pt-md">
-        {mapping.filters.length === 0 ? (
-          <p className="text-caption-sm text-mute">
-            No conditions — every row of this data source counts.
-          </p>
-        ) : (
-          mapping.filters.map((f) => (
-            <FilterRow
-              key={f.key}
-              filter={f}
-              columns={columns}
-              labels={labels}
-              onChange={(patch) =>
-                onChange({
-                  filters: mapping.filters.map((x) =>
-                    x.key === f.key ? { ...x, ...patch } : x,
-                  ),
-                })
-              }
-              onRemove={() =>
-                onChange({ filters: mapping.filters.filter((x) => x.key !== f.key) })
-              }
-            />
-          ))
+        {isProportion && (
+          <div className="flex flex-wrap items-center gap-md pb-sm">
+            <span className="text-label-md text-on-surface">Out of</span>
+            {(
+              [
+                ["rows", "Rows of this data source"],
+                ["faculty", "Faculty headcount"],
+              ] as [DenominatorSource, string][]
+            ).map(([value, label]) => (
+              <label key={value} className="flex items-center gap-xs text-body-sm">
+                <input
+                  type="radio"
+                  name={`denom-${mapping.key}`}
+                  checked={mapping.denominatorSource === value}
+                  onChange={() => onChange({ denominatorSource: value })}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
         )}
 
-        <div className="flex items-center justify-between">
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="add"
-            onClick={() => onChange({ filters: [...mapping.filters, newFilter()] })}
-          >
-            Add condition
-          </Button>
+        <ConditionList
+          heading={
+            byFaculty ? "Count rows where…" : isProportion ? "Out of rows where…" : undefined
+          }
+          emptyText={
+            byFaculty
+              ? "No conditions — every row of this data source counts toward the top."
+              : isProportion
+                ? "No conditions — every row of this data source is the denominator."
+                : "No conditions — every row of this data source counts."
+          }
+          filters={mapping.filters}
+          columns={columns}
+          labels={labels}
+          onChange={(filters) => onChange({ filters })}
+        />
 
-          {preview && (
+        {isProportion && !byFaculty && (
+          <div className="mt-sm border-t border-hairline pt-md">
+            <ConditionList
+              heading="Of those, count rows where…"
+              emptyText="Add at least one — without it the answer is always 100%."
+              filters={mapping.numeratorFilters}
+              columns={columns}
+              labels={labels}
+              onChange={(numeratorFilters) => onChange({ numeratorFilters })}
+            />
+          </div>
+        )}
+
+        {byFaculty && (
+          <div className="mt-sm flex flex-col gap-xs border-t border-hairline pt-md">
+            <span className="text-label-md text-on-surface">Divide by active faculty</span>
+            <div className="flex flex-wrap gap-md">
+              {RANKS.map((rank) => (
+                <label key={rank} className="flex items-center gap-xs text-body-sm">
+                  <input
+                    type="checkbox"
+                    checked={mapping.facultyRanks.includes(rank)}
+                    onChange={(e) =>
+                      onChange({
+                        // Keep RANKS order rather than click order, so the
+                        // stored list and the description read consistently.
+                        facultyRanks: RANKS.filter((r) =>
+                          r === rank ? e.target.checked : mapping.facultyRanks.includes(r),
+                        ),
+                      })
+                    }
+                  />
+                  {rank}
+                </label>
+              ))}
+            </div>
+            <p className="text-caption-sm text-mute">
+              {mapping.facultyRanks.length === 0
+                ? "Pick at least one rank — there is nothing to divide by."
+                : `${headcount} active ${headcount === 1 ? "person" : "people"}. Uses the current roster, so earlier quarters are divided by today's headcount.`}
+            </p>
+          </div>
+        )}
+
+        {preview && (
+          <div className="flex justify-end">
             <span className="text-caption-sm text-mute">
               <Badge tone={preview.matched > 0 ? "success" : "warning"}>
-                {preview.matched} of {preview.total} rows
+                {byFaculty
+                  ? `${preview.matched} rows ÷ ${headcount} faculty`
+                  : isProportion
+                    ? `${preview.numerator} of ${preview.matched} rows`
+                    : `${preview.matched} of ${preview.total} rows`}
               </Badge>{" "}
               {preview.pending
                 ? "· finish the condition to preview"
@@ -548,8 +673,60 @@ function MappingCard({
                         formatNumber(preview.value, mapping.aggregation === "count" ? 0 : 2)
                   }`}
             </span>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** One list of conditions plus its "Add condition" button. Rendered twice for
+ *  the proportion kinds — once for the population, once for the numerator. */
+function ConditionList({
+  heading,
+  emptyText,
+  filters,
+  columns,
+  labels,
+  onChange,
+}: {
+  heading?: string;
+  emptyText: string;
+  filters: DraftFilter[];
+  columns: DataSourceColumn[];
+  labels: Record<string, string>;
+  onChange: (filters: DraftFilter[]) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-sm">
+      {heading && <span className="text-label-md text-on-surface">{heading}</span>}
+
+      {filters.length === 0 ? (
+        <p className="text-caption-sm text-mute">{emptyText}</p>
+      ) : (
+        filters.map((f) => (
+          <FilterRow
+            key={f.key}
+            filter={f}
+            columns={columns}
+            labels={labels}
+            onChange={(patch) =>
+              onChange(filters.map((x) => (x.key === f.key ? { ...x, ...patch } : x)))
+            }
+            onRemove={() => onChange(filters.filter((x) => x.key !== f.key))}
+          />
+        ))
+      )}
+
+      <div>
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="add"
+          onClick={() => onChange([...filters, newFilter()])}
+        >
+          Add condition
+        </Button>
       </div>
     </div>
   );

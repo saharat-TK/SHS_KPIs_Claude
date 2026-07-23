@@ -16,6 +16,8 @@ import { aggregate, matchesFilters } from "@/lib/kpi/dataSourceFilters";
 import { isApprovalDataLocked } from "@/lib/kpi/approvalWorkflow";
 import { getApprovalState } from "@/lib/kpi/approvalServer";
 import { kpiValueFromVariables } from "@/lib/kpi/progress";
+import { facultyHeadcount } from "@/lib/kpi/facultyHeadcount";
+import { ACADEMIC_RANKS } from "@/lib/types";
 import {
   PERFORMANCE_QUARTER_COUNT,
   PERFORMANCE_YEAR_COUNT,
@@ -94,6 +96,16 @@ async function loadColumns(db: Db, dataSourceId: number): Promise<DataSourceColu
     [dataSourceId],
   );
   return rows.map(mapColumnRow);
+}
+
+/** The roster behind a "per faculty member" denominator. Loaded once per feed
+ *  run — the headcount is the same for every link, year and quarter, since the
+ *  roster carries no history. */
+async function loadRoster(db: Db): Promise<{ rank: string; status: string }[]> {
+  const [rows] = await db.query<RowDataPacket[]>(
+    "SELECT `rank`, status FROM faculty WHERE status = 'active'",
+  );
+  return rows.map((r) => ({ rank: String(r.rank), status: String(r.status) }));
 }
 
 async function loadLinks(db: Db, where: string, args: unknown[]): Promise<LinkRow[]> {
@@ -194,6 +206,7 @@ async function applyLink(
   link: LinkRow,
   columns: DataSourceColumn[],
   entries: Entry[],
+  roster: { rank: string; status: string }[],
 ): Promise<FeedOutcome> {
   const outcome = empty();
   const targets = await targetsForLink(conn, link);
@@ -232,7 +245,23 @@ async function applyLink(
         const values = new Map<string, number | null>();
         for (const mapping of link.mappings) {
           const matched = rows.filter((e) => matchesFilters(e, columns, mapping.filters));
-          values.set(mapping.slot, aggregate(mapping.aggregation, mapping.columnKey, matched));
+          // A faculty denominator makes `matched` the numerator outright; only
+          // the rows-mode proportion narrows further, and it narrows within
+          // `matched` so the numerator stays a subset of the denominator.
+          const proportion =
+            mapping.denominatorSource === "faculty"
+              ? { denominator: facultyHeadcount(roster, mapping.facultyRanks ?? ACADEMIC_RANKS) }
+              : mapping.numeratorFilters?.length
+                ? {
+                    numerator: matched.filter((e) =>
+                      matchesFilters(e, columns, mapping.numeratorFilters!),
+                    ),
+                  }
+                : undefined;
+          values.set(
+            mapping.slot,
+            aggregate(mapping.aggregation, mapping.columnKey, matched, proportion),
+          );
         }
 
         if (target.perfMetricId != null) {
@@ -286,10 +315,11 @@ export async function feedFromDataSource(
 
   const columns = await loadColumns(conn, dataSourceId);
   const entries = await loadEntries(conn, dataSourceId);
+  const roster = await loadRoster(conn);
 
   let outcome = empty();
   for (const link of links) {
-    outcome = merge(outcome, await applyLink(conn, link, columns, entries));
+    outcome = merge(outcome, await applyLink(conn, link, columns, entries, roster));
   }
   return outcome;
 }
@@ -315,6 +345,7 @@ export async function feedRecord(
   // Columns and entries are per data source; load each one once.
   const columnsBySource = new Map<number, DataSourceColumn[]>();
   const entriesBySource = new Map<number, Entry[]>();
+  const roster = await loadRoster(conn);
 
   let outcome = empty();
   for (const link of links) {
@@ -329,6 +360,7 @@ export async function feedRecord(
         link,
         columnsBySource.get(link.dataSourceId)!,
         entriesBySource.get(link.dataSourceId)!,
+        roster,
       ),
     );
   }
