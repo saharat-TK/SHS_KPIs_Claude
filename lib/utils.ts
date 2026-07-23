@@ -38,7 +38,11 @@ export function computeKpiValue(
 
   if (type === "percent_of_total" || type === "ratio_of_total") {
     const ratio = pooledRatio(metrics);
-    if (ratio === null) return null;
+    // No usable target on any sub-KPI → no denominator; fall back to a plain
+    // sum of the values (no ×100 for percent — a sum is not a fraction).
+    if (ratio === null) {
+      return metrics.reduce((acc, m) => acc + m.currentValue, 0);
+    }
     return type === "percent_of_total" ? ratio * 100 : ratio;
   }
 
