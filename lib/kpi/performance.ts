@@ -16,6 +16,15 @@ function pooledRatio(
   return usable.reduce((a, r) => a + r.value!, 0) / totalTarget;
 }
 
+// Plain sum of the present child values. Fallback for the pooled ratio/percent
+// roll-ups when no metric has a usable target (so there is no denominator to
+// divide by). Returns null only when no child has a value at all.
+function sumOfValues(rows: { value: number | null }[]): number | null {
+  const present = rows.filter((r) => r.value != null);
+  if (present.length === 0) return null;
+  return present.reduce((a, r) => a + r.value!, 0);
+}
+
 // Roll-up of child metric values for one quarter, per the KPI's calculation
 // type. Nulls (metrics not yet entered) are excluded. custom_formula is not
 // auto-computed here (its variables aren't tied to metrics) → returns null.
@@ -23,10 +32,17 @@ export function rollup(
   calcType: string,
   rows: { weight: number; value: number | null; target?: number | null }[],
 ): number | null {
-  if (calcType === "ratio_of_total") return pooledRatio(rows);
+  // ratio_of_total / percent_of_total pool progress over targets. When no
+  // metric has a usable target (all missing or zero) there is no denominator,
+  // so fall back to a plain sum of the child values. The percent variant does
+  // NOT scale the fallback by 100 — a plain sum is not a fraction to convert.
+  if (calcType === "ratio_of_total") {
+    const ratio = pooledRatio(rows);
+    return ratio === null ? sumOfValues(rows) : ratio;
+  }
   if (calcType === "percent_of_total") {
     const ratio = pooledRatio(rows);
-    return ratio === null ? null : ratio * 100;
+    return ratio === null ? sumOfValues(rows) : ratio * 100;
   }
 
   const present = rows.filter((r) => r.value != null) as { weight: number; value: number }[];
