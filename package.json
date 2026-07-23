@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "migrate:perf-decimal-precision": "node --env-file=.env.local scripts/migrate-perf-decimal-precision.mjs",
     "seed:ip": "node --env-file=.env.local scripts/seed-intellectual-property.mjs",
     "seed:ip-usage-count": "node --env-file=.env.local scripts/seed-ip-usage-count.mjs",
     "seed:manuscripts": "node --env-file=.env.local scripts/seed-research-manuscripts.mjs",
