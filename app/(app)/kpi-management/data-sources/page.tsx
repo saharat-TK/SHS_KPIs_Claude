@@ -21,6 +21,7 @@ import {
 import { RequirePermission } from "@/components/shell/Guard";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCommittees, useCreateDataSource, useDataSources } from "@/lib/data/hooks";
+import { formatDate } from "@/lib/utils";
 import type { Committee, DataSource, DataSourcePeriodGrain } from "@/lib/types";
 
 export default function DataSourcesPage() {
@@ -107,6 +108,7 @@ function DataSources() {
                   <Th align="center">Columns</Th>
                   <Th align="center">Entries</Th>
                   <Th align="center">Linked KPIs</Th>
+                  <Th align="center">Latest Update</Th>
                   <Th align="center">Status</Th>
                 </tr>
               </thead>
@@ -128,6 +130,9 @@ function DataSources() {
                     </Td>
                     <Td align="center">{s.entryCount ?? 0}</Td>
                     <Td align="center">{s.linkCount ?? 0}</Td>
+                    <Td align="center" className="text-mute">
+                      {s.lastEntryAt ? formatDate(s.lastEntryAt) : "—"}
+                    </Td>
                     <Td align="center">
                       <Badge tone={s.status === "active" ? "success" : "neutral"}>
                         {s.status}

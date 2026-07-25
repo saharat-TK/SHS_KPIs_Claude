@@ -557,6 +557,9 @@ export interface DataSource {
   columnCount?: number;
   entryCount?: number;
   linkCount?: number;
+  // Newest entry's created_at — when data, not the source's own definition,
+  // was last recorded. Null when there are no entries yet.
+  lastEntryAt?: string | null;
 }
 
 export interface DataSourceColumn {

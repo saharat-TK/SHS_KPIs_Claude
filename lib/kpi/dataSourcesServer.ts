@@ -33,7 +33,8 @@ export const DATA_SOURCE_SELECT = `
   c.name AS committeeName,
   (SELECT COUNT(*) FROM data_source_column x WHERE x.data_source_id = d.id) AS columnCount,
   (SELECT COUNT(*) FROM data_source_entry e WHERE e.data_source_id = d.id) AS entryCount,
-  (SELECT COUNT(*) FROM data_source_link l WHERE l.data_source_id = d.id) AS linkCount
+  (SELECT COUNT(*) FROM data_source_link l WHERE l.data_source_id = d.id) AS linkCount,
+  (SELECT MAX(e.created_at) FROM data_source_entry e WHERE e.data_source_id = d.id) AS lastEntryAt
 `;
 
 export const DATA_SOURCE_FROM = `
