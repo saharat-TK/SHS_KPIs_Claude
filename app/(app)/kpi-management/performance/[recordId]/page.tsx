@@ -16,6 +16,8 @@ import {
   EmptyState,
   Field,
   Select,
+  healthOf,
+  HEALTH_LABEL,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
@@ -36,7 +38,13 @@ import {
   openQuartersForYear,
   PERFORMANCE_YEAR_COUNT,
 } from "@/lib/kpi/performancePeriods";
-import { formatDate } from "@/lib/utils";
+import {
+  targetForYear,
+  currentValueForYear,
+  percentOfTarget,
+  HEALTH_TONE,
+} from "@/lib/kpi/progress";
+import { formatDate, formatNumber } from "@/lib/utils";
 import type { KpiType, PerformanceStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
@@ -75,16 +83,18 @@ function PerformanceRecordDetail() {
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
 
   const [cat, setCat] = useState<string>("all");
-  const [approvalYear, setApprovalYear] = useState(1);
+  // Drives both the Annual Target / Current Progress columns and the approval
+  // lookups below; the quarter selector stays approval-only.
+  const [selectedYear, setSelectedYear] = useState(1);
   const [approvalQuarter, setApprovalQuarter] = useState(1);
 
   const categories = categoriesQ.data ?? [];
   const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
   const isAdmin = can("configure_kpis");
-  const q1Approvals = useRecordApprovals(recordId, approvalYear, 1);
-  const q2Approvals = useRecordApprovals(recordId, approvalYear, 2);
-  const q3Approvals = useRecordApprovals(recordId, approvalYear, 3);
-  const q4Approvals = useRecordApprovals(recordId, approvalYear, 4);
+  const q1Approvals = useRecordApprovals(recordId, selectedYear, 1);
+  const q2Approvals = useRecordApprovals(recordId, selectedYear, 2);
+  const q3Approvals = useRecordApprovals(recordId, selectedYear, 3);
+  const q4Approvals = useRecordApprovals(recordId, selectedYear, 4);
   const approvalQueries = [q1Approvals, q2Approvals, q3Approvals, q4Approvals];
   const approvalsByQuarter = useMemo(
     () => ({
@@ -200,8 +210,8 @@ function PerformanceRecordDetail() {
         <div className="flex flex-wrap items-end gap-md lg:justify-end">
           <Field label="Year">
             <Select
-              value={String(approvalYear)}
-              onChange={(e) => setApprovalYear(Number(e.target.value))}
+              value={String(selectedYear)}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
               className="min-w-[160px] rounded-xl"
             >
               {[1, 2, 3, 4, 5].map((yearNo) => (
@@ -242,6 +252,8 @@ function PerformanceRecordDetail() {
                 <tr>
                   <Th>KPI Name</Th>
                   <Th align="center">Type</Th>
+                  <Th align="right">Annual Target</Th>
+                  <Th align="center">Current Progress</Th>
                   <Th align="center">Weight</Th>
                   <Th align="center">Sub-KPIs</Th>
                   <Th align="center">Roll-up</Th>
@@ -264,6 +276,20 @@ function PerformanceRecordDetail() {
                   const approvalLock = selectedLock?.locked
                     ? { quarter: approvalQuarter, lock: selectedLock }
                     : fallbackLock;
+                  // Target/current for the selected year. Current = the latest
+                  // quarter with a value; percent is against the ANNUAL target,
+                  // so a mid-year KPI reads proportionally low by design.
+                  const annualTarget = targetForYear(k.annualTargets, selectedYear);
+                  const current = currentValueForYear(k.progress, selectedYear);
+                  const pct = percentOfTarget(current, annualTarget);
+                  const hasTh = k.thresholdGreen != null && k.thresholdAmber != null;
+                  const health =
+                    hasTh && pct != null
+                      ? healthOf(pct, {
+                          green: k.thresholdGreen!,
+                          amber: k.thresholdAmber!,
+                        })
+                      : null;
                   return (
                     <Tr
                       key={k.id}
@@ -274,6 +300,29 @@ function PerformanceRecordDetail() {
                       <Td className="font-medium">{k.name}</Td>
                       <Td align="center">
                         <Badge tone={TYPE_TONE[k.kpiType]}>{k.kpiType}</Badge>
+                      </Td>
+                      <Td align="right">
+                        {annualTarget == null
+                          ? "—"
+                          : `${formatNumber(annualTarget, 2)} ${k.unit ?? ""}`}
+                      </Td>
+                      <Td align="center">
+                        {current == null ? (
+                          <span className="text-caption-sm text-mute">—</span>
+                        ) : (
+                          <div className="flex items-center justify-center gap-sm">
+                            <span>{`${formatNumber(current, 2)} ${k.unit ?? ""}`}</span>
+                            {pct != null && (
+                              // Badge takes no title, so the status label rides
+                              // on a wrapper for hover/screen-reader text.
+                              <span title={health ? HEALTH_LABEL[health] : undefined}>
+                                <Badge tone={health ? HEALTH_TONE[health] : "neutral"}>
+                                  {formatNumber(pct, 0)}%
+                                </Badge>
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </Td>
                       <Td align="center">{k.weight}%</Td>
                       <Td align="center">{k.metricCount ?? 0}</Td>
