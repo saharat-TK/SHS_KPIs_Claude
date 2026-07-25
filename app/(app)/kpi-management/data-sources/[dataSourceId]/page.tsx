@@ -33,6 +33,7 @@ import {
   useDataSourceLinks,
   useDeleteDataSourceEntry,
   useDeleteDataSourceLink,
+  useAcademicCatalog,
   useFacultyRecords,
 } from "@/lib/data/hooks";
 import {
@@ -41,7 +42,7 @@ import {
   isHttpUrl,
 } from "@/lib/kpi/dataSources";
 import { describeMapping } from "@/lib/kpi/dataSourceFilters";
-import { buildCellLabels } from "@/lib/kpi/programs";
+import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { Icon } from "@/components/ui/Icon";
 import type { DataSourceColumn, DataSourceEntry, DataSourceLink } from "@/lib/types";
@@ -105,9 +106,11 @@ function DataSourceDetail({ id }: { id: number }) {
   // Derived cells store a code (faculty id, program abbr); the table and the CSV
   // both resolve it through this one map so the two always agree.
   const facultyQ = useFacultyRecords();
+  const academicCatalogQ = useAcademicCatalog();
+  const academicCatalog = academicCatalogQ.data;
   const cellLabels = useMemo(
-    () => buildCellLabels(facultyQ.data ?? []),
-    [facultyQ.data],
+    () => (academicCatalog ? buildCellLabels(facultyQ.data ?? [], academicCatalog) : {}),
+    [academicCatalog, facultyQ.data],
   );
 
   const exportCsv = () => {
@@ -123,7 +126,10 @@ function DataSourceDetail({ id }: { id: number }) {
   };
 
   return (
-    <QueryBoundary isLoading={sourceQ.isLoading} isError={sourceQ.isError}>
+    <QueryBoundary
+      isLoading={sourceQ.isLoading || academicCatalogQ.isLoading}
+      isError={sourceQ.isError || academicCatalogQ.isError}
+    >
       {!source ? null : (
         <>
           <PageHeader
@@ -331,6 +337,7 @@ function DataSourceDetail({ id }: { id: number }) {
               setEditingLink(null);
             }}
             dataSourceId={id}
+            academicCatalog={academicCatalog!}
             link={editingLink}
           />
 
@@ -345,6 +352,7 @@ function DataSourceDetail({ id }: { id: number }) {
               periodGrain={source.periodGrain}
               columns={columns}
               entry={editing}
+              academicCatalog={academicCatalog!}
             />
           )}
         </>

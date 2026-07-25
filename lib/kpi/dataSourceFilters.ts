@@ -123,6 +123,7 @@ export function operatorsFor(dataType: DataSourceColumnType): FilterOperator[] {
     case "select":
     case "faculty":
     case "program":
+    case "curriculum":
       return ["eq", "in"];
     default:
       return ["eq"];

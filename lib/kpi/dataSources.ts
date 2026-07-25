@@ -14,6 +14,7 @@ export const DATA_SOURCE_COLUMN_TYPES: DataSourceColumnType[] = [
   "boolean",
   "faculty",
   "program",
+  "curriculum",
 ];
 
 export const COLUMN_TYPE_LABELS: Record<DataSourceColumnType, string> = {
@@ -25,13 +26,18 @@ export const COLUMN_TYPE_LABELS: Record<DataSourceColumnType, string> = {
   boolean: "Yes / No",
   faculty: "Faculties",
   program: "5 Programs",
+  curriculum: "9 Curriculums",
 };
 
-/** Types whose allowed values come from elsewhere (the faculty roster, the program
- *  list) rather than from options the admin types. Their `options` column stays NULL;
- *  the server fills the allowed set in before validating, and the UI renders the
- *  choices from a hook or a constant. */
-export const DERIVED_OPTION_TYPES: DataSourceColumnType[] = ["faculty", "program"];
+/** Types whose allowed values come from elsewhere (the faculty roster or academic
+ *  catalog) rather than from options the admin types. Their `options` column stays
+ *  NULL; the server fills the allowed set in before validating, and the UI renders
+ *  choices from the matching query hook. */
+export const DERIVED_OPTION_TYPES: DataSourceColumnType[] = [
+  "faculty",
+  "program",
+  "curriculum",
+];
 
 export const isDerivedOptionType = (t: DataSourceColumnType) =>
   DERIVED_OPTION_TYPES.includes(t);
@@ -41,6 +47,7 @@ export const isDerivedOptionType = (t: DataSourceColumnType) =>
 export const DERIVED_OPTION_SOURCE: Partial<Record<DataSourceColumnType, string>> = {
   faculty: "Options come from the faculty roster (active staff).",
   program: "Options are the five academic programs.",
+  curriculum: "Options are the nine curricula.",
 };
 
 /** Column definition as far as validation cares — lets callers pass either a
@@ -136,11 +143,12 @@ export function coerceCellValue(
       }
       return s;
     }
-    // faculty/program validate identically to select — the difference is only where
+    // Derived types validate identically to select — the difference is only where
     // `options` came from (resolveColumnOptions fills them server-side).
     case "select":
     case "faculty":
-    case "program": {
+    case "program":
+    case "curriculum": {
       const s = String(raw);
       const options = column.options ?? [];
       if (options.length > 0 && !options.includes(s)) {

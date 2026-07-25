@@ -37,6 +37,31 @@
 
 SET NAMES utf8mb4;
 
+-- ── Academic catalog ────────────────────────────────────────────────────────
+-- The authoritative five-program / nine-curriculum reference graph. It is
+-- intentionally separate from faculty.program, whose legacy ENUM vocabulary
+-- is not equivalent to these academic program codes.
+CREATE TABLE academic_program (
+  code       VARCHAR(20)  PRIMARY KEY,                 -- e.g. "PH"
+  label_th   VARCHAR(255) NOT NULL,
+  sort_order INT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE curriculum (
+  code         VARCHAR(20)  PRIMARY KEY,               -- e.g. "PHB"
+  program_code VARCHAR(20)  NOT NULL,
+  label_th     VARCHAR(255) NOT NULL,
+  sort_order   INT NOT NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_curriculum_program FOREIGN KEY (program_code)
+    REFERENCES academic_program(code) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_curriculum_program ON curriculum(program_code, sort_order);
+
 -- ####################   LAYER A — LIBRARY (admin templates)   #################
 
 -- ── strategic_set ────────────────────────────────────────────────────────────
@@ -472,13 +497,14 @@ CREATE TABLE data_source_column (
   col_key        VARCHAR(40)  NOT NULL,                -- slug, e.g. "student_count"
   label          VARCHAR(255) NOT NULL,
   data_type      ENUM('text','url','number','date','select','boolean',
-                      'faculty','program') NOT NULL DEFAULT 'text',
+                      'faculty','program','curriculum') NOT NULL DEFAULT 'text',
                                                        -- faculty: stores a faculty.id ("fac-001")
                                                        -- program: stores a PROGRAMS abbr ("PH")
+                                                       -- curriculum: stores a CURRICULUMS abbr ("PHB")
   unit           VARCHAR(50)  NULL,                    -- free text, same convention as library_kpi.unit
   options        JSON NULL,                            -- string[] of allowed values; only for data_type='select'.
-                                                       -- NULL for faculty/program: their options are DERIVED
-                                                       -- (roster / lib/kpi/programs.ts), never authored or stored.
+                                                       -- NULL for faculty/program/curriculum: their options are DERIVED
+                                                       -- (roster / shared catalog), never authored or stored.
   is_required    TINYINT(1) NOT NULL DEFAULT 0,
   sort_order     INT NOT NULL DEFAULT 0,
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -601,9 +627,9 @@ CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id);
 --    UNLIKE the roll-up it RESPECTS the guards: a closed recording period or an
 --    approval-locked quarter (submitted/forwarded/approved) is skipped and
 --    reported, never overwritten.
---  * Derived-option column types ('faculty','program'): allowed values are NOT in
+--  * Derived-option column types ('faculty','program','curriculum'): allowed values are NOT in
 --    data_source_column.options (it stays NULL). resolveColumnOptions() in
---    lib/kpi/dataSourcesServer.ts fills them from the faculty roster / PROGRAMS
+--    lib/kpi/dataSourcesServer.ts fills them from the faculty roster / shared catalogs
 --    before each entry write, so the stored id or code is validated but there is
 --    no FK — deleting a faculty row will NOT cascade into values_json. Display
 --    falls back to the raw id when a lookup misses, by design.

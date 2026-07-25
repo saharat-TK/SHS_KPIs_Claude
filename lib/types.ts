@@ -525,6 +525,31 @@ export interface ApprovalEvent {
 // Mirrors schema/SHS_KPI_Management_schema.sql data_source[_column|_entry|_link].
 // Committee-owned raw data; linked to library KPIs/metrics as evidence.
 
+export interface AcademicProgram {
+  /** Stable code stored in `program` data-source cells, e.g. "PH". */
+  code: string;
+  /** Thai display name. */
+  label: string;
+  sortOrder: number;
+}
+
+export interface Curriculum {
+  /** Stable code stored in `curriculum` data-source cells, e.g. "PHB". */
+  code: string;
+  /** Owning academic program. */
+  programCode: string;
+  /** Thai display name. */
+  label: string;
+  sortOrder: number;
+}
+
+/** Read-only reference catalog for program/curriculum data-source fields and
+ *  the KPI library's batch metric presets. */
+export interface AcademicCatalog {
+  programs: AcademicProgram[];
+  curricula: Curriculum[];
+}
+
 export type DataSourcePeriodGrain = "quarterly" | "annual";
 export type DataSourceStatus = "active" | "archived";
 export type DataSourceColumnType =
@@ -537,7 +562,8 @@ export type DataSourceColumnType =
   // Derived-option types: the user does not author their options, so `options`
   // stays NULL in the DB and is resolved at validation/render time instead.
   | "faculty" // stores a faculty.id ("fac-001")
-  | "program"; // stores a PROGRAMS abbr ("PH")
+  | "program" // stores an academic program code ("PH")
+  | "curriculum"; // stores an academic curriculum code ("PHB")
 
 /** A cell value as stored in data_source_entry.values_json. */
 export type DataSourceCellValue = string | number | boolean | null;

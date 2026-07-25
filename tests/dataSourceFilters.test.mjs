@@ -15,6 +15,7 @@ const COLUMNS = [
   { colKey: "citations", label: "Citations", dataType: "number" },
   { colKey: "pub_date", label: "Published", dataType: "date" },
   { colKey: "author", label: "Author", dataType: "faculty" },
+  { colKey: "curriculum", label: "Curriculum", dataType: "curriculum" },
   { colKey: "title", label: "Title", dataType: "text" },
 ];
 
@@ -37,6 +38,7 @@ test("operatorsFor is minimal and type-appropriate", () => {
   assert.deepEqual(operatorsFor("select"), ["eq", "in"]);
   assert.deepEqual(operatorsFor("faculty"), ["eq", "in"]);
   assert.deepEqual(operatorsFor("program"), ["eq", "in"]);
+  assert.deepEqual(operatorsFor("curriculum"), ["eq", "in"]);
   assert.deepEqual(operatorsFor("text"), ["eq"]);
   assert.deepEqual(operatorsFor("boolean"), ["eq"]);
 });

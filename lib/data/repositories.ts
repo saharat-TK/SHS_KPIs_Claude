@@ -19,6 +19,7 @@ import type {
   AnnualTarget,
   ApprovalAction,
   ApprovalEvent,
+  AcademicCatalog,
   Kpi,
   KpiCategoryRecord,
   LibraryKpi,
@@ -836,6 +837,13 @@ export const dataSourcesRepo = {
       await fetch(`/api/data-source-links/${linkId}`, { method: "DELETE" }),
       "Failed to remove link",
     ),
+};
+
+// Academic catalog — real MySQL-backed reference data for program/curriculum
+// fields and metric batch presets.
+export const academicCatalogRepo = {
+  get: async (): Promise<AcademicCatalog> =>
+    jsonOrThrow(await fetch("/api/academic-catalog"), "Failed to load academic catalog"),
 };
 
 /** A column as sent to saveColumns: `id` present = keep (and keep its col_key). */

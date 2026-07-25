@@ -32,6 +32,7 @@ import type {
 } from "@/lib/types";
 import {
   approvalsRepo,
+  academicCatalogRepo,
   type ApprovalTransitionInput,
   committeesRepo,
   committeeMembershipsRepo,
@@ -82,6 +83,7 @@ export const qk = {
   measurements: ["measurements"] as const,
   validations: ["validations"] as const,
   facultyRecords: ["facultyRecords"] as const,
+  academicCatalog: ["academicCatalog"] as const,
   committeeMemberships: ["committeeMemberships"] as const,
   strategicSets: ["strategicSets"] as const,
   strategicSet: (id: number) => ["strategicSets", id] as const,
@@ -116,6 +118,9 @@ export const useFaculty = () =>
 
 export const useFacultyRecords = () =>
   useQuery({ queryKey: qk.facultyRecords, queryFn: facultyRecordsRepo.list });
+
+export const useAcademicCatalog = () =>
+  useQuery({ queryKey: qk.academicCatalog, queryFn: academicCatalogRepo.get });
 
 export const useCommitteeMemberships = () =>
   useQuery({ queryKey: qk.committeeMemberships, queryFn: committeeMembershipsRepo.list });

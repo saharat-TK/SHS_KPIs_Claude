@@ -168,6 +168,9 @@ const facultyCol = (over = {}) =>
 const programCol = (over = {}) =>
   col({ colKey: "prog", label: "Program", dataType: "program", ...over });
 
+const curriculumCol = (over = {}) =>
+  col({ colKey: "curriculum", label: "Curriculum", dataType: "curriculum", ...over });
+
 test("faculty columns accept an id present in the resolved option set", () => {
   const c = facultyCol({ options: ["fac-001", "fac-002"] });
   assert.equal(coerceCellValue(c, "fac-002"), "fac-002");
@@ -196,6 +199,15 @@ test("program columns validate against the five program codes", () => {
   );
 });
 
+test("curriculum columns validate against the nine curriculum codes", () => {
+  const c = curriculumCol({ options: ["PHB", "PHM", "PHD"] });
+  assert.equal(coerceCellValue(c, "PHM"), "PHM");
+  assert.throws(
+    () => coerceCellValue(c, "PH"),
+    /"Curriculum": "PH" is not a valid choice\. Options are the nine curricula/,
+  );
+});
+
 test("validateEntryValues enforces required on derived types", () => {
   const columns = [facultyCol({ isRequired: true, options: ["fac-001"] })];
   assert.throws(() => validateEntryValues(columns, {}), /"Owner" is required/);
@@ -220,6 +232,12 @@ test("formatCellValue falls back to the raw value when a lookup misses", () => {
   assert.equal(formatCellValue(programCol(), "LEGACY", {}), "LEGACY");
   // Blank is still blank, not a stray code.
   assert.equal(formatCellValue(facultyCol(), null, {}), "—");
+});
+
+test("formatCellValue resolves curriculum codes through the supplied label map", () => {
+  const labels = { PHB: "สาธารณสุขศาสตร์" };
+  assert.equal(formatCellValue(curriculumCol(), "PHB", labels), "สาธารณสุขศาสตร์");
+  assert.equal(formatCellValue(curriculumCol(), "LEGACY", {}), "LEGACY");
 });
 
 test("formatCellValue leaves non-derived types alone", () => {

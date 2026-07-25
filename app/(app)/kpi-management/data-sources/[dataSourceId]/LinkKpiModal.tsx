@@ -26,13 +26,13 @@ import {
   operatorsFor,
 } from "@/lib/kpi/dataSourceFilters";
 import { unitNeedsDivisor } from "@/lib/kpi/progress";
-import { buildCellLabels } from "@/lib/kpi/programs";
-import { PROGRAMS } from "@/lib/kpi/programs";
+import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import { formatNumber } from "@/lib/utils";
 import { ACADEMIC_RANKS, RANKS } from "@/lib/types";
 import { facultyHeadcount } from "@/lib/kpi/facultyHeadcount";
 import type {
   AggregationKind,
+  AcademicCatalog,
   DataSourceColumn,
   DataSourceFilter,
   DataSourceLink,
@@ -166,11 +166,13 @@ export function LinkKpiModal({
   open,
   onClose,
   dataSourceId,
+  academicCatalog,
   link,
 }: {
   open: boolean;
   onClose: () => void;
   dataSourceId: number;
+  academicCatalog: AcademicCatalog;
   /** Present = edit mode. */
   link?: DataSourceLink | null;
 }) {
@@ -192,7 +194,10 @@ export function LinkKpiModal({
 
   const columns = useMemo(() => columnsQ.data ?? [], [columnsQ.data]);
   const entries = useMemo(() => entriesQ.data ?? [], [entriesQ.data]);
-  const labels = useMemo(() => buildCellLabels(facultyQ.data ?? []), [facultyQ.data]);
+  const labels = useMemo(
+    () => buildCellLabels(facultyQ.data ?? [], academicCatalog),
+    [academicCatalog, facultyQ.data],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -341,6 +346,7 @@ export function LinkKpiModal({
                   columns={columns}
                   entries={entries}
                   labels={labels}
+                  academicCatalog={academicCatalog}
                   faculty={facultyQ.data ?? []}
                   allowsVariables={allowsVariables}
                   onChange={(patch) => updateMapping(m.key, patch)}
@@ -433,6 +439,7 @@ function MappingCard({
   columns,
   entries,
   labels,
+  academicCatalog,
   faculty,
   allowsVariables,
   onChange,
@@ -442,6 +449,7 @@ function MappingCard({
   columns: DataSourceColumn[];
   entries: { id: number; year: number; quarter: number | null; values: Record<string, unknown> }[];
   labels: Record<string, string>;
+  academicCatalog: AcademicCatalog;
   faculty: FacultyRecord[];
   allowsVariables: boolean;
   onChange: (patch: Partial<DraftMapping>) => void;
@@ -607,6 +615,7 @@ function MappingCard({
           filters={mapping.filters}
           columns={columns}
           labels={labels}
+          academicCatalog={academicCatalog}
           onChange={(filters) => onChange({ filters })}
         />
 
@@ -618,6 +627,7 @@ function MappingCard({
               filters={mapping.numeratorFilters}
               columns={columns}
               labels={labels}
+              academicCatalog={academicCatalog}
               onChange={(numeratorFilters) => onChange({ numeratorFilters })}
             />
           </div>
@@ -688,6 +698,7 @@ function ConditionList({
   filters,
   columns,
   labels,
+  academicCatalog,
   onChange,
 }: {
   heading?: string;
@@ -695,6 +706,7 @@ function ConditionList({
   filters: DraftFilter[];
   columns: DataSourceColumn[];
   labels: Record<string, string>;
+  academicCatalog: AcademicCatalog;
   onChange: (filters: DraftFilter[]) => void;
 }) {
   return (
@@ -710,6 +722,7 @@ function ConditionList({
             filter={f}
             columns={columns}
             labels={labels}
+            academicCatalog={academicCatalog}
             onChange={(patch) =>
               onChange(filters.map((x) => (x.key === f.key ? { ...x, ...patch } : x)))
             }
@@ -736,12 +749,14 @@ function FilterRow({
   filter,
   columns,
   labels,
+  academicCatalog,
   onChange,
   onRemove,
 }: {
   filter: DraftFilter;
   columns: DataSourceColumn[];
   labels: Record<string, string>;
+  academicCatalog: AcademicCatalog;
   onChange: (patch: Partial<DraftFilter>) => void;
   onRemove: () => void;
 }) {
@@ -815,6 +830,7 @@ function FilterRow({
           <MultiValueInput
             column={column}
             labels={labels}
+            academicCatalog={academicCatalog}
             values={filter.values}
             onChange={(values) => onChange({ values })}
           />
@@ -826,6 +842,7 @@ function FilterRow({
               <ValueInput
                 column={column}
                 labels={labels}
+                academicCatalog={academicCatalog}
                 value={filter.value}
                 onChange={(v) => onChange({ value: v })}
               />
@@ -837,6 +854,7 @@ function FilterRow({
                 <ValueInput
                   column={column}
                   labels={labels}
+                  academicCatalog={academicCatalog}
                   value={filter.valueTo}
                   onChange={(v) => onChange({ valueTo: v })}
                 />
@@ -911,13 +929,22 @@ function PeriodBound({
 function choiceOptions(
   column: DataSourceColumn | undefined,
   labels: Record<string, string>,
+  academicCatalog: AcademicCatalog,
 ): { value: string; label: string }[] | null {
   if (!column) return null;
   switch (column.dataType) {
     case "select":
       return (column.options ?? []).map((o) => ({ value: o, label: o }));
     case "program":
-      return PROGRAMS.map((p) => ({ value: p.abbr, label: `${p.abbr} — ${p.label}` }));
+      return academicCatalog.programs.map((program) => ({
+        value: program.code,
+        label: `${program.code} — ${program.label}`,
+      }));
+    case "curriculum":
+      return academicCatalog.curricula.map((curriculum) => ({
+        value: curriculum.code,
+        label: `${curriculum.code} — ${curriculum.label}`,
+      }));
     case "faculty":
       return Object.entries(labels)
         .filter(([k]) => k.startsWith("fac-"))
@@ -935,15 +962,17 @@ function choiceOptions(
 function MultiValueInput({
   column,
   labels,
+  academicCatalog,
   values,
   onChange,
 }: {
   column?: DataSourceColumn;
   labels: Record<string, string>;
+  academicCatalog: AcademicCatalog;
   values: string[];
   onChange: (values: string[]) => void;
 }) {
-  const options = choiceOptions(column, labels) ?? [];
+  const options = choiceOptions(column, labels, academicCatalog) ?? [];
   const remaining = options.filter((o) => !values.includes(o.value));
   const labelFor = (v: string) => options.find((o) => o.value === v)?.label ?? v;
 
@@ -1006,11 +1035,13 @@ function MultiValueInput({
 function ValueInput({
   column,
   labels,
+  academicCatalog,
   value,
   onChange,
 }: {
   column?: DataSourceColumn;
   labels: Record<string, string>;
+  academicCatalog: AcademicCatalog;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -1019,7 +1050,7 @@ function ValueInput({
   }
 
   // Choice-like types share their option list with the "is any of" picker.
-  const choices = choiceOptions(column, labels);
+  const choices = choiceOptions(column, labels, academicCatalog);
   if (choices) {
     return (
       <Select value={value} onChange={(e) => onChange(e.target.value)}>

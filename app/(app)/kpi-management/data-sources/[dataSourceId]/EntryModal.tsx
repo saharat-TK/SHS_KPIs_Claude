@@ -9,8 +9,8 @@ import {
   useUpdateDataSourceEntry,
 } from "@/lib/data/hooks";
 import { COLUMN_TYPE_LABELS } from "@/lib/kpi/dataSources";
-import { PROGRAMS } from "@/lib/kpi/programs";
 import type {
+  AcademicCatalog,
   DataSourceCellValue,
   DataSourceColumn,
   DataSourceEntry,
@@ -27,6 +27,7 @@ export function EntryModal({
   periodGrain,
   columns,
   entry,
+  academicCatalog,
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,6 +35,7 @@ export function EntryModal({
   periodGrain: DataSourcePeriodGrain;
   columns: DataSourceColumn[];
   entry: DataSourceEntry | null;
+  academicCatalog: AcademicCatalog;
 }) {
   const { user } = useAuth();
   const create = useCreateDataSourceEntry();
@@ -154,6 +156,7 @@ export function EntryModal({
               column={c}
               value={values[c.colKey] ?? ""}
               faculty={faculty}
+              academicCatalog={academicCatalog}
               onChange={(v) => setValues((prev) => ({ ...prev, [c.colKey]: v }))}
             />
           </Field>
@@ -172,11 +175,13 @@ function CellInput({
   value,
   onChange,
   faculty,
+  academicCatalog,
 }: {
   column: DataSourceColumn;
   value: string;
   onChange: (value: string) => void;
   faculty: FacultyRecord[];
+  academicCatalog: AcademicCatalog;
 }) {
   switch (column.dataType) {
     case "select":
@@ -210,9 +215,20 @@ function CellInput({
       return (
         <Select value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">—</option>
-          {PROGRAMS.map((p) => (
-            <option key={p.abbr} value={p.abbr}>
-              {p.abbr} — {p.label}
+          {academicCatalog.programs.map((program) => (
+            <option key={program.code} value={program.code}>
+              {program.code} — {program.label}
+            </option>
+          ))}
+        </Select>
+      );
+    case "curriculum":
+      return (
+        <Select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">—</option>
+          {academicCatalog.curricula.map((curriculum) => (
+            <option key={curriculum.code} value={curriculum.code}>
+              {curriculum.code} — {curriculum.label}
             </option>
           ))}
         </Select>
