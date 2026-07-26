@@ -30,6 +30,7 @@ import type {
   PerformancePeriod,
   PerformanceStatus,
   PerfKpi,
+  PerfKpiSource,
   PerfMetric,
   QuarterProgress,
   StrategicSet,
@@ -598,6 +599,11 @@ export const performanceRecordsRepo = {
     jsonOrThrow(await fetch(`/api/perf-kpis/${perfKpiId}`), "Failed to load performance KPI"),
   metricsByKpi: async (perfKpiId: number): Promise<PerfMetric[]> =>
     jsonOrThrow(await fetch(`/api/perf-metrics?perfKpiId=${perfKpiId}`), "Failed to load performance metrics"),
+  sourcesByKpi: async (perfKpiId: number): Promise<PerfKpiSource[]> =>
+    jsonOrThrow(
+      await fetch(`/api/perf-kpis/${perfKpiId}/sources`),
+      "Failed to load linked data sources",
+    ),
   saveKpiProgress: async (
     perfKpiId: number,
     input: {

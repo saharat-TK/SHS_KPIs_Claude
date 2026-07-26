@@ -25,6 +25,7 @@ import { useBreadcrumbLabel } from "@/components/shell/BreadcrumbLabels";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
   usePerfKpi,
+  usePerfKpiSources,
   usePerfMetricsByKpi,
   usePerformancePeriods,
   usePerformanceRecord,
@@ -47,10 +48,11 @@ import {
   resolveStageRole,
 } from "@/lib/kpi/approvalWorkflow";
 import { formatNumber } from "@/lib/utils";
-import type { ApprovalAction, ApprovalState } from "@/lib/types";
+import type { ApprovalAction, ApprovalState, PerfMetric } from "@/lib/types";
 import { ProgressPanel, type QuarterEntryAction } from "./ProgressPanel";
 import { MetricProgressModal } from "./MetricProgressModal";
 import { AnnualQuarterProgressMatrix } from "./AnnualQuarterProgressMatrix";
+import { LinkedDataSourcesSection } from "./LinkedDataSourcesSection";
 
 const DIRECT_ACTION_LABEL: Partial<Record<ApprovalAction, string>> = {
   submit: "Submit to Committee lead",
@@ -92,6 +94,7 @@ function PerfKpiProgress() {
   const recordQ = usePerformanceRecord(recordId);
   const periodsQ = usePerformancePeriods(recordId);
   const metricsQ = usePerfMetricsByKpi(perfKpiId);
+  const sourcesQ = usePerfKpiSources(perfKpiId);
   const save = useSaveKpiProgress(perfKpiId);
   const membershipsQ = useCommitteeMemberships();
   const approvalTransition = useApprovalTransition(recordId);
@@ -115,6 +118,27 @@ function PerfKpiProgress() {
   // enforces it; this drives the read-only UI and quarter-tab labels.
   const kpi = kpiQ.data;
   const metrics = metricsQ.data ?? [];
+  const sources = useMemo(() => sourcesQ.data ?? [], [sourcesQ.data]);
+  // A metric is fed only by a link that actually MAPS a value. An evidence-only
+  // link (empty mappings) never overwrites progress, so it must not lock entry.
+  const fedLibraryMetricIds = useMemo(
+    () =>
+      new Set(
+        sources
+          .flatMap((s) => s.links)
+          .filter((l) => l.libraryMetricId != null && l.mappings.length > 0)
+          .map((l) => l.libraryMetricId as number),
+      ),
+    [sources],
+  );
+  const isMetricFed = (metric: PerfMetric) =>
+    metric.sourceMetricId != null && fedLibraryMetricIds.has(metric.sourceMetricId);
+  const fedSourceName = (metric: PerfMetric) =>
+    sources.find((s) =>
+      s.links.some(
+        (l) => l.libraryMetricId === metric.sourceMetricId && l.mappings.length > 0,
+      ),
+    )?.name ?? null;
   const q1Approval = useKpiApproval(perfKpiId, year, 1);
   const q2Approval = useKpiApproval(perfKpiId, year, 2);
   const q3Approval = useKpiApproval(perfKpiId, year, 3);
@@ -324,13 +348,29 @@ function PerfKpiProgress() {
                                 ? healthOf(pct, { green: m.thresholdGreen!, amber: m.thresholdAmber! })
                                 : null;
                             const metricLocked = !!selectedApprovalLock?.locked && !allowApprovalLockedEditing;
+                            const fed = isMetricFed(m);
                             const go = () => setEditingMetricId(m.id);
                             return (
                               <Tr key={m.id} onClick={go}>
                                 <Td>
                                   <Badge tone="neutral">M{index + 1}</Badge>
                                 </Td>
-                                <Td className="font-medium">{m.name}</Td>
+                                <Td className="font-medium">
+                                  <span className="inline-flex items-center gap-xs">
+                                    {m.name}
+                                    {fed && (
+                                      // Value comes from the feed; only Issue /
+                                      // Solution stay editable in the pop-up.
+                                      // Badge takes no title, so it rides on a wrapper.
+                                      <span title={`Fed by ${fedSourceName(m) ?? "a data source"}`}>
+                                        <Badge tone="info">
+                                          <Icon name="database" size={14} />
+                                          auto
+                                        </Badge>
+                                      </span>
+                                    )}
+                                  </span>
+                                </Td>
                                 <Td align="right">
                                   {annualTarget == null
                                     ? "—"
@@ -405,6 +445,13 @@ function PerfKpiProgress() {
               }
             />
 
+            <LinkedDataSourcesSection
+              sources={sources}
+              metrics={metrics}
+              isLoading={sourcesQ.isLoading}
+              isError={sourcesQ.isError}
+            />
+
             {!kpi.hasChildren && !kpi.fedBy && (
               <div className="flex items-center gap-sm text-caption-sm text-mute">
                 <Badge tone="neutral">leaf KPI</Badge>
@@ -426,6 +473,9 @@ function PerfKpiProgress() {
                   periodsLoading={periodsQ.isLoading}
                   approvalState={selectedApprovalState}
                   allowApprovalLockedEditing={allowApprovalLockedEditing}
+                  fedByName={
+                    isMetricFed(editingMetric) ? fedSourceName(editingMetric) : null
+                  }
                   onClose={() => setEditingMetricId(null)}
                 />
               ) : null;

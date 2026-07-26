@@ -73,12 +73,15 @@ export async function PUT(
         );
       }
 
+      // is_computed = 0 marks this as hand-entered, matching the KPI route.
+      // Without it a value typed over a fed metric stayed flagged as computed,
+      // and the next feed run overwrote it with no trace.
       await conn.query(
         `INSERT INTO perf_metric_quarter_progress
-           (perf_metric_id, year_no, quarter_no, progress_value, issue, solution, recorded_by, recorded_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+           (perf_metric_id, year_no, quarter_no, progress_value, is_computed, issue, solution, recorded_by, recorded_at)
+         VALUES (?, ?, ?, ?, 0, ?, ?, ?, CURRENT_TIMESTAMP)
          ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value),
-           issue = VALUES(issue), solution = VALUES(solution),
+           is_computed = 0, issue = VALUES(issue), solution = VALUES(solution),
            recorded_by = VALUES(recorded_by), recorded_at = CURRENT_TIMESTAMP`,
         [params.id, yearNo, quarterNo, value, b.issue.trim(), b.solution.trim(), b.recordedBy ?? null],
       );

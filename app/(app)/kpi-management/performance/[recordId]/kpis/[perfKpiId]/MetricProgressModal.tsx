@@ -35,6 +35,7 @@ export function MetricProgressModal({
   periodsLoading = false,
   approvalState,
   allowApprovalLockedEditing = false,
+  fedByName = null,
 }: {
   metric: PerfMetric;
   perfKpiId: number;
@@ -48,6 +49,10 @@ export function MetricProgressModal({
   /** Parent KPI's quarter approval state; submitted/forwarded/approved lock metrics too. */
   approvalState?: ApprovalState;
   allowApprovalLockedEditing?: boolean;
+  /** Set when a data source maps a value into this metric. The value is then
+   *  read-only — typing over it would be overwritten by the next feed — but
+   *  Issue / Solution stay editable, since approval still requires them. */
+  fedByName?: string | null;
 }) {
   const { user } = useAuth();
   const save = useSaveMetricProgress(metric.id, perfKpiId);
@@ -84,6 +89,15 @@ export function MetricProgressModal({
       subtitle={`Quarterly progress · Year ${year} · Quarter ${quarter}`}
     >
       <div className="flex flex-col gap-lg">
+        {fedByName && (
+          <div className="flex items-center gap-sm rounded-lg border border-hairline bg-surface-soft px-md py-sm text-caption-sm text-mute">
+            <Badge tone="info">auto</Badge>
+            This sub-KPI&apos;s value is computed from the data source “{fedByName}”.
+            Edit the raw data there to change it — you can still record the Issue and
+            Solution here.
+          </div>
+        )}
+
         <div className="overflow-hidden rounded-lg border border-hairline">
           <div className="border-b border-hairline bg-surface-lowest px-md py-sm">
             <span className="text-label-md text-on-surface">Quarter {quarter}</span>
@@ -96,7 +110,7 @@ export function MetricProgressModal({
             targetLabel={targetLabel}
             existing={progressFor(quarter)}
             prefill={previousQuarterProgress(metric.progress, year, quarter)}
-            valueEditable
+            valueEditable={!fedByName}
             unit={metric.unit}
             readOnly={periodsLoading || periodLocked || (!!approvalLock?.locked && !allowApprovalLockedEditing)}
             readOnlyMessage={allowApprovalLockedEditing ? undefined : readOnlyMessage}
