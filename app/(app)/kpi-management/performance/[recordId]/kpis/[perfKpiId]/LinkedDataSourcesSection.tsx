@@ -197,15 +197,20 @@ function SourcePanel({
   return (
     <>
       <div className="flex flex-col gap-sm px-md py-md sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-sm text-body-sm text-mute">
-          <Badge tone={source.status === "active" ? "success" : "neutral"}>
-            {source.status}
-          </Badge>
-          <span className="min-w-0 truncate">
-            {source.committeeName ?? source.committeeId}
-          </span>
-          <span>·</span>
-          <span>{source.periodGrain} entries</span>
+        <div className="flex min-w-0 flex-col gap-tiny">
+          {/* Named here, not only in the tab strip — that only renders for two
+              or more sources, so a single linked source was otherwise unnamed. */}
+          <h4 className="truncate text-label-md text-on-surface">{source.name}</h4>
+          <div className="flex min-w-0 flex-wrap items-center gap-sm text-body-sm text-mute">
+            <Badge tone={source.status === "active" ? "success" : "neutral"}>
+              {source.status}
+            </Badge>
+            <span className="min-w-0 truncate">
+              {source.committeeName ?? source.committeeId}
+            </span>
+            <span>·</span>
+            <span>{source.periodGrain} entries</span>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-sm">
           {entries.length > 0 && (
