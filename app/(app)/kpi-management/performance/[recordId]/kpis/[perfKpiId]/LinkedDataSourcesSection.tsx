@@ -21,7 +21,13 @@ import {
 import { formatCellValue, formatEntryPeriod } from "@/lib/kpi/dataSources";
 import { buildCellLabels } from "@/lib/kpi/programs";
 import { downloadCsv, toCsv } from "@/lib/csv";
-import type { DataSourceEntry, PerfKpiSource, PerfMetric } from "@/lib/types";
+import type {
+  DataSourceEntry,
+  PerfKpi,
+  PerfKpiSource,
+  PerfMetric,
+} from "@/lib/types";
+import { LinkDataSourceModal } from "./LinkDataSourceModal";
 import {
   EntriesTable,
   formatEntryCreatedAt,
@@ -35,28 +41,49 @@ const TEN_ROW_HEIGHT = "max-h-[28rem]";
 /** The raw data behind this KPI, edited in place. Read/record only: columns are
  *  defined and sources created on the Data Sources page, not here. */
 export function LinkedDataSourcesSection({
+  kpi,
   sources,
   metrics,
   isLoading,
   isError,
 }: {
+  kpi: PerfKpi;
   sources: PerfKpiSource[];
   metrics: PerfMetric[];
   isLoading: boolean;
   isError: boolean;
 }) {
+  const { can } = useAuth();
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [linking, setLinking] = useState(false);
   // Fall back to the first source until one is picked, so the tab strip and the
   // table agree even before any interaction.
   const active = sources.find((s) => s.id === activeId) ?? sources[0] ?? null;
 
+  // A link edits the LIBRARY KPI and refeeds every active record, so it takes the
+  // same permission the Data Sources page requires to create one.
+  const canLink = can("configure_kpis");
+  const linkedSourceIds = sources.map((s) => s.id);
+
   return (
     <Card className="overflow-visible">
-      <div className="flex flex-col gap-tiny border-b border-hairline px-md py-md">
-        <h3 className="text-heading-md text-on-surface">Linked Data Sources</h3>
-        <p className="text-caption-sm text-mute">
-          The raw data behind this KPI. Edit it here and the computed values follow.
-        </p>
+      <div className="flex items-start justify-between gap-md border-b border-hairline px-md py-md">
+        <div className="flex flex-col gap-tiny">
+          <h3 className="text-heading-md text-on-surface">Linked Data Sources</h3>
+          <p className="text-caption-sm text-mute">
+            The raw data behind this KPI. Edit it here and the computed values follow.
+          </p>
+        </div>
+        {canLink && sources.length > 0 && (
+          <Button
+            variant="outline"
+            icon="add_link"
+            className="shrink-0"
+            onClick={() => setLinking(true)}
+          >
+            Link Data Source
+          </Button>
+        )}
       </div>
 
       <QueryBoundary isLoading={isLoading} isError={isError}>
@@ -64,7 +91,18 @@ export function LinkedDataSourcesSection({
           <EmptyState
             icon="database"
             title="No data source linked"
-            message="Nothing feeds this KPI yet. Link one from the Data Sources page — a link applies to the KPI everywhere, across every performance record."
+            message={
+              canLink
+                ? "Nothing feeds this KPI yet. Linking a source applies to the KPI everywhere, across every performance record."
+                : "Nothing feeds this KPI yet. An administrator can link one from here or from the Data Sources page."
+            }
+            action={
+              canLink ? (
+                <Button icon="add_link" onClick={() => setLinking(true)}>
+                  Link Data Source
+                </Button>
+              ) : undefined
+            }
           />
         ) : (
           <>
@@ -91,6 +129,16 @@ export function LinkedDataSourcesSection({
           </>
         )}
       </QueryBoundary>
+
+      {linking && (
+        <LinkDataSourceModal
+          open
+          onClose={() => setLinking(false)}
+          kpi={kpi}
+          metrics={metrics}
+          linkedSourceIds={linkedSourceIds}
+        />
+      )}
     </Card>
   );
 }
