@@ -94,6 +94,7 @@ export const qk = {
   perfKpis: (recordId: number) => ["perfKpis", recordId] as const,
   perfKpi: (id: number) => ["perfKpi", id] as const,
   perfMetrics: (perfKpiId: number) => ["perfMetrics", perfKpiId] as const,
+  perfKpiSources: (perfKpiId: number) => ["perfKpiSources", perfKpiId] as const,
   approvals: (recordId: number, yearNo: number, quarterNo: number) =>
     ["approvals", recordId, yearNo, quarterNo] as const,
   kpiApproval: (perfKpiId: number, yearNo: number, quarterNo: number) =>
@@ -735,6 +736,14 @@ export const usePerfMetricsByKpi = (perfKpiId: number) =>
   useQuery({
     queryKey: qk.perfMetrics(perfKpiId),
     queryFn: () => performanceRecordsRepo.metricsByKpi(perfKpiId),
+    enabled: Number.isFinite(perfKpiId) && perfKpiId > 0,
+  });
+
+/** Data sources linked to this KPI or any of its metrics. */
+export const usePerfKpiSources = (perfKpiId: number) =>
+  useQuery({
+    queryKey: qk.perfKpiSources(perfKpiId),
+    queryFn: () => performanceRecordsRepo.sourcesByKpi(perfKpiId),
     enabled: Number.isFinite(perfKpiId) && perfKpiId > 0,
   });
 

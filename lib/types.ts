@@ -661,3 +661,17 @@ export interface DataSourceLink {
   setName?: string;
   dataSourceName?: string;
 }
+
+/** A data source reached from a performance KPI — linked either to the library
+ *  KPI it was snapshotted from, or to one of its metrics. `links` carries every
+ *  link that reaches this KPI, including evidence-only ones (empty mappings),
+ *  which show their data but never feed a value. */
+export interface PerfKpiSource {
+  id: number;
+  name: string;
+  periodGrain: DataSourcePeriodGrain;
+  committeeId: string;
+  committeeName: string | null;
+  status: DataSourceStatus;
+  links: DataSourceLink[];
+}
