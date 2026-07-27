@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import {
+  useAcademicCatalog,
   useLibraryMetrics,
   useCreateLibraryMetric,
   useUpdateLibraryMetric,
@@ -39,7 +40,6 @@ import {
   type MetricTargetMode,
 } from "@/lib/types";
 import { personsForCommittee } from "@/lib/kpi/committee";
-import { PROGRAMS } from "@/lib/kpi/programs";
 
 function toYearSlots(targets: AnnualTarget[] | undefined): (number | null)[] {
   const slots: (number | null)[] = [null, null, null, null, null];
@@ -66,21 +66,9 @@ const ZERO_YEARS: (number | null)[] = [0, 0, 0, 0, 0];
 
 // Batch presets — each entry prefixes `${abbr}-` onto the parent KPI's name.
 // `label` is the Thai program/curriculum name, shown for reference in the dialog.
-// The program list lives in lib/kpi/programs.ts because the `program` data-source
-// column type shares it; curriculums are used only here.
+// Both lists come from the academic catalog tables, the same source the
+// program/curriculum data-source columns use, so they cannot drift apart.
 type BatchEntry = { abbr: string; label: string };
-
-const CURRICULUM_BATCH: BatchEntry[] = [
-  { abbr: "PHB", label: "สาธารณสุขศาสตร์" },
-  { abbr: "PHM", label: "การจัดการสุขภาพชายแดน" },
-  { abbr: "PHD", label: "ระบาดและวัคซีนวิทยา" },
-  { abbr: "SHSB", label: "วิทยาศาสตร์การกีฬาและสุขภาพ" },
-  { abbr: "SHSM", label: "วิทยาศาสตร์และเทคโนโลยีการกีฬาประยุกต์" },
-  { abbr: "OHSB", label: "อาชีวอนามัยและความปลอดภัย" },
-  { abbr: "EnvHB", label: "อนามัยสิ่งแวดล้อม" },
-  { abbr: "EnvHM", label: "เทคโนโลยีการจัดการสิ่งแวดล้อมอย่างยั่งยืน" },
-  { abbr: "BMM", label: "เทคโนโลยีชีวการแพทย์และสารสนเทศสุขภาพ" },
-];
 
 const TARGET_MODE_OPTIONS: {
   value: MetricTargetMode;
@@ -135,9 +123,22 @@ export function MetricEditor({
   const [batch, setBatch] = useState<{ title: string; entries: BatchEntry[] } | null>(null);
 
   const metrics = metricsQ.data ?? [];
+  const catalogQ = useAcademicCatalog();
+  const toBatchEntry = (e: { code: string; label: string }): BatchEntry => ({
+    abbr: e.code,
+    label: e.label,
+  });
+  const programBatch = (catalogQ.data?.programs ?? []).map(toBatchEntry);
+  const curriculumBatch = (catalogQ.data?.curricula ?? []).map(toBatchEntry);
+  // The presets are useless until the catalog arrives, so gate on it too.
+  const canStartBatch = canAddMetric && !!catalogQ.data;
   const batchTooltip = !canAddMetric
     ? "Save the parent KPI before adding sub-KPIs"
-    : undefined;
+    : !catalogQ.data
+      ? catalogQ.isError
+        ? "Could not load the academic catalog"
+        : "Loading the academic catalog…"
+      : undefined;
 
   return (
     <Card>
@@ -150,9 +151,9 @@ export function MetricEditor({
               size="sm"
               variant="secondary"
               icon="groups"
-              disabled={!canAddMetric}
+              disabled={!canStartBatch}
               title={batchTooltip}
-              onClick={() => setBatch({ title: "Batch: 5 Programs", entries: PROGRAMS })}
+              onClick={() => setBatch({ title: "Batch: 5 Programs", entries: programBatch })}
             >
               Batch: 5 Programs
             </Button>
@@ -160,10 +161,10 @@ export function MetricEditor({
               size="sm"
               variant="secondary"
               icon="school"
-              disabled={!canAddMetric}
+              disabled={!canStartBatch}
               title={batchTooltip}
               onClick={() =>
-                setBatch({ title: "Batch: 9 Curriculums", entries: CURRICULUM_BATCH })
+                setBatch({ title: "Batch: 9 Curriculums", entries: curriculumBatch })
               }
             >
               Batch: 9 Curriculums

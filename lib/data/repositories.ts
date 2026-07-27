@@ -1,4 +1,5 @@
 import type {
+  AcademicCatalog,
   Committee,
   CommitteeMembership,
   DataSource,
@@ -891,4 +892,11 @@ export type {
   Measurement,
   Metric,
   ValidationSubmission,
+};
+
+// Academic catalog — MySQL-backed reference data for the program/curriculum
+// pickers and the KPI library's metric batch presets.
+export const academicCatalogRepo = {
+  get: async (): Promise<AcademicCatalog> =>
+    jsonOrThrow(await fetch("/api/academic-catalog"), "Failed to load academic catalog"),
 };

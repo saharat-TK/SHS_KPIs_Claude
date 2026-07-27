@@ -25,10 +25,11 @@ import {
   useDataSourceLinks,
   useDeleteDataSourceLink,
   useFacultyRecords,
+  useAcademicCatalog,
 } from "@/lib/data/hooks";
 import { formatCellValue, formatEntryPeriod } from "@/lib/kpi/dataSources";
 import { describeMapping } from "@/lib/kpi/dataSourceFilters";
-import { buildCellLabels } from "@/lib/kpi/programs";
+import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { Icon } from "@/components/ui/Icon";
 import type { DataSourceColumn, DataSourceEntry, DataSourceLink } from "@/lib/types";
@@ -82,9 +83,10 @@ function DataSourceDetail({ id }: { id: number }) {
   // Derived cells store a code (faculty id, program abbr); the table and the CSV
   // both resolve it through this one map so the two always agree.
   const facultyQ = useFacultyRecords();
+  const catalogQ = useAcademicCatalog();
   const cellLabels = useMemo(
-    () => buildCellLabels(facultyQ.data ?? []),
-    [facultyQ.data],
+    () => buildCellLabels(facultyQ.data ?? [], catalogQ.data),
+    [facultyQ.data, catalogQ.data],
   );
 
   const exportCsv = () => {

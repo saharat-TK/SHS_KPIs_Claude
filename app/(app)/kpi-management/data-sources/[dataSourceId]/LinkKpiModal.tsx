@@ -7,13 +7,14 @@ import {
   useDataSourceColumns,
   useDataSourceEntries,
   useFacultyRecords,
+  useAcademicCatalog,
   useLibraryKpis,
   useLibraryMetrics,
   useStrategicSets,
   useUpdateDataSourceLink,
 } from "@/lib/data/hooks";
 import { unitNeedsDivisor } from "@/lib/kpi/progress";
-import { buildCellLabels } from "@/lib/kpi/programs";
+import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import type { DataSourceLink, MappingSlot } from "@/lib/types";
 import {
   MappingCard,
@@ -51,12 +52,13 @@ export function LinkKpiModal({
   const columnsQ = useDataSourceColumns(dataSourceId);
   const entriesQ = useDataSourceEntries(dataSourceId);
   const facultyQ = useFacultyRecords();
+  const catalogQ = useAcademicCatalog();
   const create = useCreateDataSourceLink();
   const update = useUpdateDataSourceLink();
 
   const columns = useMemo(() => columnsQ.data ?? [], [columnsQ.data]);
   const entries = useMemo(() => entriesQ.data ?? [], [entriesQ.data]);
-  const labels = useMemo(() => buildCellLabels(facultyQ.data ?? []), [facultyQ.data]);
+  const labels = useMemo(() => buildCellLabels(facultyQ.data ?? [], catalogQ.data), [facultyQ.data, catalogQ.data]);
 
   useEffect(() => {
     if (!open) return;
