@@ -446,6 +446,7 @@ function PerfKpiProgress() {
             />
 
             <LinkedDataSourcesSection
+              kpi={kpi}
               sources={sources}
               metrics={metrics}
               isLoading={sourcesQ.isLoading}
