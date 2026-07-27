@@ -19,11 +19,13 @@ import {
   matchesFilters,
   operatorsFor,
 } from "@/lib/kpi/dataSourceFilters";
-import { PROGRAMS } from "@/lib/kpi/programs";
+import { useAcademicCatalog } from "@/lib/data/hooks";
+import { EMPTY_ACADEMIC_CATALOG, catalogOptionLabel } from "@/lib/kpi/academicCatalog";
 import { formatNumber } from "@/lib/utils";
 import { ACADEMIC_RANKS, RANKS } from "@/lib/types";
 import { facultyHeadcount } from "@/lib/kpi/facultyHeadcount";
 import type {
+  AcademicCatalog,
   AggregationKind,
   DataSourceColumn,
   DataSourceFilter,
@@ -633,13 +635,16 @@ function PeriodBound({
 function choiceOptions(
   column: DataSourceColumn | undefined,
   labels: Record<string, string>,
+  catalog: AcademicCatalog,
 ): { value: string; label: string }[] | null {
   if (!column) return null;
   switch (column.dataType) {
     case "select":
       return (column.options ?? []).map((o) => ({ value: o, label: o }));
     case "program":
-      return PROGRAMS.map((p) => ({ value: p.abbr, label: `${p.abbr} — ${p.label}` }));
+      return catalog.programs.map((p) => ({ value: p.code, label: catalogOptionLabel(p) }));
+    case "curriculum":
+      return catalog.curricula.map((c) => ({ value: c.code, label: catalogOptionLabel(c) }));
     case "faculty":
       return Object.entries(labels)
         .filter(([k]) => k.startsWith("fac-"))
@@ -665,7 +670,8 @@ function MultiValueInput({
   values: string[];
   onChange: (values: string[]) => void;
 }) {
-  const options = choiceOptions(column, labels) ?? [];
+  const catalog = useAcademicCatalog().data ?? EMPTY_ACADEMIC_CATALOG;
+  const options = choiceOptions(column, labels, catalog) ?? [];
   const remaining = options.filter((o) => !values.includes(o.value));
   const labelFor = (v: string) => options.find((o) => o.value === v)?.label ?? v;
 
@@ -736,12 +742,13 @@ function ValueInput({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const catalog = useAcademicCatalog().data ?? EMPTY_ACADEMIC_CATALOG;
   if (!column) {
     return <Input value={value} disabled placeholder="Pick a field first" onChange={() => {}} />;
   }
 
   // Choice-like types share their option list with the "is any of" picker.
-  const choices = choiceOptions(column, labels);
+  const choices = choiceOptions(column, labels, catalog);
   if (choices) {
     return (
       <Select value={value} onChange={(e) => onChange(e.target.value)}>
@@ -751,6 +758,12 @@ function ValueInput({
             {o.label}
           </option>
         ))}
+        {/* A filter written before this field became a dropdown can hold a value
+            the catalog doesn't know. Keep it visible, or the Select would render
+            blank and quietly rewrite the filter on the next save. */}
+        {value && !choices.some((o) => o.value === value) && (
+          <option value={value}>{value} — not in the catalog</option>
+        )}
       </Select>
     );
   }

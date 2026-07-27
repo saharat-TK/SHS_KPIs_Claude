@@ -4,13 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal, Button, Field, Input, Select } from "@/components/ui";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
+  useAcademicCatalog,
   useCreateDataSourceEntry,
   useFacultyRecords,
   useUpdateDataSourceEntry,
 } from "@/lib/data/hooks";
 import { COLUMN_TYPE_LABELS } from "@/lib/kpi/dataSources";
-import { PROGRAMS } from "@/lib/kpi/programs";
+import {
+  EMPTY_ACADEMIC_CATALOG,
+  catalogOptionLabel,
+  curriculaForProgram,
+} from "@/lib/kpi/academicCatalog";
 import type {
+  AcademicCatalog,
   DataSourceCellValue,
   DataSourceColumn,
   DataSourceEntry,
@@ -52,6 +58,9 @@ export function EntryModal({
     [needsFaculty, facultyQ.data],
   );
 
+  // Same idea for the academic catalog: one query feeds both pickers.
+  const catalog = useAcademicCatalog().data ?? EMPTY_ACADEMIC_CATALOG;
+
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(String(thisYear));
   const [quarter, setQuarter] = useState("1");
@@ -72,6 +81,14 @@ export function EntryModal({
       ),
     );
   }, [open, entry, columns, thisYear]);
+
+  // A curriculum belongs to a program, so when this source also collects the
+  // program we narrow the curriculum picker to that program's curricula. With no
+  // program column — the common case — every curriculum stays on offer.
+  const programColumn = columns.find((c) => c.dataType === "program");
+  const selectedProgramCode = programColumn
+    ? (values[programColumn.colKey] ?? "").trim() || null
+    : null;
 
   const yearValid = /^\d{4}$/.test(year.trim());
   const requiredFilled = columns.every(
@@ -154,6 +171,8 @@ export function EntryModal({
               column={c}
               value={values[c.colKey] ?? ""}
               faculty={faculty}
+              catalog={catalog}
+              selectedProgramCode={selectedProgramCode}
               onChange={(v) => setValues((prev) => ({ ...prev, [c.colKey]: v }))}
             />
           </Field>
@@ -167,16 +186,29 @@ export function EntryModal({
   );
 }
 
+/** Keeps a stored code that isn't in the current option list selectable, rather
+ *  than letting the Select silently blank it. Covers values typed in before the
+ *  field became a dropdown, and a curriculum hidden by the program cascade. */
+function UnrecognisedOption({ value, known }: { value: string; known: string[] }) {
+  if (!value || known.includes(value)) return null;
+  return <option value={value}>{value} — not in the catalog</option>;
+}
+
 function CellInput({
   column,
   value,
   onChange,
   faculty,
+  catalog,
+  selectedProgramCode,
 }: {
   column: DataSourceColumn;
   value: string;
   onChange: (value: string) => void;
   faculty: FacultyRecord[];
+  catalog: AcademicCatalog;
+  /** Set when this source also has a program column, to narrow curricula. */
+  selectedProgramCode: string | null;
 }) {
   switch (column.dataType) {
     case "select":
@@ -210,13 +242,33 @@ function CellInput({
       return (
         <Select value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">—</option>
-          {PROGRAMS.map((p) => (
-            <option key={p.abbr} value={p.abbr}>
-              {p.abbr} — {p.label}
+          {catalog.programs.map((p) => (
+            <option key={p.code} value={p.code}>
+              {catalogOptionLabel(p)}
             </option>
           ))}
+          <UnrecognisedOption
+            value={value}
+            known={catalog.programs.map((p) => p.code)}
+          />
         </Select>
       );
+    case "curriculum": {
+      const offered = curriculaForProgram(catalog.curricula, selectedProgramCode);
+      return (
+        <Select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">—</option>
+          {offered.map((c) => (
+            <option key={c.code} value={c.code}>
+              {catalogOptionLabel(c)}
+            </option>
+          ))}
+          {/* Also covers a valid curriculum that the chosen program filtered out,
+              so switching program never silently discards what was recorded. */}
+          <UnrecognisedOption value={value} known={offered.map((c) => c.code)} />
+        </Select>
+      );
+    }
     case "boolean":
       return (
         <Select value={value} onChange={(e) => onChange(e.target.value)}>

@@ -17,9 +17,10 @@ import {
   useDataSourceColumns,
   useDataSourceEntries,
   useFacultyRecords,
+  useAcademicCatalog,
 } from "@/lib/data/hooks";
 import { formatCellValue, formatEntryPeriod } from "@/lib/kpi/dataSources";
-import { buildCellLabels } from "@/lib/kpi/programs";
+import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import type {
   DataSourceEntry,
@@ -155,6 +156,7 @@ function SourcePanel({
   const columnsQ = useDataSourceColumns(source.id);
   const entriesQ = useDataSourceEntries(source.id);
   const facultyQ = useFacultyRecords();
+  const catalogQ = useAcademicCatalog();
 
   const [editing, setEditing] = useState<DataSourceEntry | null>(null);
   const [adding, setAdding] = useState(false);
@@ -163,8 +165,8 @@ function SourcePanel({
   const columns = useMemo(() => columnsQ.data ?? [], [columnsQ.data]);
   const entries = entriesQ.data ?? [];
   const cellLabels = useMemo(
-    () => buildCellLabels(facultyQ.data ?? []),
-    [facultyQ.data],
+    () => buildCellLabels(facultyQ.data ?? [], catalogQ.data),
+    [facultyQ.data, catalogQ.data],
   );
 
   // Scoped to the DATA SOURCE's committee, not the performance record's.

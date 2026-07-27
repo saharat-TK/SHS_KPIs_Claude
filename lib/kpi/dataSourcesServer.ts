@@ -11,7 +11,7 @@ import type {
 } from "@/lib/types";
 import { DataSourceValidationError } from "@/lib/kpi/dataSources";
 import { validateMappings } from "@/lib/kpi/dataSourceFilters";
-import { PROGRAM_CODES } from "@/lib/kpi/programs";
+import { loadAcademicCatalog } from "@/lib/kpi/academicCatalogServer";
 
 type Db = Pool | PoolConnection;
 
@@ -155,8 +155,8 @@ export async function validateLinkMappings(
 
 /** Fill in `options` for derived-option columns so validateEntryValues can check them
  *  the same way it checks a `select`. Faculty ids come from the live roster (active
- *  staff only); program codes from the shared PROGRAMS list. Nothing here is
- *  persisted — data_source_column.options stays NULL for these types.
+ *  staff only); program and curriculum codes from the academic catalog tables.
+ *  Nothing here is persisted — data_source_column.options stays NULL for these types.
  *
  *  Call this immediately before validating an entry write. */
 export async function resolveColumnOptions(
@@ -172,9 +172,20 @@ export async function resolveColumnOptions(
     facultyIds = rows.map((r) => String(r.id));
   }
 
+  // Likewise for the catalog — one load covers both program and curriculum.
+  const needsCatalog = columns.some(
+    (c) => c.dataType === "program" || c.dataType === "curriculum",
+  );
+  const catalog = needsCatalog ? await loadAcademicCatalog(db) : null;
+
   return columns.map((c) => {
     if (c.dataType === "faculty") return { ...c, options: facultyIds ?? [] };
-    if (c.dataType === "program") return { ...c, options: PROGRAM_CODES };
+    if (c.dataType === "program") {
+      return { ...c, options: catalog?.programs.map((p) => p.code) ?? [] };
+    }
+    if (c.dataType === "curriculum") {
+      return { ...c, options: catalog?.curricula.map((x) => x.code) ?? [] };
+    }
     return c;
   });
 }

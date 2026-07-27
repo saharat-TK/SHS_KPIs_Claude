@@ -31,6 +31,7 @@ import type {
   UnitRecord,
 } from "@/lib/types";
 import {
+  academicCatalogRepo,
   approvalsRepo,
   type ApprovalTransitionInput,
   committeesRepo,
@@ -95,6 +96,7 @@ export const qk = {
   perfKpi: (id: number) => ["perfKpi", id] as const,
   perfMetrics: (perfKpiId: number) => ["perfMetrics", perfKpiId] as const,
   perfKpiSources: (perfKpiId: number) => ["perfKpiSources", perfKpiId] as const,
+  academicCatalog: ["academicCatalog"] as const,
   approvals: (recordId: number, yearNo: number, quarterNo: number) =>
     ["approvals", recordId, yearNo, quarterNo] as const,
   kpiApproval: (perfKpiId: number, yearNo: number, quarterNo: number) =>
@@ -1079,3 +1081,8 @@ export function useDeleteDataSourceLink() {
     },
   });
 }
+
+/** The academic catalog (programs + curricula). Small, stable reference data —
+ *  one query serves every program/curriculum picker on the page. */
+export const useAcademicCatalog = () =>
+  useQuery({ queryKey: qk.academicCatalog, queryFn: academicCatalogRepo.get });
