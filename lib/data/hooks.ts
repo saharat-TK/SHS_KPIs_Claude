@@ -38,6 +38,7 @@ import {
   committeeMembershipsRepo,
   dataSourcesRepo,
   type DataSourceColumnInput,
+  type DataSourceBulkEntryInput,
   type DataSourceEntryInput,
   type DataSourceLinkInput,
   type LinkWriteResult,
@@ -972,6 +973,25 @@ export function useCreateDataSourceEntry() {
     mutationFn: ({ id, input }: { id: number; input: DataSourceEntryInput }) =>
       dataSourcesRepo.createEntry(id, input),
     meta: { toast: "Entry recorded" },
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: ["dataSourceEntries", id] });
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
+      invalidatePerformanceValues(qc);
+    },
+  });
+}
+
+export function useBulkCreateDataSourceEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: DataSourceBulkEntryInput }) =>
+      dataSourcesRepo.bulkCreateEntries(id, input),
+    meta: {
+      toast: (d: unknown) => {
+        const n = (d as { inserted: number }).inserted;
+        return `${n} ${n === 1 ? "entry" : "entries"} imported`;
+      },
+    },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: ["dataSourceEntries", id] });
       qc.invalidateQueries({ queryKey: ["dataSources"] });

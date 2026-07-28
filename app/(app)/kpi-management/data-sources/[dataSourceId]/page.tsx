@@ -27,13 +27,19 @@ import {
   useFacultyRecords,
   useAcademicCatalog,
 } from "@/lib/data/hooks";
-import { formatCellValue, formatEntryPeriod } from "@/lib/kpi/dataSources";
+import {
+  buildEntryTemplateCsv,
+  formatCellValue,
+  formatEntryPeriod,
+  type TemplateChoice,
+} from "@/lib/kpi/dataSources";
 import { describeMapping } from "@/lib/kpi/dataSourceFilters";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
-import { downloadCsv, toCsv } from "@/lib/csv";
+import { UTF8_BOM, downloadCsv, toCsv } from "@/lib/csv";
 import { Icon } from "@/components/ui/Icon";
 import type { DataSourceColumn, DataSourceEntry, DataSourceLink } from "@/lib/types";
 import { EntryModal } from "./EntryModal";
+import { ImportEntriesModal } from "./ImportEntriesModal";
 import { LinkKpiModal } from "./LinkKpiModal";
 import { ManageColumnsModal } from "./ManageColumnsModal";
 import { EntriesTable, formatEntryCreatedAt } from "./EntriesTable";
@@ -62,6 +68,7 @@ function DataSourceDetail({ id }: { id: number }) {
   const [editing, setEditing] = useState<DataSourceEntry | null>(null);
   const [editingLink, setEditingLink] = useState<DataSourceLink | null>(null);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [findData, setFindData] = useState("");
 
   const source = sourceQ.data;
@@ -89,6 +96,8 @@ function DataSourceDetail({ id }: { id: number }) {
     [facultyQ.data, catalogQ.data],
   );
 
+  const fileSlug = source?.name.replace(/\s+/g, "-").toLowerCase() ?? "data-source";
+
   const exportCsv = () => {
     if (!source) return;
     const headers = ["Period", ...columns.map((c) => c.label), "Note", "Created at"];
@@ -98,7 +107,55 @@ function DataSourceDetail({ id }: { id: number }) {
       e.note ?? "",
       formatEntryCreatedAt(e.createdAt),
     ]);
-    downloadCsv(`${source.name.replace(/\s+/g, "-").toLowerCase()}.csv`, toCsv(headers, rows));
+    downloadCsv(`${fileSlug}.csv`, toCsv(headers, rows));
+  };
+
+  // A constrained column cannot be filled in offline unless the file says what
+  // it accepts, so the template's legend enumerates every allowed value. The
+  // codes come from the same two queries the entry form's pickers use, so the
+  // template can never offer something the form would reject.
+  const templateChoices = useMemo(() => {
+    const catalog = catalogQ.data;
+    const roster = (facultyQ.data ?? []).filter((f) => f.status === "active");
+    const out: Record<string, TemplateChoice[]> = {};
+
+    for (const c of columns) {
+      if (c.dataType === "select") {
+        out[c.colKey] = (c.options ?? []).map((o) => ({ code: o, label: o }));
+      } else if (c.dataType === "program") {
+        out[c.colKey] = (catalog?.programs ?? []).map((p) => ({
+          code: p.code,
+          label: p.label,
+        }));
+      } else if (c.dataType === "curriculum") {
+        out[c.colKey] = (catalog?.curricula ?? []).map((x) => ({
+          code: x.code,
+          label: x.label,
+          hint: x.programCode,
+        }));
+      } else if (c.dataType === "faculty") {
+        // DERIVED_OPTION_SOURCE refuses to list 64 ids in an error message, but
+        // someone filling a spreadsheet offline has no other way to find one.
+        out[c.colKey] = roster.map((f) => ({
+          code: f.id,
+          label: f.name,
+          hint: f.program,
+        }));
+      }
+    }
+    return out;
+  }, [columns, catalogQ.data, facultyQ.data]);
+
+  const downloadTemplate = () => {
+    if (!source) return;
+    // The BOM is what makes Excel read the Thai labels in the legend as UTF-8.
+    const csv = buildEntryTemplateCsv({
+      sourceName: source.name,
+      grain: source.periodGrain,
+      columns,
+      choices: templateChoices,
+    });
+    downloadCsv(`${fileSlug}-template.csv`, `${UTF8_BOM}${csv}`);
   };
 
   return (
@@ -112,16 +169,28 @@ function DataSourceDetail({ id }: { id: number }) {
               `Raw data owned by ${source.committeeName ?? source.committeeId}.`
             }
             actions={
-              <div className="flex items-center gap-sm">
+              <div className="flex flex-wrap items-center gap-sm">
                 {entries.length > 0 && (
                   <Button variant="ghost" icon="download" onClick={exportCsv}>
                     Export CSV
                   </Button>
                 )}
                 {tab === "data" && canRecord && columns.length > 0 && (
-                  <Button icon="add" onClick={() => setAdding(true)}>
-                    Add Entry
-                  </Button>
+                  <>
+                    <Button variant="ghost" icon="description" onClick={downloadTemplate}>
+                      Template
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      icon="upload_file"
+                      onClick={() => setImporting(true)}
+                    >
+                      Upload CSV
+                    </Button>
+                    <Button icon="add" onClick={() => setAdding(true)}>
+                      Add Entry
+                    </Button>
+                  </>
                 )}
                 {tab === "columns" && isAdmin && (
                   <Button icon="edit" onClick={() => setShowColumns(true)}>
@@ -311,6 +380,18 @@ function DataSourceDetail({ id }: { id: number }) {
             }}
             dataSourceId={id}
             link={editingLink}
+          />
+
+          <ImportEntriesModal
+            open={importing}
+            onClose={() => setImporting(false)}
+            dataSourceId={id}
+            periodGrain={source.periodGrain}
+            columns={columns}
+            choices={templateChoices}
+            entries={entries}
+            cellLabels={cellLabels}
+            onDownloadTemplate={downloadTemplate}
           />
 
           {(adding || editing) && (

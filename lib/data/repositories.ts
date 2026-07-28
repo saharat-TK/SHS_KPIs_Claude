@@ -789,6 +789,20 @@ export const dataSourcesRepo = {
       }),
       "Failed to record entry",
     ),
+  // One request for a whole CSV import: the route inserts every row and re-feeds
+  // the KPIs once, which looping createEntry cannot do.
+  bulkCreateEntries: async (
+    id: number,
+    input: DataSourceBulkEntryInput,
+  ): Promise<{ inserted: number }> =>
+    jsonOrThrow(
+      await fetch(`/api/data-sources/${id}/entries/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to import entries",
+    ),
   updateEntry: async (
     entryId: number,
     input: Partial<DataSourceEntryInput>,
@@ -876,6 +890,19 @@ export interface DataSourceEntryInput {
   quarter: number | null;
   values: Record<string, DataSourceCellValue>;
   note?: string | null;
+  actorId?: string;
+  userRole?: string;
+}
+
+/** A CSV import. The actor is carried once for the batch rather than repeated on
+ *  every row — one upload is one person's action. */
+export interface DataSourceBulkEntryInput {
+  rows: {
+    year: number;
+    quarter: number | null;
+    values: Record<string, DataSourceCellValue>;
+    note?: string | null;
+  }[];
   actorId?: string;
   userRole?: string;
 }
