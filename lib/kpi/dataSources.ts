@@ -245,3 +245,394 @@ export function formatCellValue(
 export function formatEntryPeriod(year: number, quarter: number | null): string {
   return quarter === null ? String(year) : `${year} Q${quarter}`;
 }
+
+/* ------------------------------------------------------------------------- *
+ * CSV template + bulk import
+ *
+ * The download and the upload are two halves of one contract, so they live
+ * together: buildEntryTemplateCsv decides what the header row says, and
+ * matchTemplateHeaders decides what the header row is allowed to say. Splitting
+ * them across modules is how a template and its importer drift apart.
+ *
+ * Everything here reuses coerceCellValue and normalizeEntryPeriod, which the API
+ * also runs — a row that previews clean cannot then fail server-side for a
+ * different reason. The one thing this layer adds is *collecting* errors instead
+ * of throwing on the first: a 200-row file needs every problem at once.
+ * ------------------------------------------------------------------------- */
+
+/** Rows opening with this are documentation, not data — the legend the template
+ *  writes and the importer skips. */
+export const TEMPLATE_COMMENT = "#";
+export const TEMPLATE_YEAR_HEADER = "Year";
+export const TEMPLATE_QUARTER_HEADER = "Quarter";
+export const TEMPLATE_NOTE_HEADER = "Note";
+
+/** Blank rows left under the header so the file opens ready to type into. */
+const TEMPLATE_BLANK_ROWS = 3;
+
+/** One allowed value for a constrained column, as the legend presents it.
+ *  `hint` carries extra context — a curriculum's owning program, say. */
+export interface TemplateChoice {
+  code: string;
+  label: string;
+  hint?: string;
+}
+
+/** Which CSV position holds what, once the header row has been understood. */
+export interface TemplateHeaderMap {
+  year: number;
+  /** null when the file carries no Quarter column. */
+  quarter: number | null;
+  note: number | null;
+  /** colKey -> index in the row. Missing optional columns are simply absent. */
+  columns: Record<string, number>;
+}
+
+/** A problem with one cell, or with the row as a whole when colKey is null. */
+export interface EntryRowError {
+  colKey: string | null;
+  message: string;
+}
+
+export interface ParsedEntryRow {
+  /** 1-based line in the uploaded file, so the user can find it in Excel. */
+  lineNumber: number;
+  year: number | null;
+  quarter: number | null;
+  values: Record<string, DataSourceCellValue>;
+  note: string | null;
+  errors: EntryRowError[];
+  /** What the file actually said, kept so the preview can show a rejected cell
+   *  as the user typed it rather than as the null it coerced to. */
+  raw: Record<string, string>;
+  rawPeriod: string;
+}
+
+/** CSV escaping, duplicated from lib/csv.ts on purpose: this module may not take
+ *  runtime imports (see formatCellValue's note), and a template whose Thai column
+ *  label contains a comma must still produce a parseable header row. */
+function escapeCsvCell(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/** How a column's accepted input is described in the legend: the type's own name
+ *  (COLUMN_TYPE_LABELS, so the legend and the columns editor always agree), then
+ *  what to actually type. Constrained types end with a colon — their allowed
+ *  values are listed underneath. */
+function describeColumnInput(column: ColumnSpec): string {
+  switch (column.dataType) {
+    case "date":
+      return "Format: YYYY-MM-DD.";
+    case "url":
+      return "Must start with http:// or https://.";
+    case "boolean":
+      return "Enter true or false.";
+    case "select":
+      return "Enter one of these values:";
+    case "faculty":
+      return "Enter one of these ids:";
+    case "program":
+    case "curriculum":
+      return "Enter one of these codes:";
+    default:
+      return "";
+  }
+}
+
+/** The CSV a committee downloads, fills in offline, and uploads back.
+ *
+ *  `choices` arrives resolved (built from the academic catalog and the faculty
+ *  roster by the caller) because this module cannot query anything itself. A
+ *  column with no entry there simply gets no allowed-value block. */
+export function buildEntryTemplateCsv(args: {
+  sourceName: string;
+  grain: DataSourcePeriodGrain;
+  columns: ColumnSpec[];
+  choices?: Record<string, TemplateChoice[]>;
+}): string {
+  const { sourceName, grain, columns, choices = {} } = args;
+  const comment = (text: string) => (text ? `${TEMPLATE_COMMENT} ${text}` : TEMPLATE_COMMENT);
+
+  const lines: string[] = [
+    comment(`SHS data entry template — ${sourceName}`),
+    comment(
+      grain === "quarterly"
+        ? `Period grain: quarterly — fill both ${TEMPLATE_YEAR_HEADER} and ${TEMPLATE_QUARTER_HEADER} (1–4).`
+        : `Period grain: annual — fill ${TEMPLATE_YEAR_HEADER} only, and leave no ${TEMPLATE_QUARTER_HEADER} column.`,
+    ),
+    comment("Lines starting with # are ignored on upload. Do not edit the header row."),
+    comment(`${TEMPLATE_NOTE_HEADER} is optional and free text.`),
+    comment(""),
+    comment("Columns:"),
+  ];
+
+  for (const column of columns) {
+    const type = COLUMN_TYPE_LABELS[column.dataType];
+    const required = column.isRequired ? ", required" : "";
+    const how = describeColumnInput(column);
+    lines.push(
+      comment(
+        `  ${column.label} [${column.colKey}] — ${type}${required}.${how ? ` ${how}` : ""}`,
+      ),
+    );
+    for (const choice of choices[column.colKey] ?? []) {
+      // A `select`'s options are their own label; only derived types have a
+      // separate human name worth printing alongside the code.
+      const named =
+        choice.label && choice.label !== choice.code
+          ? `${choice.code} = ${choice.label}`
+          : choice.code;
+      lines.push(comment(`      ${named}${choice.hint ? ` (${choice.hint})` : ""}`));
+    }
+  }
+  lines.push(comment(""));
+
+  const header = [
+    TEMPLATE_YEAR_HEADER,
+    ...(grain === "quarterly" ? [TEMPLATE_QUARTER_HEADER] : []),
+    ...columns.map((c) => c.label),
+    TEMPLATE_NOTE_HEADER,
+  ];
+  lines.push(header.map(escapeCsvCell).join(","));
+
+  const blank = new Array(header.length).fill("").join(",");
+  for (let i = 0; i < TEMPLATE_BLANK_ROWS; i += 1) lines.push(blank);
+
+  return lines.join("\n");
+}
+
+/** Client-side mirror of resolveColumnOptions (dataSourcesServer.ts).
+ *
+ *  A derived-option column arrives from the API with `options: null` — the
+ *  allowed set lives in the faculty roster and the academic catalog, and the
+ *  server fills it in just before validating. Without the same step here,
+ *  coerceCellValue's `options.length > 0` guard silently accepts anything in
+ *  those columns, so a bad program code would preview clean and only blow up on
+ *  import. The import preview must be given the resolved set, not the raw one. */
+export function withResolvedOptions(
+  columns: ColumnSpec[],
+  choices: Record<string, TemplateChoice[]>,
+): ColumnSpec[] {
+  return columns.map((c) =>
+    isDerivedOptionType(c.dataType)
+      ? { ...c, options: (choices[c.colKey] ?? []).map((x) => x.code) }
+      : c,
+  );
+}
+
+/** Header cells survive a trip through Excel and a human, so compare them
+ *  loosely: case, surrounding space, and collapsed inner space all forgiven. */
+const normalizeHeader = (cell: string) =>
+  cell.trim().replace(/\s+/g, " ").toLowerCase();
+
+/** Work out which CSV position holds which column. Accepts either the label the
+ *  template printed or the underlying col_key, so a file that has been through a
+ *  rename still lines up. */
+export function matchTemplateHeaders(
+  header: string[],
+  grain: DataSourcePeriodGrain,
+  columns: ColumnSpec[],
+): { map: TemplateHeaderMap; errors: string[] } {
+  const errors: string[] = [];
+  const map: TemplateHeaderMap = { year: -1, quarter: null, note: null, columns: {} };
+
+  const byName = new Map<string, ColumnSpec>();
+  for (const column of columns) {
+    byName.set(normalizeHeader(column.label), column);
+    byName.set(normalizeHeader(column.colKey), column);
+  }
+
+  header.forEach((cell, index) => {
+    const name = normalizeHeader(cell);
+    if (name === "") return; // trailing empty cells are Excel's, not the user's
+
+    if (name === normalizeHeader(TEMPLATE_YEAR_HEADER)) {
+      map.year = index;
+      return;
+    }
+    if (name === normalizeHeader(TEMPLATE_QUARTER_HEADER)) {
+      map.quarter = index;
+      return;
+    }
+    if (name === normalizeHeader(TEMPLATE_NOTE_HEADER)) {
+      map.note = index;
+      return;
+    }
+
+    const column = byName.get(name);
+    if (!column) {
+      errors.push(`Unrecognised column "${cell.trim()}" in the header row`);
+      return;
+    }
+    if (map.columns[column.colKey] !== undefined) {
+      errors.push(`Column "${column.label}" appears more than once in the header row`);
+      return;
+    }
+    map.columns[column.colKey] = index;
+  });
+
+  if (map.year === -1) {
+    errors.push(`The header row must include a "${TEMPLATE_YEAR_HEADER}" column`);
+  }
+  if (grain === "quarterly" && map.quarter === null) {
+    errors.push(
+      `This data source records quarterly, so the header row must include a "${TEMPLATE_QUARTER_HEADER}" column`,
+    );
+  }
+  // A missing required column is reported once here rather than once per row.
+  for (const column of columns) {
+    if (column.isRequired && map.columns[column.colKey] === undefined) {
+      errors.push(`Required column "${column.label}" is missing from the header row`);
+    }
+  }
+
+  return { map, errors };
+}
+
+/** Spreadsheets spell booleans the way people do. Normalise to what
+ *  coerceCellValue accepts rather than loosening the storage contract. */
+function normalizeBooleanCell(raw: string): string {
+  const s = raw.trim().toLowerCase();
+  if (s === "yes" || s === "y") return "true";
+  if (s === "no" || s === "n") return "false";
+  return raw.trim();
+}
+
+/** Read one cell, turning a thrown coercion error into a collected one.
+ *  For derived types, a value that matches a *label* rather than a code is the
+ *  most likely mistake (someone pasted from the Export CSV), so name the code. */
+function readCell(
+  column: ColumnSpec,
+  raw: string,
+  labels: Record<string, string> | undefined,
+): { value: DataSourceCellValue; error: EntryRowError | null } {
+  const trimmed =
+    column.dataType === "boolean" ? normalizeBooleanCell(raw) : raw.trim();
+
+  try {
+    const value = coerceCellValue(column, trimmed);
+    if (column.isRequired && value === null) {
+      return {
+        value: null,
+        error: { colKey: column.colKey, message: `"${column.label}" is required` },
+      };
+    }
+    return { value, error: null };
+  } catch (err) {
+    let message = err instanceof Error ? err.message : `"${column.label}" is invalid`;
+    if (isDerivedOptionType(column.dataType) && labels) {
+      const match = Object.entries(labels).find(([, label]) => label === trimmed);
+      if (match) message += ` — did you mean "${match[0]}"?`;
+    }
+    return { value: null, error: { colKey: column.colKey, message } };
+  }
+}
+
+/** Coerce every parsed row, collecting all problems instead of throwing on the
+ *  first. Rows that are entirely blank are dropped rather than flagged —
+ *  spreadsheets pad files with empties and that is not the user's mistake. */
+export function collectEntryRows(args: {
+  rows: { lineNumber: number; cells: string[] }[];
+  map: TemplateHeaderMap;
+  grain: DataSourcePeriodGrain;
+  columns: ColumnSpec[];
+  labels?: Record<string, string>;
+}): ParsedEntryRow[] {
+  const { rows, map, grain, columns, labels } = args;
+  const cellAt = (cells: string[], index: number | null) =>
+    index === null || index < 0 ? "" : (cells[index] ?? "");
+
+  const out: ParsedEntryRow[] = [];
+  for (const { lineNumber, cells } of rows) {
+    if (cells.every((c) => c.trim() === "")) continue;
+
+    const errors: EntryRowError[] = [];
+    const values: Record<string, DataSourceCellValue> = {};
+    const raw: Record<string, string> = {};
+
+    for (const column of columns) {
+      const index = map.columns[column.colKey];
+      const cell = cellAt(cells, index === undefined ? null : index);
+      const { value, error } = readCell(column, cell, labels);
+      values[column.colKey] = value;
+      raw[column.colKey] = cell.trim();
+      if (error) errors.push(error);
+    }
+
+    const rawYear = cellAt(cells, map.year).trim();
+    const rawQuarter = cellAt(cells, map.quarter).trim();
+    let year: number | null = null;
+    let quarter: number | null = null;
+    try {
+      const period = normalizeEntryPeriod(grain, rawYear, rawQuarter);
+      year = period.year;
+      quarter = period.quarter;
+    } catch (err) {
+      errors.push({
+        colKey: null,
+        message: err instanceof Error ? err.message : "The period is invalid",
+      });
+    }
+
+    out.push({
+      lineNumber,
+      year,
+      quarter,
+      values,
+      note: cellAt(cells, map.note).trim() || null,
+      errors,
+      raw,
+      rawPeriod: [rawYear, rawQuarter && `Q${rawQuarter}`].filter(Boolean).join(" "),
+    });
+  }
+  return out;
+}
+
+/** Read a whole uploaded file: drop the legend, take the first surviving row as
+ *  the header, and coerce the rest. Line numbers are kept against the original
+ *  file so an error the user sees matches what their editor shows. */
+export function readEntryTemplateCsv(args: {
+  rows: string[][];
+  grain: DataSourcePeriodGrain;
+  columns: ColumnSpec[];
+  labels?: Record<string, string>;
+}): { headerErrors: string[]; rows: ParsedEntryRow[] } {
+  const { rows, grain, columns, labels } = args;
+
+  const meaningful = rows
+    .map((cells, i) => ({ lineNumber: i + 1, cells }))
+    .filter(
+      ({ cells }) =>
+        !(cells[0] ?? "").trimStart().startsWith(TEMPLATE_COMMENT) &&
+        !cells.every((c) => c.trim() === ""),
+    );
+
+  if (meaningful.length === 0) {
+    return { headerErrors: ["This file has no header row"], rows: [] };
+  }
+
+  const [header, ...body] = meaningful;
+  const { map, errors } = matchTemplateHeaders(header.cells, grain, columns);
+  if (errors.length > 0) return { headerErrors: errors, rows: [] };
+
+  return {
+    headerErrors: [],
+    rows: collectEntryRows({ rows: body, map, grain, columns, labels }),
+  };
+}
+
+/** Identity of a row for duplicate detection: its period plus every stored cell.
+ *  `note` is excluded — two rows that differ only by their note are the same
+ *  observation annotated twice, which is exactly what we want to warn about. */
+export function entryFingerprint(
+  columns: ColumnSpec[],
+  year: number | null,
+  quarter: number | null,
+  values: Record<string, DataSourceCellValue>,
+): string {
+  return JSON.stringify([
+    year,
+    quarter,
+    columns.map((c) => values[c.colKey] ?? null),
+  ]);
+}
