@@ -6,6 +6,11 @@ import { cn } from "@/lib/utils";
 /** How long the panel survives the pointer leaving. Long enough to cross the
  *  gap between the trigger and the panel, short enough not to feel stuck. */
 const CLOSE_DELAY_MS = 200;
+const MOTION_DURATION_MS = 160;
+
+type PopoverChildren =
+  | ReactNode
+  | ((controls: { close: () => void }) => ReactNode);
 
 /**
  * A hover-opened panel that can hold interactive controls.
@@ -30,7 +35,8 @@ export function HoverPopover({
 }: {
   /** Rendered with the aria wiring to apply to the real control. */
   trigger: (props: { "aria-expanded": boolean; "aria-controls": string }) => ReactNode;
-  children: ReactNode;
+  /** A render function can close the panel before opening a secondary surface. */
+  children: PopoverChildren;
   /** Names the panel for assistive tech — it has no visible heading of its own. */
   label: string;
   /** Which edge the panel lines up with. Right for a trigger near the page edge. */
@@ -39,16 +45,26 @@ export function HoverPopover({
 }) {
   const [hovering, setHovering] = useState(false);
   const [pinned, setPinned] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
   const open = hovering || pinned;
 
   const wrapRef = useRef<HTMLSpanElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const presenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animationFrame = useRef<number | null>(null);
   const panelId = useId();
 
   const cancelClose = () => {
     if (closeTimer.current) {
       clearTimeout(closeTimer.current);
       closeTimer.current = null;
+    }
+  };
+  const cancelPresenceTimer = () => {
+    if (presenceTimer.current) {
+      clearTimeout(presenceTimer.current);
+      presenceTimer.current = null;
     }
   };
   const openNow = () => {
@@ -69,9 +85,28 @@ export function HoverPopover({
   useEffect(
     () => () => {
       if (closeTimer.current) clearTimeout(closeTimer.current);
+      if (presenceTimer.current) clearTimeout(presenceTimer.current);
+      if (animationFrame.current) cancelAnimationFrame(animationFrame.current);
     },
     [],
   );
+
+  // Keep the panel in the DOM just long enough for its exit transition. A frame
+  // between mounting and visibility lets the opening scale/fade transition run.
+  useEffect(() => {
+    cancelPresenceTimer();
+    if (open) {
+      setMounted(true);
+      animationFrame.current = requestAnimationFrame(() => setVisible(true));
+      return () => {
+        if (animationFrame.current) cancelAnimationFrame(animationFrame.current);
+      };
+    }
+
+    setVisible(false);
+    if (!mounted) return;
+    presenceTimer.current = setTimeout(() => setMounted(false), MOTION_DURATION_MS);
+  }, [open, mounted]);
 
   useEffect(() => {
     if (!open) return;
@@ -113,18 +148,22 @@ export function HoverPopover({
         {trigger({ "aria-expanded": open, "aria-controls": panelId })}
       </span>
 
-      {open && (
+      {mounted && (
         <div
           id={panelId}
           aria-label={label}
+          aria-hidden={!open}
           className={cn(
-            "absolute top-full z-40 mt-xs max-h-96 w-[min(46rem,88vw)] overflow-auto scroll-thin",
-            "rounded-lg border border-hairline bg-surface-lowest shadow-lg",
+            "absolute top-full z-40 mt-xs max-h-96 w-max max-w-[88vw] overflow-auto scroll-thin",
+            "origin-top-right rounded-lg border border-hairline shadow-lg",
+            !panelClassName && "bg-surface-lowest",
+            "transition-[opacity,transform] duration-[160ms] ease-out",
             align === "right" ? "right-0" : "left-0",
+            visible ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0",
             panelClassName,
           )}
         >
-          {children}
+          {typeof children === "function" ? children({ close: closeNow }) : children}
         </div>
       )}
     </span>
