@@ -378,12 +378,19 @@ CREATE TABLE perf_metric_annual_target (
 -- ── perf_metric_quarter_progress ─────────────────────────────────────────────
 -- Metrics are entered directly (leaf level), each with its Issue section, OR fed
 -- from a data source (is_computed = 1, see LAYER D decision D3).
+--
+-- Deliberately NO value_source column, unlike perf_kpi_quarter_progress: that
+-- table has three writers (manual PUT, parent roll-up, feed) which is_computed
+-- alone cannot tell apart. A metric is a leaf with only two, so is_computed
+-- already says which one wrote the row.
 CREATE TABLE perf_metric_quarter_progress (
   id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   perf_metric_id BIGINT UNSIGNED NOT NULL,
   year_no        TINYINT UNSIGNED NOT NULL CHECK (year_no BETWEEN 1 AND 5),
   quarter_no     TINYINT UNSIGNED NOT NULL CHECK (quarter_no BETWEEN 1 AND 4),
   progress_value DECIMAL(14,4) NULL,
+  variable1_value DECIMAL(14,4) NULL,                  -- numerator the feed divided; NULL on a hand-entered row
+  variable2_value DECIMAL(14,4) NULL,                  -- denominator; NULL when the aggregation had none
   is_computed    TINYINT(1) NOT NULL DEFAULT 0,        -- 1 = written by the data-source feed
   issue          TEXT NULL,
   solution       TEXT NULL,

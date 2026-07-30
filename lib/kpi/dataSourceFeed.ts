@@ -248,15 +248,20 @@ async function applyLink(
           const matched = rows.filter((e) => matchesFilters(e, columns, mapping.filters));
           // A faculty denominator makes `matched` the numerator outright; only
           // the rows-mode proportion narrows further, and it narrows within
-          // `matched` so the numerator stays a subset of the denominator.
+          // `matched` so the numerator stays a subset of the denominator. With a
+          // numerator column the two sides can share every row and still differ,
+          // so an empty condition list is no longer "nothing to divide".
           const proportion =
             mapping.denominatorSource === "faculty"
               ? { denominator: facultyHeadcount(roster, mapping.facultyRanks ?? ACADEMIC_RANKS) }
-              : mapping.numeratorFilters?.length
+              : mapping.numeratorFilters?.length || mapping.numeratorColumnKey
                 ? {
-                    numerator: matched.filter((e) =>
-                      matchesFilters(e, columns, mapping.numeratorFilters!),
-                    ),
+                    numerator: mapping.numeratorFilters?.length
+                      ? matched.filter((e) =>
+                          matchesFilters(e, columns, mapping.numeratorFilters!),
+                        )
+                      : matched,
+                    numeratorColumnKey: mapping.numeratorColumnKey ?? null,
                   }
                 : undefined;
           values.set(
@@ -266,14 +271,28 @@ async function applyLink(
         }
 
         if (target.perfMetricId != null) {
-          // perf_metric_quarter_progress has no variable columns — the parent
-          // KPI gets its own numerator/denominator from the roll-up below.
+          // A metric takes the single "value" slot only (it has no variable
+          // definitions to map two aggregations onto), but that slot still
+          // divided something — so store its numerator/denominator, the same
+          // reasoning as the KPI branch below. The parent KPI derives its own
+          // pair from the roll-up, not from these.
+          const parts = values.get("value") ?? null;
           await conn.query(
             `INSERT INTO perf_metric_quarter_progress
-               (perf_metric_id, year_no, quarter_no, progress_value, is_computed)
-             VALUES (?, ?, ?, ?, 1)
-             ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value), is_computed = 1`,
-            [target.perfMetricId, yearNo, quarterNo, values.get("value")?.value ?? null],
+               (perf_metric_id, year_no, quarter_no, progress_value,
+                variable1_value, variable2_value, is_computed)
+             VALUES (?, ?, ?, ?, ?, ?, 1)
+             ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value),
+               variable1_value = VALUES(variable1_value),
+               variable2_value = VALUES(variable2_value), is_computed = 1`,
+            [
+              target.perfMetricId,
+              yearNo,
+              quarterNo,
+              parts?.value ?? null,
+              parts?.numerator ?? null,
+              parts?.denominator ?? null,
+            ],
           );
           // Let the existing roll-up carry the change up to the parent KPI.
           await recomputeKpiQuarter(conn, target.perfKpiId, yearNo, quarterNo);

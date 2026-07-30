@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import type { ApprovalState, Role } from "@/lib/types";
 import { recomputeKpiQuarter } from "@/lib/kpi/performance";
+import { METRIC_QUARTER_PROGRESS_FIELDS } from "@/lib/kpi/fields";
 import { getApprovalState, resolvePosition } from "@/lib/kpi/approvalServer";
 import { approvalLockForState, resolveStageRole } from "@/lib/kpi/approvalWorkflow";
 
@@ -76,11 +77,25 @@ export async function PUT(
       // is_computed = 0 marks this as hand-entered, matching the KPI route.
       // Without it a value typed over a fed metric stayed flagged as computed,
       // and the next feed run overwrote it with no trace.
+      //
+      // The variable columns hold the feed's numerator/denominator — a metric has
+      // no variable inputs of its own — so a person overwriting the value must
+      // clear them, or "22 of 29" would assert a basis the new number lacks. But
+      // only then: a fed metric is value-read-only and still saves Issue and
+      // Solution through here (approval demands them), echoing the stored value
+      // back, and that must not strip the pair it is still the basis for.
+      //
+      // Both guards read progress_value BEFORE it is reassigned, so they must
+      // stay above it — MySQL evaluates these assignments left to right.
       await conn.query(
         `INSERT INTO perf_metric_quarter_progress
-           (perf_metric_id, year_no, quarter_no, progress_value, is_computed, issue, solution, recorded_by, recorded_at)
-         VALUES (?, ?, ?, ?, 0, ?, ?, ?, CURRENT_TIMESTAMP)
-         ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value),
+           (perf_metric_id, year_no, quarter_no, progress_value, variable1_value, variable2_value,
+            is_computed, issue, solution, recorded_by, recorded_at)
+         VALUES (?, ?, ?, ?, NULL, NULL, 0, ?, ?, ?, CURRENT_TIMESTAMP)
+         ON DUPLICATE KEY UPDATE
+           variable1_value = IF(progress_value <=> VALUES(progress_value), variable1_value, NULL),
+           variable2_value = IF(progress_value <=> VALUES(progress_value), variable2_value, NULL),
+           progress_value = VALUES(progress_value),
            is_computed = 0, issue = VALUES(issue), solution = VALUES(solution),
            recorded_by = VALUES(recorded_by), recorded_at = CURRENT_TIMESTAMP`,
         [params.id, yearNo, quarterNo, value, b.issue.trim(), b.solution.trim(), b.recordedBy ?? null],
@@ -96,7 +111,7 @@ export async function PUT(
     }
 
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT year_no AS yearNo, quarter_no AS quarterNo, progress_value AS progressValue, issue, solution
+      `SELECT ${METRIC_QUARTER_PROGRESS_FIELDS}
        FROM perf_metric_quarter_progress WHERE perf_metric_id = ? ORDER BY year_no, quarter_no`,
       [params.id],
     );

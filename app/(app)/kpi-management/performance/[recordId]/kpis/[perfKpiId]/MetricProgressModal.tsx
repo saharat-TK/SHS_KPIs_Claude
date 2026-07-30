@@ -69,7 +69,11 @@ export function MetricProgressModal({
   const target = quarterTarget(quarter);
   const current = progressFor(quarter)?.progressValue ?? null;
   const pct = percentOfTarget(current, target);
-  const hasThresholds = metric.thresholdGreen != null && metric.thresholdAmber != null;
+  // Both cutoffs or neither — a half-configured pair colours nothing.
+  const thresholds =
+    metric.thresholdGreen != null && metric.thresholdAmber != null
+      ? { green: metric.thresholdGreen, amber: metric.thresholdAmber }
+      : null;
   const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
   const approvalLock = approvalLockForState(approvalState);
   const readOnlyMessage = approvalLock?.locked
@@ -111,6 +115,13 @@ export function MetricProgressModal({
             existing={progressFor(quarter)}
             prefill={previousQuarterProgress(metric.progress, year, quarter)}
             valueEditable={!fedByName}
+            // A fed metric stores what its aggregation divided, so show the pair
+            // behind the number. Generic labels: unlike a KPI, library_metric has
+            // no variable names to borrow.
+            computedVariables={
+              fedByName ? { v1Label: "Numerator", v2Label: "Denominator" } : null
+            }
+            thresholds={thresholds}
             unit={metric.unit}
             readOnly={periodsLoading || periodLocked || (!!approvalLock?.locked && !allowApprovalLockedEditing)}
             readOnlyMessage={allowApprovalLockedEditing ? undefined : readOnlyMessage}
@@ -152,12 +163,8 @@ export function MetricProgressModal({
                   {pct == null ? "—" : `${formatNumber(pct, 0)}% of target`}
                 </span>
               </div>
-              {hasThresholds ? (
-                <ThresholdBar
-                  value={pct ?? 0}
-                  max={100}
-                  thresholds={{ green: metric.thresholdGreen!, amber: metric.thresholdAmber! }}
-                />
+              {thresholds ? (
+                <ThresholdBar value={pct ?? 0} max={100} thresholds={thresholds} />
               ) : (
                 <div className="h-2 w-full rounded-full bg-surface-container-high overflow-hidden">
                   <div
@@ -166,20 +173,10 @@ export function MetricProgressModal({
                   />
                 </div>
               )}
-              {hasThresholds && pct != null ? (
+              {thresholds && pct != null ? (
                 <div className="pt-tiny">
-                  <Badge
-                    tone={
-                      HEALTH_TONE[
-                        healthOf(pct, { green: metric.thresholdGreen!, amber: metric.thresholdAmber! })
-                      ]
-                    }
-                  >
-                    {
-                      HEALTH_LABEL[
-                        healthOf(pct, { green: metric.thresholdGreen!, amber: metric.thresholdAmber! })
-                      ]
-                    }
+                  <Badge tone={HEALTH_TONE[healthOf(pct, thresholds)]}>
+                    {HEALTH_LABEL[healthOf(pct, thresholds)]}
                   </Badge>
                 </div>
               ) : (

@@ -55,6 +55,15 @@ export const KPI_QUARTER_PROGRESS_FIELDS = `
   is_computed AS isComputed, value_source AS valueSource, issue, solution
 `;
 
+// One recorded metric quarter, same convention as KPI_QUARTER_PROGRESS_FIELDS
+// above (unaliased; callers prepend their own key column). No value_source —
+// see the note on perf_metric_quarter_progress in the schema.
+export const METRIC_QUARTER_PROGRESS_FIELDS = `
+  year_no AS yearNo, quarter_no AS quarterNo, progress_value AS progressValue,
+  variable1_value AS variable1Value, variable2_value AS variable2Value,
+  is_computed AS isComputed, issue, solution
+`;
+
 export const PERF_METRIC_FIELDS = `
   m.id, m.perf_kpi_id AS perfKpiId, m.source_metric_id AS sourceMetricId, m.name, m.description,
   m.category_id AS categoryId, m.data_collect_method AS dataCollectMethod,

@@ -13,6 +13,7 @@ import {
 const COLUMNS = [
   { colKey: "quartile", label: "Quartile", dataType: "select", options: ["Q1", "Q2"] },
   { colKey: "citations", label: "Citations", dataType: "number" },
+  { colKey: "reviews", label: "Reviews", dataType: "number" },
   { colKey: "pub_date", label: "Published", dataType: "date" },
   { colKey: "author", label: "Author", dataType: "faculty" },
   { colKey: "title", label: "Title", dataType: "text" },
@@ -245,6 +246,54 @@ test("a fixed denominator wins over a numerator subset", () => {
   assert.equal(aggregate("ratio_of", null, POP, { denominator: 8, numerator: NUM }), 0.5);
 });
 
+// Both sides of the fraction as two number columns of the SAME row — the
+// "96 employed of 120 graduates" shape, which narrowing rows cannot express.
+const TWO_COL = [
+  entry({ id: 1, values: { quartile: "Q1", citations: 120, reviews: 96 } }),
+  entry({ id: 2, values: { quartile: "Q2", citations: 80, reviews: 20 } }),
+];
+
+test("a numerator column totals the top on a different column from the bottom", () => {
+  const one = [TWO_COL[0]];
+  assert.equal(
+    aggregate("percent_of", "citations", one, { numerator: one, numeratorColumnKey: "reviews" }),
+    80,
+  );
+  assert.equal(
+    aggregate("ratio_of", "citations", one, { numerator: one, numeratorColumnKey: "reviews" }),
+    0.8,
+  );
+});
+
+test("a numerator column composes with a narrowed numerator subset", () => {
+  // 96 (row 1's reviews) of 200 (both rows' citations) — the subset narrows the
+  // rows, the column switches what is totalled over them.
+  assert.equal(
+    aggregate("percent_of", "citations", TWO_COL, {
+      numerator: [TWO_COL[0]],
+      numeratorColumnKey: "reviews",
+    }),
+    48,
+  );
+});
+
+test("two independent columns carry no ceiling of 100 percent", () => {
+  const one = [TWO_COL[0]];
+  // 120 of 96. Unlike the single-column case, the two sides are unrelated
+  // quantities, so this is real data rather than something to clamp.
+  assert.equal(
+    aggregate("percent_of", "reviews", one, { numerator: one, numeratorColumnKey: "citations" }),
+    125,
+  );
+});
+
+test("an absent numerator column leaves both sides on the same column", () => {
+  assert.equal(
+    aggregate("percent_of", "citations", POP, { numerator: NUM, numeratorColumnKey: null }),
+    aggregate("percent_of", "citations", POP, { numerator: NUM }),
+  );
+});
+
 // ── validation ──────────────────────────────────────────────────────────────
 
 const mapping = (over = {}) => ({
@@ -407,6 +456,86 @@ test("validateMappings rejects a proportion with no numerator condition", () => 
   );
 });
 
+test("validateMappings accepts a numerator column in place of a numerator condition", () => {
+  const out = validateMappings(COLUMNS, "quarterly", [
+    mapping({
+      aggregation: "percent_of",
+      columnKey: "citations",
+      numeratorColumnKey: "reviews",
+      filters: [F("quartile", "eq", "Q1")],
+    }),
+  ]);
+  assert.equal(out[0].numeratorColumnKey, "reviews");
+  assert.deepEqual(out[0].numeratorFilters, []);
+});
+
+test("validateMappings drops a numerator column that repeats the denominator's", () => {
+  // Same column on both sides is no second quantity — so with nothing narrowing
+  // the rows either, the mapping is back to always 100%.
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({
+          aggregation: "percent_of",
+          columnKey: "citations",
+          numeratorColumnKey: "citations",
+        }),
+      ]),
+    /needs a numerator column, or at least one condition/,
+  );
+  const out = validateMappings(COLUMNS, "quarterly", [
+    mapping({
+      aggregation: "percent_of",
+      columnKey: "citations",
+      numeratorColumnKey: "citations",
+      numeratorFilters: [F("quartile", "eq", "Q1")],
+    }),
+  ]);
+  assert.equal(out[0].numeratorColumnKey, undefined);
+});
+
+test("validateMappings holds a numerator column to the same rules as any column", () => {
+  const bad = (over) => () =>
+    validateMappings(COLUMNS, "quarterly", [
+      mapping({ aggregation: "percent_of", columnKey: "citations", ...over }),
+    ]);
+  assert.throws(bad({ numeratorColumnKey: "nope" }), /Unknown column "nope"/);
+  assert.throws(bad({ numeratorColumnKey: "title" }), /"Title" is not a number column/);
+  // A column total over a bare row count is not a proportion of anything.
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "percent_of", numeratorColumnKey: "reviews" }),
+      ]),
+    /needs a denominator column to divide by/,
+  );
+});
+
+test("validateMappings rejects a numerator column where there is no separate numerator", () => {
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "sum", columnKey: "citations", numeratorColumnKey: "reviews" }),
+      ]),
+    /no separate numerator to total on its own column/,
+  );
+  // Faculty mode's numerator IS the matched rows on columnKey; a second column
+  // there would just be that column, so it is refused rather than reinterpreted.
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({
+          aggregation: "ratio_of",
+          columnKey: "citations",
+          numeratorColumnKey: "reviews",
+          denominatorSource: "faculty",
+          facultyRanks: ["Lecturer"],
+        }),
+      ]),
+    /no separate numerator to total on its own column/,
+  );
+});
+
 test("validateMappings keeps numeratorFilters off the non-proportion kinds", () => {
   const out = validateMappings(COLUMNS, "quarterly", [
     mapping({ aggregation: "sum", columnKey: "citations", numeratorFilters: [F("quartile", "eq", "Q1")] }),
@@ -534,6 +663,22 @@ test("describeMapping spells out both sides of a proportion", () => {
       COLUMNS,
     ),
     "Percent of Citations · counting Quartile is Q1",
+  );
+});
+
+test("describeMapping names both columns when the numerator has its own", () => {
+  assert.equal(
+    describeMapping(
+      mapping({
+        aggregation: "percent_of",
+        columnKey: "citations",
+        numeratorColumnKey: "reviews",
+        filters: [F("quartile", "eq", "Q1")],
+        numeratorFilters: [],
+      }),
+      COLUMNS,
+    ),
+    "Percent of Reviews out of Citations where Quartile is Q1",
   );
 });
 

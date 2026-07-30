@@ -41,9 +41,10 @@ request.
 - Target = **KPI** → writes `perf_kpi_quarter_progress` (`is_computed = 1`), but
   **leaf KPIs only**. A `has_children` KPI is skipped — the roll-up owns its value,
   and feeding it directly would be overwritten on the next roll-up.
-- The feed writes only `progress_value` (plus `variable1_value` / `variable2_value`
-  for two-variable KPIs). It **never** writes `issue` / `solution` — a computed
-  number has no narrative, so it bypasses the HTTP progress routes that require them.
+- The feed writes only `progress_value` plus `variable1_value` / `variable2_value`
+  — on metric rows as well as KPI rows. It **never** writes `issue` / `solution` —
+  a computed number has no narrative, so it bypasses the HTTP progress routes that
+  require them.
 - The feed **respects guards** (unlike the roll-up): a closed recording period, an
   approval-locked/under-review quarter, or a period with no rows is skipped and
   reported, never stamped over.
@@ -102,6 +103,22 @@ in the UI.
 `value` slot stores the aggregation's own parts instead — `aggregateParts()` in
 `lib/kpi/dataSourceFilters.ts` returns the numerator and denominator alongside
 the result (a proportion's population, an average's row count, and so on).
+
+**Metric** — `perf_metric_quarter_progress`. A fed metric stores the same three
+numbers (`progress_value` + the pair, `is_computed = 1`), and
+`MetricProgressModal` shows them as "numerator / denominator / computed value".
+The manual `PUT` NULLs the pair only when the incoming value differs from the
+stored one: a metric has no variable inputs of its own, so the feed's pair must
+not sit under a hand-typed number — but a fed metric is value-read-only and still
+saves Issue/Solution through that route, echoing its value back, and that must
+not strip the pair it is still the basis for. There is **no `value_source`
+column** here: two engines write the table and `is_computed` already separates
+them.
+
+A metric only ever takes the single `value` slot. `library_metric` has no
+variable definitions to map two aggregations onto, so a two-part fraction is
+expressed inside one mapping instead — `numeratorColumnKey` totals the top on a
+different column from the bottom (employed ÷ graduates, both on the same row).
 
 `value_source` exists because `is_computed` cannot separate a roll-up from a
 feed. It also marks the one provenance under which the stored pair is
