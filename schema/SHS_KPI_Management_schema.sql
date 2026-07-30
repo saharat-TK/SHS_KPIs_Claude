@@ -142,7 +142,7 @@ CREATE TABLE library_kpi (
   unit                VARCHAR(50)  NULL,                    -- "%", "score", "ratio", "จำนวน"
   five_year_target    DECIMAL(14,4) NULL,                   -- per-year cap for each annual target (decision #5)
   -- Calculation logic + roll-up (decision #7: BOTH simple type AND optional formula)
-  calculation_type    ENUM('weighted_sum','simple_average','percent_of_total','ratio_of_total','custom_formula') NOT NULL DEFAULT 'weighted_sum',
+  calculation_type    ENUM('weighted_sum','simple_average','percent_of_total','ratio_of_total','combined_percent','combined_ratio','custom_formula') NOT NULL DEFAULT 'weighted_sum',
   calculation_logic   TEXT NULL,                            -- free-text notes / description of the logic
   formula_id          BIGINT UNSIGNED NULL,                 -- FK -> formula.id; used when calculation_type='custom_formula'
   -- Threshold setting
@@ -276,7 +276,7 @@ CREATE TABLE perf_kpi (
   weight              DECIMAL(6,2) NOT NULL DEFAULT 0,
   unit                VARCHAR(50)  NULL,
   five_year_target    DECIMAL(14,4) NULL,
-  calculation_type    ENUM('weighted_sum','simple_average','percent_of_total','ratio_of_total','custom_formula') NOT NULL DEFAULT 'weighted_sum',
+  calculation_type    ENUM('weighted_sum','simple_average','percent_of_total','ratio_of_total','combined_percent','combined_ratio','custom_formula') NOT NULL DEFAULT 'weighted_sum',
   calculation_logic   TEXT NULL,
   formula_id          BIGINT UNSIGNED NULL,               -- copied FK -> formula.id (formulas are global, not snapshotted)
   threshold_green     DECIMAL(14,4) NULL,
@@ -605,6 +605,24 @@ CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id);
 --    exclusion rule. Unlike percent_of_total this was NOT backfilled onto
 --    existing unit='Ratio' KPIs — they were never on the old implicit percent
 --    path, so flipping them would change results rather than preserve them.
+--  * combined_percent / combined_ratio: pooled roll-up over what the CHILDREN
+--    themselves divided —
+--      SUM(child variable1_value) / SUM(child variable2_value)  [* 100]
+--    with the same both-sides-usable exclusion, and no sum fallback (without
+--    denominators there is no rate to report).
+--    Which pooled family a KPI wants depends on the shape of its children, not
+--    on its own unit:
+--      children are COUNTS on their targets' scale  -> *_of_total
+--        e.g. "admitted vs target": 329 admitted / 315 planned = 104%.
+--      children are themselves FRACTIONS            -> combined_*
+--        e.g. "% employed": pooling 4 curriculum percentages against 4 target
+--        percentages gave 109%; the true rate is 109 employed / 143 grads = 76%.
+--    A fed child carries variable2_value only when its own aggregation was a
+--    fraction (percent_of / ratio_of in lib/kpi/dataSourceFilters.ts), so its
+--    presence is what distinguishes the two cases in practice. Existing KPIs are
+--    NOT auto-flipped; candidates are reported by
+--      node --env-file=.env.local scripts/migrate-kpi-combined-types.mjs
+--    and stamped only with --apply.
 --  * Metric thresholds (decision #6): threshold_green/amber now exist on
 --    library_metric & perf_metric — drive the metric's current-value bar the
 --    same way KPI thresholds drive the KPI bar.

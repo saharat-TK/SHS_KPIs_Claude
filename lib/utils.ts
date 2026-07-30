@@ -27,6 +27,10 @@ function pooledRatio(metrics: Metric[]): number | null {
  * - simple_average: unweighted mean of sub-KPI current values
  * - percent_of_total: pooled percentage, Σvᵢ / Σtargetᵢ · 100
  * - ratio_of_total: the same pooled ratio without the ·100
+ * - combined_percent / combined_ratio: pool each sub-KPI's OWN numerator and
+ *   denominator. Not computable here — a Metric carries only currentValue and
+ *   target, never the pair it divided, which lives on the quarter progress row.
+ *   Returns null, like custom_formula; POOLED_EXPLAINER tells the user why.
  * - custom_formula: not aggregated here (formula-driven), returns null
  * Returns null when there is nothing to aggregate.
  */
@@ -34,7 +38,14 @@ export function computeKpiValue(
   type: KpiCalculationType,
   metrics: Metric[]
 ): number | null {
-  if (type === "custom_formula" || metrics.length === 0) return null;
+  if (
+    type === "custom_formula" ||
+    type === "combined_percent" ||
+    type === "combined_ratio" ||
+    metrics.length === 0
+  ) {
+    return null;
+  }
 
   if (type === "percent_of_total" || type === "ratio_of_total") {
     const ratio = pooledRatio(metrics);

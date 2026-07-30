@@ -42,6 +42,8 @@ export type KpiCalculationType =
   | "simple_average"
   | "percent_of_total"
   | "ratio_of_total"
+  | "combined_percent"
+  | "combined_ratio"
   | "custom_formula";
 
 export const KPI_CALCULATION_TYPES: {
@@ -68,6 +70,19 @@ export const KPI_CALCULATION_TYPES: {
     id: "ratio_of_total",
     label: "Ratio of total",
     hint: "Sum of sub-KPI progress ÷ sum of their targets",
+  },
+  // For sub-KPIs that are themselves fractions. Percentages don't add, so the
+  // *_of_total pair above is meaningless on them — these pool what each sub-KPI
+  // actually divided instead. See rollupParts in lib/kpi/performance.ts.
+  {
+    id: "combined_percent",
+    label: "Combined percentage",
+    hint: "Sum of sub-KPI numerators ÷ sum of their denominators × 100",
+  },
+  {
+    id: "combined_ratio",
+    label: "Combined ratio",
+    hint: "Sum of sub-KPI numerators ÷ sum of their denominators",
   },
   {
     id: "custom_formula",

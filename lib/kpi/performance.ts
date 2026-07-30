@@ -7,21 +7,42 @@ interface RollupRow {
   weight: number;
   value: number | null;
   target?: number | null;
+  /** What the metric itself divided, from perf_metric_quarter_progress. Present
+   *  only when the metric's own aggregation was a fraction (percent_of /
+   *  ratio_of) — a sum or count leaves v2 null. Read by the combined_* types. */
+  v1?: number | null;
+  v2?: number | null;
 }
 
-// Pooled ratio: totals on both sides, so a metric counts only if it has both a
-// progress value and a usable target — otherwise it would skew the ratio by
-// contributing to one side but not the other. Null when nothing is usable,
-// i.e. when there is no denominator to divide by at all.
-function pooledParts(
+/** Total a numerator and a denominator across the children that carry both.
+ *  A child with only one side is dropped: contributing to one total and not the
+ *  other would skew the result. Null when nothing is usable, i.e. when there is
+ *  no denominator to divide by at all. */
+function poolTotals(
   rows: RollupRow[],
+  numerator: (r: RollupRow) => number | null | undefined,
+  denominator: (r: RollupRow) => number | null | undefined,
 ): { numerator: number; denominator: number } | null {
-  const usable = rows.filter((r) => r.value != null && r.target != null && r.target !== 0);
+  const usable = rows.filter((r) => {
+    const d = denominator(r);
+    return numerator(r) != null && d != null && d !== 0;
+  });
   if (usable.length === 0) return null;
-  const denominator = usable.reduce((a, r) => a + r.target!, 0);
-  if (denominator === 0) return null;
-  return { numerator: usable.reduce((a, r) => a + r.value!, 0), denominator };
+  const total = usable.reduce((a, r) => a + denominator(r)!, 0);
+  if (total === 0) return null;
+  return { numerator: usable.reduce((a, r) => a + numerator(r)!, 0), denominator: total };
 }
+
+// Progress pooled over targets: "how much of what we aimed for did we get".
+// Sound only while each child's value is a COUNT on the same scale as its
+// target — see the combined_* pool below for children that are fractions.
+const pooledParts = (rows: RollupRow[]) =>
+  poolTotals(rows, (r) => r.value, (r) => r.target);
+
+// The children's own numerators pooled over their own denominators: the true
+// overall rate, e.g. Σ employed ÷ Σ graduates.
+const combinedParts = (rows: RollupRow[]) =>
+  poolTotals(rows, (r) => r.v1, (r) => r.v2);
 
 // Plain sum of the present child values. Fallback for the pooled ratio/percent
 // roll-ups when no metric has a usable target (so there is no denominator to
@@ -53,14 +74,27 @@ const NO_PARTS: RollupParts = { value: null, variable1: null, variable2: null };
  *   percent_of_total  V1 = Σ usable values, V2 = Σ usable targets, value = V1/V2*100
  *   ratio_of_total    V1 = Σ usable values, V2 = Σ usable targets, value = V1/V2
  *   …either, no usable target (fallback)   V1 = Σ present values, V2 = null, value = V1
+ *   combined_percent  V1 = Σ child v1, V2 = Σ child v2, value = V1/V2*100
+ *   combined_ratio    V1 = Σ child v1, V2 = Σ child v2, value = V1/V2
  *   simple_average    V1 = Σ present values, V2 = how many had one, value = V1/V2
  *   weighted_sum      V1 = Σ (weight/100 × value), V2 = null, value = V1
+ *
+ * Choosing between the two pooled families is about what the CHILDREN are, not
+ * what the parent's unit is. *_of_total divides progress by target, which needs
+ * each child's value to be a count on its target's scale ("270 admitted of 315
+ * planned"). combined_* divides the children's own numerators by their own
+ * denominators, which is the only correct answer when a child is itself a
+ * fraction — percentages do not add, so Σ of four employment rates is not an
+ * employment rate.
  *
  * IMPORTANT: these pairs are driven by calculation_type, NOT by the KPI's unit,
  * so — unlike a hand-entered row — they are not re-derivable through
  * kpiValueFromVariables(unit, v1, v2). The two pooled types happen to coincide
  * with it, but simple_average on a 'percent' unit is V1/V2 with no ×100. Never
  * run kpiValueFromVariables on a row whose value_source isn't 'manual'.
+ * combined_* is the one genuine exception — its pair really is the KPI's own
+ * Variable 1 ÷ Variable 2 — but the rule stays as written, because nothing
+ * downstream should have to check calculation_type to know whether it holds.
  */
 export function rollupParts(calcType: string, rows: RollupRow[]): RollupParts {
   // ratio_of_total / percent_of_total pool progress over targets. When no
@@ -79,6 +113,20 @@ export function rollupParts(calcType: string, rows: RollupRow[]): RollupParts {
     }
     const sum = sumOfValues(rows);
     return { value: sum, variable1: sum, variable2: null };
+  }
+
+  // combined_percent / combined_ratio pool what the children themselves
+  // divided. No sum-of-values fallback here, deliberately: without denominators
+  // there is no rate to report, and a bare sum of numerators would read as one.
+  if (calcType === "combined_percent" || calcType === "combined_ratio") {
+    const pooled = combinedParts(rows);
+    if (pooled === null) return NO_PARTS;
+    const ratio = pooled.numerator / pooled.denominator;
+    return {
+      value: calcType === "combined_percent" ? ratio * 100 : ratio,
+      variable1: pooled.numerator,
+      variable2: pooled.denominator,
+    };
   }
 
   const present = rows.filter((r) => r.value != null) as { weight: number; value: number }[];
@@ -123,6 +171,8 @@ export async function recomputeKpiQuarter(
   const [metricRows] = await conn.query<RowDataPacket[]>(
     `SELECT m.weight AS weight,
             p.progress_value AS value,
+            p.variable1_value AS v1,
+            p.variable2_value AS v2,
             t.target_value AS annualTarget
        FROM perf_metric m
        LEFT JOIN perf_metric_quarter_progress p
@@ -142,6 +192,8 @@ export async function recomputeKpiQuarter(
       weight: Number(r.weight),
       value: r.value == null ? null : Number(r.value),
       target,
+      v1: r.v1 == null ? null : Number(r.v1),
+      v2: r.v2 == null ? null : Number(r.v2),
     };
   }));
 

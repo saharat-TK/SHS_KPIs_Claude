@@ -57,6 +57,10 @@ const POOLED_EXPLAINER: Partial<Record<KpiCalculationType, string>> = {
     "Computed on performance records as total sub-KPI progress ÷ total sub-KPI target × 100 for the quarter.",
   ratio_of_total:
     "Computed on performance records as total sub-KPI progress ÷ total sub-KPI target for the quarter.",
+  combined_percent:
+    "Computed on performance records as total sub-KPI numerator ÷ total sub-KPI denominator × 100 for the quarter. Use this when the sub-KPIs are themselves percentages.",
+  combined_ratio:
+    "Computed on performance records as total sub-KPI numerator ÷ total sub-KPI denominator for the quarter. Use this when the sub-KPIs are themselves ratios.",
 };
 
 // Units that imply a calculation type. Drives the soft default in setUnit.
