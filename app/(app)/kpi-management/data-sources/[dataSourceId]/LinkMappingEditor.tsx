@@ -22,6 +22,7 @@ import {
 import { useAcademicCatalog } from "@/lib/data/hooks";
 import { EMPTY_ACADEMIC_CATALOG, catalogOptionLabel } from "@/lib/kpi/academicCatalog";
 import { formatNumber } from "@/lib/utils";
+import { unitNeedsDivisor } from "@/lib/kpi/progress";
 import { ACADEMIC_RANKS, RANKS } from "@/lib/types";
 import { facultyHeadcount } from "@/lib/kpi/facultyHeadcount";
 import type {
@@ -33,15 +34,8 @@ import type {
   DenominatorSource,
   FacultyRecord,
   FilterOperator,
-  MappingSlot,
   Rank,
 } from "@/lib/types";
-
-export const SLOT_LABELS: Record<MappingSlot, string> = {
-  value: "The KPI value",
-  variable1: "Variable 1 (dividend)",
-  variable2: "Variable 2 (divisor)",
-};
 
 let seq = 0;
 const nextKey = () => `d${(seq += 1)}`;
@@ -58,7 +52,6 @@ export interface DraftFilter {
 
 export interface DraftMapping {
   key: string;
-  slot: MappingSlot;
   aggregation: AggregationKind;
   columnKey: string;
   /** Which rows count. Doubles as the population under a "rows" denominator. */
@@ -92,9 +85,8 @@ const isFilterReady = (f: DraftFilter) =>
     ? f.values.length > 0
     : f.value !== "" && (f.operator !== "between" || f.valueTo !== ""));
 
-export const newMapping = (slot: MappingSlot = "value"): DraftMapping => ({
+export const newMapping = (): DraftMapping => ({
   key: nextKey(),
-  slot,
   aggregation: "count",
   columnKey: "",
   filters: [],
@@ -116,7 +108,6 @@ const filterToDraft = (f: DataSourceFilter): DraftFilter => ({
 export function toDraft(m: DataSourceLinkMapping): DraftMapping {
   return {
     key: nextKey(),
-    slot: m.slot,
     aggregation: m.aggregation,
     columnKey: m.columnKey ?? "",
     filters: (m.filters ?? []).map(filterToDraft),
@@ -144,7 +135,6 @@ const filtersToPayload = (fs: DraftFilter[]): DataSourceFilter[] =>
     });
 
 export const toPayload = (d: DraftMapping): DataSourceLinkMapping => ({
-  slot: d.slot,
   aggregation: d.aggregation,
   columnKey: aggregationAllowsColumn(d.aggregation) ? d.columnKey || null : null,
   filters: filtersToPayload(d.filters),
@@ -170,7 +160,6 @@ export function MappingCard({
   entries,
   labels,
   faculty,
-  allowsVariables,
   onChange,
   onRemove,
 }: {
@@ -179,7 +168,6 @@ export function MappingCard({
   entries: { id: number; year: number; quarter: number | null; values: Record<string, unknown> }[];
   labels: Record<string, string>;
   faculty: FacultyRecord[];
-  allowsVariables: boolean;
   onChange: (patch: Partial<DraftMapping>) => void;
   onRemove: () => void;
 }) {
@@ -252,19 +240,6 @@ export function MappingCard({
       {/* Top-aligned: the Column field's hint makes it taller than its
           neighbours, and bottom-alignment would push their labels out of line. */}
       <div className="flex flex-wrap items-start gap-sm">
-        {allowsVariables && (
-          <div className="w-48">
-            <Field label="Feeds">
-              <Select
-                value={mapping.slot}
-                onChange={(e) => onChange({ slot: e.target.value as MappingSlot })}
-              >
-                <option value="variable1">{SLOT_LABELS.variable1}</option>
-                <option value="variable2">{SLOT_LABELS.variable2}</option>
-              </Select>
-            </Field>
-          </div>
-        )}
         <div className="w-44">
           <Field label="Aggregate">
             <Select
@@ -483,14 +458,11 @@ export function MappingCard({
   );
 }
 
-/** Everything both link modals show below their picker: the mapping list, the
- *  button that adds one, and the note. The two modals choose opposite things —
- *  a KPI for a source, or a source for a KPI — but what they build out of that
- *  choice is identical, so it lives here rather than being kept in step by hand.
- *
- *  `allowsVariables` comes from targetAllowsVariables (lib/kpi/progress.ts) in
- *  both callers; it decides whether this is a one-value or a two-variable feed,
- *  and so how many mappings the button will add. */
+/** Everything both link modals show below their picker: the mapping, the button
+ *  that adds it, and the note. The two modals choose opposite things — a KPI for
+ *  a source, or a source for a KPI — but what they build out of that choice is
+ *  identical, so it lives here rather than being kept in step by hand. A link
+ *  carries one mapping whichever way it was made, and whatever it targets. */
 export function LinkMappingSection({
   mappings,
   onChange,
@@ -498,7 +470,6 @@ export function LinkMappingSection({
   entries,
   labels,
   faculty,
-  allowsVariables,
   targetUnit,
   note,
   onNote,
@@ -515,8 +486,8 @@ export function LinkMappingSection({
   }[];
   labels: Record<string, string>;
   faculty: FacultyRecord[];
-  allowsVariables: boolean;
-  /** Named in the two-variable tip. Null when the target has no unit. */
+  /** Drives the tip pointing a percent/ratio target at the aggregation that
+   *  divides. Null when the target has no unit. */
   targetUnit: string | null;
   note: string;
   onNote: (note: string) => void;
@@ -525,17 +496,7 @@ export function LinkMappingSection({
    *  "no columns" copy below would misdescribe that. */
   placeholder?: string;
 }) {
-  const addMapping = () =>
-    onChange([
-      ...mappings,
-      newMapping(
-        allowsVariables
-          ? mappings.some((m) => m.slot === "variable1")
-            ? "variable2"
-            : "variable1"
-          : "value",
-      ),
-    ]);
+  const addMapping = () => onChange([...mappings, newMapping()]);
 
   return (
     <>
@@ -548,7 +509,7 @@ export function LinkMappingSection({
               within each year.
             </p>
           </div>
-          {!placeholder && mappings.length < (allowsVariables ? 2 : 1) && (
+          {!placeholder && mappings.length === 0 && (
             <Button size="sm" variant="ghost" icon="add" onClick={addMapping}>
               Add mapping
             </Button>
@@ -575,7 +536,6 @@ export function LinkMappingSection({
                 entries={entries}
                 labels={labels}
                 faculty={faculty}
-                allowsVariables={allowsVariables}
                 onChange={(patch) =>
                   onChange(mappings.map((x) => (x.key === m.key ? { ...x, ...patch } : x)))
                 }
@@ -585,10 +545,13 @@ export function LinkMappingSection({
           </div>
         )}
 
-        {!placeholder && allowsVariables && mappings.length > 0 && (
+        {/* The dividend and divisor live inside one aggregation, so a percent
+            target needs the kind that divides rather than a second mapping. */}
+        {!placeholder && unitNeedsDivisor(targetUnit) && mappings.length > 0 && (
           <p className="mt-sm flex items-center gap-xs text-caption-sm text-mute">
-            <Badge tone="neutral">tip</Badge>A {targetUnit} target is fed as{" "}
-            {SLOT_LABELS.variable1} ÷ {SLOT_LABELS.variable2}.
+            <Badge tone="neutral">tip</Badge>A {targetUnit} target is fed by{" "}
+            {targetUnit?.trim().toLowerCase() === "ratio" ? "Ratio of" : "Percent of"} —
+            it records the dividend and divisor behind the number.
           </p>
         )}
       </div>

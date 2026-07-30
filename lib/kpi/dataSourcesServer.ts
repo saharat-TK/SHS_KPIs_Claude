@@ -134,7 +134,10 @@ export function mapLinkRow(row: RowDataPacket): DataSourceLink {
 }
 
 /** Validate a link's mappings against the source's own columns and grain.
- *  Rethrows as DataSourceValidationError so errorResponse answers 400. */
+ *  Rethrows as DataSourceValidationError so errorResponse answers 400.
+ *
+ *  The target needs no say: every link, KPI or metric, carries one mapping
+ *  producing one number, so there is nothing left for a KPI's unit to permit. */
 export async function validateLinkMappings(
   db: Db,
   dataSourceId: number | string,
