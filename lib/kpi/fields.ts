@@ -45,6 +45,16 @@ export const PERF_KPI_FIELDS = `
   k.has_children AS hasChildren
 `;
 
+// One recorded KPI quarter. Unaliased, so callers that join prepend their own
+// key column (e.g. `perf_kpi_id AS perfKpiId,`). Shared because this SELECT is
+// otherwise repeated per route, which is how the record-list endpoint ended up
+// silently omitting the variable columns.
+export const KPI_QUARTER_PROGRESS_FIELDS = `
+  year_no AS yearNo, quarter_no AS quarterNo, progress_value AS progressValue,
+  variable1_value AS variable1Value, variable2_value AS variable2Value,
+  is_computed AS isComputed, value_source AS valueSource, issue, solution
+`;
+
 export const PERF_METRIC_FIELDS = `
   m.id, m.perf_kpi_id AS perfKpiId, m.source_metric_id AS sourceMetricId, m.name, m.description,
   m.category_id AS categoryId, m.data_collect_method AS dataCollectMethod,

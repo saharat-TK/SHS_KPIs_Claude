@@ -9,6 +9,7 @@ import {
   Input,
   Tabs,
   Badge,
+  StatCard,
   ThresholdBar,
   HEALTH_LABEL,
   healthOf,
@@ -22,6 +23,7 @@ import {
   unitNeedsDivisor,
   previousQuarterProgress,
   HEALTH_TONE,
+  HEALTH_SURFACE,
 } from "@/lib/kpi/progress";
 import { approvalLockForState, type ApprovalLockInfo } from "@/lib/kpi/approvalWorkflow";
 import { isPeriodOpen, openQuartersForYear } from "@/lib/kpi/performancePeriods";
@@ -31,6 +33,7 @@ import type {
   PerformancePeriod,
   QuarterlyTargetMode,
   QuarterProgress,
+  Thresholds,
 } from "@/lib/types";
 
 const QUARTERS = [1, 2, 3, 4];
@@ -75,6 +78,9 @@ export interface ProgressPanelProps {
   onQuarterChange?: (quarter: number) => void;
   /** How quarterly targets are derived (defaults to cumulative divide_equally). */
   quarterlyTargetMode?: QuarterlyTargetMode;
+  /** Roll-up rule, used to label the numerator/denominator shown on a computed
+   *  quarter (the pair means something different per calculation type). */
+  calculationType?: string | null;
   /** KPI-variable definitions (leaf KPIs); when variable1Name is set the value
    *  is entered as V1 (+V2 for Percent/Ratio) instead of a single field. */
   variable1Name?: string | null;
@@ -120,6 +126,7 @@ export function ProgressPanel({
   quarter: quarterProp,
   onQuarterChange,
   quarterlyTargetMode = "divide_equally",
+  calculationType,
   variable1Name,
   variable1Unit,
   variable2Name,
@@ -157,6 +164,29 @@ export function ProgressPanel({
       : null;
   const progressFor = (q: number) =>
     progress.find((p) => p.yearNo === year && p.quarterNo === q);
+  // A computed quarter also stores what its engine divided. Label that pair by
+  // provenance: a data source fed the KPI's own declared variables, while the
+  // roll-up totalled sub-KPIs in whatever way calculationType prescribes.
+  const computedVariablesFor = (row: QuarterProgress | undefined) => {
+    if (valueEditable || !row || row.variable1Value == null) return null;
+    if (row.valueSource === "data_source") {
+      return {
+        v1Label: variable1Name ?? "Numerator",
+        v2Label: variable2Name ?? "Denominator",
+      };
+    }
+    switch (calculationType) {
+      case "percent_of_total":
+      case "ratio_of_total":
+        return { v1Label: "Total sub-KPI progress", v2Label: "Total sub-KPI target" };
+      case "simple_average":
+        return { v1Label: "Total sub-KPI progress", v2Label: "Sub-KPIs with data" };
+      case "weighted_sum":
+        return { v1Label: "Weighted total", v2Label: "Divisor" };
+      default:
+        return { v1Label: "Numerator", v2Label: "Denominator" };
+    }
+  };
   const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
   const approvalLock = approvalLockForState(approvalState);
   const effectiveReadOnly =
@@ -188,6 +218,13 @@ export function ProgressPanel({
   }));
 
   const hasThresholds = thresholdGreen != null && thresholdAmber != null;
+  // Tint the Threshold card by this same annual pct — computed once and reused
+  // by the card surface, the labels, and the status pill below.
+  const health =
+    hasThresholds && pct != null
+      ? healthOf(pct, { green: thresholdGreen!, amber: thresholdAmber! })
+      : null;
+  const surface = health ? HEALTH_SURFACE[health] : null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-lg">
@@ -257,6 +294,10 @@ export function ProgressPanel({
             valueEditable={valueEditable}
             unit={unit}
             variables={variables}
+            computedVariables={computedVariablesFor(progressFor(quarter))}
+            thresholds={
+              hasThresholds ? { green: thresholdGreen!, amber: thresholdAmber! } : null
+            }
             readOnly={effectiveReadOnly}
             readOnlyMessage={readOnlyMessage}
             approvalLock={approvalLock?.locked ? approvalLock : null}
@@ -272,17 +313,17 @@ export function ProgressPanel({
       </div>
 
       <div className="flex flex-col gap-lg">
-        <Card>
-          <CardHeader title="Threshold" subtitle={`Year ${year}`} />
+        <Card className={surface?.card}>
+          <CardHeader title="Threshold" subtitle={`Year ${year}`} className={surface?.card} />
           <CardBody className="flex flex-col gap-md">
             <div className="flex items-center justify-between">
-              <span className="text-body-sm text-mute">Annual target</span>
+              <span className={cn("text-body-sm", surface?.muted ?? "text-mute")}>Annual target</span>
               <span className="text-body-strong text-on-surface">
                 {yearTarget == null ? "—" : `${formatNumber(yearTarget, 2)} ${unit ?? ""}`}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-body-sm text-mute">Current value</span>
+              <span className={cn("text-body-sm", surface?.muted ?? "text-mute")}>Current value</span>
               <span className="text-heading-md text-on-surface">
                 {current == null ? "—" : `${formatNumber(current, 2)} ${unit ?? ""}`}
               </span>
@@ -290,7 +331,7 @@ export function ProgressPanel({
 
             <div className="flex flex-col gap-xs pt-xs border-t border-hairline">
               <div className="flex items-center justify-between">
-                <span className="text-body-sm text-mute">Progress</span>
+                <span className={cn("text-body-sm", surface?.muted ?? "text-mute")}>Progress</span>
                 <span className="text-body-strong text-on-surface">
                   {pct == null ? "—" : `${formatNumber(pct, 0)}% of target`}
                 </span>
@@ -309,11 +350,9 @@ export function ProgressPanel({
                   />
                 </div>
               )}
-              {hasThresholds && pct != null ? (
+              {health ? (
                 <div className="pt-tiny">
-                  <Badge tone={HEALTH_TONE[healthOf(pct, { green: thresholdGreen, amber: thresholdAmber })]}>
-                    {HEALTH_LABEL[healthOf(pct, { green: thresholdGreen, amber: thresholdAmber })]}
-                  </Badge>
+                  <Badge tone={HEALTH_TONE[health]}>{HEALTH_LABEL[health]}</Badge>
                 </div>
               ) : (
                 <p className="text-caption-sm text-mute">
@@ -339,6 +378,13 @@ export interface QuarterEntryVariables {
   kpiUnit: string | null;
 }
 
+/** Read-only labels for the numerator/denominator stored on a computed quarter.
+ *  Display only — the values come from the saved row, never from this form. */
+export interface QuarterEntryComputedVariables {
+  v1Label: string;
+  v2Label: string;
+}
+
 export function QuarterEntry({
   quarter,
   target,
@@ -348,6 +394,8 @@ export function QuarterEntry({
   valueEditable,
   unit,
   variables,
+  computedVariables,
+  thresholds,
   readOnly,
   readOnlyMessage,
   approvalLock,
@@ -368,6 +416,11 @@ export function QuarterEntry({
   unit: string | null;
   /** When set (leaf KPI with defined variables), value is entered as V1 (+V2). */
   variables?: QuarterEntryVariables | null;
+  /** When set (computed quarter with stored variables), show them read-only. */
+  computedVariables?: QuarterEntryComputedVariables | null;
+  /** Percent cutoffs used to colour the computed value by status. Null when the
+   *  KPI has none configured. */
+  thresholds?: Thresholds | null;
   readOnly: boolean;
   readOnlyMessage?: string;
   approvalLock?: ApprovalLockInfo | null;
@@ -424,6 +477,14 @@ export function QuarterEntry({
   const v1Num = var1Str === "" ? null : Number(var1Str);
   const v2Num = var2Str === "" ? null : Number(var2Str);
   const computedValue = variables ? kpiValueFromVariables(variables.kpiUnit, v1Num, v2Num) : null;
+
+  // Colour the computed result by how far this quarter got against its OWN
+  // target — the same legend as the Threshold card and the quarter matrix, which
+  // also divides by the quarter target. healthOf is not null-safe, so guard
+  // first (mirrors healthForPercent in AnnualQuarterProgressMatrix).
+  const computedPct = percentOfTarget(existing?.progressValue ?? null, target);
+  const computedHealth =
+    thresholds && computedPct != null ? healthOf(computedPct, thresholds) : null;
 
   const variablesFilled =
     !variables ||
@@ -575,9 +636,47 @@ export function QuarterEntry({
             </span>
           </div>
         </div>
+      ) : computedVariables && existing?.variable1Value != null ? (
+        // A computed quarter shows what its engine divided alongside the result,
+        // so the value reads as "319 of 300" rather than a bare number. The
+        // divisor is absent for calculations that have none (weighted_sum).
+        <div
+          className={cn(
+            "grid gap-lg",
+            existing.variable2Value != null
+              ? "grid-cols-1 sm:grid-cols-3"
+              : "grid-cols-1 sm:grid-cols-2",
+          )}
+        >
+          <StatCard
+            tone="soft"
+            className="shadow-chrome"
+            label={computedVariables.v1Label}
+            value={formatNumber(existing.variable1Value, 2)}
+          />
+          {existing.variable2Value != null && (
+            <StatCard
+              tone="soft"
+              className="shadow-chrome"
+              label={computedVariables.v2Label}
+              value={formatNumber(existing.variable2Value, 2)}
+            />
+          )}
+          <StatCard
+            // No thresholds, no target or no value => status unknown, so stay
+            // neutral rather than asserting "On Target" without evidence.
+            tone={computedHealth ?? "default"}
+            className="shadow-chrome"
+            label="Computed value (Cumulative)"
+            value={
+              existing.progressValue == null ? "—" : formatNumber(existing.progressValue, 2)
+            }
+            unit={existing.progressValue == null ? undefined : unit ?? undefined}
+          />
+        </div>
       ) : (
-        <div className="flex flex-col gap-xs">
-          <span className="text-label-md text-on-surface">
+        <div className="flex flex-col gap-xs text-right">
+          <span className="text-body-sm font-bold text-on-surface">
             {valueEditable ? "Progress value (Cumulative)" : "Computed value (Cumulative)"}
           </span>
           {valueEditable ? (
@@ -590,7 +689,7 @@ export function QuarterEntry({
               placeholder="Enter recorded value"
             />
           ) : (
-            <div className="flex h-[36px] items-center rounded-DEFAULT border border-hairline bg-surface-soft px-md text-body-sm text-mute">
+            <div className="flex h-[36px] items-center justify-end rounded-DEFAULT border border-hairline bg-surface-soft px-md text-body-md font-bold text-on-surface">
               {existing?.progressValue == null
                 ? "— (awaiting sub-KPI data)"
                 : `${formatNumber(existing.progressValue, 2)} ${unit ?? ""}`}

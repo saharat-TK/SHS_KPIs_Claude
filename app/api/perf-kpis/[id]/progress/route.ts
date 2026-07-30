@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import type { ApprovalState, Role } from "@/lib/types";
 import { unitNeedsDivisor, kpiValueFromVariables } from "@/lib/kpi/progress";
+import { KPI_QUARTER_PROGRESS_FIELDS } from "@/lib/kpi/fields";
 import { getApprovalState, resolvePosition } from "@/lib/kpi/approvalServer";
 import { approvalLockForState, resolveStageRole } from "@/lib/kpi/approvalWorkflow";
 
@@ -15,6 +16,10 @@ function numOrNull(v: unknown): number | null {
 // Upsert one quarter of KPI progress. For a leaf KPI the user enters
 // progress_value directly; for a has_children KPI the value is roll-up-computed
 // (from metrics) so we only record the required Issue/Solution here.
+// Leaf rows are stamped value_source='manual' — the one provenance under which
+// progress_value is re-derivable from the stored variables via
+// kpiValueFromVariables (see lib/kpi/performance.ts#rollupParts for why the
+// computed paths are not).
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -102,26 +107,33 @@ export async function PUT(
         value = kpiValueFromVariables(unit, var1, var2);
       } else {
         // Legacy leaf KPI without variable definitions: direct value entry.
+        // Record it as Variable 1 too, so every manual row carries the number it
+        // was built from even when the KPI never declared variable names.
         value = numOrNull(b.progressValue);
+        var1 = value;
       }
 
       await pool.query(
         `INSERT INTO perf_kpi_quarter_progress
            (perf_kpi_id, year_no, quarter_no, progress_value, variable1_value, variable2_value,
-            is_computed, issue, solution, recorded_by, recorded_at)
-         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, CURRENT_TIMESTAMP)
+            is_computed, value_source, issue, solution, recorded_by, recorded_at)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 'manual', ?, ?, ?, CURRENT_TIMESTAMP)
          ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value),
            variable1_value = VALUES(variable1_value), variable2_value = VALUES(variable2_value),
-           is_computed = 0, issue = VALUES(issue), solution = VALUES(solution),
+           is_computed = 0, value_source = 'manual',
+           issue = VALUES(issue), solution = VALUES(solution),
            recorded_by = VALUES(recorded_by), recorded_at = CURRENT_TIMESTAMP`,
         [params.id, yearNo, quarterNo, value, var1, var2, b.issue.trim(), b.solution.trim(), recordedBy],
       );
     } else {
-      // Computed KPI: preserve the roll-up progress_value, only update Issue.
+      // Computed KPI: preserve the roll-up's progress_value, variables and
+      // value_source — only update Issue. A fresh row is inserted as a roll-up
+      // placeholder for recomputeKpiQuarter to fill in.
       await pool.query(
         `INSERT INTO perf_kpi_quarter_progress
-           (perf_kpi_id, year_no, quarter_no, progress_value, is_computed, issue, solution, recorded_by, recorded_at)
-         VALUES (?, ?, ?, NULL, 1, ?, ?, ?, CURRENT_TIMESTAMP)
+           (perf_kpi_id, year_no, quarter_no, progress_value, is_computed, value_source,
+            issue, solution, recorded_by, recorded_at)
+         VALUES (?, ?, ?, NULL, 1, 'rollup', ?, ?, ?, CURRENT_TIMESTAMP)
          ON DUPLICATE KEY UPDATE issue = VALUES(issue), solution = VALUES(solution),
            recorded_by = VALUES(recorded_by), recorded_at = CURRENT_TIMESTAMP`,
         [params.id, yearNo, quarterNo, b.issue.trim(), b.solution.trim(), recordedBy],
@@ -129,9 +141,7 @@ export async function PUT(
     }
 
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT year_no AS yearNo, quarter_no AS quarterNo, progress_value AS progressValue,
-              variable1_value AS variable1Value, variable2_value AS variable2Value,
-              is_computed AS isComputed, issue, solution
+      `SELECT ${KPI_QUARTER_PROGRESS_FIELDS}
        FROM perf_kpi_quarter_progress WHERE perf_kpi_id = ? ORDER BY year_no, quarter_no`,
       [params.id],
     );

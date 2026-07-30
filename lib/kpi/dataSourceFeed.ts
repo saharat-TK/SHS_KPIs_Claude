@@ -12,7 +12,8 @@ import type {
   DataSourceColumn,
   DataSourceLinkMapping,
 } from "@/lib/types";
-import { aggregate, matchesFilters } from "@/lib/kpi/dataSourceFilters";
+import type { AggregateParts } from "@/lib/kpi/dataSourceFilters";
+import { aggregateParts, matchesFilters } from "@/lib/kpi/dataSourceFilters";
 import { isApprovalDataLocked } from "@/lib/kpi/approvalWorkflow";
 import { getApprovalState } from "@/lib/kpi/approvalServer";
 import { kpiValueFromVariables } from "@/lib/kpi/progress";
@@ -242,7 +243,7 @@ async function applyLink(
           continue;
         }
 
-        const values = new Map<string, number | null>();
+        const values = new Map<string, AggregateParts>();
         for (const mapping of link.mappings) {
           const matched = rows.filter((e) => matchesFilters(e, columns, mapping.filters));
           // A faculty denominator makes `matched` the numerator outright; only
@@ -260,42 +261,52 @@ async function applyLink(
                 : undefined;
           values.set(
             mapping.slot,
-            aggregate(mapping.aggregation, mapping.columnKey, matched, proportion),
+            aggregateParts(mapping.aggregation, mapping.columnKey, matched, proportion),
           );
         }
 
         if (target.perfMetricId != null) {
+          // perf_metric_quarter_progress has no variable columns — the parent
+          // KPI gets its own numerator/denominator from the roll-up below.
           await conn.query(
             `INSERT INTO perf_metric_quarter_progress
                (perf_metric_id, year_no, quarter_no, progress_value, is_computed)
              VALUES (?, ?, ?, ?, 1)
              ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value), is_computed = 1`,
-            [target.perfMetricId, yearNo, quarterNo, values.get("value") ?? null],
+            [target.perfMetricId, yearNo, quarterNo, values.get("value")?.value ?? null],
           );
           // Let the existing roll-up carry the change up to the parent KPI.
           await recomputeKpiQuarter(conn, target.perfKpiId, yearNo, quarterNo);
-        } else if (values.has("variable1") || values.has("variable2")) {
-          const v1 = values.get("variable1") ?? null;
-          const v2 = values.get("variable2") ?? null;
-          // Derive with the same helper the entry form previews with, so the
-          // stored number always matches what a human would have seen.
-          const progress = kpiValueFromVariables(target.unit, v1, v2);
+        } else {
+          // Two mapped slots carry their own dividend and divisor; a single
+          // "value" slot still divided something internally (a proportion's
+          // population, an average's row count), so store the aggregation's own
+          // numerator/denominator rather than leaving the columns empty.
+          let progress: number | null;
+          let v1: number | null;
+          let v2: number | null;
+          if (values.has("variable1") || values.has("variable2")) {
+            v1 = values.get("variable1")?.value ?? null;
+            v2 = values.get("variable2")?.value ?? null;
+            // Derive with the same helper the entry form previews with, so the
+            // stored number always matches what a human would have seen.
+            progress = kpiValueFromVariables(target.unit, v1, v2);
+          } else {
+            const parts = values.get("value") ?? null;
+            progress = parts?.value ?? null;
+            v1 = parts?.numerator ?? null;
+            v2 = parts?.denominator ?? null;
+          }
           await conn.query(
             `INSERT INTO perf_kpi_quarter_progress
-               (perf_kpi_id, year_no, quarter_no, progress_value, variable1_value, variable2_value, is_computed)
-             VALUES (?, ?, ?, ?, ?, ?, 1)
+               (perf_kpi_id, year_no, quarter_no, progress_value, variable1_value, variable2_value,
+                is_computed, value_source)
+             VALUES (?, ?, ?, ?, ?, ?, 1, 'data_source')
              ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value),
                variable1_value = VALUES(variable1_value),
-               variable2_value = VALUES(variable2_value), is_computed = 1`,
+               variable2_value = VALUES(variable2_value),
+               is_computed = 1, value_source = 'data_source'`,
             [target.perfKpiId, yearNo, quarterNo, progress, v1, v2],
-          );
-        } else {
-          await conn.query(
-            `INSERT INTO perf_kpi_quarter_progress
-               (perf_kpi_id, year_no, quarter_no, progress_value, is_computed)
-             VALUES (?, ?, ?, ?, 1)
-             ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value), is_computed = 1`,
-            [target.perfKpiId, yearNo, quarterNo, values.get("value") ?? null],
           );
         }
         outcome.updated += 1;

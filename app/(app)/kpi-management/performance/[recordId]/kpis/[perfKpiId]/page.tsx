@@ -284,6 +284,7 @@ function PerfKpiProgress() {
               quarter={quarter}
               onQuarterChange={setQuarter}
               quarterlyTargetMode={kpi.quarterlyTargetMode}
+              calculationType={kpi.calculationType}
               variable1Name={kpi.variable1Name}
               variable1Unit={kpi.variable1Unit}
               variable2Name={kpi.variable2Name}

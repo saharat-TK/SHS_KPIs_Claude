@@ -313,15 +313,23 @@ CREATE TABLE perf_kpi_annual_target (
 -- is reflected automatically. progress_value is entered directly for leaf KPIs,
 -- or written by the calc engine when has_children = 1. Issue + solution are the
 -- required "Issue" section for each quarter.
+--
+-- Every write path also records the numerator/denominator it divided, in
+-- variable1_value / variable2_value, and names itself in value_source. The pair
+-- is only re-derivable through kpiValueFromVariables() (lib/kpi/progress.ts)
+-- when value_source = 'manual' — see the roll-up semantics in
+-- lib/kpi/performance.ts#rollupParts, which are driven by calculation_type
+-- rather than by the unit.
 CREATE TABLE perf_kpi_quarter_progress (
   id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   perf_kpi_id    BIGINT UNSIGNED NOT NULL,
   year_no        TINYINT UNSIGNED NOT NULL CHECK (year_no BETWEEN 1 AND 5),
   quarter_no     TINYINT UNSIGNED NOT NULL CHECK (quarter_no BETWEEN 1 AND 4),
   progress_value DECIMAL(14,4) NULL,                       -- accumulated current value (computed from variables for leaf KPIs)
-  variable1_value DECIMAL(14,4) NULL,                      -- raw Variable 1 (Dividend) entered this quarter
-  variable2_value DECIMAL(14,4) NULL,                      -- raw Variable 2 (Divisor); used when unit is Percent/Ratio
+  variable1_value DECIMAL(14,4) NULL,                      -- Variable 1 (Dividend/numerator) behind progress_value
+  variable2_value DECIMAL(14,4) NULL,                      -- Variable 2 (Divisor/denominator); NULL when the source had none
   is_computed    BOOLEAN NOT NULL DEFAULT 0,               -- 1 => derived from metrics, not entered
+  value_source   ENUM('manual','rollup','data_source') NOT NULL DEFAULT 'manual', -- which engine wrote the row
   issue          TEXT NULL,                                -- required: problem/difficulty getting the data
   solution       TEXT NULL,                                -- required: how it will be addressed
   recorded_by    VARCHAR(255) NULL,
@@ -597,7 +605,15 @@ CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id);
 --    Q1..Q4; computed on read, not stored.
 --  * Roll-up for has_children KPIs uses calculation_type + calculation_logic
 --    over child perf_metric quarter values; result written to
---    perf_kpi_quarter_progress.progress_value with is_computed = 1.
+--    perf_kpi_quarter_progress.progress_value with is_computed = 1 and
+--    value_source = 'rollup', alongside the numerator/denominator it divided in
+--    variable1_value / variable2_value (lib/kpi/performance.ts#rollupParts).
+--  * value_source names the engine that wrote a quarter row: 'manual' (the
+--    progress PUT routes), 'rollup' (the calc engine above) or 'data_source'
+--    (lib/kpi/dataSourceFeed.ts). is_computed stays as-is for existing callers,
+--    but it cannot tell 'rollup' and 'data_source' apart — use value_source.
+--    Existing databases are upgraded by
+--      node --env-file=.env.local scripts/migrate-kpi-value-source.mjs
 --  * Full re-sync (decision #4): match perf rows to library rows by
 --    source_kpi_id / source_metric_id; INSERT new, UPDATE definitions + targets,
 --    and soft-handle library rows deleted after activation (recommend a

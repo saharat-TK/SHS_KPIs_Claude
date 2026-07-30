@@ -14,6 +14,8 @@
     "migrate:ratio-of-total": "node --env-file=.env.local scripts/migrate-kpi-ratio-of-total.mjs",
     "migrate:academic-catalog": "node --env-file=.env.local scripts/migrate-academic-catalog.mjs",
     "migrate:recompute-parent-rollups": "node --env-file=.env.local scripts/recompute-parent-rollups.mjs",
+    "migrate:kpi-value-source": "node --env-file=.env.local scripts/migrate-kpi-value-source.mjs",
+    "migrate:backfill-kpi-variables": "node --env-file=.env.local scripts/backfill-kpi-quarter-variables.mjs",
     "seed:ip": "node --env-file=.env.local scripts/seed-intellectual-property.mjs",
     "seed:ip-usage-count": "node --env-file=.env.local scripts/seed-ip-usage-count.mjs",
     "seed:manuscripts": "node --env-file=.env.local scripts/seed-research-manuscripts.mjs",
