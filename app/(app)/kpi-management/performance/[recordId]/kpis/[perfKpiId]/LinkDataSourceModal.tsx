@@ -6,7 +6,7 @@
 // POST to /api/data-sources/[id]/links — the data source is the path param and
 // the target is the body, so reverse mode varies the path instead of the body.
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Button, Field, Input, Select, Badge } from "@/components/ui";
+import { Modal, Button, Field, Select } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import {
   useCreateDataSourceLink,
@@ -15,26 +15,29 @@ import {
   useDataSources,
   useFacultyRecords,
   useAcademicCatalog,
+  useUpdateDataSourceLink,
 } from "@/lib/data/hooks";
-import { unitNeedsDivisor } from "@/lib/kpi/progress";
+import { targetAllowsVariables } from "@/lib/kpi/progress";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
-import type { PerfKpi, PerfMetric } from "@/lib/types";
+import type { DataSourceLink, PerfKpi, PerfMetric } from "@/lib/types";
 import {
-  MappingCard,
-  SLOT_LABELS,
-  newMapping,
+  LinkMappingSection,
+  toDraft,
   toPayload,
   type DraftMapping,
 } from "@/app/(app)/kpi-management/data-sources/[dataSourceId]/LinkMappingEditor";
 
 /** Link a data source to this KPI or one of its sub-KPIs. The target is fixed by
- *  the page; only the source and its mapping are chosen here. */
+ *  the page; only the source and its mapping are chosen here. Editing keeps both
+ *  the source and the target — the unique key is built on them — and changes only
+ *  the mappings, exactly as LinkKpiModal's edit mode does. */
 export function LinkDataSourceModal({
   open,
   onClose,
   kpi,
   metrics,
   linkedSourceIds,
+  link,
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,7 +46,11 @@ export function LinkDataSourceModal({
   /** Sources already linked to this KPI — offered but flagged, since a second
    *  link to the same target would collide with uq_ds_link. */
   linkedSourceIds: number[];
+  /** Present = edit mode. Carries its own dataSourceId, so editing needs no
+   *  other prop to know which source's columns to preview against. */
+  link?: DataSourceLink | null;
 }) {
+  const isEdit = !!link;
   const [dataSourceId, setDataSourceId] = useState(0);
   // "" = the KPI itself; otherwise a perf metric id.
   const [metricId, setMetricId] = useState(0);
@@ -51,11 +58,15 @@ export function LinkDataSourceModal({
   const [mappings, setMappings] = useState<DraftMapping[]>([]);
 
   const sourcesQ = useDataSources();
-  const columnsQ = useDataSourceColumns(dataSourceId);
-  const entriesQ = useDataSourceEntries(dataSourceId);
+  // In edit mode the source is the one the link already belongs to, so the
+  // mapping preview reads the right columns without a picker.
+  const activeSourceId = link?.dataSourceId ?? dataSourceId;
+  const columnsQ = useDataSourceColumns(activeSourceId);
+  const entriesQ = useDataSourceEntries(activeSourceId);
   const facultyQ = useFacultyRecords();
   const catalogQ = useAcademicCatalog();
   const create = useCreateDataSourceLink();
+  const update = useUpdateDataSourceLink();
 
   const columns = useMemo(() => columnsQ.data ?? [], [columnsQ.data]);
   const entries = useMemo(() => entriesQ.data ?? [], [entriesQ.data]);
@@ -63,30 +74,50 @@ export function LinkDataSourceModal({
 
   useEffect(() => {
     if (!open) return;
-    setDataSourceId(0);
-    setMetricId(0);
-    setNote("");
-    setMappings([]);
-  }, [open]);
+    setNote(link?.note ?? "");
+    setMappings((link?.mappings ?? []).map(toDraft));
+    if (!link) {
+      setDataSourceId(0);
+      setMetricId(0);
+    }
+  }, [open, link]);
 
   // The link targets the LIBRARY row this record was snapshotted from, never the
   // perf row. A KPI created straight on a record has no library twin.
   const selectedMetric = metrics.find((m) => m.id === metricId) ?? null;
   const targetLibraryKpiId = kpi.sourceKpiId ?? null;
   const targetLibraryMetricId = selectedMetric?.sourceMetricId ?? null;
-  const targetMissing = metricId > 0 ? targetLibraryMetricId == null : targetLibraryKpiId == null;
+  const targetMissing =
+    !isEdit && (metricId > 0 ? targetLibraryMetricId == null : targetLibraryKpiId == null);
 
-  // A percent/ratio target can be fed as two variables instead of one value.
-  const targetUnit = selectedMetric ? selectedMetric.unit : kpi.unit;
-  const allowsVariables = unitNeedsDivisor(targetUnit ?? null);
+  // A percent/ratio target can be fed as two variables instead of one value —
+  // KPI targets only. Same helper the data-sources modal uses, so the rule is
+  // identical whichever direction you link from.
+  const targetUnit = (selectedMetric ? selectedMetric.unit : kpi.unit) ?? null;
+  const allowsVariables = targetAllowsVariables({
+    isMetric: metricId > 0,
+    unit: targetUnit,
+    isEdit,
+  });
 
-  const updateMapping = (key: string, patch: Partial<DraftMapping>) =>
-    setMappings((ms) => ms.map((m) => (m.key === key ? { ...m, ...patch } : m)));
+  const alreadyLinked =
+    !isEdit && dataSourceId > 0 && linkedSourceIds.includes(dataSourceId);
+  const submitting = create.isPending || update.isPending;
+  const valid = isEdit ? activeSourceId > 0 : dataSourceId > 0 && !targetMissing;
 
-  const alreadyLinked = dataSourceId > 0 && linkedSourceIds.includes(dataSourceId);
-  const valid = dataSourceId > 0 && !targetMissing;
-
-  const submit = () =>
+  const submit = () => {
+    const payload = mappings.map(toPayload);
+    if (isEdit && link) {
+      update.mutate(
+        {
+          dataSourceId: activeSourceId,
+          linkId: link.id,
+          patch: { mappings: payload, note: note.trim() || null },
+        },
+        { onSuccess: onClose },
+      );
+      return;
+    }
     create.mutate(
       {
         id: dataSourceId,
@@ -94,27 +125,32 @@ export function LinkDataSourceModal({
           ...(metricId > 0
             ? { libraryMetricId: targetLibraryMetricId as number }
             : { libraryKpiId: targetLibraryKpiId as number }),
-          mappings: mappings.map(toPayload),
+          mappings: payload,
           note: note.trim() || undefined,
         },
       },
       { onSuccess: onClose },
     );
+  };
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       size="lg"
-      title="Link a Data Source"
-      subtitle="Pick the source, then say which of its rows count toward this KPI. Leave the mapping empty to record the link as evidence only."
+      title={isEdit ? "Edit Link" : "Link a Data Source"}
+      subtitle={
+        isEdit
+          ? `Which rows of “${link?.dataSourceName ?? "this data source"}” produce “${link?.metricName || link?.kpiName}”.`
+          : "Pick the source, then say which of its rows count toward this KPI. Leave the mapping empty to record the link as evidence only."
+      }
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={!valid || create.isPending} onClick={submit}>
-            {create.isPending ? "Saving…" : "Link"}
+          <Button disabled={!valid || submitting} onClick={submit}>
+            {submitting ? "Saving…" : isEdit ? "Save Link" : "Link"}
           </Button>
         </>
       }
@@ -129,34 +165,55 @@ export function LinkDataSourceModal({
           </span>
         </div>
 
-        <Field label="Data source">
-          <Select
-            value={dataSourceId || ""}
-            onChange={(e) => setDataSourceId(Number(e.target.value))}
-          >
-            <option value="">Select a data source…</option>
-            {(sourcesQ.data ?? []).map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-                {s.committeeName ? ` — ${s.committeeName}` : ""}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {isEdit ? (
+          // Both the source and the target are part of the link's unique key, so
+          // editing can only change the mappings — state them instead of
+          // offering pickers that would have nothing to do.
+          <div className="rounded-md border border-hairline bg-surface-lowest px-md py-sm text-body-sm">
+            <span className="text-mute">Feeding </span>
+            <span className="font-medium">{link?.metricName || link?.kpiName}</span>
+            {link?.dataSourceName && (
+              <>
+                <span className="text-mute"> from </span>
+                <span className="font-medium">{link.dataSourceName}</span>
+              </>
+            )}
+          </div>
+        ) : (
+          <>
+            <Field label="Data source">
+              <Select
+                value={dataSourceId || ""}
+                onChange={(e) => setDataSourceId(Number(e.target.value))}
+              >
+                <option value="">Select a data source…</option>
+                {(sourcesQ.data ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                    {s.committeeName ? ` — ${s.committeeName}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
-        <Field
-          label="Feeds"
-          hint="Which part of this KPI the source produces a value for."
-        >
-          <Select value={metricId || ""} onChange={(e) => setMetricId(Number(e.target.value))}>
-            <option value="">This KPI ({kpi.name})</option>
-            {metrics.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+            <Field
+              label="Feeds"
+              hint="Which part of this KPI the source produces a value for."
+            >
+              <Select
+                value={metricId || ""}
+                onChange={(e) => setMetricId(Number(e.target.value))}
+              >
+                <option value="">This KPI ({kpi.name})</option>
+                {metrics.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </>
+        )}
 
         {targetMissing && (
           <p className="text-body-sm text-error">
@@ -169,85 +226,28 @@ export function LinkDataSourceModal({
         {alreadyLinked && (
           <p className="text-body-sm text-mute">
             This source already feeds part of this KPI. Linking it again to the same
-            target will be rejected — pick a different target or edit the existing
-            link from the Data Sources page.
+            target will be rejected — pick a different target, or edit the existing
+            link from the Linked Data Sources list.
           </p>
         )}
 
-        {dataSourceId > 0 && (
-          <div className="border-t border-hairline pt-md">
-            <div className="mb-sm flex items-center justify-between">
-              <div>
-                <h3 className="text-label-md text-on-surface">Which rows count</h3>
-                <p className="text-caption-sm text-mute">
-                  Matching rows are aggregated into the quarterly value, cumulatively
-                  within each year.
-                </p>
-              </div>
-              {mappings.length < (allowsVariables ? 2 : 1) && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon="add"
-                  onClick={() =>
-                    setMappings((ms) => [
-                      ...ms,
-                      newMapping(
-                        allowsVariables
-                          ? ms.some((m) => m.slot === "variable1")
-                            ? "variable2"
-                            : "variable1"
-                          : "value",
-                      ),
-                    ])
-                  }
-                >
-                  Add mapping
-                </Button>
-              )}
-            </div>
-
-            {columns.length === 0 ? (
-              <p className="text-body-sm text-mute">
-                This data source has no columns yet, so there is nothing to filter on.
-              </p>
-            ) : mappings.length === 0 ? (
-              <p className="text-body-sm text-mute">
-                No mapping — this link is evidence only and will not change any value.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-md">
-                {mappings.map((m) => (
-                  <MappingCard
-                    key={m.key}
-                    mapping={m}
-                    columns={columns}
-                    entries={entries}
-                    labels={labels}
-                    faculty={facultyQ.data ?? []}
-                    allowsVariables={allowsVariables}
-                    onChange={(patch) => updateMapping(m.key, patch)}
-                    onRemove={() =>
-                      setMappings((ms) => ms.filter((x) => x.key !== m.key))
-                    }
-                  />
-                ))}
-              </div>
-            )}
-
-            {allowsVariables && mappings.length > 0 && (
-              <p className="mt-sm flex items-center gap-xs text-caption-sm text-mute">
-                <Badge tone="neutral">tip</Badge>
-                A {targetUnit} target is fed as {SLOT_LABELS.variable1} ÷{" "}
-                {SLOT_LABELS.variable2}.
-              </p>
-            )}
-          </div>
-        )}
-
-        <Field label="Note" hint="Optional — how this data supports the KPI.">
-          <Input value={note} onChange={(e) => setNote(e.target.value)} />
-        </Field>
+        <LinkMappingSection
+          mappings={mappings}
+          onChange={setMappings}
+          columns={columns}
+          entries={entries}
+          labels={labels}
+          faculty={facultyQ.data ?? []}
+          allowsVariables={allowsVariables}
+          targetUnit={targetUnit}
+          note={note}
+          onNote={setNote}
+          placeholder={
+            activeSourceId > 0
+              ? undefined
+              : "Pick a data source above to choose which of its rows count."
+          }
+        />
       </div>
     </Modal>
   );
