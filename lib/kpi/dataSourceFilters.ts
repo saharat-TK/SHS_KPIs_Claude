@@ -296,8 +296,12 @@ const NO_PARTS: AggregateParts = { value: null, numerator: null, denominator: nu
  *  percent_of / ratio_of are the only kinds needing more than one input, supplied
  *  via `proportion`:
  *   - `numerator` — a subset of `entries`, which is itself the denominator.
- *     Callers must derive it from the already-matched population, so the result
- *     can't exceed 100%.
+ *     Callers must derive it from the already-matched population, so a
+ *     single-column result can't exceed 100%.
+ *   - `numeratorColumnKey` — totals the top on a DIFFERENT column from the
+ *     bottom (employed ÷ graduates, both on the same rows). Two columns are
+ *     independent quantities, so this mode carries no ≤100% guarantee — 125% is
+ *     real data, not something to clamp.
  *   - `denominator` — a fixed divisor (a faculty headcount) that replaces
  *     `entries` on the bottom; then `entries` IS the numerator, because the
  *     mapping's filters selected those rows directly. Wins over `numerator`. */
@@ -307,13 +311,14 @@ export function aggregateParts(
   entries: FilterableEntry[],
   proportion?: {
     numerator?: FilterableEntry[];
+    numeratorColumnKey?: string | null;
     denominator?: number | null;
   },
 ): AggregateParts {
   if (kind === "percent_of" || kind === "ratio_of") {
     // No column → proportion of rows; with one → proportion of its total.
-    const total = (rows: FilterableEntry[]) =>
-      columnKey ? numericCells(rows, columnKey).reduce((s, n) => s + n, 0) : rows.length;
+    const total = (rows: FilterableEntry[], key = columnKey) =>
+      key ? numericCells(rows, key).reduce((s, n) => s + n, 0) : rows.length;
 
     const fixed = proportion?.denominator;
     if (fixed !== undefined) {
@@ -333,7 +338,7 @@ export function aggregateParts(
     const subset = proportion?.numerator;
     if (!subset) return NO_PARTS;
     const denominator = total(entries);
-    const numerator = total(subset);
+    const numerator = total(subset, proportion?.numeratorColumnKey ?? columnKey);
     // An empty population — or a column summing to zero — has no proportion.
     if (denominator === 0) return { value: null, numerator, denominator };
     const ratio = numerator / denominator;
@@ -381,6 +386,7 @@ export function aggregate(
   entries: FilterableEntry[],
   proportion?: {
     numerator?: FilterableEntry[];
+    numeratorColumnKey?: string | null;
     denominator?: number | null;
   },
 ): number | null {
@@ -442,12 +448,22 @@ export function validateMappings(
     };
 
     const source = (m?.denominatorSource ?? "rows") as DenominatorSource;
+    // A stray numerator column is rejected rather than dropped: silently
+    // ignoring it would compute a different fraction than the one asked for.
+    const strayNumeratorColumn = () => {
+      if (m?.numeratorColumnKey) {
+        throw invalid(
+          `"${AGGREGATION_LABELS[aggregation]}" has no separate numerator to total on its own column`,
+        );
+      }
+    };
     if (!isProportionKind(aggregation)) {
       if (m?.denominatorSource) {
         throw invalid(
           `"${AGGREGATION_LABELS[aggregation]}" has no denominator to choose a source for`,
         );
       }
+      strayNumeratorColumn();
     } else if (source === "faculty") {
       // The roster supplies the divisor, so `filters` selects the numerator rows
       // directly and a second list would have nothing to narrow.
@@ -457,15 +473,37 @@ export function validateMappings(
       }
       const unknown = ranks.find((r: string) => !VALID_RANKS.includes(r as Rank));
       if (unknown) throw invalid(`Unknown faculty rank "${unknown}"`);
+      // The numerator here is `filters` totalled on columnKey; totalling a
+      // different column against the roster is already just that column.
+      strayNumeratorColumn();
       mapping.denominatorSource = "faculty";
       mapping.facultyRanks = ranks as Rank[];
     } else if (source === "rows") {
+      const asked = m?.numeratorColumnKey?.trim() || null;
+      // Repeating the denominator's column is no second quantity at all — drop
+      // it, so nothing downstream has to keep explaining a no-op.
+      const numeratorColumnKey = asked === columnKey ? null : asked;
+      if (numeratorColumnKey) {
+        if (!columnKey) {
+          throw invalid(
+            "A numerator column needs a denominator column to divide by — pick one, or clear it to compare row counts",
+          );
+        }
+        const col = byKey.get(numeratorColumnKey);
+        if (!col) throw invalid(`Unknown column "${numeratorColumnKey}"`);
+        if (col.dataType !== "number") {
+          throw invalid(`"${col.label}" is not a number column, so it cannot be aggregated`);
+        }
+        mapping.numeratorColumnKey = numeratorColumnKey;
+      }
+
       const raw2 = Array.isArray(m?.numeratorFilters) ? m.numeratorFilters : [];
-      // With no numerator condition the numerator IS the population, so the
-      // mapping would always return exactly 100 (or 1) — never intended.
-      if (raw2.length === 0) {
+      // With no numerator condition the numerator IS the population — exactly
+      // 100 (or 1) while both sides total the same column, but a real fraction
+      // once the top totals a different one.
+      if (raw2.length === 0 && !numeratorColumnKey) {
         throw invalid(
-          `"${AGGREGATION_LABELS[aggregation]}" needs at least one condition saying which rows to count`,
+          `"${AGGREGATION_LABELS[aggregation]}" needs a numerator column, or at least one condition saying which rows to count`,
         );
       }
       mapping.numeratorFilters = raw2.map((f: DataSourceFilter) =>
@@ -578,15 +616,19 @@ export function describeMapping(
   columns: FilterColumnSpec[],
   labels?: Record<string, string>,
 ): string {
-  const column = columns.find((c) => c.colKey === mapping.columnKey);
+  const labelOf = (key: string | null | undefined) =>
+    columns.find((c) => c.colKey === key)?.label ?? key ?? "";
   const list = (fs: DataSourceFilter[]) =>
     fs.map((f) => describeFilter(f, columns, labels)).join(" and ");
-  // No column to name → the kind is measuring rows themselves.
-  const head = mapping.columnKey
-    ? `${AGGREGATION_LABELS[mapping.aggregation]} ${column?.label ?? mapping.columnKey}`
-    : mapping.aggregation === "count"
-      ? AGGREGATION_LABELS.count
-      : `${AGGREGATION_LABELS[mapping.aggregation]} rows`;
+  // No column to name → the kind is measuring rows themselves. Two columns name
+  // both sides, or the fraction would read as one column's share of itself.
+  const head = mapping.numeratorColumnKey
+    ? `${AGGREGATION_LABELS[mapping.aggregation]} ${labelOf(mapping.numeratorColumnKey)} out of ${labelOf(mapping.columnKey)}`
+    : mapping.columnKey
+      ? `${AGGREGATION_LABELS[mapping.aggregation]} ${labelOf(mapping.columnKey)}`
+      : mapping.aggregation === "count"
+        ? AGGREGATION_LABELS.count
+        : `${AGGREGATION_LABELS[mapping.aggregation]} rows`;
 
   const scoped = mapping.filters.length === 0 ? head : `${head} where ${list(mapping.filters)}`;
 

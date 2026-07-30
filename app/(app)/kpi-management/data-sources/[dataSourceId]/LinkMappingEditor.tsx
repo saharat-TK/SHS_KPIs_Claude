@@ -12,7 +12,7 @@ import {
   AGGREGATION_LABELS,
   OPERATOR_LABELS,
   PERIOD_FIELD,
-  aggregate,
+  aggregateParts,
   aggregationAllowsColumn,
   isMultiValueOperator,
   isProportionKind,
@@ -65,6 +65,9 @@ export interface DraftMapping {
   filters: DraftFilter[];
   /** Narrows the numerator within it. Proportion kinds, "rows" denominator only. */
   numeratorFilters: DraftFilter[];
+  /** Totals the numerator on its own column instead of columnKey. Empty = same
+   *  column both sides. Proportion kinds, "rows" denominator only. */
+  numeratorColumnKey: string;
   /** Proportion kinds only. */
   denominatorSource: DenominatorSource;
   /** Which ranks the headcount counts, when the denominator is the roster. */
@@ -96,6 +99,7 @@ export const newMapping = (slot: MappingSlot = "value"): DraftMapping => ({
   columnKey: "",
   filters: [],
   numeratorFilters: [],
+  numeratorColumnKey: "",
   denominatorSource: "rows",
   facultyRanks: ACADEMIC_RANKS,
 });
@@ -117,6 +121,7 @@ export function toDraft(m: DataSourceLinkMapping): DraftMapping {
     columnKey: m.columnKey ?? "",
     filters: (m.filters ?? []).map(filterToDraft),
     numeratorFilters: (m.numeratorFilters ?? []).map(filterToDraft),
+    numeratorColumnKey: m.numeratorColumnKey ?? "",
     denominatorSource: m.denominatorSource ?? "rows",
     facultyRanks: m.facultyRanks ?? ACADEMIC_RANKS,
   };
@@ -148,7 +153,14 @@ export const toPayload = (d: DraftMapping): DataSourceLinkMapping => ({
   ...(isProportionKind(d.aggregation)
     ? d.denominatorSource === "faculty"
       ? { denominatorSource: "faculty" as const, facultyRanks: d.facultyRanks }
-      : { numeratorFilters: filtersToPayload(d.numeratorFilters) }
+      : {
+          numeratorFilters: filtersToPayload(d.numeratorFilters),
+          // The same column on both sides is a no-op the server strips anyway;
+          // dropping it here keeps the live preview in step with what it stores.
+          ...(d.numeratorColumnKey && d.numeratorColumnKey !== d.columnKey
+            ? { numeratorColumnKey: d.numeratorColumnKey }
+            : {}),
+        }
     : {}),
 });
 
@@ -175,6 +187,10 @@ export function MappingCard({
 
   const isProportion = isProportionKind(mapping.aggregation);
   const byFaculty = isProportion && mapping.denominatorSource === "faculty";
+  // Two columns make the sides differ on their own, so the numerator conditions
+  // stop being the only thing keeping the answer off 100%.
+  const numeratorColumn = numberColumns.find((c) => c.colKey === mapping.numeratorColumnKey);
+  const twoColumn = !!numeratorColumn && mapping.numeratorColumnKey !== mapping.columnKey;
   // Same helper the server feeds with, so the preview can't disagree with the
   // number that ends up stored.
   const headcount = facultyHeadcount(faculty, mapping.facultyRanks);
@@ -203,13 +219,25 @@ export function MappingCard({
       const proportion = byFaculty
         ? { denominator: headcount }
         : numerator
-          ? { numerator: numerator as never }
+          ? {
+              numerator: numerator as never,
+              // Already collision-stripped by toPayload, so the preview divides
+              // exactly what a save would.
+              numeratorColumnKey: payload.numeratorColumnKey ?? null,
+            }
           : undefined;
+      const parts = aggregateParts(
+        mapping.aggregation,
+        payload.columnKey,
+        matched as never,
+        proportion,
+      );
       return {
         matched: matched.length,
         total: entries.length,
         numerator: numerator?.length ?? null,
-        value: aggregate(mapping.aggregation, payload.columnKey, matched as never, proportion),
+        parts,
+        value: parts.value,
         pending:
           ready.length !== mapping.filters.length ||
           (!byFaculty && readyNum.length !== mapping.numeratorFilters.length),
@@ -267,7 +295,18 @@ export function MappingCard({
             >
               <Select
                 value={mapping.columnKey}
-                onChange={(e) => onChange({ columnKey: e.target.value })}
+                onChange={(e) => {
+                  const columnKey = e.target.value;
+                  // Taking over the numerator's column — or dropping to a row
+                  // count — leaves nothing for it to mean, and the picker below
+                  // would render blank on a value it no longer offers.
+                  onChange({
+                    columnKey,
+                    ...(!columnKey || columnKey === mapping.numeratorColumnKey
+                      ? { numeratorColumnKey: "" }
+                      : {}),
+                  });
+                }}
               >
                 <option value="">
                   {isProportion ? "Count rows" : "Select a column…"}
@@ -335,10 +374,44 @@ export function MappingCard({
         />
 
         {isProportion && !byFaculty && (
-          <div className="mt-sm border-t border-hairline pt-md">
+          <div className="mt-sm flex flex-col gap-sm border-t border-hairline pt-md">
+            <div className="max-w-xs">
+              <Field
+                label="Numerator column"
+                hint={
+                  !mapping.columnKey
+                    ? "Pick a column above first — a column total has no row count to divide by."
+                    : "For fractions whose top and bottom are two different columns."
+                }
+              >
+                <Select
+                  value={mapping.numeratorColumnKey}
+                  disabled={!mapping.columnKey}
+                  onChange={(e) => onChange({ numeratorColumnKey: e.target.value })}
+                >
+                  <option value="">Same column as the denominator</option>
+                  {numberColumns
+                    .filter((c) => c.colKey !== mapping.columnKey)
+                    .map((c) => (
+                      <option key={c.id} value={c.colKey}>
+                        {c.label}
+                      </option>
+                    ))}
+                </Select>
+              </Field>
+            </div>
+
             <ConditionList
-              heading="Of those, count rows where…"
-              emptyText="Add at least one — without it the answer is always 100%."
+              heading={
+                twoColumn
+                  ? `Of those, total ${numeratorColumn!.label} where…`
+                  : "Of those, count rows where…"
+              }
+              emptyText={
+                twoColumn
+                  ? "No conditions — the whole population above is totalled on both columns."
+                  : "Add at least one — without it the answer is always 100%."
+              }
               filters={mapping.numeratorFilters}
               columns={columns}
               labels={labels}
@@ -384,9 +457,15 @@ export function MappingCard({
               <Badge tone={preview.matched > 0 ? "success" : "warning"}>
                 {byFaculty
                   ? `${preview.matched} rows ÷ ${headcount} faculty`
-                  : isProportion
-                    ? `${preview.numerator} of ${preview.matched} rows`
-                    : `${preview.matched} of ${preview.total} rows`}
+                  : // Row counts would mislead in two-column mode — the fraction
+                    // is two column totals, often over the very same rows.
+                    twoColumn &&
+                      preview.parts.numerator != null &&
+                      preview.parts.denominator != null
+                    ? `${formatNumber(preview.parts.numerator, 2)} of ${formatNumber(preview.parts.denominator, 2)}`
+                    : isProportion
+                      ? `${preview.numerator} of ${preview.matched} rows`
+                      : `${preview.matched} of ${preview.total} rows`}
               </Badge>{" "}
               {preview.pending
                 ? "· finish the condition to preview"

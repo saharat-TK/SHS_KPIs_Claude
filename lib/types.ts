@@ -670,6 +670,11 @@ export interface DataSourceLinkMapping {
   /** Narrows the numerator inside the population. percent_of / ratio_of with
    *  denominatorSource "rows" only; absent otherwise. */
   numeratorFilters?: DataSourceFilter[];
+  /** The column totalled on TOP of the fraction, when it differs from columnKey
+   *  (which stays the bottom) — e.g. employed ÷ graduates, two number columns of
+   *  the same row. percent_of / ratio_of with denominatorSource "rows" only;
+   *  absent ⇒ both sides total columnKey, and only the row set differs. */
+  numeratorColumnKey?: string | null;
   /** percent_of / ratio_of only. */
   denominatorSource?: DenominatorSource;
   /** Which ranks count toward the headcount, always further restricted to

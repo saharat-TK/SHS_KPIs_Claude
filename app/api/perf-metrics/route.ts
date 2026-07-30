@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
-import { PERF_METRIC_FIELDS } from "@/lib/kpi/fields";
+import { METRIC_QUARTER_PROGRESS_FIELDS, PERF_METRIC_FIELDS } from "@/lib/kpi/fields";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +26,7 @@ export async function GET(req: NextRequest) {
       [ids],
     );
     const [progress] = await pool.query<RowDataPacket[]>(
-      `SELECT perf_metric_id AS perfMetricId, year_no AS yearNo, quarter_no AS quarterNo,
-              progress_value AS progressValue, issue, solution
+      `SELECT perf_metric_id AS perfMetricId, ${METRIC_QUARTER_PROGRESS_FIELDS}
        FROM perf_metric_quarter_progress WHERE perf_metric_id IN (?)
        ORDER BY year_no, quarter_no`,
       [ids],
@@ -40,16 +39,13 @@ export async function GET(req: NextRequest) {
       targetsByMetric.set(t.perfMetricId, list);
     }
     const progressByMetric = new Map<number, RowDataPacket[]>();
-    for (const p of progress) {
-      const list = progressByMetric.get(p.perfMetricId) ?? [];
-      list.push({
-        yearNo: p.yearNo,
-        quarterNo: p.quarterNo,
-        progressValue: p.progressValue,
-        issue: p.issue,
-        solution: p.solution,
-      } as RowDataPacket);
-      progressByMetric.set(p.perfMetricId, list);
+    for (const { perfMetricId, ...row } of progress) {
+      const list = progressByMetric.get(perfMetricId) ?? [];
+      // Spread the row rather than re-listing its columns: the field list above
+      // is then the only place a new progress column has to be named. Re-listing
+      // is how the KPI record-list endpoint once silently dropped the variables.
+      list.push(row as RowDataPacket);
+      progressByMetric.set(perfMetricId, list);
     }
 
     const result = metrics.map((m) => ({
