@@ -178,7 +178,11 @@ export function ProgressPanel({
     switch (calculationType) {
       case "percent_of_total":
       case "ratio_of_total":
-        return { v1Label: "Total sub-KPI progress", v2Label: "Total sub-KPI target" };
+        return {
+          v1Label: "Total sub-KPI progress",
+          v2Label: "Total sub-KPI target",
+          reverseCards: true,
+        };
       case "simple_average":
         return { v1Label: "Total sub-KPI progress", v2Label: "Sub-KPIs with data" };
       case "weighted_sum":
@@ -383,6 +387,8 @@ export interface QuarterEntryVariables {
 export interface QuarterEntryComputedVariables {
   v1Label: string;
   v2Label: string;
+  /** Present the denominator-style target before the progress total. */
+  reverseCards?: boolean;
 }
 
 export function QuarterEntry({
@@ -648,13 +654,21 @@ export function QuarterEntry({
               : "grid-cols-1 sm:grid-cols-2",
           )}
         >
+          {computedVariables.reverseCards && existing.variable2Value != null && (
+            <StatCard
+              tone="soft"
+              className="shadow-chrome"
+              label={computedVariables.v2Label}
+              value={formatNumber(existing.variable2Value, 2)}
+            />
+          )}
           <StatCard
             tone="soft"
             className="shadow-chrome"
             label={computedVariables.v1Label}
             value={formatNumber(existing.variable1Value, 2)}
           />
-          {existing.variable2Value != null && (
+          {!computedVariables.reverseCards && existing.variable2Value != null && (
             <StatCard
               tone="soft"
               className="shadow-chrome"
