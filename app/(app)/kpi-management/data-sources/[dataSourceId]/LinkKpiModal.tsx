@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Button, Field, Input, Select } from "@/components/ui";
+import { Modal, Button, Field, Select } from "@/components/ui";
 import {
   useCreateDataSourceLink,
   useDataSourceColumns,
@@ -13,12 +13,11 @@ import {
   useStrategicSets,
   useUpdateDataSourceLink,
 } from "@/lib/data/hooks";
-import { unitNeedsDivisor } from "@/lib/kpi/progress";
+import { targetAllowsVariables } from "@/lib/kpi/progress";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
-import type { DataSourceLink, MappingSlot } from "@/lib/types";
+import type { DataSourceLink } from "@/lib/types";
 import {
-  MappingCard,
-  newMapping,
+  LinkMappingSection,
   toDraft,
   toPayload,
   type DraftMapping,
@@ -73,11 +72,12 @@ export function LinkKpiModal({
 
   // A percent/ratio KPI can be fed as two variables instead of one value.
   const selectedKpi = (kpisQ.data ?? []).find((k) => k.id === kpiId);
-  const allowsVariables =
-    !isEdit && !metricId && unitNeedsDivisor(selectedKpi?.unit ?? null);
-
-  const updateMapping = (key: string, patch: Partial<DraftMapping>) =>
-    setMappings((ms) => ms.map((m) => (m.key === key ? { ...m, ...patch } : m)));
+  const targetUnit = selectedKpi?.unit ?? null;
+  const allowsVariables = targetAllowsVariables({
+    isMetric: metricId > 0,
+    unit: targetUnit,
+    isEdit,
+  });
 
   const submitting = create.isPending || update.isPending;
   const valid = isEdit || kpiId > 0;
@@ -158,70 +158,18 @@ export function LinkKpiModal({
           />
         )}
 
-        <div className="border-t border-hairline pt-md">
-          <div className="mb-sm flex items-center justify-between">
-            <div>
-              <h3 className="text-label-md text-on-surface">Which rows count</h3>
-              <p className="text-caption-sm text-mute">
-                Matching rows are aggregated into the quarterly value, cumulatively
-                within each year.
-              </p>
-            </div>
-            {mappings.length < (allowsVariables ? 2 : 1) && (
-              <Button
-                size="sm"
-                variant="ghost"
-                icon="add"
-                onClick={() =>
-                  setMappings((ms) => [
-                    ...ms,
-                    newMapping(
-                      allowsVariables
-                        ? ms.some((m) => m.slot === "variable1")
-                          ? "variable2"
-                          : "variable1"
-                        : "value",
-                    ),
-                  ])
-                }
-              >
-                Add mapping
-              </Button>
-            )}
-          </div>
-
-          {columns.length === 0 ? (
-            <p className="text-body-sm text-mute">
-              This data source has no columns yet, so there is nothing to filter on.
-            </p>
-          ) : mappings.length === 0 ? (
-            <p className="text-body-sm text-mute">
-              No mapping — this link is evidence only and will not change any value.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-md">
-              {mappings.map((m) => (
-                <MappingCard
-                  key={m.key}
-                  mapping={m}
-                  columns={columns}
-                  entries={entries}
-                  labels={labels}
-                  faculty={facultyQ.data ?? []}
-                  allowsVariables={allowsVariables}
-                  onChange={(patch) => updateMapping(m.key, patch)}
-                  onRemove={() =>
-                    setMappings((ms) => ms.filter((x) => x.key !== m.key))
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <Field label="Note" hint="Optional — how this data supports the KPI.">
-          <Input value={note} onChange={(e) => setNote(e.target.value)} />
-        </Field>
+        <LinkMappingSection
+          mappings={mappings}
+          onChange={setMappings}
+          columns={columns}
+          entries={entries}
+          labels={labels}
+          faculty={facultyQ.data ?? []}
+          allowsVariables={allowsVariables}
+          targetUnit={targetUnit}
+          note={note}
+          onNote={setNote}
+        />
       </div>
     </Modal>
   );

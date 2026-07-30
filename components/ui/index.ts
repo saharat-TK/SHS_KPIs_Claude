@@ -8,6 +8,7 @@ export { UnitSelect } from "./UnitSelect";
 export { RadioGroup, type RadioOption } from "./RadioGroup";
 export { Tabs, type TabItem } from "./Tabs";
 export { Modal } from "./Modal";
+export { HoverPopover } from "./HoverPopover";
 export { StatCard } from "./StatCard";
 export { ThresholdBar, healthOf, HEALTH_LABEL, type Health } from "./ThresholdBar";
 export { StatusPill } from "./StatusPill";

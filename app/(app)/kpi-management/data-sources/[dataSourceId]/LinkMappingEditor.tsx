@@ -483,6 +483,123 @@ export function MappingCard({
   );
 }
 
+/** Everything both link modals show below their picker: the mapping list, the
+ *  button that adds one, and the note. The two modals choose opposite things —
+ *  a KPI for a source, or a source for a KPI — but what they build out of that
+ *  choice is identical, so it lives here rather than being kept in step by hand.
+ *
+ *  `allowsVariables` comes from targetAllowsVariables (lib/kpi/progress.ts) in
+ *  both callers; it decides whether this is a one-value or a two-variable feed,
+ *  and so how many mappings the button will add. */
+export function LinkMappingSection({
+  mappings,
+  onChange,
+  columns,
+  entries,
+  labels,
+  faculty,
+  allowsVariables,
+  targetUnit,
+  note,
+  onNote,
+  placeholder,
+}: {
+  mappings: DraftMapping[];
+  onChange: (mappings: DraftMapping[]) => void;
+  columns: DataSourceColumn[];
+  entries: {
+    id: number;
+    year: number;
+    quarter: number | null;
+    values: Record<string, unknown>;
+  }[];
+  labels: Record<string, string>;
+  faculty: FacultyRecord[];
+  allowsVariables: boolean;
+  /** Named in the two-variable tip. Null when the target has no unit. */
+  targetUnit: string | null;
+  note: string;
+  onNote: (note: string) => void;
+  /** Shown in place of the mapping controls when there is nothing to map yet —
+   *  the reverse modal has no data source until one is picked, and the
+   *  "no columns" copy below would misdescribe that. */
+  placeholder?: string;
+}) {
+  const addMapping = () =>
+    onChange([
+      ...mappings,
+      newMapping(
+        allowsVariables
+          ? mappings.some((m) => m.slot === "variable1")
+            ? "variable2"
+            : "variable1"
+          : "value",
+      ),
+    ]);
+
+  return (
+    <>
+      <div className="border-t border-hairline pt-md">
+        <div className="mb-sm flex items-center justify-between">
+          <div>
+            <h3 className="text-label-md text-on-surface">Which rows count</h3>
+            <p className="text-caption-sm text-mute">
+              Matching rows are aggregated into the quarterly value, cumulatively
+              within each year.
+            </p>
+          </div>
+          {!placeholder && mappings.length < (allowsVariables ? 2 : 1) && (
+            <Button size="sm" variant="ghost" icon="add" onClick={addMapping}>
+              Add mapping
+            </Button>
+          )}
+        </div>
+
+        {placeholder ? (
+          <p className="text-body-sm text-mute">{placeholder}</p>
+        ) : columns.length === 0 ? (
+          <p className="text-body-sm text-mute">
+            This data source has no columns yet, so there is nothing to filter on.
+          </p>
+        ) : mappings.length === 0 ? (
+          <p className="text-body-sm text-mute">
+            No mapping — this link is evidence only and will not change any value.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-md">
+            {mappings.map((m) => (
+              <MappingCard
+                key={m.key}
+                mapping={m}
+                columns={columns}
+                entries={entries}
+                labels={labels}
+                faculty={faculty}
+                allowsVariables={allowsVariables}
+                onChange={(patch) =>
+                  onChange(mappings.map((x) => (x.key === m.key ? { ...x, ...patch } : x)))
+                }
+                onRemove={() => onChange(mappings.filter((x) => x.key !== m.key))}
+              />
+            ))}
+          </div>
+        )}
+
+        {!placeholder && allowsVariables && mappings.length > 0 && (
+          <p className="mt-sm flex items-center gap-xs text-caption-sm text-mute">
+            <Badge tone="neutral">tip</Badge>A {targetUnit} target is fed as{" "}
+            {SLOT_LABELS.variable1} ÷ {SLOT_LABELS.variable2}.
+          </p>
+        )}
+      </div>
+
+      <Field label="Note" hint="Optional — how this data supports the KPI.">
+        <Input value={note} onChange={(e) => onNote(e.target.value)} />
+      </Field>
+    </>
+  );
+}
+
 /** One list of conditions plus its "Add condition" button. Rendered twice for
  *  the proportion kinds — once for the population, once for the numerator. */
 function ConditionList({

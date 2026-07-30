@@ -1045,6 +1045,10 @@ function invalidatePerformanceValues(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["perfKpis"] });
   qc.invalidateQueries({ queryKey: ["perfKpi"] });
   qc.invalidateQueries({ queryKey: ["perfMetrics"] });
+  // The set of linked sources changes with the link itself, and the performance
+  // page's Linked Data Sources section reads it — without this, creating,
+  // editing or removing a link there appears to do nothing until a reload.
+  qc.invalidateQueries({ queryKey: ["perfKpiSources"] });
 }
 
 /** "Linked · 12 quarters updated · 4 skipped (4 period closed)". The feed summary
@@ -1098,6 +1102,10 @@ export function useDeleteDataSourceLink() {
     onSuccess: (_d, { dataSourceId }) => {
       qc.invalidateQueries({ queryKey: qk.dataSourceLinks(dataSourceId) });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
+      // Values it already fed keep their last number, but what feeds them no
+      // longer does — so the perf slice (fedBy flags, the linked-sources list)
+      // is stale until it refetches.
+      invalidatePerformanceValues(qc);
     },
   });
 }
