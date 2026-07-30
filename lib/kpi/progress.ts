@@ -22,32 +22,6 @@ export function unitNeedsDivisor(unit: string | null): boolean {
   return u === "percent" || u === "ratio";
 }
 
-/**
- * Whether a data-source link's target may be fed as Variable 1 ÷ Variable 2
- * (two mappings) rather than as one value.
- *
- * KPI-only, deliberately. `library_metric` carries no variable1/variable2
- * definitions, and applyLink writes only the "value" slot for a metric target
- * (lib/kpi/dataSourceFeed.ts) — so a variable mapping on a metric saves
- * cleanly, reports quarters updated, and then stores NULL for every one of
- * them. Editing never offers it either: a link's slots are settled once it
- * exists, since its unique key is built on the target.
- *
- * Shared by both link modals (LinkKpiModal, LinkDataSourceModal) so the rule
- * cannot drift between the two directions of linking.
- */
-export function targetAllowsVariables({
-  isMetric,
-  unit,
-  isEdit = false,
-}: {
-  isMetric: boolean;
-  unit: string | null;
-  isEdit?: boolean;
-}): boolean {
-  return !isEdit && !isMetric && unitNeedsDivisor(unit);
-}
-
 /** Derive a leaf KPI's value from its entered variables per its unit:
  *  Percent → (V1/V2)*100, Ratio → V1/V2, any other unit → V1 (single variable). */
 export function kpiValueFromVariables(

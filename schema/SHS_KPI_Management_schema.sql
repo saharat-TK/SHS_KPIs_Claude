@@ -559,10 +559,13 @@ CREATE TABLE data_source_link (
   data_source_id    BIGINT UNSIGNED NOT NULL,
   library_kpi_id    BIGINT UNSIGNED NULL,
   library_metric_id BIGINT UNSIGNED NULL,
-  -- How the matching rows become a number (decision D5). Array of 1-2 mappings:
-  --   [{ slot, aggregation, columnKey, filters: [{ field, operator, value, valueTo }] }]
-  -- slot: 'value' | 'variable1' | 'variable2'  (two slots feed a percent/ratio KPI)
+  -- How the matching rows become a number (decision D5). A single-element array:
+  --   [{ aggregation, columnKey, filters: [{ field, operator, value, valueTo }] }]
   -- field: a data_source_column.col_key, or '__period' for the entry's own year/quarter
+  -- A percent/ratio target uses aggregation 'percent_of' / 'ratio_of', which carries
+  -- both sides of the fraction; the feed stores its numerator/denominator in the
+  -- target's variable1_value / variable2_value. Rows written before that consolidation
+  -- also carried a 'slot' key — see scripts/migrate-link-value-slots.mjs.
   -- Validated by validateMappings() in lib/kpi/dataSourceFilters.ts before write.
   mappings          JSON NULL,
   note              VARCHAR(1000) NULL,

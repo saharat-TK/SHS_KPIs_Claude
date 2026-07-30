@@ -391,17 +391,13 @@ test("validateMappings refuses in on a column type that does not support it", ()
   );
 });
 
-test("validateMappings rejects two mappings feeding the same slot", () => {
+test("validateMappings rejects a second mapping", () => {
+  // One mapping in, one number out. A fraction lives inside a percent_of /
+  // ratio_of mapping, not across two — see tests/linkMappingShape.test.mjs.
   assert.throws(
     () => validateMappings(COLUMNS, "quarterly", [mapping(), mapping()]),
-    /Two mappings both feed "value"/,
+    /single mapping/,
   );
-  // Two different slots are the percent/ratio case and must be allowed.
-  const ok = validateMappings(COLUMNS, "quarterly", [
-    mapping({ slot: "variable1" }),
-    mapping({ slot: "variable2" }),
-  ]);
-  assert.equal(ok.length, 2);
 });
 
 test("validateMappings widens a period range to whole years for annual sources", () => {

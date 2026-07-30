@@ -98,11 +98,13 @@ changes — not when the user saves the parent's issue/solution.**
 from the feed (`is_computed = 1`, `value_source = 'data_source'`) and is read-only
 in the UI.
 
-**Every path fills the variable columns.** A link mapped to `variable1` /
-`variable2` stores those two aggregations directly; a link mapped to the single
-`value` slot stores the aggregation's own parts instead — `aggregateParts()` in
+**Every path fills the variable columns.** A link carries one mapping, and that
+mapping already knows what it divided — `aggregateParts()` in
 `lib/kpi/dataSourceFilters.ts` returns the numerator and denominator alongside
-the result (a proportion's population, an average's row count, and so on).
+the result (a proportion's two sides, an average's total and row count, and so
+on). Those parts are what the feed stores in `variable1_value` /
+`variable2_value`, so a fed percent reads with the same basis a hand-entered one
+would: "96 of 120 → 80%".
 
 **Metric** — `perf_metric_quarter_progress`. A fed metric stores the same three
 numbers (`progress_value` + the pair, `is_computed = 1`), and
@@ -115,10 +117,14 @@ not strip the pair it is still the basis for. There is **no `value_source`
 column** here: two engines write the table and `is_computed` already separates
 them.
 
-A metric only ever takes the single `value` slot. `library_metric` has no
-variable definitions to map two aggregations onto, so a two-part fraction is
-expressed inside one mapping instead — `numeratorColumnKey` totals the top on a
-different column from the bottom (employed ÷ graduates, both on the same row).
+Every link — KPI or metric — carries exactly one mapping, so a two-part fraction
+is expressed inside it: `percent_of` / `ratio_of` with `numeratorColumnKey`
+totals the top on a different column from the bottom (employed ÷ graduates, both
+on the same row), or with `denominatorSource: "faculty"` divides by the roster
+headcount. Links once carried a `slot` naming which of the target's numbers they
+fed (`value`, or the pair `variable1`/`variable2`); the pair said nothing the
+proportion kinds do not, and every link that used it was misconfigured into
+storing NULL. `scripts/migrate-link-value-slots.mjs` collapsed the stored ones.
 
 `value_source` exists because `is_computed` cannot separate a roll-up from a
 feed. It also marks the one provenance under which the stored pair is

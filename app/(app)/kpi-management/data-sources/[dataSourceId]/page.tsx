@@ -458,9 +458,6 @@ function LinksTable({
                   <div className="flex flex-col gap-xxs">
                     {l.mappings.map((m, i) => (
                       <span key={i} className="text-caption-sm">
-                        {m.slot !== "value" && (
-                          <Badge tone="neutral">{m.slot}</Badge>
-                        )}{" "}
                         {describeMapping(m, columns, cellLabels)}
                       </span>
                     ))}

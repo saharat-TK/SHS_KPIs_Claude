@@ -16,7 +16,6 @@ import type { AggregateParts } from "@/lib/kpi/dataSourceFilters";
 import { aggregateParts, matchesFilters } from "@/lib/kpi/dataSourceFilters";
 import { isApprovalDataLocked } from "@/lib/kpi/approvalWorkflow";
 import { getApprovalState } from "@/lib/kpi/approvalServer";
-import { kpiValueFromVariables } from "@/lib/kpi/progress";
 import { facultyHeadcount } from "@/lib/kpi/facultyHeadcount";
 import { ACADEMIC_RANKS } from "@/lib/types";
 import {
@@ -243,40 +242,39 @@ async function applyLink(
           continue;
         }
 
-        const values = new Map<string, AggregateParts>();
-        for (const mapping of link.mappings) {
-          const matched = rows.filter((e) => matchesFilters(e, columns, mapping.filters));
-          // A faculty denominator makes `matched` the numerator outright; only
-          // the rows-mode proportion narrows further, and it narrows within
-          // `matched` so the numerator stays a subset of the denominator. With a
-          // numerator column the two sides can share every row and still differ,
-          // so an empty condition list is no longer "nothing to divide".
-          const proportion =
-            mapping.denominatorSource === "faculty"
-              ? { denominator: facultyHeadcount(roster, mapping.facultyRanks ?? ACADEMIC_RANKS) }
-              : mapping.numeratorFilters?.length || mapping.numeratorColumnKey
-                ? {
-                    numerator: mapping.numeratorFilters?.length
-                      ? matched.filter((e) =>
-                          matchesFilters(e, columns, mapping.numeratorFilters!),
-                        )
-                      : matched,
-                    numeratorColumnKey: mapping.numeratorColumnKey ?? null,
-                  }
-                : undefined;
-          values.set(
-            mapping.slot,
-            aggregateParts(mapping.aggregation, mapping.columnKey, matched, proportion),
-          );
-        }
+        // One mapping per link, so one aggregation per quarter. It already
+        // carries its own numerator and denominator (a proportion's two sides,
+        // an average's total and row count), which is what both progress tables
+        // record alongside the value.
+        const mapping = link.mappings[0];
+        const matched = rows.filter((e) => matchesFilters(e, columns, mapping.filters));
+        // A faculty denominator makes `matched` the numerator outright; only
+        // the rows-mode proportion narrows further, and it narrows within
+        // `matched` so the numerator stays a subset of the denominator. With a
+        // numerator column the two sides can share every row and still differ,
+        // so an empty condition list is no longer "nothing to divide".
+        const proportion =
+          mapping.denominatorSource === "faculty"
+            ? { denominator: facultyHeadcount(roster, mapping.facultyRanks ?? ACADEMIC_RANKS) }
+            : mapping.numeratorFilters?.length || mapping.numeratorColumnKey
+              ? {
+                  numerator: mapping.numeratorFilters?.length
+                    ? matched.filter((e) =>
+                        matchesFilters(e, columns, mapping.numeratorFilters!),
+                      )
+                    : matched,
+                  numeratorColumnKey: mapping.numeratorColumnKey ?? null,
+                }
+              : undefined;
+        const parts: AggregateParts = aggregateParts(
+          mapping.aggregation,
+          mapping.columnKey,
+          matched,
+          proportion,
+        );
 
         if (target.perfMetricId != null) {
-          // A metric takes the single "value" slot only (it has no variable
-          // definitions to map two aggregations onto), but that slot still
-          // divided something — so store its numerator/denominator, the same
-          // reasoning as the KPI branch below. The parent KPI derives its own
-          // pair from the roll-up, not from these.
-          const parts = values.get("value") ?? null;
+          // The parent KPI derives its own pair from the roll-up, not from these.
           await conn.query(
             `INSERT INTO perf_metric_quarter_progress
                (perf_metric_id, year_no, quarter_no, progress_value,
@@ -289,33 +287,17 @@ async function applyLink(
               target.perfMetricId,
               yearNo,
               quarterNo,
-              parts?.value ?? null,
-              parts?.numerator ?? null,
-              parts?.denominator ?? null,
+              parts.value,
+              parts.numerator,
+              parts.denominator,
             ],
           );
           // Let the existing roll-up carry the change up to the parent KPI.
           await recomputeKpiQuarter(conn, target.perfKpiId, yearNo, quarterNo);
         } else {
-          // Two mapped slots carry their own dividend and divisor; a single
-          // "value" slot still divided something internally (a proportion's
-          // population, an average's row count), so store the aggregation's own
-          // numerator/denominator rather than leaving the columns empty.
-          let progress: number | null;
-          let v1: number | null;
-          let v2: number | null;
-          if (values.has("variable1") || values.has("variable2")) {
-            v1 = values.get("variable1")?.value ?? null;
-            v2 = values.get("variable2")?.value ?? null;
-            // Derive with the same helper the entry form previews with, so the
-            // stored number always matches what a human would have seen.
-            progress = kpiValueFromVariables(target.unit, v1, v2);
-          } else {
-            const parts = values.get("value") ?? null;
-            progress = parts?.value ?? null;
-            v1 = parts?.numerator ?? null;
-            v2 = parts?.denominator ?? null;
-          }
+          // The aggregation's own numerator/denominator ARE the KPI's Variable 1
+          // and Variable 2 — "96 of 120 → 80%" — so a fed percent reads with the
+          // same basis a hand-entered one would.
           await conn.query(
             `INSERT INTO perf_kpi_quarter_progress
                (perf_kpi_id, year_no, quarter_no, progress_value, variable1_value, variable2_value,
@@ -325,7 +307,14 @@ async function applyLink(
                variable1_value = VALUES(variable1_value),
                variable2_value = VALUES(variable2_value),
                is_computed = 1, value_source = 'data_source'`,
-            [target.perfKpiId, yearNo, quarterNo, progress, v1, v2],
+            [
+              target.perfKpiId,
+              yearNo,
+              quarterNo,
+              parts.value,
+              parts.numerator,
+              parts.denominator,
+            ],
           );
         }
         outcome.updated += 1;

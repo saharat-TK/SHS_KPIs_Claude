@@ -17,7 +17,6 @@ import {
   useAcademicCatalog,
   useUpdateDataSourceLink,
 } from "@/lib/data/hooks";
-import { targetAllowsVariables } from "@/lib/kpi/progress";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import type { DataSourceLink, PerfKpi, PerfMetric } from "@/lib/types";
 import {
@@ -90,15 +89,9 @@ export function LinkDataSourceModal({
   const targetMissing =
     !isEdit && (metricId > 0 ? targetLibraryMetricId == null : targetLibraryKpiId == null);
 
-  // A percent/ratio target can be fed as two variables instead of one value —
-  // KPI targets only. Same helper the data-sources modal uses, so the rule is
-  // identical whichever direction you link from.
+  // Only used for the tip naming the aggregation that divides — the mapping
+  // itself is the same shape whichever part of the KPI is fed.
   const targetUnit = (selectedMetric ? selectedMetric.unit : kpi.unit) ?? null;
-  const allowsVariables = targetAllowsVariables({
-    isMetric: metricId > 0,
-    unit: targetUnit,
-    isEdit,
-  });
 
   const alreadyLinked =
     !isEdit && dataSourceId > 0 && linkedSourceIds.includes(dataSourceId);
@@ -238,7 +231,6 @@ export function LinkDataSourceModal({
           entries={entries}
           labels={labels}
           faculty={facultyQ.data ?? []}
-          allowsVariables={allowsVariables}
           targetUnit={targetUnit}
           note={note}
           onNote={setNote}

@@ -13,7 +13,6 @@ import {
   useStrategicSets,
   useUpdateDataSourceLink,
 } from "@/lib/data/hooks";
-import { targetAllowsVariables } from "@/lib/kpi/progress";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import type { DataSourceLink } from "@/lib/types";
 import {
@@ -70,14 +69,9 @@ export function LinkKpiModal({
     }
   }, [open, link]);
 
-  // A percent/ratio KPI can be fed as two variables instead of one value.
-  const selectedKpi = (kpisQ.data ?? []).find((k) => k.id === kpiId);
-  const targetUnit = selectedKpi?.unit ?? null;
-  const allowsVariables = targetAllowsVariables({
-    isMetric: metricId > 0,
-    unit: targetUnit,
-    isEdit,
-  });
+  // Only used for the tip naming the aggregation that divides — the mapping
+  // itself is the same shape for every target.
+  const targetUnit = (kpisQ.data ?? []).find((k) => k.id === kpiId)?.unit ?? null;
 
   const submitting = create.isPending || update.isPending;
   const valid = isEdit || kpiId > 0;
@@ -165,7 +159,6 @@ export function LinkKpiModal({
           entries={entries}
           labels={labels}
           faculty={facultyQ.data ?? []}
-          allowsVariables={allowsVariables}
           targetUnit={targetUnit}
           note={note}
           onNote={setNote}

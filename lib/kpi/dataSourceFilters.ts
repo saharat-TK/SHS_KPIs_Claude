@@ -7,7 +7,6 @@ import type {
   DataSourcePeriodGrain,
   DenominatorSource,
   FilterOperator,
-  MappingSlot,
   Rank,
 } from "@/lib/types";
 
@@ -402,19 +401,14 @@ export function validateMappings(
 ): DataSourceLinkMapping[] {
   if (raw === null || raw === undefined) return [];
   if (!Array.isArray(raw)) throw invalid("mappings must be a list");
-  if (raw.length > 2) throw invalid("A link can carry at most two mappings");
+  // One number in, one number out. A fraction is a percent_of / ratio_of
+  // mapping, not two mappings — see DataSourceLinkMapping.
+  if (raw.length > 1) throw invalid("A link carries a single mapping");
+  rejectLegacySlot(raw[0]);
 
   const byKey = new Map(columns.map((c) => [c.colKey, c]));
-  const seenSlots = new Set<string>();
 
   return raw.map((m) => {
-    const slot = (m?.slot ?? "value") as MappingSlot;
-    if (!["value", "variable1", "variable2"].includes(slot)) {
-      throw invalid(`Unknown mapping target "${slot}"`);
-    }
-    if (seenSlots.has(slot)) throw invalid(`Two mappings both feed "${slot}"`);
-    seenSlots.add(slot);
-
     const aggregation = m?.aggregation as AggregationKind;
     if (!AGGREGATION_KINDS.includes(aggregation)) {
       throw invalid(`Unknown aggregation "${m?.aggregation}"`);
@@ -439,7 +433,6 @@ export function validateMappings(
 
     const filters = Array.isArray(m?.filters) ? m.filters : [];
     const mapping: DataSourceLinkMapping = {
-      slot,
       aggregation,
       columnKey,
       filters: filters.map((f: DataSourceFilter) =>
@@ -515,6 +508,21 @@ export function validateMappings(
 
     return mapping;
   });
+}
+
+/** Links used to carry a "slot" naming which of the target's numbers a mapping
+ *  fed ("value", or the pair "variable1"/"variable2"). The pair is gone —
+ *  percent_of / ratio_of express the same fraction in one mapping — and
+ *  scripts/migrate-link-value-slots.mjs rewrote the stored ones. Anything still
+ *  asking for a variable slot is refused rather than quietly read as the value,
+ *  which would change what the link means. */
+function rejectLegacySlot(m: unknown): void {
+  const slot = (m as { slot?: string })?.slot;
+  if (slot != null && slot !== "value") {
+    throw invalid(
+      `Mappings no longer take a "${slot}" target — use Percent of / Ratio of to divide one column by another`,
+    );
+  }
 }
 
 function validateFilter(

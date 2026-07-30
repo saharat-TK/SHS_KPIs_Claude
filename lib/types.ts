@@ -648,16 +648,18 @@ export type AggregationKind =
   | "percent_of"
   | "ratio_of";
 
-/** Where the aggregated number lands on the target. A percent/ratio KPI takes
- *  two mappings (variable1 = dividend, variable2 = divisor); everything else
- *  takes one "value". */
-export type MappingSlot = "value" | "variable1" | "variable2";
-
 /** Where a proportion's denominator comes from. Absent ⇒ "rows". */
 export type DenominatorSource = "rows" | "faculty";
 
+/** How a link turns matching rows into one number. Exactly one per link.
+ *
+ *  There is no separate dividend/divisor pair: percent_of and ratio_of already
+ *  return the value together with the numerator and denominator that produced
+ *  it (aggregateParts), which is what perf_*_quarter_progress stores in
+ *  progress_value / variable1_value / variable2_value. A second mapping would
+ *  be a redundant way to say the same thing — see
+ *  scripts/migrate-link-value-slots.mjs for the "slot" field it replaced. */
 export interface DataSourceLinkMapping {
-  slot: MappingSlot;
   aggregation: AggregationKind;
   /** The column being aggregated. Null (and unused) when aggregation is "count".
    *  Optional for percent_of / ratio_of, which fall back to counting rows. */
