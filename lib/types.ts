@@ -452,10 +452,16 @@ export interface QuarterProgress {
   yearNo: number; // 1..5
   quarterNo: number; // 1..4
   progressValue: number | null;
-  /** Raw KPI-variable inputs for leaf KPIs; progressValue is derived from them. */
+  /** The numerator and denominator behind progressValue, whichever engine
+   *  produced the row (see valueSource). variable2Value is null when that
+   *  engine had no divisor. Only a 'manual' row can be re-derived with
+   *  kpiValueFromVariables — the computed pairs follow calculation_type /
+   *  the aggregation kind, not the KPI's unit. */
   variable1Value?: number | null;
   variable2Value?: number | null;
   isComputed?: boolean;
+  /** Which engine wrote this row. isComputed cannot tell the last two apart. */
+  valueSource?: "manual" | "rollup" | "data_source";
   issue: string | null;
   solution: string | null;
   quarterTarget?: number; // derived

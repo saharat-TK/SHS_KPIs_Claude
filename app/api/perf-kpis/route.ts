@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
-import { PERF_KPI_FIELDS } from "@/lib/kpi/fields";
+import { KPI_QUARTER_PROGRESS_FIELDS, PERF_KPI_FIELDS } from "@/lib/kpi/fields";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +29,7 @@ export async function GET(req: NextRequest) {
       [ids],
     );
     const [progress] = await pool.query<RowDataPacket[]>(
-      `SELECT perf_kpi_id AS perfKpiId, year_no AS yearNo, quarter_no AS quarterNo,
-              progress_value AS progressValue, is_computed AS isComputed, issue, solution
+      `SELECT perf_kpi_id AS perfKpiId, ${KPI_QUARTER_PROGRESS_FIELDS}
        FROM perf_kpi_quarter_progress WHERE perf_kpi_id IN (?)
        ORDER BY year_no, quarter_no`,
       [ids],
@@ -49,7 +48,10 @@ export async function GET(req: NextRequest) {
         yearNo: p.yearNo,
         quarterNo: p.quarterNo,
         progressValue: p.progressValue,
+        variable1Value: p.variable1Value,
+        variable2Value: p.variable2Value,
         isComputed: p.isComputed,
+        valueSource: p.valueSource,
         issue: p.issue,
         solution: p.solution,
       } as RowDataPacket);

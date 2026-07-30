@@ -1,6 +1,23 @@
 import { cn } from "@/lib/utils";
+import { HEALTH_SURFACE } from "@/lib/kpi/progress";
 import { Icon } from "./Icon";
 import { Card } from "./Card";
+
+// Fill + label/unit colour, kept paired: a tinted card needs its muted text
+// darkened to stay legible (text-mute on any of these fills is only ~3.7:1,
+// under AA for 12-13px, while each pairing below clears 6:1). The value itself
+// stays text-on-surface — near-black is the most readable on all five fills.
+//
+// healthy/watch/at_risk come from HEALTH_SURFACE (lib/kpi/progress.ts) — the
+// same Badge success/warning/error tones the Threshold sidebar card uses, kept
+// in one place rather than duplicated per consumer. `soft` is StatCard's own
+// paler derivative of healthy, for grouping cards that carry no status —
+// deliberately lighter than every status tint so it is never mistaken for one.
+const TONES = {
+  default: { card: "", muted: "text-mute" },
+  soft: { card: "!bg-[#f2f8ea] !border-[#cfe3b4]", muted: "text-[#2f6500]" },
+  ...HEALTH_SURFACE,
+} as const;
 
 export function StatCard({
   label,
@@ -8,6 +25,7 @@ export function StatCard({
   unit,
   delta,
   icon,
+  tone = "default",
   className,
 }: {
   label: string;
@@ -15,8 +33,12 @@ export function StatCard({
   unit?: string;
   delta?: { value: string; direction: "up" | "down" | "flat" };
   icon?: string;
+  /** Tints the card: "soft" to group status-free stats, or a Health value to
+   *  show threshold status. Omit for the plain white card. */
+  tone?: keyof typeof TONES;
   className?: string;
 }) {
+  const toneClasses = TONES[tone];
   const dirColor =
     delta?.direction === "up"
       ? "text-success"
@@ -31,14 +53,14 @@ export function StatCard({
         : "trending_flat";
 
   return (
-    <Card className={cn("p-lg flex flex-col gap-sm", className)}>
+    <Card className={cn("p-lg flex flex-col gap-sm", toneClasses.card, className)}>
       <div className="flex items-center justify-between">
-        <span className="text-label-md text-mute">{label}</span>
+        <span className={cn("text-label-md", toneClasses.muted)}>{label}</span>
         {icon && <Icon name={icon} size={20} className="text-primary" />}
       </div>
       <div className="flex items-end gap-xs">
         <span className="text-display-md text-on-surface leading-none">{value}</span>
-        {unit && <span className="text-body-sm text-mute mb-tiny">{unit}</span>}
+        {unit && <span className={cn("text-body-sm mb-tiny", toneClasses.muted)}>{unit}</span>}
       </div>
       {delta && (
         <span className={cn("inline-flex items-center gap-xs text-caption-sm", dirColor)}>

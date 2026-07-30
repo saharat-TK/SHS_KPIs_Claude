@@ -3,17 +3,24 @@
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import type { QuarterlyTargetMode } from "@/lib/types";
 
+interface RollupRow {
+  weight: number;
+  value: number | null;
+  target?: number | null;
+}
+
 // Pooled ratio: totals on both sides, so a metric counts only if it has both a
 // progress value and a usable target — otherwise it would skew the ratio by
-// contributing to one side but not the other.
-function pooledRatio(
-  rows: { value: number | null; target?: number | null }[],
-): number | null {
+// contributing to one side but not the other. Null when nothing is usable,
+// i.e. when there is no denominator to divide by at all.
+function pooledParts(
+  rows: RollupRow[],
+): { numerator: number; denominator: number } | null {
   const usable = rows.filter((r) => r.value != null && r.target != null && r.target !== 0);
   if (usable.length === 0) return null;
-  const totalTarget = usable.reduce((a, r) => a + r.target!, 0);
-  if (totalTarget === 0) return null;
-  return usable.reduce((a, r) => a + r.value!, 0) / totalTarget;
+  const denominator = usable.reduce((a, r) => a + r.target!, 0);
+  if (denominator === 0) return null;
+  return { numerator: usable.reduce((a, r) => a + r.value!, 0), denominator };
 }
 
 // Plain sum of the present child values. Fallback for the pooled ratio/percent
@@ -25,40 +32,78 @@ function sumOfValues(rows: { value: number | null }[]): number | null {
   return present.reduce((a, r) => a + r.value!, 0);
 }
 
-// Roll-up of child metric values for one quarter, per the KPI's calculation
-// type. Nulls (metrics not yet entered) are excluded. custom_formula is not
-// auto-computed here (its variables aren't tied to metrics) → returns null.
-export function rollup(
-  calcType: string,
-  rows: { weight: number; value: number | null; target?: number | null }[],
-): number | null {
+/** A roll-up result plus the two numbers it was derived from, stored on the
+ *  quarter row as variable1_value / variable2_value so a computed KPI can show
+ *  "115 of 150" behind its 76.7%. variable2 is null when the calculation has no
+ *  divisor at all. */
+export interface RollupParts {
+  value: number | null;
+  variable1: number | null;
+  variable2: number | null;
+}
+
+const NO_PARTS: RollupParts = { value: null, variable1: null, variable2: null };
+
+/**
+ * Roll-up of child metric values for one quarter, per the KPI's calculation
+ * type, together with the numerator/denominator behind it. Nulls (metrics not
+ * yet entered) are excluded. custom_formula is not auto-computed here (its
+ * variables aren't tied to metrics) → all three come back null.
+ *
+ *   percent_of_total  V1 = Σ usable values, V2 = Σ usable targets, value = V1/V2*100
+ *   ratio_of_total    V1 = Σ usable values, V2 = Σ usable targets, value = V1/V2
+ *   …either, no usable target (fallback)   V1 = Σ present values, V2 = null, value = V1
+ *   simple_average    V1 = Σ present values, V2 = how many had one, value = V1/V2
+ *   weighted_sum      V1 = Σ (weight/100 × value), V2 = null, value = V1
+ *
+ * IMPORTANT: these pairs are driven by calculation_type, NOT by the KPI's unit,
+ * so — unlike a hand-entered row — they are not re-derivable through
+ * kpiValueFromVariables(unit, v1, v2). The two pooled types happen to coincide
+ * with it, but simple_average on a 'percent' unit is V1/V2 with no ×100. Never
+ * run kpiValueFromVariables on a row whose value_source isn't 'manual'.
+ */
+export function rollupParts(calcType: string, rows: RollupRow[]): RollupParts {
   // ratio_of_total / percent_of_total pool progress over targets. When no
   // metric has a usable target (all missing or zero) there is no denominator,
   // so fall back to a plain sum of the child values. The percent variant does
   // NOT scale the fallback by 100 — a plain sum is not a fraction to convert.
-  if (calcType === "ratio_of_total") {
-    const ratio = pooledRatio(rows);
-    return ratio === null ? sumOfValues(rows) : ratio;
-  }
-  if (calcType === "percent_of_total") {
-    const ratio = pooledRatio(rows);
-    return ratio === null ? sumOfValues(rows) : ratio * 100;
+  if (calcType === "ratio_of_total" || calcType === "percent_of_total") {
+    const pooled = pooledParts(rows);
+    if (pooled !== null) {
+      const ratio = pooled.numerator / pooled.denominator;
+      return {
+        value: calcType === "percent_of_total" ? ratio * 100 : ratio,
+        variable1: pooled.numerator,
+        variable2: pooled.denominator,
+      };
+    }
+    const sum = sumOfValues(rows);
+    return { value: sum, variable1: sum, variable2: null };
   }
 
   const present = rows.filter((r) => r.value != null) as { weight: number; value: number }[];
-  if (present.length === 0) return null;
+  if (present.length === 0) return NO_PARTS;
   if (calcType === "simple_average") {
-    return present.reduce((a, r) => a + r.value, 0) / present.length;
+    const total = present.reduce((a, r) => a + r.value, 0);
+    return { value: total / present.length, variable1: total, variable2: present.length };
   }
   if (calcType === "weighted_sum") {
-    // Percent-weighted sum: each weight is a percentage contribution.
-    return present.reduce((a, r) => a + (r.weight / 100) * r.value, 0);
+    // Percent-weighted sum: each weight is a percentage contribution. Nothing
+    // divides it, so the weighted total IS the value.
+    const total = present.reduce((a, r) => a + (r.weight / 100) * r.value, 0);
+    return { value: total, variable1: total, variable2: null };
   }
-  return null;
+  return NO_PARTS;
+}
+
+/** The roll-up value alone — see rollupParts for the semantics. */
+export function rollup(calcType: string, rows: RollupRow[]): number | null {
+  return rollupParts(calcType, rows).value;
 }
 
 // Recompute a has_children KPI's progress for one (year, quarter) from its
-// child metrics and write it back with is_computed=1, leaving the KPI's own
+// child metrics and write it back with is_computed=1 and value_source='rollup',
+// alongside the numerator/denominator it divided, leaving the KPI's own
 // issue/solution untouched. No-op for leaf KPIs.
 export async function recomputeKpiQuarter(
   conn: PoolConnection,
@@ -87,7 +132,7 @@ export async function recomputeKpiQuarter(
       WHERE m.perf_kpi_id = ?`,
     [yearNo, quarterNo, yearNo, perfKpiId],
   );
-  const value = rollup(kpiRows[0].calculation_type, metricRows.map((r) => {
+  const parts = rollupParts(kpiRows[0].calculation_type, metricRows.map((r) => {
     // Mirror lib/kpi/progress.ts#quarterTargetFor. Kept inline (not imported)
     // so this server module has no runtime cross-import for the test runner.
     const annual = r.annualTarget == null ? null : Number(r.annualTarget);
@@ -101,10 +146,14 @@ export async function recomputeKpiQuarter(
   }));
 
   await conn.query(
-    `INSERT INTO perf_kpi_quarter_progress (perf_kpi_id, year_no, quarter_no, progress_value, is_computed)
-     VALUES (?, ?, ?, ?, 1)
-     ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value), is_computed = 1`,
-    [perfKpiId, yearNo, quarterNo, value],
+    `INSERT INTO perf_kpi_quarter_progress
+       (perf_kpi_id, year_no, quarter_no, progress_value, variable1_value, variable2_value,
+        is_computed, value_source)
+     VALUES (?, ?, ?, ?, ?, ?, 1, 'rollup')
+     ON DUPLICATE KEY UPDATE progress_value = VALUES(progress_value),
+       variable1_value = VALUES(variable1_value), variable2_value = VALUES(variable2_value),
+       is_computed = 1, value_source = 'rollup'`,
+    [perfKpiId, yearNo, quarterNo, parts.value, parts.variable1, parts.variable2],
   );
 }
 

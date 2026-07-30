@@ -274,7 +274,20 @@ function numericCells(
   return out;
 }
 
-/** Reduce the matching entries to one number.
+/** An aggregation result plus the two numbers behind it, so a KPI fed from a
+ *  data source can store what it divided in variable1_value / variable2_value.
+ *  `denominator` is null for the kinds that have no divisor. The parts stay
+ *  populated even when `value` is null (a zero denominator, say) — they are the
+ *  record of what was found, not of what could be computed. */
+export interface AggregateParts {
+  value: number | null;
+  numerator: number | null;
+  denominator: number | null;
+}
+
+const NO_PARTS: AggregateParts = { value: null, numerator: null, denominator: null };
+
+/** Reduce the matching entries to one number, plus its numerator/denominator.
  *
  *  `count` always yields a number (zero rows is a meaningful zero). The others
  *  yield null when no row carries a usable value, so the KPI shows "—" rather
@@ -288,6 +301,80 @@ function numericCells(
  *   - `denominator` — a fixed divisor (a faculty headcount) that replaces
  *     `entries` on the bottom; then `entries` IS the numerator, because the
  *     mapping's filters selected those rows directly. Wins over `numerator`. */
+export function aggregateParts(
+  kind: AggregationKind,
+  columnKey: string | null,
+  entries: FilterableEntry[],
+  proportion?: {
+    numerator?: FilterableEntry[];
+    denominator?: number | null;
+  },
+): AggregateParts {
+  if (kind === "percent_of" || kind === "ratio_of") {
+    // No column → proportion of rows; with one → proportion of its total.
+    const total = (rows: FilterableEntry[]) =>
+      columnKey ? numericCells(rows, columnKey).reduce((s, n) => s + n, 0) : rows.length;
+
+    const fixed = proportion?.denominator;
+    if (fixed !== undefined) {
+      const numerator = total(entries);
+      // Nobody to divide by is "—", not a divide-by-zero or a misleading 0.
+      if (fixed == null || fixed === 0) {
+        return { value: null, numerator, denominator: fixed ?? null };
+      }
+      const ratio = numerator / fixed;
+      return {
+        value: kind === "percent_of" ? ratio * 100 : ratio,
+        numerator,
+        denominator: fixed,
+      };
+    }
+
+    const subset = proportion?.numerator;
+    if (!subset) return NO_PARTS;
+    const denominator = total(entries);
+    const numerator = total(subset);
+    // An empty population — or a column summing to zero — has no proportion.
+    if (denominator === 0) return { value: null, numerator, denominator };
+    const ratio = numerator / denominator;
+    return {
+      value: kind === "percent_of" ? ratio * 100 : ratio,
+      numerator,
+      denominator,
+    };
+  }
+
+  if (kind === "count") {
+    return { value: entries.length, numerator: entries.length, denominator: null };
+  }
+  if (!columnKey) return NO_PARTS;
+
+  if (kind === "latest") {
+    const withValue = entries.filter((e) => {
+      const v = e.values[columnKey];
+      return v !== null && v !== undefined && v !== "";
+    });
+    if (withValue.length === 0) return NO_PARTS;
+    // Newest by period, then by insertion order for same-period rows.
+    const newest = withValue.reduce((best, e) => {
+      const a = periodOrdinal(e.year, e.quarter);
+      const b = periodOrdinal(best.year, best.quarter);
+      return a > b || (a === b && e.id > best.id) ? e : best;
+    });
+    const n = Number(newest.values[columnKey]);
+    return Number.isFinite(n) ? { value: n, numerator: n, denominator: null } : NO_PARTS;
+  }
+
+  const nums = numericCells(entries, columnKey);
+  if (nums.length === 0) return NO_PARTS;
+  const total = nums.reduce((s, n) => s + n, 0);
+  // An average divides the summed column by how many rows carried a number.
+  return kind === "avg"
+    ? { value: total / nums.length, numerator: total, denominator: nums.length }
+    : { value: total, numerator: total, denominator: null };
+}
+
+/** The aggregated value alone — see aggregateParts for the semantics. */
 export function aggregate(
   kind: AggregationKind,
   columnKey: string | null,
@@ -297,51 +384,7 @@ export function aggregate(
     denominator?: number | null;
   },
 ): number | null {
-  if (kind === "percent_of" || kind === "ratio_of") {
-    // No column → proportion of rows; with one → proportion of its total.
-    const total = (rows: FilterableEntry[]) =>
-      columnKey ? numericCells(rows, columnKey).reduce((s, n) => s + n, 0) : rows.length;
-
-    const fixed = proportion?.denominator;
-    if (fixed !== undefined) {
-      // Nobody to divide by is "—", not a divide-by-zero or a misleading 0.
-      if (fixed == null || fixed === 0) return null;
-      const ratio = total(entries) / fixed;
-      return kind === "percent_of" ? ratio * 100 : ratio;
-    }
-
-    const numerator = proportion?.numerator;
-    if (!numerator) return null;
-    const denom = total(entries);
-    // An empty population — or a column summing to zero — has no proportion.
-    if (denom === 0) return null;
-    const ratio = total(numerator) / denom;
-    return kind === "percent_of" ? ratio * 100 : ratio;
-  }
-
-  if (kind === "count") return entries.length;
-  if (!columnKey) return null;
-
-  if (kind === "latest") {
-    const withValue = entries.filter((e) => {
-      const v = e.values[columnKey];
-      return v !== null && v !== undefined && v !== "";
-    });
-    if (withValue.length === 0) return null;
-    // Newest by period, then by insertion order for same-period rows.
-    const newest = withValue.reduce((best, e) => {
-      const a = periodOrdinal(e.year, e.quarter);
-      const b = periodOrdinal(best.year, best.quarter);
-      return a > b || (a === b && e.id > best.id) ? e : best;
-    });
-    const n = Number(newest.values[columnKey]);
-    return Number.isFinite(n) ? n : null;
-  }
-
-  const nums = numericCells(entries, columnKey);
-  if (nums.length === 0) return null;
-  const total = nums.reduce((s, n) => s + n, 0);
-  return kind === "avg" ? total / nums.length : total;
+  return aggregateParts(kind, columnKey, entries, proportion).value;
 }
 
 /** Validate + normalise the mappings stored on a link. Throws on the first

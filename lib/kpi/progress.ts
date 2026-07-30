@@ -53,6 +53,11 @@ export function currentValueForYear(
  * empty quarter's entry form. Q1 has no source. Parent computed-only rows (a
  * value but no user-entered context) are skipped so we land on a quarter the
  * recorder actually filled.
+ *
+ * The variable columns are NOT evidence of that on their own: the roll-up and
+ * the data-source feed fill them too, with their own numerator/denominator. So
+ * they only count on a hand-entered row. Issue/solution stay unconditional —
+ * those really are typed by a person, even on a computed parent.
  */
 export function previousQuarterProgress(
   progress: QuarterProgress[] | undefined,
@@ -66,9 +71,10 @@ export function previousQuarterProgress(
       row &&
       ((row.issue ?? "").trim() !== "" ||
         (row.solution ?? "").trim() !== "" ||
-        row.variable1Value != null ||
-        row.variable2Value != null ||
-        (row.progressValue != null && !row.isComputed))
+        (!row.isComputed &&
+          (row.variable1Value != null ||
+            row.variable2Value != null ||
+            row.progressValue != null)))
     ) {
       return row;
     }
@@ -98,4 +104,18 @@ export const HEALTH_TONE: Record<"healthy" | "watch" | "at_risk", "success" | "w
   healthy: "success",
   watch: "warning",
   at_risk: "error",
+};
+
+/** Fill + label colour for a health status, marked !important because `cn`
+ *  (lib/utils.ts) is a plain join with no tailwind-merge — an un-important
+ *  override can silently lose to a component's own base classes (e.g. Card's
+ *  bg-surface-lowest). text-mute on these fills is only ~3.7:1, under AA for
+ *  small text, so the paired colour replaces it wherever this is applied. */
+export const HEALTH_SURFACE: Record<
+  "healthy" | "watch" | "at_risk",
+  { card: string; muted: string }
+> = {
+  healthy: { card: "!bg-[#e9f3dd] !border-[#bcd99a]", muted: "text-[#2f6500]" },
+  watch: { card: "!bg-[#fbeed6] !border-[#e9c98a]", muted: "text-[#8a4b00]" },
+  at_risk: { card: "!bg-error-container !border-[#f0b6b0]", muted: "text-on-error-container" },
 };

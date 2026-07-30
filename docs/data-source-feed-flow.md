@@ -85,11 +85,26 @@ changes — not when the user saves the parent's issue/solution.**
 
 | Column | Source |
 |---|---|
-| `progress_value` | System — `rollup()` in `recomputeKpiQuarter` |
+| `progress_value` | System — `rollupParts()` in `recomputeKpiQuarter` |
+| `variable1_value` / `variable2_value` | System — the numerator/denominator that roll-up divided |
 | `is_computed` | `1` |
+| `value_source` | `'rollup'` |
 | `issue` / `solution` | User — parent KPI `PUT` |
 
 **Leaf KPI** — `progress_value` (and `variable1/2_value`) are user-entered,
-`is_computed = 0`, and issue/solution are user-entered — all in one `PUT`. A leaf
-KPI fed by a data source instead gets `progress_value` from the feed
-(`is_computed = 1`) and is read-only in the UI.
+`is_computed = 0`, `value_source = 'manual'`, and issue/solution are user-entered
+— all in one `PUT`. A leaf KPI fed by a data source instead gets `progress_value`
+from the feed (`is_computed = 1`, `value_source = 'data_source'`) and is read-only
+in the UI.
+
+**Every path fills the variable columns.** A link mapped to `variable1` /
+`variable2` stores those two aggregations directly; a link mapped to the single
+`value` slot stores the aggregation's own parts instead — `aggregateParts()` in
+`lib/kpi/dataSourceFilters.ts` returns the numerator and denominator alongside
+the result (a proportion's population, an average's row count, and so on).
+
+`value_source` exists because `is_computed` cannot separate a roll-up from a
+feed. It also marks the one provenance under which the stored pair is
+re-derivable via `kpiValueFromVariables()`: `'manual'`. The computed pairs follow
+`calculation_type` or the aggregation kind rather than the KPI's unit — see the
+table in `lib/kpi/performance.ts#rollupParts`.
