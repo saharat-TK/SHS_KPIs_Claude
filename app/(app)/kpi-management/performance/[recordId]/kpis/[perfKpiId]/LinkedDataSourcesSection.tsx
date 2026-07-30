@@ -23,11 +23,9 @@ import {
   useAcademicCatalog,
 } from "@/lib/data/hooks";
 import { formatCellValue, formatEntryPeriod } from "@/lib/kpi/dataSources";
-import { describeMapping } from "@/lib/kpi/dataSourceFilters";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import type {
-  DataSourceColumn,
   DataSourceEntry,
   DataSourceLink,
   PerfKpi,
@@ -68,20 +66,6 @@ export function LinkedDataSourcesSection({
   // table agree even before any interaction.
   const active = sources.find((s) => s.id === activeId) ?? sources[0] ?? null;
 
-  // The feeds panel describes the active source's mappings, so it needs that
-  // source's columns and the shared code→name labels. SourcePanel asks for the
-  // same three; these are react-query hooks keyed by id, so both callers share
-  // one fetch rather than duplicating it.
-  const activeColumnsQ = useDataSourceColumns(active?.id ?? 0);
-  const facultyQ = useFacultyRecords();
-  const catalogQ = useAcademicCatalog();
-  const activeColumns = useMemo(() => activeColumnsQ.data ?? [], [activeColumnsQ.data]);
-  // Labels take no data source — faculty ids and catalog codes are global.
-  const cellLabels = useMemo(
-    () => buildCellLabels(facultyQ.data ?? [], catalogQ.data),
-    [facultyQ.data, catalogQ.data],
-  );
-
   // A link edits the LIBRARY KPI and refeeds every active record, so it takes the
   // same permission the Data Sources page requires to create one.
   const canLink = can("configure_kpis");
@@ -102,28 +86,24 @@ export function LinkedDataSourcesSection({
           {active && (
             <HoverPopover
               label={`Feeds from ${active.name}`}
+              panelClassName="border-primary/20 bg-[#eff8e8]"
               trigger={(aria) => (
                 <Button {...aria} variant="ghost" icon="link">
                   Feeds · {active.links.length}
                 </Button>
               )}
             >
-              <div className="border-b border-hairline px-md py-sm">
-                {/* Named because the panel shows ONE source's links, and with a
-                    tab strip it would otherwise be unclear which. */}
-                <p className="text-label-md text-on-surface">{active.name}</p>
-                <p className="text-caption-sm text-mute">
-                  What this source feeds, and how each value is derived.
-                </p>
-              </div>
-              <LinksList
-                links={active.links}
-                columns={activeColumns}
-                cellLabels={cellLabels}
-                canLink={canLink}
-                dataSourceId={active.id}
-                onEdit={setEditingLink}
-              />
+              {({ close }) => (
+                <LinksList
+                  links={active.links}
+                  canLink={canLink}
+                  dataSourceId={active.id}
+                  onEdit={(link) => {
+                    close();
+                    setEditingLink(link);
+                  }}
+                />
+              )}
             </HoverPopover>
           )}
           {canLink && sources.length > 0 && (
@@ -339,20 +319,14 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
   );
 }
 
-/** Why this source is attached, one row per link, with the same edit/unlink
- *  affordances the Data Sources page offers — the two pages should not disagree
- *  about what you can do to a link. Rendered inside the header's feeds pop-up. */
+/** A compact, actionable list of the active source's targets. */
 function LinksList({
   links,
-  columns,
-  cellLabels,
   canLink,
   dataSourceId,
   onEdit,
 }: {
   links: DataSourceLink[];
-  columns: DataSourceColumn[];
-  cellLabels: Record<string, string>;
   canLink: boolean;
   dataSourceId: number;
   onEdit: (link: DataSourceLink) => void;
@@ -363,66 +337,46 @@ function LinksList({
   if (links.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-xs p-md">
+    <div className="flex flex-col gap-xs p-sm">
       {links.map((l) => (
         <div
           key={l.id}
-          className="flex items-start justify-between gap-sm text-caption-sm text-mute"
+          className="flex items-center gap-xs rounded-md px-sm py-xs text-body-sm text-on-surface transition-colors hover:bg-[#d9edc8] focus-within:bg-[#d9edc8]"
         >
-          <p className="flex min-w-0 items-start gap-xs">
-            <Icon name="link" className="mt-tiny shrink-0 text-[16px]" />
-            <span className="min-w-0">
-              Feeds{" "}
-              <span className="font-medium text-on-surface">
-                {l.metricName ?? l.kpiName ?? "this KPI"}
-              </span>
-              {l.mappings.length === 0 ? (
-                <> — evidence only, it changes no value.</>
-              ) : (
-                <>
-                  {" — "}
-                  {l.mappings.map((m, i) => (
-                    <span key={i}>
-                      {i > 0 && "; "}
-                      {m.slot !== "value" && <Badge tone="neutral">{m.slot}</Badge>}{" "}
-                      {describeMapping(m, columns, cellLabels)}
-                    </span>
-                  ))}
-                </>
-              )}
+          {canLink ? (
+            <button
+              type="button"
+              onClick={() => onEdit(l)}
+              className="min-w-0 flex-1 truncate rounded-sm text-left font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
+              aria-label={`Edit feed for ${l.metricName ?? l.kpiName ?? "this KPI"}`}
+            >
+              Feeds {l.metricName ?? l.kpiName ?? "this KPI"}
+            </button>
+          ) : (
+            <span className="min-w-0 flex-1 truncate font-medium">
+              Feeds {l.metricName ?? l.kpiName ?? "this KPI"}
             </span>
-          </p>
+          )}
 
           {canLink && (
-            <div className="inline-flex shrink-0 items-center gap-xxs">
-              <button
-                type="button"
-                aria-label="Edit link"
-                title="Edit link"
-                onClick={() => onEdit(l)}
-                className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
-              >
-                <Icon name="edit" className="text-[18px]" />
-              </button>
-              <button
-                type="button"
-                aria-label="Remove link"
-                title="Remove link"
-                onClick={async () => {
-                  const ok = await confirm({
-                    title: "Remove this link?",
-                    message:
-                      "The raw data stays; only the link to the KPI is removed. Values it already fed keep their last computed number.",
-                    tone: "danger",
-                    confirmLabel: "Remove",
-                  });
-                  if (ok) remove.mutate({ dataSourceId, linkId: l.id });
-                }}
-                className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
-              >
-                <Icon name="link_off" className="text-[18px]" />
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label="Remove link"
+              title="Remove link"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "Remove this link?",
+                  message:
+                    "The raw data stays; only the link to the KPI is removed. Values it already fed keep their last computed number.",
+                  tone: "danger",
+                  confirmLabel: "Remove",
+                });
+                if (ok) remove.mutate({ dataSourceId, linkId: l.id });
+              }}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-mute transition-colors hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
+            >
+              <Icon name="link_off" className="text-[18px]" />
+            </button>
           )}
         </div>
       ))}
