@@ -176,6 +176,15 @@ export function ProgressPanel({
       };
     }
     switch (calculationType) {
+      // The combined types total what the sub-KPIs themselves divided, so the
+      // pair IS this KPI's own Variable 1 ÷ Variable 2 — label it the way a
+      // directly-fed row is labelled, not as progress-against-target.
+      case "combined_percent":
+      case "combined_ratio":
+        return {
+          v1Label: variable1Name ?? "Numerator",
+          v2Label: variable2Name ?? "Denominator",
+        };
       case "percent_of_total":
       case "ratio_of_total":
         return {

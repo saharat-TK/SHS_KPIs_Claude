@@ -12,6 +12,7 @@
     "test": "node --test \"tests/**/*.test.mjs\"",
     "migrate:percent-of-total": "node --env-file=.env.local scripts/migrate-kpi-percent-of-total.mjs",
     "migrate:ratio-of-total": "node --env-file=.env.local scripts/migrate-kpi-ratio-of-total.mjs",
+    "migrate:kpi-combined-types": "node --env-file=.env.local scripts/migrate-kpi-combined-types.mjs",
     "migrate:academic-catalog": "node --env-file=.env.local scripts/migrate-academic-catalog.mjs",
     "migrate:recompute-parent-rollups": "node --env-file=.env.local scripts/recompute-parent-rollups.mjs",
     "migrate:kpi-value-source": "node --env-file=.env.local scripts/migrate-kpi-value-source.mjs",
