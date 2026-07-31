@@ -232,7 +232,7 @@ CREATE TABLE performance_record (
   name           VARCHAR(255) NOT NULL,
   start_year     SMALLINT NOT NULL,
   end_year       SMALLINT AS (start_year + 4) STORED,
-  status         ENUM('active','closed','archived') NOT NULL DEFAULT 'active',
+  status         ENUM('active','inactive','completed') NOT NULL DEFAULT 'active',
   activated_by   VARCHAR(255) NULL,
   activated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_synced_at TIMESTAMP NULL,

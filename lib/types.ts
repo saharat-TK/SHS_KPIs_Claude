@@ -287,7 +287,7 @@ export interface User {
 export type KpiType = "strategic" | "operational" | "routine";
 export type CollectionPeriod = "Q1" | "Q2" | "Q3" | "Q4" | "every_quarter";
 export type StrategicSetStatus = "draft" | "active" | "archived";
-export type PerformanceStatus = "active" | "closed" | "archived";
+export type PerformanceStatus = "active" | "inactive" | "completed";
 
 export const KPI_TYPES: { id: KpiType; label: string }[] = [
   { id: "strategic", label: "Strategic" },

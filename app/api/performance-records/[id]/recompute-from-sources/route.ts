@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
+import type { RowDataPacket } from "mysql2";
 import { describeOutcome } from "@/lib/kpi/feedOutcome";
 import { feedRecord } from "@/lib/kpi/dataSourceFeed";
 
@@ -17,6 +18,18 @@ export async function POST(
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      const [recordRows] = await conn.query<RowDataPacket[]>(
+        "SELECT status FROM performance_record WHERE id = ? FOR UPDATE",
+        [params.id],
+      );
+      if (recordRows.length === 0) {
+        await conn.rollback();
+        return NextResponse.json({ error: "Performance record not found" }, { status: 404 });
+      }
+      if (recordRows[0].status !== "active") {
+        await conn.rollback();
+        return NextResponse.json({ error: "Only active records can receive data-source updates" }, { status: 409 });
+      }
       const outcome = await feedRecord(conn, Number(params.id));
       await conn.commit();
       return NextResponse.json({ ...outcome, summary: describeOutcome(outcome) });

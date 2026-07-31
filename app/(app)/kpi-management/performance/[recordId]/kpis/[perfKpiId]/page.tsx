@@ -117,6 +117,10 @@ function PerfKpiProgress() {
   // Review/final approval states lock this KPI and all its metrics. Backend
   // enforces it; this drives the read-only UI and quarter-tab labels.
   const kpi = kpiQ.data;
+  const recordReadOnly = recordQ.data != null && recordQ.data.status !== "active";
+  const recordReadOnlyMessage = recordReadOnly
+    ? `This performance record is ${recordQ.data?.status} and is view-only. Reactivate it to record progress.`
+    : undefined;
   const metrics = metricsQ.data ?? [];
   const sources = useMemo(() => sourcesQ.data ?? [], [sourcesQ.data]);
   // A metric is fed only by a link that actually MAPS a value. An evidence-only
@@ -163,10 +167,10 @@ function PerfKpiProgress() {
   }, [kpi?.committeeId, membershipsQ.data, user.facultyId, user.role]);
   const directActions = useMemo(
     () =>
-      selectedApprovalState
+      !recordReadOnly && selectedApprovalState
         ? availableActions(stageRole, selectedApprovalState).filter((action) => action !== "reverse")
         : [],
-    [selectedApprovalState, stageRole],
+    [recordReadOnly, selectedApprovalState, stageRole],
   );
   const approvalActionBusy =
     selectedApprovalQuery.isLoading ||
@@ -263,6 +267,8 @@ function PerfKpiProgress() {
               // A fed KPI is as computed as a rolled-up one — typing over it
               // would just be overwritten by the next feed.
               valueEditable={!kpi.hasChildren && !kpi.fedBy}
+              readOnly={recordReadOnly}
+              readOnlyReason={recordReadOnlyMessage}
               // A link outranks the roll-up (rollsUpFromChildren in
               // lib/kpi/performance.ts), so test fedBy first — otherwise a
               // linked parent would claim its sub-KPIs produced a number they
@@ -355,7 +361,9 @@ function PerfKpiProgress() {
                               hasTh && pct != null
                                 ? healthOf(pct, { green: m.thresholdGreen!, amber: m.thresholdAmber! })
                                 : null;
-                            const metricLocked = !!selectedApprovalLock?.locked && !allowApprovalLockedEditing;
+                            const metricLocked =
+                              recordReadOnly ||
+                              (!!selectedApprovalLock?.locked && !allowApprovalLockedEditing);
                             const fed = isMetricFed(m);
                             const go = () => setEditingMetricId(m.id);
                             return (
@@ -430,15 +438,15 @@ function PerfKpiProgress() {
                                   ) : (
                                     <button
                                       type="button"
-                                      aria-label="Enter progress"
-                                      title="Enter progress"
+                                      aria-label={recordReadOnly ? "View progress" : "Enter progress"}
+                                      title={recordReadOnly ? "View progress" : "Enter progress"}
                                       className="text-mute hover:text-on-surface"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         go();
                                       }}
                                     >
-                                      <Icon name="edit_note" size={20} />
+                                      <Icon name={recordReadOnly ? "visibility" : "edit_note"} size={20} />
                                     </button>
                                   )}
                                 </Td>
@@ -482,6 +490,8 @@ function PerfKpiProgress() {
                   periodsLoading={periodsQ.isLoading}
                   approvalState={selectedApprovalState}
                   allowApprovalLockedEditing={allowApprovalLockedEditing}
+                  readOnly={recordReadOnly}
+                  readOnlyReason={recordReadOnlyMessage}
                   fedByName={
                     isMetricFed(editingMetric) ? fedSourceName(editingMetric) : null
                   }

@@ -41,8 +41,10 @@ export async function PUT(
     const [kpiRows] = await pool.query<RowDataPacket[]>(
       `SELECT k.has_children, k.unit, k.variable1_name AS variable1Name,
               k.record_id AS recordId, k.committee_id AS committeeId,
+              r.status AS recordStatus,
               COALESCE(p.is_open, 0) AS isOpen
        FROM perf_kpi k
+       JOIN performance_record r ON r.id = k.record_id
        LEFT JOIN performance_record_period p
          ON p.record_id = k.record_id AND p.year_no = ? AND p.quarter_no = ?
        WHERE k.id = ?`,
@@ -50,6 +52,12 @@ export async function PUT(
     );
     if (kpiRows.length === 0) {
       return NextResponse.json({ error: "Performance KPI not found" }, { status: 404 });
+    }
+    if (kpiRows[0].recordStatus !== "active") {
+      return NextResponse.json(
+        { error: "This performance record is inactive or completed and is view-only" },
+        { status: 409 },
+      );
     }
     if (!kpiRows[0].isOpen) {
       return NextResponse.json(

@@ -49,8 +49,8 @@ import type { KpiType, PerformanceStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
   active: "success",
-  closed: "neutral",
-  archived: "warning",
+  inactive: "neutral",
+  completed: "warning",
 };
 const TYPE_TONE: Record<KpiType, "primary" | "info" | "neutral"> = {
   strategic: "primary",
@@ -94,6 +94,7 @@ function PerformanceRecordDetail() {
   const categories = categoriesQ.data ?? [];
   const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
   const isAdmin = can("configure_kpis");
+  const recordIsActive = record?.status === "active";
   const q1Approvals = useRecordApprovals(recordId, selectedYear, 1);
   const q2Approvals = useRecordApprovals(recordId, selectedYear, 2);
   const q3Approvals = useRecordApprovals(recordId, selectedYear, 3);
@@ -217,7 +218,8 @@ function PerformanceRecordDetail() {
               <Button
                 variant="outline"
                 icon="sync"
-                disabled={sync.isPending}
+                disabled={sync.isPending || !recordIsActive}
+                title={recordIsActive ? undefined : "Only active records can sync from the library"}
                 onClick={() => sync.mutate(recordId)}
               >
                 {sync.isPending ? "Syncing…" : "Sync from Library"}
@@ -227,8 +229,12 @@ function PerformanceRecordDetail() {
               <Button
                 variant="outline"
                 icon="database"
-                disabled={recompute.isPending}
-                title="Recompute the values that data sources feed into this record"
+                disabled={recompute.isPending || !recordIsActive}
+                title={
+                  recordIsActive
+                    ? "Recompute the values that data sources feed into this record"
+                    : "Only active records can receive data-source updates"
+                }
                 onClick={() => recompute.mutate(recordId)}
               >
                 {recompute.isPending ? "Recomputing…" : "Recompute from Data Sources"}
