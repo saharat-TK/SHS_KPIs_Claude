@@ -37,9 +37,6 @@ import type {
   StrategicSet,
   StrategicSetStatus,
   UnitRecord,
-  ValidationComment,
-  ValidationStatus,
-  ValidationSubmission,
 } from "@/lib/types";
 import { delay, getDB, uid } from "./store";
 
@@ -379,35 +376,6 @@ export const measurementsRepo = {
   list: () => delay(getDB().measurements),
   byTarget: (targetId: string) =>
     delay(getDB().measurements.filter((m) => m.targetId === targetId)),
-};
-
-// Validations ----------------------------------------------------------------
-export const validationsRepo = {
-  list: () => delay(getDB().validations),
-  decide: async (
-    id: string,
-    status: ValidationStatus,
-    reviewerId: string,
-    comment?: ValidationComment,
-  ) => {
-    const db = getDB();
-    const sub = db.validations.find((v) => v.id === id);
-    if (!sub) throw new Error("Submission not found");
-    sub.status = status;
-    sub.reviewerId = reviewerId;
-    if (comment) sub.comments.push(comment);
-    return delay(sub);
-  },
-  submit: async (input: Omit<ValidationSubmission, "id" | "status" | "comments">) => {
-    const sub: ValidationSubmission = {
-      ...input,
-      id: uid("val"),
-      status: "pending",
-      comments: [],
-    };
-    getDB().validations.push(sub);
-    return delay(sub);
-  },
 };
 
 // ── KPI Management — Strategic Sets (DB-backed) ─────────────────────────────
@@ -918,7 +886,6 @@ export type {
   KpiCategoryRecord,
   Measurement,
   Metric,
-  ValidationSubmission,
 };
 
 // Academic catalog — MySQL-backed reference data for the program/curriculum

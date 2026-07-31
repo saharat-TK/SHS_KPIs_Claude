@@ -24,8 +24,9 @@ import {
   useKpis,
   useCommittees,
   useFaculty,
-  useValidations,
   useKpiCategories,
+  usePerformanceRecords,
+  useRecordApprovals,
 } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { KPI_CATEGORIES } from "@/lib/types";
@@ -36,13 +37,21 @@ export default function DashboardPage() {
   const kpis = useKpis();
   const committees = useCommittees();
   const faculty = useFaculty();
-  const validations = useValidations();
+  const performanceRecords = usePerformanceRecords();
   const categoriesQ = useKpiCategories();
+  const activeRecord =
+    performanceRecords.data?.find((record) => record.status === "active") ??
+    performanceRecords.data?.[0];
+  const approvals = useRecordApprovals(activeRecord?.id ?? 0, 1, 1);
 
   const categories = categoriesQ.data ?? KPI_CATEGORIES;
 
   const loading =
-    kpis.isLoading || committees.isLoading || faculty.isLoading || validations.isLoading;
+    kpis.isLoading ||
+    committees.isLoading ||
+    faculty.isLoading ||
+    performanceRecords.isLoading ||
+    approvals.isLoading;
 
   const atRisk = useMemo(
     () =>
@@ -52,7 +61,9 @@ export default function DashboardPage() {
     [kpis.data],
   );
 
-  const pending = (validations.data ?? []).filter((v) => v.status === "pending").length;
+  const pending = (approvals.data ?? []).filter(
+    (approval) => approval.state === "submitted" || approval.state === "forwarded",
+  ).length;
 
   const categorySummary = useMemo(() => {
     return categories.map((c) => {
@@ -130,7 +141,7 @@ export default function DashboardPage() {
             <CardHeader
               title="Needs Review"
               actions={
-                can("review_submissions") && (
+                can("record_performance") && (
                   <Link href="/validation">
                     <Button variant="ghost" size="sm" iconRight="chevron_right">
                       Queue
@@ -146,11 +157,13 @@ export default function DashboardPage() {
                 </span>
                 <div>
                   <p className="text-heading-md text-on-surface">{pending}</p>
-                  <p className="text-caption-sm text-mute">submissions awaiting validation</p>
+                  <p className="text-caption-sm text-mute">
+                    KPI packages awaiting review{activeRecord ? ` · ${activeRecord.name}` : ""}
+                  </p>
                 </div>
               </div>
               <p className="text-body-sm text-mute">
-                {can("review_submissions")
+                {can("record_performance")
                   ? "You have reviewer access — open the queue to act on these."
                   : "Reviewers will action these submissions."}
               </p>
