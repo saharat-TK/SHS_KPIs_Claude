@@ -1,7 +1,10 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { HEALTH_SURFACE } from "@/lib/kpi/progress";
 import { Icon } from "./Icon";
 import { Card } from "./Card";
+import { CountUp } from "./CountUp";
 
 // Fill + label/unit colour, kept paired: a tinted card needs its muted text
 // darkened to stay legible (text-mute on any of these fills is only ~3.7:1,
@@ -27,6 +30,8 @@ export function StatCard({
   icon,
   tone = "default",
   className,
+  animate = false,
+  digits = 0,
 }: {
   label: string;
   value: string | number;
@@ -37,6 +42,11 @@ export function StatCard({
    *  show threshold status. Omit for the plain white card. */
   tone?: keyof typeof TONES;
   className?: string;
+  /** Count the value up from zero on mount and on every change. Numeric values
+   *  only — a string value is always rendered as given. */
+  animate?: boolean;
+  /** Decimal places for the animated value. */
+  digits?: number;
 }) {
   const toneClasses = TONES[tone];
   const dirColor =
@@ -59,7 +69,13 @@ export function StatCard({
         {icon && <Icon name={icon} size={20} className="text-primary" />}
       </div>
       <div className="flex items-end gap-xs">
-        <span className="text-display-md text-on-surface leading-none">{value}</span>
+        <span className="text-display-md text-on-surface leading-none tabular-nums">
+          {animate && typeof value === "number" ? (
+            <CountUp value={value} digits={digits} />
+          ) : (
+            value
+          )}
+        </span>
         {unit && <span className={cn("text-body-sm mb-tiny", toneClasses.muted)}>{unit}</span>}
       </div>
       {delta && (

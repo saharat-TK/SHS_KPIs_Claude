@@ -1,0 +1,339 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  categorySeries,
+  groupsInUse,
+  healthMix,
+  kpiStatusAsOf,
+  kpisInGroup,
+  pickActiveRecord,
+  quarterSeries,
+  statusesAsOf,
+  summarize,
+  yearSeries,
+  UNCATEGORISED,
+} from "../lib/kpi/dashboard.ts";
+import { valueAsOfQuarter } from "../lib/kpi/progress.ts";
+
+// A leaf KPI shaped like the perf-kpis payload. `progress` rows carry only the
+// fields the dashboard reads.
+function kpi(over = {}) {
+  return {
+    id: 1,
+    name: "KPI",
+    unit: "Item",
+    categoryId: "research_output",
+    thresholdGreen: 80,
+    thresholdAmber: 60,
+    quarterlyTargetMode: "divide_equally",
+    annualTargets: [{ yearNo: 1, targetValue: 100 }],
+    progress: [],
+    ...over,
+  };
+}
+
+const q = (yearNo, quarterNo, progressValue) => ({
+  yearNo,
+  quarterNo,
+  progressValue,
+  issue: null,
+  solution: null,
+});
+
+// ── valueAsOfQuarter ────────────────────────────────────────────────────────
+
+test("valueAsOfQuarter reads the quarter itself when it has a value", () => {
+  assert.equal(valueAsOfQuarter([q(1, 2, 12)], 1, 2), 12);
+});
+
+test("valueAsOfQuarter falls back to the newest earlier quarter", () => {
+  // use_annual KPIs typically record Q3 and Q4 only — asking for Q4 must not
+  // stop at an empty Q4 row when Q3 holds the value.
+  const rows = [q(1, 1, null), q(1, 3, 76.2), q(1, 4, null)];
+  assert.equal(valueAsOfQuarter(rows, 1, 4), 76.2);
+});
+
+test("valueAsOfQuarter never looks forward", () => {
+  assert.equal(valueAsOfQuarter([q(1, 3, 76.2)], 1, 2), null);
+});
+
+test("valueAsOfQuarter stays inside its year", () => {
+  assert.equal(valueAsOfQuarter([q(1, 4, 90)], 2, 4), null);
+});
+
+test("valueAsOfQuarter returns null for an all-null or missing year", () => {
+  assert.equal(valueAsOfQuarter([q(1, 1, null), q(1, 2, null)], 1, 4), null);
+  assert.equal(valueAsOfQuarter(undefined, 1, 4), null);
+});
+
+// ── kpiStatusAsOf ───────────────────────────────────────────────────────────
+
+test("divide_equally grades against a quarter slice of the annual target", () => {
+  const k = kpi({ progress: [q(1, 1, 25)] });
+  const s = kpiStatusAsOf(k, 1, 1);
+  assert.equal(s.quarterTarget, 25); // 100 * 1/4
+  assert.equal(s.pct, 100);
+  assert.equal(s.health, "healthy");
+});
+
+test("use_annual grades against the whole annual target every quarter", () => {
+  const k = kpi({ quarterlyTargetMode: "use_annual", progress: [q(1, 1, 25)] });
+  const s = kpiStatusAsOf(k, 1, 1);
+  assert.equal(s.quarterTarget, 100);
+  assert.equal(s.pct, 25);
+  assert.equal(s.health, "at_risk");
+});
+
+test("the live Y2Q4 innovation-patents reading is 84% and healthy", () => {
+  // Record 2, "Number of Innovation patent and inventions": Y2 target 25,
+  // Q4 value 21, divide_equally → Q4 target is the full 25.
+  const k = kpi({
+    annualTargets: [{ yearNo: 2, targetValue: 25 }],
+    progress: [q(2, 1, 6), q(2, 2, 12), q(2, 3, 16), q(2, 4, 21)],
+  });
+  const s = kpiStatusAsOf(k, 2, 4);
+  assert.equal(s.pct, 84);
+  assert.equal(s.health, "healthy");
+});
+
+test("over-achievement stays healthy and is reported past 100%", () => {
+  const k = kpi({
+    quarterlyTargetMode: "use_annual",
+    thresholdGreen: 100,
+    thresholdAmber: 70,
+    progress: [q(1, 3, 104.4444)],
+  });
+  const s = kpiStatusAsOf(k, 1, 3);
+  assert.ok(s.pct > 104 && s.pct < 105);
+  assert.equal(s.health, "healthy");
+});
+
+test("a KPI with no thresholds has an achievement but no health", () => {
+  const k = kpi({ thresholdGreen: null, thresholdAmber: null, progress: [q(1, 4, 90)] });
+  const s = kpiStatusAsOf(k, 1, 4);
+  assert.equal(s.pct, 90);
+  assert.equal(s.health, null);
+});
+
+test("a missing target or value leaves both pct and health null", () => {
+  assert.equal(kpiStatusAsOf(kpi({ annualTargets: [] , progress: [q(1, 4, 9)] }), 1, 4).pct, null);
+  assert.equal(kpiStatusAsOf(kpi(), 1, 4).pct, null);
+  assert.equal(kpiStatusAsOf(kpi(), 1, 4).health, null);
+});
+
+test("a zero target cannot produce an achievement", () => {
+  const k = kpi({ annualTargets: [{ yearNo: 1, targetValue: 0 }], progress: [q(1, 4, 5)] });
+  assert.equal(kpiStatusAsOf(k, 1, 4).pct, null);
+});
+
+// ── summarize ───────────────────────────────────────────────────────────────
+
+test("summarize counts data, grading and health separately", () => {
+  const statuses = statusesAsOf(
+    [
+      // Mixed units on purpose: only the achievement % is comparable.
+      kpi({ id: 1, unit: "Item", progress: [q(1, 4, 100)] }), // 100% healthy
+      kpi({ id: 2, unit: "Percent", progress: [q(1, 4, 65)] }), // 65% watch
+      kpi({ id: 3, unit: "Ratio", progress: [q(1, 4, 10)] }), // 10% at risk
+      kpi({ id: 4, thresholdGreen: null, thresholdAmber: null, progress: [q(1, 4, 90)] }),
+      kpi({ id: 5 }), // nothing recorded
+    ],
+    1,
+    4,
+  );
+  const s = summarize(statuses);
+  assert.equal(s.total, 5);
+  assert.equal(s.withData, 4);
+  assert.equal(s.graded, 3);
+  assert.equal(s.onTarget, 1);
+  assert.equal(s.watch, 1);
+  assert.equal(s.atRisk, 1);
+  assert.equal(s.noData, 1);
+  // Share of GRADED KPIs, not of all five.
+  assert.ok(Math.abs(s.pctOnTarget - 100 / 3) < 1e-9);
+  // Mean over the four with data, including the ungraded one.
+  assert.equal(s.avgAchievement, (100 + 65 + 10 + 90) / 4);
+});
+
+test("summarize of an empty scope reports nulls, not zeros", () => {
+  const s = summarize([]);
+  assert.equal(s.total, 0);
+  assert.equal(s.pctOnTarget, null);
+  assert.equal(s.avgAchievement, null);
+});
+
+test("summarize with data but no thresholds cannot report on-target", () => {
+  const statuses = statusesAsOf(
+    [kpi({ thresholdGreen: null, thresholdAmber: null, progress: [q(1, 4, 90)] })],
+    1,
+    4,
+  );
+  const s = summarize(statuses);
+  assert.equal(s.withData, 1);
+  assert.equal(s.graded, 0);
+  assert.equal(s.pctOnTarget, null);
+});
+
+test("healthMix keeps its slice order and includes the no-data slice", () => {
+  const mix = healthMix(summarize(statusesAsOf([kpi()], 1, 4)));
+  assert.deepEqual(
+    mix.map((m) => m.key),
+    ["healthy", "watch", "at_risk", "no_data"],
+  );
+  assert.equal(mix[3].value, 1);
+});
+
+// ── pickActiveRecord ────────────────────────────────────────────────────────
+
+const rec = (over) => ({ id: 1, status: "active", activatedAt: "2026-07-03 17:11:14", ...over });
+
+test("pickActiveRecord ignores closed and archived records", () => {
+  assert.equal(pickActiveRecord([rec({ id: 1, status: "closed" }), rec({ id: 2, status: "archived" })]), null);
+  assert.equal(pickActiveRecord([]), null);
+  assert.equal(pickActiveRecord(undefined), null);
+});
+
+test("pickActiveRecord prefers the record with open recording periods", () => {
+  // The live pair: record 1 was activated first but has no open periods.
+  const picked = pickActiveRecord([
+    rec({ id: 2, activatedAt: "2026-07-04 11:41:51", openPeriodCount: 12 }),
+    rec({ id: 1, activatedAt: "2026-07-03 17:11:14", openPeriodCount: 0 }),
+  ]);
+  assert.equal(picked.id, 2);
+});
+
+test("open periods outrank a later activation", () => {
+  const picked = pickActiveRecord([
+    rec({ id: 1, activatedAt: "2026-01-01 00:00:00", openPeriodCount: 4 }),
+    rec({ id: 2, activatedAt: "2026-09-09 00:00:00", openPeriodCount: 0 }),
+  ]);
+  assert.equal(picked.id, 1);
+});
+
+test("with periods equal, the most recent activation wins, then the id", () => {
+  assert.equal(
+    pickActiveRecord([
+      rec({ id: 1, activatedAt: "2026-01-01 00:00:00" }),
+      rec({ id: 2, activatedAt: "2026-09-09 00:00:00" }),
+    ]).id,
+    2,
+  );
+  assert.equal(
+    pickActiveRecord([
+      rec({ id: 1, activatedAt: "2026-01-01 00:00:00" }),
+      rec({ id: 7, activatedAt: "2026-01-01 00:00:00" }),
+    ]).id,
+    7,
+  );
+});
+
+// ── grouping ────────────────────────────────────────────────────────────────
+
+const CATEGORIES = [
+  { id: "student_success", label: "Student Success" },
+  { id: "research_output", label: "Research Output" },
+  { id: "community_services", label: "Community Services" },
+];
+
+test("groupsInUse omits categories the record does not use", () => {
+  const kpis = [kpi({ id: 1, categoryId: "research_output" })];
+  assert.deepEqual(
+    groupsInUse(kpis, CATEGORIES).map((g) => g.id),
+    ["research_output"],
+  );
+});
+
+test("groupsInUse keeps the categories' own order", () => {
+  const kpis = [
+    kpi({ id: 1, categoryId: "research_output" }),
+    kpi({ id: 2, categoryId: "student_success" }),
+  ];
+  assert.deepEqual(
+    groupsInUse(kpis, CATEGORIES).map((g) => g.id),
+    ["student_success", "research_output"],
+  );
+});
+
+test("KPIs with a null or unknown category fall into one Uncategorised group", () => {
+  const kpis = [kpi({ id: 1, categoryId: null }), kpi({ id: 2, categoryId: "deleted_cat" })];
+  const groups = groupsInUse(kpis, CATEGORIES);
+  assert.deepEqual(groups.map((g) => g.id), [UNCATEGORISED]);
+  // Given the categories, both land in the group that groupsInUse offered — a
+  // KPI pointing at a deleted category is never left unreachable.
+  assert.deepEqual(kpisInGroup(kpis, UNCATEGORISED, CATEGORIES).map((k) => k.id), [1, 2]);
+  // Without them, only the genuinely null one can be identified.
+  assert.deepEqual(kpisInGroup(kpis, UNCATEGORISED).map((k) => k.id), [1]);
+});
+
+test("categorySeries reports one row per used group, worst health winning", () => {
+  const kpis = [
+    kpi({ id: 1, categoryId: "research_output", progress: [q(1, 4, 100)] }), // healthy
+    kpi({ id: 2, categoryId: "research_output", progress: [q(1, 4, 10)] }), // at risk
+    kpi({ id: 3, categoryId: "student_success", progress: [q(1, 4, 100)] }), // healthy
+  ];
+  const rows = categorySeries(kpis, CATEGORIES, 1, 4);
+  assert.equal(rows.length, 2);
+  const research = rows.find((r) => r.id === "research_output");
+  assert.equal(research.health, "at_risk");
+  assert.equal(research.pct, 55); // (100 + 10) / 2
+  assert.equal(research.onTarget, 1);
+  assert.equal(rows.find((r) => r.id === "student_success").health, "healthy");
+});
+
+test("a group with no gradable data has null health rather than at_risk", () => {
+  const rows = categorySeries([kpi({ id: 1, categoryId: "research_output" })], CATEGORIES, 1, 4);
+  assert.equal(rows[0].health, null);
+  assert.equal(rows[0].pct, null);
+});
+
+// ── series builders ─────────────────────────────────────────────────────────
+
+test("quarterSeries walks Q1..Q4 and omits quarters with no data", () => {
+  const kpis = [kpi({ id: 1, progress: [q(1, 3, 75), q(1, 4, 100)] })];
+  const { rows, lines } = quarterSeries(kpis, CATEGORIES, 1);
+  assert.deepEqual(rows.map((r) => r.quarter), ["Q1", "Q2", "Q3", "Q4"]);
+  assert.equal(rows[0].overall, undefined); // nothing recorded by Q1
+  assert.equal(rows[2].overall, 100); // 75 against a 75 quarter target
+  assert.equal(rows[3].overall, 100); // 100 against the full 100
+  // One group in scope → the overall line only, no redundant per-group line.
+  assert.deepEqual(lines.map((l) => l.key), ["overall"]);
+});
+
+test("quarterSeries adds a line per group once more than one is in scope", () => {
+  const kpis = [
+    kpi({ id: 1, categoryId: "research_output", progress: [q(1, 4, 100)] }),
+    kpi({ id: 2, categoryId: "student_success", progress: [q(1, 4, 50)] }),
+  ];
+  const { rows, lines } = quarterSeries(kpis, CATEGORIES, 1);
+  assert.deepEqual(lines.map((l) => l.key), [
+    "overall",
+    "g_student_success",
+    "g_research_output",
+  ]);
+  assert.equal(rows[3].overall, 75);
+  assert.equal(rows[3].g_research_output, 100);
+  assert.equal(rows[3].g_student_success, 50);
+});
+
+test("yearSeries spans the record and labels calendar years from startYear", () => {
+  const kpis = [
+    kpi({
+      id: 1,
+      annualTargets: [
+        { yearNo: 1, targetValue: 100 },
+        { yearNo: 2, targetValue: 100 },
+      ],
+      progress: [q(1, 4, 90), q(2, 4, 100)],
+    }),
+  ];
+  const rows = yearSeries(kpis, 4, 2565);
+  assert.equal(rows.length, 5);
+  assert.deepEqual(rows.map((r) => r.year), ["2565", "2566", "2567", "2568", "2569"]);
+  assert.equal(rows[0].achievement, 90);
+  assert.equal(rows[1].achievement, 100);
+  assert.equal(rows[2].achievement, null); // year 3 has neither target nor value
+  assert.equal(rows[0].recorded, 1);
+  assert.equal(rows[2].recorded, 0);
+  assert.ok(rows.every((r) => r.target === 100));
+});
