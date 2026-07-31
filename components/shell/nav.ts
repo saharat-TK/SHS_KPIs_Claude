@@ -30,19 +30,6 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Faculty Data",
-    items: [
-      { label: "Committees", href: "/committee", icon: "account_tree" },
-      { label: "Faculty Roster", href: "/faculty", icon: "groups" },
-      {
-        label: "Faculty Management",
-        href: "/faculty/management",
-        icon: "manage_accounts",
-        requires: "manage_faculty",
-      },
-    ],
-  },
-  {
     label: "KPI Management",
     items: [
       {
@@ -67,6 +54,19 @@ export const NAV: NavGroup[] = [
             requires: "configure_kpis",
           },
         ],
+      },
+    ],
+  },
+  {
+    label: "Faculty Data",
+    items: [
+      { label: "Committees", href: "/committee", icon: "account_tree" },
+      { label: "Faculty Roster", href: "/faculty", icon: "groups" },
+      {
+        label: "Faculty Management",
+        href: "/faculty/management",
+        icon: "manage_accounts",
+        requires: "manage_faculty",
       },
     ],
   },
