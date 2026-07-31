@@ -595,9 +595,12 @@ CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id);
 --    target <= five_year_target. The sum of annual targets may exceed it.
 --    (A CHECK can't compare annual target rows with parent target rows.)
 --  * custom_formula KPIs (decision #7): when calculation_type='custom_formula',
---    formula_id must be set; the roll-up evaluates formula.expression (mathjs)
---    over the child metric values. weighted_sum/simple_average/percent_of_total/
---    ratio_of_total ignore formula_id.
+--    formula_id must be set. The formula RECORDS how the KPI is calculated; it is
+--    NOT evaluated. rollupParts (lib/kpi/performance.ts) returns nulls for this
+--    type, and no mathjs evaluation exists anywhere in the app despite the
+--    dependency being present — a custom_formula KPI's quarterly value stays
+--    blank until someone enters it. The other calculation types ignore
+--    formula_id entirely.
 --  * percent_of_total: pooled percentage roll-up,
 --    SUM(child progress) / SUM(child quarter target) * 100. A child with no
 --    progress value or no usable target is excluded from BOTH sums. This
