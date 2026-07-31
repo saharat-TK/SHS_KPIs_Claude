@@ -1,24 +1,17 @@
 import { cn } from "@/lib/utils";
 import type { Thresholds } from "@/lib/types";
+import { healthOf, type Health } from "@/lib/kpi/progress";
 
-export type Health = "healthy" | "watch" | "at_risk";
-
-export function healthOf(value: number, t: Thresholds): Health {
-  if (value >= t.green) return "healthy";
-  if (value >= t.amber) return "watch";
-  return "at_risk";
-}
+// healthOf / HEALTH_LABEL / Health now live in lib/kpi/progress.ts so the pure,
+// node-testable maths can reach them without loading this JSX module. Re-exported
+// here (and through components/ui/index.ts) so every existing call site is
+// unchanged.
+export { healthOf, HEALTH_LABEL, type Health } from "@/lib/kpi/progress";
 
 const HEALTH_COLOR: Record<Health, string> = {
   healthy: "bg-primary-container",
   watch: "bg-warning",
   at_risk: "bg-error",
-};
-
-export const HEALTH_LABEL: Record<Health, string> = {
-  healthy: "On Target",
-  watch: "Watch",
-  at_risk: "At Risk",
 };
 
 export function ThresholdBar({
