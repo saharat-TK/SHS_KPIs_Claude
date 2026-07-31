@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -57,6 +57,8 @@ const TYPE_TONE: Record<KpiType, "primary" | "info" | "neutral"> = {
   operational: "info",
   routine: "neutral",
 };
+type SortKey = "name" | "type" | "annualTarget" | "currentProgress" | "approvalLock";
+type SortState = { key: SortKey; dir: "asc" | "desc" };
 
 export default function PerformanceRecordPage() {
   return (
@@ -83,6 +85,7 @@ function PerformanceRecordDetail() {
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
 
   const [cat, setCat] = useState<string>("all");
+  const [sort, setSort] = useState<SortState | null>(null);
   // Drives both the Annual Target / Current Progress columns and the approval
   // lookups below; the quarter selector stays approval-only.
   const [selectedYear, setSelectedYear] = useState(1);
@@ -129,6 +132,66 @@ function PerformanceRecordDetail() {
     () => (cat === "all" ? kpis : kpis.filter((k) => k.categoryId === cat)),
     [kpis, cat],
   );
+  const approvalLockForKpi = useCallback((kpiId: number) => {
+    const selectedLock = approvalLockForState(
+      approvalsByQuarter[approvalQuarter as 1 | 2 | 3 | 4].get(kpiId)?.state,
+    );
+    if (selectedLock?.locked) return { quarter: approvalQuarter, lock: selectedLock };
+
+    return ([1, 2, 3, 4] as const)
+      .filter((quarter) => quarter !== approvalQuarter)
+      .map((quarter) => ({
+        quarter,
+        lock: approvalLockForState(approvalsByQuarter[quarter].get(kpiId)?.state),
+      }))
+      .find((item) => item.lock?.locked);
+  }, [approvalQuarter, approvalsByQuarter]);
+  const sortedRows = useMemo(() => {
+    if (!sort) return rows;
+
+    const valueFor = (kpi: (typeof rows)[number]): string | number | null => {
+      switch (sort.key) {
+        case "name":
+          return kpi.name;
+        case "type":
+          return kpi.kpiType;
+        case "annualTarget":
+          return targetForYear(kpi.annualTargets, selectedYear);
+        case "currentProgress":
+          return currentValueForYear(kpi.progress, selectedYear);
+        case "approvalLock": {
+          const approvalLock = approvalLockForKpi(kpi.id);
+          return approvalLock?.lock?.locked
+            ? `${approvalLock.quarter}:${approvalLock.lock.label}`
+            : null;
+        }
+      }
+    };
+
+    return [...rows].sort((left, right) => {
+      const leftValue = valueFor(left);
+      const rightValue = valueFor(right);
+
+      // Missing values always follow populated values, regardless of direction.
+      if (leftValue == null) return rightValue == null ? 0 : 1;
+      if (rightValue == null) return -1;
+
+      const comparison =
+        typeof leftValue === "number" && typeof rightValue === "number"
+          ? leftValue - rightValue
+          : String(leftValue).localeCompare(String(rightValue), undefined, {
+              sensitivity: "base",
+              numeric: true,
+            });
+      return sort.dir === "asc" ? comparison : -comparison;
+    });
+  }, [rows, sort, selectedYear, approvalLockForKpi]);
+  const toggleSort = (key: SortKey) =>
+    setSort((current) =>
+      current?.key === key
+        ? { key, dir: current.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" },
+    );
 
   return (
     <>
@@ -248,34 +311,66 @@ function PerformanceRecordDetail() {
             />
           ) : (
             <Table>
+              <colgroup>
+                <col style={{ width: "32%", minWidth: "280px" }} />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+              </colgroup>
               <thead>
                 <tr>
-                  <Th>KPI Name</Th>
-                  <Th align="center">Type</Th>
-                  <Th align="right">Annual Target</Th>
-                  <Th align="center">Current Progress</Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "name" ? sort.dir : null}
+                    onSort={() => toggleSort("name")}
+                  >
+                    KPI Name
+                  </Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "type" ? sort.dir : null}
+                    onSort={() => toggleSort("type")}
+                    align="center"
+                  >
+                    Type
+                  </Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "annualTarget" ? sort.dir : null}
+                    onSort={() => toggleSort("annualTarget")}
+                    align="right"
+                  >
+                    Annual Target
+                  </Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "currentProgress" ? sort.dir : null}
+                    onSort={() => toggleSort("currentProgress")}
+                    align="center"
+                  >
+                    Current Progress
+                  </Th>
                   <Th align="center">Weight</Th>
                   <Th align="center">Sub-KPIs</Th>
                   <Th align="center">Roll-up</Th>
-                  <Th>Approval Lock</Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "approvalLock" ? sort.dir : null}
+                    onSort={() => toggleSort("approvalLock")}
+                  >
+                    Approval Lock
+                  </Th>
                   <Th align="right">Actions</Th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((k) => {
-                  const selectedLock = approvalLockForState(
-                    approvalsByQuarter[approvalQuarter as 1 | 2 | 3 | 4].get(k.id)?.state,
-                  );
-                  const fallbackLock = ([1, 2, 3, 4] as const)
-                    .filter((q) => q !== approvalQuarter)
-                    .map((q) => ({
-                      quarter: q,
-                      lock: approvalLockForState(approvalsByQuarter[q].get(k.id)?.state),
-                    }))
-                    .find((item) => item.lock?.locked);
-                  const approvalLock = selectedLock?.locked
-                    ? { quarter: approvalQuarter, lock: selectedLock }
-                    : fallbackLock;
+                {sortedRows.map((k) => {
+                  const approvalLock = approvalLockForKpi(k.id);
                   // Target/current for the selected year. Current = the latest
                   // quarter with a value; percent is against the ANNUAL target,
                   // so a mid-year KPI reads proportionally low by design.
@@ -344,17 +439,17 @@ function PerformanceRecordDetail() {
                         )}
                       </Td>
                       <Td align="right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          iconRight="chevron_right"
+                        <button
+                          aria-label={approvalLock?.lock?.locked ? "View progress" : "Record progress"}
+                          title={approvalLock?.lock?.locked ? "View progress" : "Record progress"}
+                          className="rounded p-xs text-mute hover:bg-surface-soft hover:text-on-surface"
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(`/kpi-management/performance/${recordId}/kpis/${k.id}`);
                           }}
                         >
-                          {approvalLock?.lock?.locked ? "View progress" : "Record progress"}
-                        </Button>
+                          <Icon name={approvalLock?.lock?.locked ? "visibility" : "edit_note"} size={18} />
+                        </button>
                       </Td>
                     </Tr>
                   );
