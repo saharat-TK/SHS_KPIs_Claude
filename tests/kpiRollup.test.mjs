@@ -104,6 +104,25 @@ test("pooled fallback sums every present value when all targets are zero", () =>
   assert.equal(rollup("percent_of_total", rows), rollup("ratio_of_total", rows));
 });
 
+test("the pooled fallback returns a total, not a rate — a known hazard", () => {
+  // Pinning the trap rather than the arithmetic. Without a usable target there
+  // is no denominator, so a Ratio/Percent KPI reports a SUM of its children in
+  // whatever unit they carry. K2-1 "publications per faculty member" reported
+  // 6, 14, 20, 23 this way — cumulative publication COUNTS on a KPI whose unit
+  // is a per-faculty ratio — until its own data-source link took over.
+  //
+  // Left as-is deliberately: returning null instead would be more honest but
+  // moves stored numbers on KPIs unrelated to that fix. If this behaviour ever
+  // changes, this test is the one that should fail first.
+  const counts = [
+    { weight: 100, value: 6, target: 0 },
+    { weight: 100, value: 11, target: 0 },
+  ];
+  assert.equal(rollup("ratio_of_total", counts), 17);
+  // Emphatically not the rate anyone would expect from a ratio KPI.
+  assert.notEqual(rollup("ratio_of_total", counts), 6 / 11);
+});
+
 test("a single usable target keeps the pooled ratio (no fallback)", () => {
   // At least one value+target pair present → pool as usual, ignore the rest.
   assert.equal(

@@ -22,6 +22,16 @@ export function unitNeedsDivisor(unit: string | null): boolean {
   return u === "percent" || u === "ratio";
 }
 
+/** Whether two units name the same quantity, so a value measured in one can be
+ *  compared against a target measured in the other. Same casing and padding
+ *  tolerance as unitNeedsDivisor. A missing unit matches nothing, including
+ *  another missing one — "unknown" is not a unit two things can share. */
+export function sameUnit(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = a?.trim().toLowerCase();
+  const right = b?.trim().toLowerCase();
+  return !!left && !!right && left === right;
+}
+
 /** Derive a leaf KPI's value from its entered variables per its unit:
  *  Percent → (V1/V2)*100, Ratio → V1/V2, any other unit → V1 (single variable). */
 export function kpiValueFromVariables(
