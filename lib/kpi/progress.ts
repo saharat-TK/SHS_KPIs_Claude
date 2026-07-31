@@ -1,8 +1,29 @@
 // Pure, client-safe helpers for showing progress against an annual target on the
-// performance pages. Status colour/label come from healthOf(pct, thresholds) +
-// HEALTH_LABEL (components/ui/ThresholdBar) — green/amber are treated as PERCENT
-// cutoffs of the target.
-import type { AnnualTarget, QuarterlyTargetMode, QuarterProgress } from "@/lib/types";
+// performance pages. green/amber are treated as PERCENT cutoffs of the target.
+//
+// NO runtime imports, on purpose — the same rule as lib/kpi/feedOutcome.ts. It
+// lets tests load this directly under node's type-stripping, which cannot
+// resolve the "@/" alias for value imports. Type-only imports are erased, so
+// they are fine.
+import type { AnnualTarget, QuarterlyTargetMode, QuarterProgress, Thresholds } from "@/lib/types";
+
+/** Health status of a value against its percent-of-target cutoffs. */
+export type Health = "healthy" | "watch" | "at_risk";
+
+/** Bucket a percent-of-target into a health status. Lives here rather than in
+ *  components/ui/ThresholdBar (which re-exports it) so the pure dashboard and
+ *  progress maths can reach it without loading a JSX module. */
+export function healthOf(value: number, t: Thresholds): Health {
+  if (value >= t.green) return "healthy";
+  if (value >= t.amber) return "watch";
+  return "at_risk";
+}
+
+export const HEALTH_LABEL: Record<Health, string> = {
+  healthy: "On Target",
+  watch: "Watch",
+  at_risk: "At Risk",
+};
 
 /** The target for a given quarter, derived from the annual target per the KPI's
  *  quarterly-target mode. divide_equally → cumulative annual*q/4 (Q1 25% … Q4
@@ -52,6 +73,23 @@ export function currentValueForYear(
 ): number | null {
   const rows = progress ?? [];
   for (let q = 4; q >= 1; q--) {
+    const p = rows.find((x) => x.yearNo === year && x.quarterNo === q);
+    if (p && p.progressValue != null) return p.progressValue;
+  }
+  return null;
+}
+
+/** Bounded sibling of currentValueForYear: the latest non-null value recorded
+ *  at or before `quarter` within `year`. This is the single place the dashboard's
+ *  "as of Qn" reading is defined — a KPI in use_annual mode typically records
+ *  only Q3/Q4, so asking for Q4 must still find the Q3 row. */
+export function valueAsOfQuarter(
+  progress: QuarterProgress[] | undefined,
+  year: number,
+  quarter: number,
+): number | null {
+  const rows = progress ?? [];
+  for (let q = quarter; q >= 1; q--) {
     const p = rows.find((x) => x.yearNo === year && x.quarterNo === q);
     if (p && p.progressValue != null) return p.progressValue;
   }

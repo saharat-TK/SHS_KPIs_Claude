@@ -23,6 +23,18 @@ export async function POST(
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      const [recordRows] = await conn.query<RowDataPacket[]>(
+        "SELECT status FROM performance_record WHERE id = ? FOR UPDATE",
+        [params.id],
+      );
+      if (recordRows.length === 0) {
+        await conn.rollback();
+        return NextResponse.json({ error: "Performance record not found" }, { status: 404 });
+      }
+      if (recordRows[0].status !== "active") {
+        await conn.rollback();
+        return NextResponse.json({ error: "Only active records can sync from the library" }, { status: 409 });
+      }
       await syncRecordFromLibrary(conn, Number(params.id));
       await recomputeRecordRollups(conn, Number(params.id));
       await conn.commit();

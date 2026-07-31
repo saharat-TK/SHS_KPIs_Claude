@@ -26,6 +26,7 @@ import {
   usePerformancePeriods,
   useSavePerformancePeriods,
   useStrategicSets,
+  useUpdatePerformanceRecord,
 } from "@/lib/data/hooks";
 import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/utils";
@@ -38,8 +39,8 @@ import type {
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
   active: "success",
-  closed: "neutral",
-  archived: "warning",
+  inactive: "neutral",
+  completed: "warning",
 };
 
 export default function PerformancePage() {
@@ -56,8 +57,13 @@ function Performance() {
   const recordsQ = usePerformanceRecords();
   const setsQ = useStrategicSets();
   const activate = useActivatePerformanceRecord();
+  const updateRecord = useUpdatePerformanceRecord();
   const [showActivate, setShowActivate] = useState(false);
   const [periodRecord, setPeriodRecord] = useState<PerformanceRecord | null>(null);
+  const [statusChange, setStatusChange] = useState<{
+    record: PerformanceRecord;
+    status: PerformanceStatus;
+  } | null>(null);
 
   const records = recordsQ.data ?? [];
   const isAdmin = can("configure_kpis");
@@ -132,6 +138,7 @@ function Performance() {
                         isAdmin={isAdmin}
                         onOpen={() => router.push(`/kpi-management/performance/${r.id}`)}
                         onPeriods={() => setPeriodRecord(r)}
+                        onSetStatus={(status) => setStatusChange({ record: r, status })}
                       />
                     </Td>
                   </Tr>
@@ -163,6 +170,21 @@ function Performance() {
           onClose={() => setPeriodRecord(null)}
         />
       )}
+
+      {statusChange && (
+        <StatusConfirmModal
+          record={statusChange.record}
+          status={statusChange.status}
+          submitting={updateRecord.isPending}
+          onClose={() => setStatusChange(null)}
+          onConfirm={() =>
+            updateRecord.mutate(
+              { id: statusChange.record.id, patch: { status: statusChange.status } },
+              { onSuccess: () => setStatusChange(null) },
+            )
+          }
+        />
+      )}
     </>
   );
 }
@@ -172,27 +194,35 @@ function RecordActions({
   isAdmin,
   onOpen,
   onPeriods,
+  onSetStatus,
 }: {
   record: PerformanceRecord;
   isAdmin: boolean;
   onOpen: () => void;
   onPeriods: () => void;
+  onSetStatus: (status: PerformanceStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
   const toggleMenu = () => {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const menuHeight = 72;
+    // Reserve space for the expanded status choices so the fixed menu opens
+    // upward when it would otherwise run beyond the viewport.
+    const menuHeight = isAdmin ? 250 : 48;
     const gap = 4;
     const top =
       rect.bottom + gap + menuHeight > window.innerHeight
         ? Math.max(gap, rect.top - menuHeight - gap)
         : rect.bottom + gap;
     setMenuPosition({ top, right: window.innerWidth - rect.right });
-    setOpen((v) => !v);
+    setOpen((wasOpen) => {
+      if (wasOpen) setStatusOpen(false);
+      return !wasOpen;
+    });
   };
 
   return (
@@ -217,6 +247,7 @@ function RecordActions({
             className="flex w-full items-center gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
             onClick={() => {
               setOpen(false);
+              setStatusOpen(false);
               onOpen();
             }}
           >
@@ -228,17 +259,93 @@ function RecordActions({
               type="button"
               className="flex w-full items-center gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
               onClick={() => {
-                setOpen(false);
-                onPeriods();
+              setOpen(false);
+              setStatusOpen(false);
+              onPeriods();
               }}
             >
               <Icon name="event_available" size={18} />
               Recording periods
             </button>
           )}
+          {isAdmin && (
+            <div className="border-t border-hairline">
+              <button
+                type="button"
+                aria-expanded={statusOpen}
+                className="flex w-full items-center justify-between gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
+                onClick={() => setStatusOpen((value) => !value)}
+              >
+                <span className="inline-flex items-center gap-sm">
+                  <Icon name="change_circle" size={18} />
+                  Set status
+                </span>
+                <Icon name={statusOpen ? "expand_less" : "expand_more"} size={18} />
+              </button>
+              {statusOpen && (
+                <div className="border-t border-hairline bg-surface-soft py-xs">
+                  {(["active", "inactive", "completed"] as const).map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      disabled={status === record.status}
+                      className="flex w-full items-center justify-between gap-sm px-lg py-sm text-left text-body-sm hover:bg-surface-container-high disabled:cursor-default disabled:text-mute"
+                      onClick={() => {
+                        setOpen(false);
+                        setStatusOpen(false);
+                        onSetStatus(status);
+                      }}
+                    >
+                      <span className="capitalize">{status}</span>
+                      {status === record.status && <Icon name="check" size={18} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function StatusConfirmModal({
+  record,
+  status,
+  submitting,
+  onClose,
+  onConfirm,
+}: {
+  record: PerformanceRecord;
+  status: PerformanceStatus;
+  submitting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Change record status"
+      subtitle={record.name}
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" disabled={submitting} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button icon="check" disabled={submitting} onClick={onConfirm}>
+            {submitting ? "Saving…" : `Set ${status}`}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-body-sm text-mute">
+        Set this record to <span className="font-medium capitalize text-on-surface">{status}</span>?
+        {status !== "active" && " Progress entry, syncing, and data-source updates will be paused until it is reactivated."}
+      </p>
+    </Modal>
   );
 }
 

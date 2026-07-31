@@ -62,6 +62,8 @@ export interface ProgressPanelProps {
   valueEditable: boolean;
   computedNote?: string;
   readOnly?: boolean;
+  /** Explains a record-level read-only state such as inactive/completed. */
+  readOnlyReason?: string;
   /** Approval state for the selected quarter, used to lock data while under review. */
   approvalState?: ApprovalState;
   /** Approval states for the selected year, keyed by quarter number. */
@@ -116,6 +118,7 @@ export function ProgressPanel({
   valueEditable,
   computedNote,
   readOnly = false,
+  readOnlyReason,
   approvalState,
   approvalStatesByQuarter = {},
   periods,
@@ -210,13 +213,13 @@ export function ProgressPanel({
   const openQuarterLabel = openThisYear.length
     ? `Open this year: ${openThisYear.map((q) => `Q${q}`).join(", ")}`
     : "No quarters open this year — ask an admin to open one.";
-  const readOnlyMessage = approvalLock?.locked
+  const readOnlyMessage = readOnlyReason ?? (approvalLock?.locked
     ? approvalLock.label
     : periodsLoading
       ? "Recording period status is loading. Data entry is temporarily disabled."
       : periodLocked
         ? `Year ${year} Quarter ${quarter} is closed for recording. Ask an admin to open it to enter progress.`
-        : undefined;
+        : undefined);
 
   // Current value = latest quarter with an entered/computed value this year.
   const current = [...QUARTERS]
@@ -596,7 +599,7 @@ export function QuarterEntry({
         )}
       </div>
 
-      {readOnlyMessage && !approvalLock?.locked && (
+      {readOnlyMessage && (!approvalLock?.locked || readOnlyMessage !== approvalLock.label) && (
         <div className="rounded border border-hairline bg-surface-soft px-md py-sm text-body-sm text-mute">
           {readOnlyMessage}
         </div>

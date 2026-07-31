@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Hanken_Grotesk } from "next/font/google";
+import { Hanken_Grotesk, Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -7,6 +7,13 @@ const hanken = Hanken_Grotesk({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
   variable: "--font-hanken",
+  display: "swap",
+});
+
+const notoThai = Noto_Sans_Thai({
+  subsets: ["thai"],
+  weight: ["400", "500", "700"],
+  variable: "--font-noto-thai",
   display: "swap",
 });
 
@@ -27,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={hanken.variable}>
+    <html lang="en" className={`${hanken.variable} ${notoThai.variable}`}>
       <body className="font-sans text-body-md text-on-surface antialiased bg-background min-h-screen">
         <Providers>{children}</Providers>
       </body>

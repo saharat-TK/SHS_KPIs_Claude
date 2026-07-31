@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { isPerformanceStatus } from "@/lib/kpi/performanceRecordStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,9 @@ export async function PATCH(
 ) {
   try {
     const body = await req.json();
+    if ("status" in body && !isPerformanceStatus(body.status)) {
+      return NextResponse.json({ error: "Invalid performance record status" }, { status: 400 });
+    }
     const setClauses: string[] = [];
     const values: unknown[] = [];
     for (const [key, column] of Object.entries(COLUMN_MAP)) {

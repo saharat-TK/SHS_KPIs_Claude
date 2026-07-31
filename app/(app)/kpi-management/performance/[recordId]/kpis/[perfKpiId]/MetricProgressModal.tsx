@@ -35,6 +35,8 @@ export function MetricProgressModal({
   periodsLoading = false,
   approvalState,
   allowApprovalLockedEditing = false,
+  readOnly = false,
+  readOnlyReason,
   fedByName = null,
 }: {
   metric: PerfMetric;
@@ -49,6 +51,8 @@ export function MetricProgressModal({
   /** Parent KPI's quarter approval state; submitted/forwarded/approved lock metrics too. */
   approvalState?: ApprovalState;
   allowApprovalLockedEditing?: boolean;
+  readOnly?: boolean;
+  readOnlyReason?: string;
   /** Set when a data source maps a value into this metric. The value is then
    *  read-only — typing over it would be overwritten by the next feed — but
    *  Issue / Solution stay editable, since approval still requires them. */
@@ -76,13 +80,13 @@ export function MetricProgressModal({
       : null;
   const periodLocked = periods ? !isPeriodOpen(periods, year, quarter) : false;
   const approvalLock = approvalLockForState(approvalState);
-  const readOnlyMessage = approvalLock?.locked
+  const lockMessage = readOnlyReason ?? (approvalLock?.locked
     ? approvalLock.label
     : periodsLoading
       ? "Recording period status is loading. Data entry is temporarily disabled."
       : periodLocked
         ? `Year ${year} Quarter ${quarter} is closed for recording. Ask an admin to open it to enter progress.`
-        : undefined;
+        : undefined);
 
   return (
     <Modal
@@ -123,8 +127,8 @@ export function MetricProgressModal({
             }
             thresholds={thresholds}
             unit={metric.unit}
-            readOnly={periodsLoading || periodLocked || (!!approvalLock?.locked && !allowApprovalLockedEditing)}
-            readOnlyMessage={allowApprovalLockedEditing ? undefined : readOnlyMessage}
+            readOnly={readOnly || periodsLoading || periodLocked || (!!approvalLock?.locked && !allowApprovalLockedEditing)}
+            readOnlyMessage={allowApprovalLockedEditing && !readOnly ? undefined : lockMessage}
             approvalLock={approvalLock?.locked && !allowApprovalLockedEditing ? approvalLock : null}
             saving={save.isPending}
             onSave={(data) =>

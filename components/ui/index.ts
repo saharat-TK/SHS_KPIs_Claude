@@ -10,6 +10,16 @@ export { Tabs, type TabItem } from "./Tabs";
 export { Modal } from "./Modal";
 export { HoverPopover } from "./HoverPopover";
 export { StatCard } from "./StatCard";
+export { CountUp, useReducedMotion } from "./CountUp";
+export {
+  TrendLineChart,
+  CategoryBarChart,
+  AchievementTrendChart,
+  GroupAchievementChart,
+  HealthDonut,
+  TargetVsActualChart,
+  HEALTH_FILL,
+} from "./Charts";
 export { ThresholdBar, healthOf, HEALTH_LABEL, type Health } from "./ThresholdBar";
 export { StatusPill } from "./StatusPill";
 export { EmptyState } from "./EmptyState";
