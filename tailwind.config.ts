@@ -112,6 +112,35 @@ const config: Config = {
       boxShadow: {
         chrome: "0 0 5px 0 rgba(0,0,0,0.1)",
       },
+      // Motion is deliberately short and linear-ish — "precise instrument", not
+      // bounce. Everything here is disabled under prefers-reduced-motion by the
+      // global guard in app/globals.css.
+      keyframes: {
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "grow-x": {
+          "0%": { transform: "scaleX(0)" },
+          "100%": { transform: "scaleX(1)" },
+        },
+        // Left-to-right reveal for plotted data — the chart is drawn in full and
+        // uncovered, so nothing depends on a JS animation loop.
+        "wipe-x": {
+          "0%": { clipPath: "inset(0 100% 0 0)" },
+          "100%": { clipPath: "inset(0 0 0 0)" },
+        },
+        "pop-in": {
+          "0%": { opacity: "0", transform: "scale(0.94)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+      },
+      animation: {
+        "fade-up": "fade-up 420ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "grow-x": "grow-x 620ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "wipe-x": "wipe-x 700ms cubic-bezier(0.33, 1, 0.68, 1) both",
+        "pop-in": "pop-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both",
+      },
     },
   },
   plugins: [],

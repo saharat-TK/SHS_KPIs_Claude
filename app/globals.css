@@ -35,3 +35,17 @@ body {
     @apply w-full max-w-canvas mx-auto;
   }
 }
+
+/* One global off-switch for motion. The charts and count-up numbers read the
+   same preference through useReducedMotion() (components/ui/CountUp.tsx), so
+   JS-driven and CSS-driven animation stop together. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
