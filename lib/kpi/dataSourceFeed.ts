@@ -21,56 +21,14 @@ import { ACADEMIC_RANKS } from "@/lib/types";
 import {
   PERFORMANCE_QUARTER_COUNT,
   PERFORMANCE_YEAR_COUNT,
-  yearForYearNo,
+  entriesInWindow,
 } from "@/lib/kpi/performancePeriods";
+import type { FeedOutcome } from "@/lib/kpi/feedOutcome";
+import { emptyOutcome, mergeOutcomes } from "@/lib/kpi/feedOutcome";
 import { recomputeKpiQuarter } from "@/lib/kpi/performance";
 import { COLUMN_SELECT, mapColumnRow, parseJsonColumn } from "@/lib/kpi/dataSourcesServer";
 
 type Db = Pool | PoolConnection;
-
-export interface FeedSkip {
-  target: string;
-  yearNo: number;
-  quarterNo: number;
-  reason: string;
-}
-
-export interface FeedOutcome {
-  updated: number;
-  /** Quarters whose stored value was emptied because the link can no longer
-   *  produce one there — see applyLink. */
-  cleared: number;
-  skipped: FeedSkip[];
-}
-
-const empty = (): FeedOutcome => ({ updated: 0, cleared: 0, skipped: [] });
-
-const merge = (a: FeedOutcome, b: FeedOutcome): FeedOutcome => ({
-  updated: a.updated + b.updated,
-  cleared: a.cleared + b.cleared,
-  skipped: [...a.skipped, ...b.skipped],
-});
-
-/** Short human summary for a toast. */
-export function describeOutcome(outcome: FeedOutcome): string {
-  const parts = [`${outcome.updated} quarter${outcome.updated === 1 ? "" : "s"} updated`];
-
-  // Only worth saying when it happened: clearing is rare, and a "0 cleared" on
-  // every ordinary save would read as though something were wrong.
-  if (outcome.cleared > 0) parts.push(`${outcome.cleared} cleared`);
-
-  if (outcome.skipped.length > 0) {
-    const byReason = new Map<string, number>();
-    for (const s of outcome.skipped) {
-      byReason.set(s.reason, (byReason.get(s.reason) ?? 0) + 1);
-    }
-    const detail = [...byReason.entries()]
-      .map(([reason, n]) => `${n} ${reason}`)
-      .join(", ");
-    parts.push(`${outcome.skipped.length} skipped (${detail})`);
-  }
-  return parts.join(" · ");
-}
 
 interface Entry {
   id: number;
@@ -135,16 +93,6 @@ async function loadLinks(db: Db, where: string, args: unknown[]): Promise<LinkRo
     }))
     // A link with no mappings is evidence only — nothing to compute.
     .filter((l) => l.mappings.length > 0);
-}
-
-/** The rows that count toward (yearNo, quarterNo): cumulative within the year.
- *  Annual-grain entries carry no quarter and describe the whole year, so they
- *  count from Q1 onward (decision D5). */
-function windowFor(entries: Entry[], startYear: number, yearNo: number, quarterNo: number) {
-  const year = yearForYearNo(startYear, yearNo);
-  return entries.filter(
-    (e) => e.year === year && (e.quarter == null || e.quarter <= quarterNo),
-  );
 }
 
 /** Where a link's value has to land: one perf row per ACTIVE performance record
@@ -252,7 +200,7 @@ async function applyLink(
   entries: Entry[],
   roster: { rank: string; status: string }[],
 ): Promise<FeedOutcome> {
-  const outcome = empty();
+  const outcome = emptyOutcome();
   const targets = await targetsForLink(conn, link);
 
   for (const target of targets) {
@@ -260,7 +208,7 @@ async function applyLink(
 
     for (let yearNo = 1; yearNo <= PERFORMANCE_YEAR_COUNT; yearNo += 1) {
       for (let quarterNo = 1; quarterNo <= PERFORMANCE_QUARTER_COUNT; quarterNo += 1) {
-        const rows = windowFor(entries, target.startYear, yearNo, quarterNo);
+        const rows = entriesInWindow(entries, target.startYear, yearNo, quarterNo);
 
         // Decide the guards once: they gate writing AND clearing alike, so a
         // closed or approval-locked quarter is never touched in either
@@ -389,15 +337,15 @@ export async function feedFromDataSource(
   dataSourceId: number,
 ): Promise<FeedOutcome> {
   const links = await loadLinks(conn, "WHERE l.data_source_id = ?", [dataSourceId]);
-  if (links.length === 0) return empty();
+  if (links.length === 0) return emptyOutcome();
 
   const columns = await loadColumns(conn, dataSourceId);
   const entries = await loadEntries(conn, dataSourceId);
   const roster = await loadRoster(conn);
 
-  let outcome = empty();
+  let outcome = emptyOutcome();
   for (const link of links) {
-    outcome = merge(outcome, await applyLink(conn, link, columns, entries, roster));
+    outcome = mergeOutcomes(outcome, await applyLink(conn, link, columns, entries, roster));
   }
   return outcome;
 }
@@ -418,20 +366,20 @@ export async function feedRecord(
      )`,
     [recordId],
   );
-  if (links.length === 0) return empty();
+  if (links.length === 0) return emptyOutcome();
 
   // Columns and entries are per data source; load each one once.
   const columnsBySource = new Map<number, DataSourceColumn[]>();
   const entriesBySource = new Map<number, Entry[]>();
   const roster = await loadRoster(conn);
 
-  let outcome = empty();
+  let outcome = emptyOutcome();
   for (const link of links) {
     if (!columnsBySource.has(link.dataSourceId)) {
       columnsBySource.set(link.dataSourceId, await loadColumns(conn, link.dataSourceId));
       entriesBySource.set(link.dataSourceId, await loadEntries(conn, link.dataSourceId));
     }
-    outcome = merge(
+    outcome = mergeOutcomes(
       outcome,
       await applyLink(
         conn,
