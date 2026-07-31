@@ -171,24 +171,26 @@ async function targetsForLink(db: Db, link: LinkRow): Promise<Target[]> {
 
   const [rows] = await db.query<RowDataPacket[]>(
     `SELECT k.id AS perfKpiId, k.name, k.record_id AS recordId, k.unit,
-            k.has_children AS hasChildren, r.start_year AS startYear
+            r.start_year AS startYear
        FROM perf_kpi k
        JOIN performance_record r ON r.id = k.record_id AND r.status = 'active'
       WHERE k.source_kpi_id = ?`,
     [link.libraryKpiId],
   );
-  // A KPI with metrics is rolled up from them; feeding it directly would be
-  // overwritten on the next roll-up, so leave it alone.
-  return rows
-    .filter((r) => !r.hasChildren)
-    .map((r) => ({
-      perfKpiId: Number(r.perfKpiId),
-      perfMetricId: null,
-      recordId: Number(r.recordId),
-      startYear: Number(r.startYear),
-      unit: r.unit ?? null,
-      name: r.name,
-    }));
+  // Metrics are no bar: linking a KPI to a data source is a statement that the
+  // source owns its value, and recomputeKpiQuarter defers to it (see
+  // rollsUpFromChildren in lib/kpi/performance.ts). A link can express what no
+  // calculation_type can — a faculty-headcount denominator, or a filter the
+  // children don't share — which is exactly why one gets authored on a KPI that
+  // already has sub-KPIs.
+  return rows.map((r) => ({
+    perfKpiId: Number(r.perfKpiId),
+    perfMetricId: null,
+    recordId: Number(r.recordId),
+    startYear: Number(r.startYear),
+    unit: r.unit ?? null,
+    name: r.name,
+  }));
 }
 
 /** Open recording periods for a record, as a "y:q" set. Missing row = closed. */

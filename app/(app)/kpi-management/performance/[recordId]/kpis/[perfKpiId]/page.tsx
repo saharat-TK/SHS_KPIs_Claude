@@ -263,11 +263,18 @@ function PerfKpiProgress() {
               // A fed KPI is as computed as a rolled-up one — typing over it
               // would just be overwritten by the next feed.
               valueEditable={!kpi.hasChildren && !kpi.fedBy}
+              // A link outranks the roll-up (rollsUpFromChildren in
+              // lib/kpi/performance.ts), so test fedBy first — otherwise a
+              // linked parent would claim its sub-KPIs produced a number they
+              // had no part in.
               computedNote={
-                kpi.hasChildren
-                  ? "This KPI's quarterly value is computed from its sub-KPIs. Enter each sub-KPI's progress below."
-                  : kpi.fedBy
-                    ? `This KPI's quarterly value is computed from the data source “${kpi.fedBy.dataSourceName}”. Edit the raw data there to change it.`
+                kpi.fedBy
+                  ? `This KPI's quarterly value is computed from the data source “${kpi.fedBy.dataSourceName}”. Edit the raw data there to change it.` +
+                    (kpi.hasChildren
+                      ? " Its sub-KPIs below are still recorded, but do not determine this value."
+                      : "")
+                  : kpi.hasChildren
+                    ? "This KPI's quarterly value is computed from its sub-KPIs. Enter each sub-KPI's progress below."
                     : undefined
               }
               periods={periodsQ.data ?? []}

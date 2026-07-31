@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rollup, rollupParts } from "../lib/kpi/performance.ts";
+import { rollup, rollupParts, rollsUpFromChildren } from "../lib/kpi/performance.ts";
 
 test("percent_of_total pools progress and targets rather than averaging ratios", () => {
   const value = rollup("percent_of_total", [
@@ -217,4 +217,20 @@ test("combined_* returns null when no child carries parts — no sum fallback", 
     variable2: null,
   });
   assert.equal(rollup("combined_ratio", []), null);
+});
+
+// ── which engine owns the value ─────────────────────────────────────────────
+
+test("only a childed KPI with no link of its own is rolled up", () => {
+  assert.equal(rollsUpFromChildren({ hasChildren: true, fedDirectly: false }), true);
+
+  // A link outranks the roll-up. K2-1 is the case: "publications (Scopus Q1-Q2)
+  // per faculty member" divides by the staff roster and excludes two of its own
+  // sub-KPIs, so rolling it up from them answered a different question — it
+  // reported 6, 14, 20, 23 (raw cumulative counts) where the answer is 0.11.
+  assert.equal(rollsUpFromChildren({ hasChildren: true, fedDirectly: true }), false);
+
+  // A leaf is never rolled up either way: fed by a link, or entered by hand.
+  assert.equal(rollsUpFromChildren({ hasChildren: false, fedDirectly: true }), false);
+  assert.equal(rollsUpFromChildren({ hasChildren: false, fedDirectly: false }), false);
 });

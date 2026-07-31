@@ -636,6 +636,11 @@ CREATE INDEX idx_dsl_metric ON data_source_link(library_metric_id);
 --    perf_kpi_quarter_progress.progress_value with is_computed = 1 and
 --    value_source = 'rollup', alongside the numerator/denominator it divided in
 --    variable1_value / variable2_value (lib/kpi/performance.ts#rollupParts).
+--    PRECEDENCE: link > roll-up > manual. A data_source_link on the KPI (with
+--    mappings) wins over the roll-up however many metrics the KPI has — the link
+--    is the more specific statement, and expresses divisors no calculation_type
+--    reaches (a faculty headcount) and numerators the children don't share.
+--    See lib/kpi/performance.ts#rollsUpFromChildren.
 --  * value_source names the engine that wrote a quarter row: 'manual' (the
 --    progress PUT routes), 'rollup' (the calc engine above) or 'data_source'
 --    (lib/kpi/dataSourceFeed.ts). is_computed stays as-is for existing callers,
