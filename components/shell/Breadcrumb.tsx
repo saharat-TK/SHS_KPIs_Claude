@@ -22,7 +22,7 @@ const LABELS: Record<string, string> = {
   history: "Version History",
   analytics: "Analytics",
   "student-success": "Student Success",
-  validation: "Validation Queue",
+  validation: "Performance Approval Queue",
   admin: "Administration",
   units: "Units",
 };

@@ -64,17 +64,38 @@ const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> 
 };
 
 export default function DashboardPage() {
-  return (
-    <RequirePermission action="view_dashboards">
-      <Dashboard />
-    </RequirePermission>
+  const { user, can } = useAuth();
+  const kpis = useKpis();
+  const committees = useCommittees();
+  const faculty = useFaculty();
+  const performanceRecords = usePerformanceRecords();
+  const categoriesQ = useKpiCategories();
+  const activeRecord =
+    performanceRecords.data?.find((record) => record.status === "active") ??
+    performanceRecords.data?.[0];
+  const approvals = useRecordApprovals(activeRecord?.id ?? 0, 1, 1);
+
+  const categories = categoriesQ.data ?? KPI_CATEGORIES;
+
+  const loading =
+    kpis.isLoading ||
+    committees.isLoading ||
+    faculty.isLoading ||
+    performanceRecords.isLoading ||
+    approvals.isLoading;
+
+  const atRisk = useMemo(
+    () =>
+      (kpis.data ?? []).filter(
+        (k) => healthOf(k.currentValue, k.thresholds) !== "healthy",
+      ),
+    [kpis.data],
   );
 }
 
-function Dashboard() {
-  const router = useRouter();
-  const { user } = useAuth();
-  const recordsQ = usePerformanceRecords();
+  const pending = (approvals.data ?? []).filter(
+    (approval) => approval.state === "submitted" || approval.state === "forwarded",
+  ).length;
 
   // Which record is on screen. Null until the records land, then the active one
   // that is actually being recorded into; the switcher can override it.
@@ -249,20 +270,40 @@ function Dashboard() {
               message="It was activated from a strategic set with no KPIs, or the sync has not run yet."
             />
           </Card>
-        ) : (
-          <>
-            <Tabs
-              items={[
-                { id: "all", label: "All Groups", count: kpis.length },
-                ...groups.map((g) => ({
-                  id: g.id,
-                  label: g.label,
-                  count: kpisInGroup(kpis, g.id, categories).length,
-                })),
-              ]}
-              active={activeGroup}
-              onChange={setGroup}
+
+          <Card>
+            <CardHeader
+              title="Needs Review"
+              actions={
+                can("record_performance") && (
+                  <Link href="/validation">
+                    <Button variant="ghost" size="sm" iconRight="chevron_right">
+                      Queue
+                    </Button>
+                  </Link>
+                )
+              }
             />
+            <CardBody className="flex flex-col gap-sm">
+              <div className="flex items-center gap-md rounded-lg bg-surface-soft p-md">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/10 text-warning">
+                  <Icon name="pending_actions" size={22} />
+                </span>
+                <div>
+                  <p className="text-heading-md text-on-surface">{pending}</p>
+                  <p className="text-caption-sm text-mute">
+                    KPI packages awaiting review{activeRecord ? ` · ${activeRecord.name}` : ""}
+                  </p>
+                </div>
+              </div>
+              <p className="text-body-sm text-mute">
+                {can("record_performance")
+                  ? "You have reviewer access — open the queue to act on these."
+                  : "Reviewers will action these submissions."}
+              </p>
+            </CardBody>
+          </Card>
+        </div>
 
             <div className="grid grid-cols-2 gap-lg lg:grid-cols-4">
               <StatCard
