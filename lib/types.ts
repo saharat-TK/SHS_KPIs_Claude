@@ -239,6 +239,32 @@ export interface Measurement {
   value: number;
 }
 
+export type ValidationStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "clarification";
+
+export interface ValidationComment {
+  authorId: string;
+  authorName: string;
+  timestamp: string;
+  text: string;
+}
+
+export interface ValidationSubmission {
+  id: string;
+  metricId: string;
+  committeeId: string;
+  submittedById: string;
+  submittedDate: string; // ISO
+  period: string;
+  value: number;
+  status: ValidationStatus;
+  reviewerId?: string;
+  comments: ValidationComment[];
+}
+
 export interface User {
   id: string;
   name: string;
@@ -500,17 +526,6 @@ export interface PerfKpiApproval {
   unit?: string | null;
   progressValue?: number | null;
   hasChildren?: boolean;
-  /** Selected-quarter metric values included by the record approval queue. */
-  metrics?: PerfKpiApprovalMetricSummary[];
-}
-
-/** A metric that belongs to a KPI-quarter approval package. Metrics are
- * reviewable evidence, but do not have an independent approval state. */
-export interface PerfKpiApprovalMetricSummary {
-  id: number;
-  name: string;
-  unit: string | null;
-  progressValue: number | null;
 }
 
 /** One append-only audit/comment row in an approval's thread. */

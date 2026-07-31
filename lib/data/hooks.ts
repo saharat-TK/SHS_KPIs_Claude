@@ -13,6 +13,8 @@ import type {
   Kpi,
   KpiCategoryRecord,
   Metric,
+  ValidationComment,
+  ValidationStatus,
 } from "@/lib/types";
 import type {
   AnnualTarget,
@@ -52,6 +54,7 @@ import {
   performanceRecordsRepo,
   strategicSetsRepo,
   unitsRepo,
+  validationsRepo,
 } from "./repositories";
 
 // ── Toast design-system seam ────────────────────────────────────────────────
@@ -79,6 +82,7 @@ export const qk = {
   formulaVersions: (id: string) => ["formulas", id, "versions"] as const,
   allVersions: ["formulas", "versions", "all"] as const,
   measurements: ["measurements"] as const,
+  validations: ["validations"] as const,
   facultyRecords: ["facultyRecords"] as const,
   committeeMemberships: ["committeeMemberships"] as const,
   strategicSets: ["strategicSets"] as const,
@@ -151,6 +155,9 @@ export const useAllVersions = () =>
 
 export const useMeasurements = () =>
   useQuery({ queryKey: qk.measurements, queryFn: measurementsRepo.list });
+
+export const useValidations = () =>
+  useQuery({ queryKey: qk.validations, queryFn: validationsRepo.list });
 
 // Mutations ------------------------------------------------------------------
 export function useCreateCommittee() {
@@ -841,6 +848,29 @@ export function useApprovalTransition(recordId: number) {
       qc.invalidateQueries({ queryKey: qk.perfKpi(perfKpiId) });
       qc.invalidateQueries({ queryKey: qk.perfMetrics(perfKpiId) });
     },
+  });
+}
+
+export function useDecideValidation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      id: string;
+      status: ValidationStatus;
+      reviewerId: string;
+      comment?: ValidationComment;
+    }) => validationsRepo.decide(args.id, args.status, args.reviewerId, args.comment),
+    meta: {
+      toast: (_d, v) => {
+        const s = (v as { status: ValidationStatus }).status;
+        return s === "approved"
+          ? "Submission approved"
+          : s === "rejected"
+            ? "Submission rejected"
+            : "Clarification requested";
+      },
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.validations }),
   });
 }
 

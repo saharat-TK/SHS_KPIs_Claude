@@ -6,6 +6,7 @@ import type {
   Kpi,
   Measurement,
   Metric,
+  ValidationSubmission,
 } from "@/lib/types";
 import * as seed from "./seed";
 
@@ -21,6 +22,7 @@ interface DB {
   formulas: Formula[];
   formulaVersions: FormulaVersion[];
   measurements: Measurement[];
+  validations: ValidationSubmission[];
 }
 
 function clone<T>(v: T): T {
@@ -39,6 +41,7 @@ export function getDB(): DB {
       formulas: clone(seed.formulas),
       formulaVersions: clone(seed.formulaVersions),
       measurements: clone(seed.measurements),
+      validations: clone(seed.validationSubmissions),
     };
   }
   return db;

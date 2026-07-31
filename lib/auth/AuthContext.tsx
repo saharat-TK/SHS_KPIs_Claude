@@ -63,7 +63,7 @@ export const PERSONAS: Persona[] = [
     name: "Dr. Krit Saetang",
     email: "reviewer@mfu.ac.th",
     role: "reviewer",
-    hint: "Reviewer · performance approval queue",
+    hint: "Reviewer · validation queue",
   },
   {
     personaId: "viewer",

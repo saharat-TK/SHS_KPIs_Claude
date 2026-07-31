@@ -34,7 +34,7 @@ Other scripts: `npm run build`, `npm run start`, `npm run lint`, `npm run typech
 | `/metrics` | Sub-KPI (metric) CRUD with targets, weights, data sources |
 | `/formulas/builder` | Formula authoring with live `mathjs` validation (sandboxed) |
 | `/formulas/history` | Version history / audit log with revert |
-| `/validation` | Performance approval queue — quarterly KPI review and approval |
+| `/validation` | Validation queue — approve / reject / request clarification |
 
 ## Roles (RBAC)
 

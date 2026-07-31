@@ -66,33 +66,8 @@ export async function GET(
       ],
     );
 
-    // Approval is granted to a KPI-quarter package, so return its child metric
-    // values as review evidence rather than creating a separate metric state.
-    const [metricRows] = await pool.query<RowDataPacket[]>(
-      `SELECT m.id, m.perf_kpi_id AS perfKpiId, m.name, m.unit,
-              qp.progress_value AS progressValue
-       FROM perf_metric m
-       INNER JOIN perf_kpi k ON k.id = m.perf_kpi_id
-       LEFT JOIN perf_metric_quarter_progress qp
-         ON qp.perf_metric_id = m.id AND qp.year_no = ? AND qp.quarter_no = ?
-       WHERE k.record_id = ?
-       ORDER BY m.perf_kpi_id, m.sort_order, m.id`,
-      [yearNo, quarterNo, params.id],
-    );
-    const metricsByKpi = new Map<number, RowDataPacket[]>();
-    for (const metric of metricRows) {
-      const metrics = metricsByKpi.get(metric.perfKpiId) ?? [];
-      metrics.push(metric);
-      metricsByKpi.set(metric.perfKpiId, metrics);
-    }
-
     return NextResponse.json(
-      rows.map((r) => ({
-        ...r,
-        hasChildren: !!r.hasChildren,
-        isOpen: !!r.isOpen,
-        metrics: metricsByKpi.get(r.perfKpiId) ?? [],
-      })),
+      rows.map((r) => ({ ...r, hasChildren: !!r.hasChildren, isOpen: !!r.isOpen })),
     );
   } catch (err) {
     return NextResponse.json(

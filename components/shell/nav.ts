@@ -30,17 +30,6 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Workflow",
-    items: [
-      {
-        label: "Performance Approval Queue",
-        href: "/validation",
-        icon: "approval",
-        requires: "record_performance",
-      },
-    ],
-  },
-  {
     label: "KPI Management",
     items: [
       {
@@ -118,6 +107,23 @@ export const NAV: NavGroup[] = [
         href: "/formulas/history",
         icon: "history",
         requires: "configure_kpis",
+      },
+    ],
+  },
+  {
+    label: "Workflow",
+    items: [
+      {
+        label: "Validation Queue",
+        href: "/validation",
+        icon: "fact_check",
+        requires: "review_submissions",
+      },
+      {
+        label: "Performance Approvals",
+        href: "/performance-approvals",
+        icon: "approval",
+        requires: "record_performance",
       },
     ],
   },
