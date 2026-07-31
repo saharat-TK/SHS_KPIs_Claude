@@ -46,6 +46,7 @@ import {
 } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
 import { unitNeedsDivisor } from "@/lib/kpi/progress";
+import { weightSumWarning } from "@/lib/kpi/weight";
 import { personsForCommittee } from "@/lib/kpi/committee";
 import { MetricEditor } from "./MetricEditor";
 
@@ -273,6 +274,9 @@ function KpiDetail() {
   const formulas = formulasQ.data ?? [];
   const metrics = metricsQ.data ?? [];
   const hasChildren = metrics.length > 0;
+  // Advisory only — nothing rejects a total other than 100, but weighted_sum
+  // scales its answer by it, so the editor is where to say so.
+  const weightWarning = weightSumWarning(metrics.map((m) => m.weight));
   const parentTargets = useMemo(
     () => ({ fiveYearTarget: draft?.fiveYearTarget ?? null, years }),
     [draft?.fiveYearTarget, years],
@@ -561,6 +565,18 @@ function KpiDetail() {
                           No formula linked yet — pick one above or open the builder to create one.
                         </p>
                       )}
+                      {/* The roll-up returns nothing for this type — see
+                          rollupParts in lib/kpi/performance.ts. Saying so here
+                          is the difference between "the formula runs" and "the
+                          formula documents what someone types in". */}
+                      <p className="flex items-start gap-xs text-caption-sm text-mute">
+                        <Badge tone="neutral">note</Badge>
+                        <span>
+                          A linked formula records how this KPI is calculated; it is not
+                          evaluated automatically. On performance records the quarterly value
+                          stays blank until someone enters it.
+                        </span>
+                      </p>
                     </>
                   ) : POOLED_EXPLAINER[draft.calculationType] ? (
                     <p className="text-body-sm text-mute">
@@ -573,6 +589,15 @@ function KpiDetail() {
                       count={metrics.length}
                       value={computeTargetPreview(draft.calculationType, metrics)}
                     />
+                  )}
+
+                  {/* Only weighted_sum reads weight; the others ignore it, so a
+                      warning there would be noise. */}
+                  {draft.calculationType === "weighted_sum" && weightWarning && (
+                    <p className="flex items-start gap-xs text-caption-sm text-mute">
+                      <Badge tone="warning">weights</Badge>
+                      <span>{weightWarning}</span>
+                    </p>
                   )}
 
                   <div className="flex flex-col gap-sm border-t border-hairline pt-lg">

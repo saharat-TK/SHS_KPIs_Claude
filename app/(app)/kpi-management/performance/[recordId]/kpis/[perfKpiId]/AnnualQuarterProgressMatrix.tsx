@@ -7,6 +7,7 @@ import {
   currentValueForYear,
   percentOfTarget,
   quarterTargetFor,
+  sameUnit,
   targetForYear,
 } from "@/lib/kpi/progress";
 import type { PerfKpi, PerfMetric, QuarterlyTargetMode, QuarterProgress } from "@/lib/types";
@@ -126,7 +127,13 @@ export function AnnualQuarterProgressMatrix({
             ))}
 
             {rows.map((row) => {
-              const cells = cellsForRow(row, year, kpiAnnualTarget, kpi.quarterlyTargetMode);
+              const cells = cellsForRow(
+                row,
+                year,
+                kpiAnnualTarget,
+                kpi.unit,
+                kpi.quarterlyTargetMode,
+              );
               return (
                 <ProgressMatrixRow key={row.id} row={row} cells={cells} />
               );
@@ -201,12 +208,30 @@ function cellsForRow(
   row: MatrixRow,
   year: number,
   kpiAnnualTarget: number | null,
+  kpiUnit: string | null,
   mode: QuarterlyTargetMode,
 ): CellData[] {
   const rowAnnualTarget = targetForYear(row.annualTargets, year);
   const rowTargetMissing = rowAnnualTarget == null || rowAnnualTarget === 0;
-  const usesKpiFallback = !row.isParent && rowTargetMissing && kpiAnnualTarget != null;
-  const annualTarget = row.isParent || !rowTargetMissing ? rowAnnualTarget : kpiAnnualTarget;
+  // Borrowing the KPI's target only means something when the two measure the
+  // same quantity. K2-1 counts publications (Item) against a per-faculty Ratio
+  // target of 0.25, so one publication rendered as 400% — a comparison the data
+  // never supported. Without a target the cell reads "—", which percentOfTarget
+  // and the renderer already handle.
+  const usesKpiFallback =
+    !row.isParent &&
+    rowTargetMissing &&
+    kpiAnnualTarget != null &&
+    sameUnit(row.unit, kpiUnit);
+  // Must key off usesKpiFallback, not rowTargetMissing alone: the flag also
+  // drives the dot and the tooltip, and if the two disagree the cell shows a
+  // percentage it does not admit to having borrowed.
+  const annualTarget =
+    row.isParent || !rowTargetMissing
+      ? rowAnnualTarget
+      : usesKpiFallback
+        ? kpiAnnualTarget
+        : null;
   const targetSource: TargetSource = usesKpiFallback ? "kpi-fallback" : "row";
   const quarterCells = QUARTERS.map((quarter) => {
     const target = quarterTargetFor(annualTarget, quarter, mode);
