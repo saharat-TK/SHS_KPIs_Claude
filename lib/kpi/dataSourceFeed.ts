@@ -6,7 +6,7 @@
 // Issue and a Solution, and a computed number has no narrative. Unlike the
 // roll-up, the feed RESPECTS the guards: a closed recording period or an
 // approval-locked quarter is skipped and reported, never overwritten.
-import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
   DataSourceCellValue,
   DataSourceColumn,
@@ -21,46 +21,14 @@ import { ACADEMIC_RANKS } from "@/lib/types";
 import {
   PERFORMANCE_QUARTER_COUNT,
   PERFORMANCE_YEAR_COUNT,
-  yearForYearNo,
+  entriesInWindow,
 } from "@/lib/kpi/performancePeriods";
+import type { FeedOutcome } from "@/lib/kpi/feedOutcome";
+import { emptyOutcome, mergeOutcomes } from "@/lib/kpi/feedOutcome";
 import { recomputeKpiQuarter } from "@/lib/kpi/performance";
 import { COLUMN_SELECT, mapColumnRow, parseJsonColumn } from "@/lib/kpi/dataSourcesServer";
 
 type Db = Pool | PoolConnection;
-
-export interface FeedSkip {
-  target: string;
-  yearNo: number;
-  quarterNo: number;
-  reason: string;
-}
-
-export interface FeedOutcome {
-  updated: number;
-  skipped: FeedSkip[];
-}
-
-const empty = (): FeedOutcome => ({ updated: 0, skipped: [] });
-
-const merge = (a: FeedOutcome, b: FeedOutcome): FeedOutcome => ({
-  updated: a.updated + b.updated,
-  skipped: [...a.skipped, ...b.skipped],
-});
-
-/** Short human summary for a toast. */
-export function describeOutcome(outcome: FeedOutcome): string {
-  const head = `${outcome.updated} quarter${outcome.updated === 1 ? "" : "s"} updated`;
-  if (outcome.skipped.length === 0) return head;
-
-  const byReason = new Map<string, number>();
-  for (const s of outcome.skipped) {
-    byReason.set(s.reason, (byReason.get(s.reason) ?? 0) + 1);
-  }
-  const detail = [...byReason.entries()]
-    .map(([reason, n]) => `${n} ${reason}`)
-    .join(", ");
-  return `${head} · ${outcome.skipped.length} skipped (${detail})`;
-}
 
 interface Entry {
   id: number;
@@ -127,16 +95,6 @@ async function loadLinks(db: Db, where: string, args: unknown[]): Promise<LinkRo
     .filter((l) => l.mappings.length > 0);
 }
 
-/** The rows that count toward (yearNo, quarterNo): cumulative within the year.
- *  Annual-grain entries carry no quarter and describe the whole year, so they
- *  count from Q1 onward (decision D5). */
-function windowFor(entries: Entry[], startYear: number, yearNo: number, quarterNo: number) {
-  const year = yearForYearNo(startYear, yearNo);
-  return entries.filter(
-    (e) => e.year === year && (e.quarter == null || e.quarter <= quarterNo),
-  );
-}
-
 /** Where a link's value has to land: one perf row per ACTIVE performance record
  *  that snapshotted the library KPI/metric. */
 interface Target {
@@ -171,24 +129,58 @@ async function targetsForLink(db: Db, link: LinkRow): Promise<Target[]> {
 
   const [rows] = await db.query<RowDataPacket[]>(
     `SELECT k.id AS perfKpiId, k.name, k.record_id AS recordId, k.unit,
-            k.has_children AS hasChildren, r.start_year AS startYear
+            r.start_year AS startYear
        FROM perf_kpi k
        JOIN performance_record r ON r.id = k.record_id AND r.status = 'active'
       WHERE k.source_kpi_id = ?`,
     [link.libraryKpiId],
   );
-  // A KPI with metrics is rolled up from them; feeding it directly would be
-  // overwritten on the next roll-up, so leave it alone.
-  return rows
-    .filter((r) => !r.hasChildren)
-    .map((r) => ({
-      perfKpiId: Number(r.perfKpiId),
-      perfMetricId: null,
-      recordId: Number(r.recordId),
-      startYear: Number(r.startYear),
-      unit: r.unit ?? null,
-      name: r.name,
-    }));
+  // Metrics are no bar: linking a KPI to a data source is a statement that the
+  // source owns its value, and recomputeKpiQuarter defers to it (see
+  // rollsUpFromChildren in lib/kpi/performance.ts). A link can express what no
+  // calculation_type can — a faculty-headcount denominator, or a filter the
+  // children don't share — which is exactly why one gets authored on a KPI that
+  // already has sub-KPIs.
+  return rows.map((r) => ({
+    perfKpiId: Number(r.perfKpiId),
+    perfMetricId: null,
+    recordId: Number(r.recordId),
+    startYear: Number(r.startYear),
+    unit: r.unit ?? null,
+    name: r.name,
+  }));
+}
+
+/** Empty the value a previous feed left on one quarter, keeping the row (and its
+ *  issue/solution) in place. Returns whether anything was actually cleared.
+ *
+ *  `is_computed = 1` is the safety rule: a hand-entered number was never this
+ *  link's to write, so it is never this link's to erase. The KPI row also takes
+ *  value_source, since an empty row still belongs to the source that owns it. */
+async function clearComputedQuarter(
+  conn: PoolConnection,
+  target: Target,
+  yearNo: number,
+  quarterNo: number,
+): Promise<boolean> {
+  const [res] =
+    target.perfMetricId != null
+      ? await conn.query<ResultSetHeader>(
+          `UPDATE perf_metric_quarter_progress
+              SET progress_value = NULL, variable1_value = NULL, variable2_value = NULL
+            WHERE perf_metric_id = ? AND year_no = ? AND quarter_no = ?
+              AND is_computed = 1 AND progress_value IS NOT NULL`,
+          [target.perfMetricId, yearNo, quarterNo],
+        )
+      : await conn.query<ResultSetHeader>(
+          `UPDATE perf_kpi_quarter_progress
+              SET progress_value = NULL, variable1_value = NULL, variable2_value = NULL,
+                  value_source = 'data_source'
+            WHERE perf_kpi_id = ? AND year_no = ? AND quarter_no = ?
+              AND is_computed = 1 AND progress_value IS NOT NULL`,
+          [target.perfKpiId, yearNo, quarterNo],
+        );
+  return res.affectedRows > 0;
 }
 
 /** Open recording periods for a record, as a "y:q" set. Missing row = closed. */
@@ -208,7 +200,7 @@ async function applyLink(
   entries: Entry[],
   roster: { rank: string; status: string }[],
 ): Promise<FeedOutcome> {
-  const outcome = empty();
+  const outcome = emptyOutcome();
   const targets = await targetsForLink(conn, link);
 
   for (const target of targets) {
@@ -216,29 +208,44 @@ async function applyLink(
 
     for (let yearNo = 1; yearNo <= PERFORMANCE_YEAR_COUNT; yearNo += 1) {
       for (let quarterNo = 1; quarterNo <= PERFORMANCE_QUARTER_COUNT; quarterNo += 1) {
-        const rows = windowFor(entries, target.startYear, yearNo, quarterNo);
-        // Nothing recorded for this period yet — leave whatever is there alone
-        // rather than stamping a null over it.
-        if (rows.length === 0) continue;
+        const rows = entriesInWindow(entries, target.startYear, yearNo, quarterNo);
 
+        // Decide the guards once: they gate writing AND clearing alike, so a
+        // closed or approval-locked quarter is never touched in either
+        // direction.
+        let block: string | null = null;
         if (!open.has(`${yearNo}:${quarterNo}`)) {
-          outcome.skipped.push({
-            target: target.name,
-            yearNo,
-            quarterNo,
-            reason: "period closed",
-          });
+          block = "period closed";
+        } else {
+          const state = await getApprovalState(conn, target.perfKpiId, yearNo, quarterNo);
+          if (isApprovalDataLocked(state)) {
+            block = state === "approved" ? "approved" : "under review";
+          }
+        }
+
+        if (rows.length === 0) {
+          // No rows to compute from. If this link wrote a value here earlier —
+          // before its source rows were re-dated or removed — nothing else will
+          // ever rewrite it: the roll-up defers to the link and the manual PUT
+          // only touches hand-entered rows. So clear it rather than leave a
+          // number that outlived the data behind it.
+          if (!block && (await clearComputedQuarter(conn, target, yearNo, quarterNo))) {
+            outcome.cleared += 1;
+            // A rolled-up parent has to follow its children down. A link-owned
+            // parent no-ops here (rollsUpFromChildren) and is cleared by its
+            // own link's pass instead.
+            if (target.perfMetricId != null) {
+              await recomputeKpiQuarter(conn, target.perfKpiId, yearNo, quarterNo);
+            }
+          }
           continue;
         }
 
-        const state = await getApprovalState(conn, target.perfKpiId, yearNo, quarterNo);
-        if (isApprovalDataLocked(state)) {
-          outcome.skipped.push({
-            target: target.name,
-            yearNo,
-            quarterNo,
-            reason: state === "approved" ? "approved" : "under review",
-          });
+        // Reported only on this path: a closed quarter that had nothing to write
+        // anyway is not a skip worth counting, and folding those in would swamp
+        // the toast.
+        if (block) {
+          outcome.skipped.push({ target: target.name, yearNo, quarterNo, reason: block });
           continue;
         }
 
@@ -330,15 +337,15 @@ export async function feedFromDataSource(
   dataSourceId: number,
 ): Promise<FeedOutcome> {
   const links = await loadLinks(conn, "WHERE l.data_source_id = ?", [dataSourceId]);
-  if (links.length === 0) return empty();
+  if (links.length === 0) return emptyOutcome();
 
   const columns = await loadColumns(conn, dataSourceId);
   const entries = await loadEntries(conn, dataSourceId);
   const roster = await loadRoster(conn);
 
-  let outcome = empty();
+  let outcome = emptyOutcome();
   for (const link of links) {
-    outcome = merge(outcome, await applyLink(conn, link, columns, entries, roster));
+    outcome = mergeOutcomes(outcome, await applyLink(conn, link, columns, entries, roster));
   }
   return outcome;
 }
@@ -359,20 +366,20 @@ export async function feedRecord(
      )`,
     [recordId],
   );
-  if (links.length === 0) return empty();
+  if (links.length === 0) return emptyOutcome();
 
   // Columns and entries are per data source; load each one once.
   const columnsBySource = new Map<number, DataSourceColumn[]>();
   const entriesBySource = new Map<number, Entry[]>();
   const roster = await loadRoster(conn);
 
-  let outcome = empty();
+  let outcome = emptyOutcome();
   for (const link of links) {
     if (!columnsBySource.has(link.dataSourceId)) {
       columnsBySource.set(link.dataSourceId, await loadColumns(conn, link.dataSourceId));
       entriesBySource.set(link.dataSourceId, await loadEntries(conn, link.dataSourceId));
     }
-    outcome = merge(
+    outcome = mergeOutcomes(
       outcome,
       await applyLink(
         conn,

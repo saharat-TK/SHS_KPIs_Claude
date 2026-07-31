@@ -15,6 +15,24 @@ export function yearNoForYear(startYear: number, year: number): number | null {
   return yearNo >= 1 && yearNo <= PERFORMANCE_YEAR_COUNT ? yearNo : null;
 }
 
+/** The rows that count toward (yearNo, quarterNo): cumulative within the year.
+ *  Annual-grain entries carry no quarter and describe the whole year, so they
+ *  count from Q1 onward (decision D5).
+ *
+ *  Generic over the row shape so this module keeps its no-imports rule — the
+ *  feed passes its own Entry, a test passes a bare { year, quarter }. */
+export function entriesInWindow<T extends { year: number; quarter: number | null }>(
+  entries: T[],
+  startYear: number,
+  yearNo: number,
+  quarterNo: number,
+): T[] {
+  const year = yearForYearNo(startYear, yearNo);
+  return entries.filter(
+    (e) => e.year === year && (e.quarter == null || e.quarter <= quarterNo),
+  );
+}
+
 export interface PerformancePeriod {
   yearNo: number;
   quarterNo: number;

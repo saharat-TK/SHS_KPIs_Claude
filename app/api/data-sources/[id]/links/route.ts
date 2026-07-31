@@ -8,11 +8,8 @@ import {
   mapLinkRow,
   validateLinkMappings,
 } from "@/lib/kpi/dataSourcesServer";
-import {
-  describeOutcome,
-  feedFromDataSource,
-  type FeedOutcome,
-} from "@/lib/kpi/dataSourceFeed";
+import { describeOutcome, type FeedOutcome } from "@/lib/kpi/feedOutcome";
+import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
 
 export const dynamic = "force-dynamic";
 

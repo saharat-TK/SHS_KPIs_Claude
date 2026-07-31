@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
-import { describeOutcome, feedRecord } from "@/lib/kpi/dataSourceFeed";
+import { describeOutcome } from "@/lib/kpi/feedOutcome";
+import { feedRecord } from "@/lib/kpi/dataSourceFeed";
 
 export const dynamic = "force-dynamic";
 

@@ -38,9 +38,13 @@ request.
 - Target = **metric** → writes `perf_metric_quarter_progress` (`is_computed = 1`),
   then calls `recomputeKpiQuarter()` so the change rolls up into the parent KPI's
   `perf_kpi_quarter_progress`.
-- Target = **KPI** → writes `perf_kpi_quarter_progress` (`is_computed = 1`), but
-  **leaf KPIs only**. A `has_children` KPI is skipped — the roll-up owns its value,
-  and feeding it directly would be overwritten on the next roll-up.
+- Target = **KPI** → writes `perf_kpi_quarter_progress` (`is_computed = 1`),
+  whether or not it has sub-KPIs. Linking a KPI to a source is a statement that
+  the source owns its value, so `recomputeKpiQuarter` stands down for it
+  (`rollsUpFromChildren` in `lib/kpi/performance.ts`). **Precedence: link >
+  roll-up > manual.** A link can express what no `calculation_type` can — K2-1
+  is "publications (Scopus Q1-Q2) per faculty member", whose divisor is the
+  staff roster and whose numerator excludes two of its own sub-KPIs.
 - The feed writes only `progress_value` plus `variable1_value` / `variable2_value`
   — on metric rows as well as KPI rows. It **never** writes `issue` / `solution` —
   a computed number has no narrative, so it bypasses the HTTP progress routes that
@@ -68,7 +72,9 @@ changes — not when the user saves the parent's issue/solution.**
   `perf_kpi_quarter_progress.progress_value` via `rollup()` with `is_computed = 1`,
   **leaving issue/solution untouched**. It runs from three places: a metric-progress
   save (`app/api/perf-metrics/[id]/progress/route.ts`), the data-source feed, and
-  `recomputeRecordRollups` (library re-sync).
+  `recomputeRecordRollups` (library re-sync). It no-ops for a KPI that has its own
+  data-source link — the guard lives inside the function, not at those three call
+  sites, so none of them can bypass it.
 - **UI:** `page.tsx` sets `valueEditable = !kpi.hasChildren && !kpi.fedBy`. For a
   parent (or a directly-fed KPI), `ProgressPanel.tsx` / `QuarterEntry` renders the
   value **read-only** as "Computed value (Cumulative)", or "— (awaiting sub-KPI
@@ -82,7 +88,9 @@ changes — not when the user saves the parent's issue/solution.**
 
 ## 6. Column provenance
 
-**Parent (`has_children`) KPI** — `perf_kpi_quarter_progress`:
+**Parent (`has_children`) KPI, not linked** — `perf_kpi_quarter_progress`. A
+parent that IS linked reads as a fed KPI instead (`value_source =
+'data_source'`), and the rows below describe the roll-up it no longer uses:
 
 | Column | Source |
 |---|---|

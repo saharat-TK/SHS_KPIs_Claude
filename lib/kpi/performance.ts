@@ -149,21 +149,61 @@ export function rollup(calcType: string, rows: RollupRow[]): number | null {
   return rollupParts(calcType, rows).value;
 }
 
-// Recompute a has_children KPI's progress for one (year, quarter) from its
-// child metrics and write it back with is_computed=1 and value_source='rollup',
+/**
+ * Which engine owns a KPI's quarter value. Only a KPI that has children AND no
+ * data-source link of its own is rolled up.
+ *
+ * A link on a KPI is an explicit statement that the source owns its value, and
+ * it can express what no calculation_type can: K2-1 is "publications (Scopus
+ * Q1-Q2) per faculty member", whose divisor is the staff roster and whose
+ * numerator excludes two of its own sub-KPIs. Rolling that KPI up from its
+ * children answered a different question entirely.
+ *
+ * The precedence is link > roll-up > manual. Deferring is unconditional: if the
+ * feed skips a quarter (no matching rows, closed period, approval lock) the
+ * value stays as it was rather than reverting to a roll-up, because a number
+ * that alternates between two engines is worse than one that holds still.
+ */
+export function rollsUpFromChildren(kpi: {
+  hasChildren: boolean;
+  fedDirectly: boolean;
+}): boolean {
+  return kpi.hasChildren && !kpi.fedDirectly;
+}
+
+// Recompute a rolled-up KPI's progress for one (year, quarter) from its child
+// metrics and write it back with is_computed=1 and value_source='rollup',
 // alongside the numerator/denominator it divided, leaving the KPI's own
-// issue/solution untouched. No-op for leaf KPIs.
+// issue/solution untouched. No-op for leaf KPIs and for KPIs a data source
+// feeds directly — see rollsUpFromChildren.
 export async function recomputeKpiQuarter(
   conn: PoolConnection,
   perfKpiId: number,
   yearNo: number,
   quarterNo: number,
 ) {
+  // `mappings IS NOT NULL` matches the fedBy query in app/api/perf-kpis/[id] and
+  // loadLinks' own filter, so an evidence-only link claims nothing.
   const [kpiRows] = await conn.query<RowDataPacket[]>(
-    "SELECT calculation_type, quarterly_target_mode, has_children FROM perf_kpi WHERE id = ?",
+    `SELECT k.calculation_type, k.quarterly_target_mode, k.has_children,
+            EXISTS (SELECT 1 FROM data_source_link l
+                     WHERE l.library_kpi_id = k.source_kpi_id
+                       AND l.mappings IS NOT NULL) AS fedDirectly
+       FROM perf_kpi k WHERE k.id = ?`,
     [perfKpiId],
   );
-  if (kpiRows.length === 0 || !kpiRows[0].has_children) return;
+  if (kpiRows.length === 0) return;
+  // Guarded here rather than at the call sites so every caller inherits it —
+  // including applyLink's metric branch, which recomputes the parent right
+  // after writing a sibling metric.
+  if (
+    !rollsUpFromChildren({
+      hasChildren: !!kpiRows[0].has_children,
+      fedDirectly: !!Number(kpiRows[0].fedDirectly),
+    })
+  ) {
+    return;
+  }
 
   // Metrics inherit the parent KPI's quarterly-target mode; the per-metric
   // quarter target (used by the percent_of_total roll-up) is derived from it in JS.
