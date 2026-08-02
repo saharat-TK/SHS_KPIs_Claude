@@ -1,31 +1,49 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Button, Field, Input, Select } from "@/components/ui";
+import { Modal, Button, Field, Input, RadioGroup, Select } from "@/components/ui";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
   useAcademicCatalog,
+  useBulkCreateDataSourceEntries,
   useCreateDataSourceEntry,
   useFacultyRecords,
   useUpdateDataSourceEntry,
 } from "@/lib/data/hooks";
 import { COLUMN_TYPE_LABELS } from "@/lib/kpi/dataSources";
 import {
-  EMPTY_ACADEMIC_CATALOG,
-  catalogOptionLabel,
-  curriculaForProgram,
-} from "@/lib/kpi/academicCatalog";
+  BATCH_MODE_LABELS,
+  availableBatchModes,
+  type BatchMode,
+} from "@/lib/kpi/batchEntry";
+import { EMPTY_ACADEMIC_CATALOG, buildCellLabels } from "@/lib/kpi/academicCatalog";
 import type {
-  AcademicCatalog,
   DataSourceCellValue,
   DataSourceColumn,
   DataSourceEntry,
   DataSourcePeriodGrain,
-  FacultyRecord,
 } from "@/lib/types";
+import { CellInput } from "./CellInput";
+import { BatchEntryGrid, toPayload, useBatchRows } from "./BatchEntryGrid";
 
-/** Add or edit one row of raw data. Values are held as strings while editing and
- *  coerced server-side by validateEntryValues, which is the authority. */
+const BATCH_MODE_HINTS: Record<BatchMode, string> = {
+  single: "Add one row and fill it in yourself.",
+  programs: "One row per academic program, with the program already chosen.",
+  curricula: "One row per curriculum, with the curriculum already chosen.",
+};
+
+/** The curriculum batch only fills a program in when the source has somewhere to
+ *  put one, so the hint must not promise it otherwise. */
+const hintFor = (mode: BatchMode, hasProgramColumn: boolean) =>
+  mode === "curricula" && hasProgramColumn
+    ? "One row per curriculum, with the curriculum and its program already chosen."
+    : BATCH_MODE_HINTS[mode];
+
+/** Add or edit one row of raw data — or, when the source records per program or
+ *  per curriculum, a whole batch at once.
+ *
+ *  Values are held as strings while editing and coerced server-side by
+ *  validateEntryValues, which is the authority. */
 export function EntryModal({
   open,
   onClose,
@@ -33,6 +51,7 @@ export function EntryModal({
   periodGrain,
   columns,
   entry,
+  entries = [],
 }: {
   open: boolean;
   onClose: () => void;
@@ -40,10 +59,13 @@ export function EntryModal({
   periodGrain: DataSourcePeriodGrain;
   columns: DataSourceColumn[];
   entry: DataSourceEntry | null;
+  /** Rows already recorded, so a batch can flag one it would repeat. */
+  entries?: DataSourceEntry[];
 }) {
   const { user } = useAuth();
   const create = useCreateDataSourceEntry();
   const update = useUpdateDataSourceEntry();
+  const bulk = useBulkCreateDataSourceEntries();
 
   // Only fetch the roster when a faculty column is actually on this source.
   const needsFaculty = columns.some((c) => c.dataType === "faculty");
@@ -59,19 +81,27 @@ export function EntryModal({
   );
 
   // Same idea for the academic catalog: one query feeds both pickers.
-  const catalog = useAcademicCatalog().data ?? EMPTY_ACADEMIC_CATALOG;
+  const catalogQ = useAcademicCatalog();
+  const catalog = catalogQ.data ?? EMPTY_ACADEMIC_CATALOG;
 
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(String(thisYear));
   const [quarter, setQuarter] = useState("1");
   const [note, setNote] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
+  const [mode, setMode] = useState<BatchMode>("single");
+
+  // A batch preset is useless until the catalog arrives, and editing an existing
+  // row is always a single row, so the chooser only appears when creating.
+  const modes = useMemo(() => availableBatchModes(columns), [columns]);
+  const showModes = !entry && modes.length > 1 && !!catalogQ.data;
 
   useEffect(() => {
     if (!open) return;
     setYear(String(entry?.year ?? thisYear));
     setQuarter(String(entry?.quarter ?? 1));
     setNote(entry?.note ?? "");
+    setMode("single");
     setValues(
       Object.fromEntries(
         columns.map((c) => {
@@ -91,24 +121,61 @@ export function EntryModal({
     : null;
 
   const yearValid = /^\d{4}$/.test(year.trim());
+  const batchQuarter = periodGrain === "annual" ? null : Number(quarter);
+  const batch = useBatchRows({
+    mode: mode === "single" ? "programs" : mode,
+    columns,
+    catalog,
+    faculty,
+    entries,
+    year: yearValid ? Number(year) : null,
+    quarter: batchQuarter,
+  });
+
+  const cellLabels = useMemo(() => buildCellLabels([], catalog), [catalog]);
+
   const requiredFilled = columns.every(
     (c) => !c.isRequired || (values[c.colKey] ?? "").trim() !== "",
   );
-  const valid = yearValid && requiredFilled;
-  const submitting = create.isPending || update.isPending;
+  const isBatch = mode !== "single";
+  const valid = isBatch
+    ? yearValid && batch.canSubmit
+    : yearValid && requiredFilled;
+  const submitting = create.isPending || update.isPending || bulk.isPending;
+
+  const actor = { actorId: user?.facultyId, userRole: user?.role };
+
+  const submitBatch = () => {
+    bulk.mutate(
+      {
+        id: dataSourceId,
+        input: {
+          rows: batch.included.map((row) => ({
+            year: Number(year),
+            quarter: batchQuarter,
+            values: toPayload(row.locked, row.values, columns),
+            note: row.note.trim() || null,
+          })),
+          ...actor,
+        },
+      },
+      { onSuccess: onClose },
+    );
+  };
 
   const submit = () => {
+    if (isBatch) return submitBatch();
+
     // Empty string means "no value"; the API turns it into null.
     const payloadValues: Record<string, DataSourceCellValue> = Object.fromEntries(
       columns.map((c) => [c.colKey, (values[c.colKey] ?? "").trim() || null]),
     );
     const input = {
       year: Number(year),
-      quarter: periodGrain === "annual" ? null : Number(quarter),
+      quarter: batchQuarter,
       values: payloadValues,
       note: note.trim() || null,
-      actorId: user?.facultyId,
-      userRole: user?.role,
+      ...actor,
     };
 
     if (entry) {
@@ -121,24 +188,56 @@ export function EntryModal({
     }
   };
 
+  const submitLabel = isBatch
+    ? `Add ${batch.included.length} ${batch.included.length === 1 ? "Entry" : "Entries"}`
+    : entry
+      ? "Save"
+      : "Add Entry";
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={entry ? "Edit Entry" : "Add Entry"}
-      subtitle="One row of raw data for this source."
+      subtitle={
+        entry
+          ? "One row of raw data for this source."
+          : isBatch
+            ? `${hintFor(mode, !!programColumn)} All rows share the period below.`
+            : "One row of raw data for this source."
+      }
+      size={isBatch ? "lg" : "md"}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button disabled={!valid || submitting} onClick={submit}>
-            {submitting ? "Saving…" : entry ? "Save" : "Add Entry"}
+            {submitting ? "Saving…" : submitLabel}
           </Button>
         </>
       }
     >
-      <div className="grid gap-md">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-md">
+        {showModes && (
+          // Not wrapped in a Field: Field is a <label>, and nesting the radios'
+          // own labels inside it would make any click select the first option.
+          <div className="flex flex-col gap-xs">
+            <h3 className="text-label-md text-on-surface">What to add</h3>
+            <RadioGroup
+              name="batch-mode"
+              orientation="horizontal"
+              value={mode}
+              onChange={setMode}
+              options={modes.map((m) => ({
+                value: m,
+                label: BATCH_MODE_LABELS[m],
+                hint: hintFor(m, !!programColumn),
+              }))}
+            />
+          </div>
+        )}
+
         <div className="flex gap-md">
           <Field label="Year">
             <Input
@@ -161,145 +260,39 @@ export function EntryModal({
           )}
         </div>
 
-        {columns.map((c) => (
-          <Field
-            key={c.id}
-            label={`${c.label}${c.isRequired ? " *" : ""}`}
-            hint={[COLUMN_TYPE_LABELS[c.dataType], c.unit].filter(Boolean).join(" · ")}
-          >
-            <CellInput
-              column={c}
-              value={values[c.colKey] ?? ""}
-              faculty={faculty}
-              catalog={catalog}
-              selectedProgramCode={selectedProgramCode}
-              onChange={(v) => setValues((prev) => ({ ...prev, [c.colKey]: v }))}
-            />
-          </Field>
-        ))}
+        {isBatch ? (
+          <BatchEntryGrid
+            state={batch}
+            columns={columns}
+            catalog={catalog}
+            faculty={faculty}
+            labels={cellLabels}
+          />
+        ) : (
+          <>
+            {columns.map((c) => (
+              <Field
+                key={c.id}
+                label={`${c.label}${c.isRequired ? " *" : ""}`}
+                hint={[COLUMN_TYPE_LABELS[c.dataType], c.unit].filter(Boolean).join(" · ")}
+              >
+                <CellInput
+                  column={c}
+                  value={values[c.colKey] ?? ""}
+                  faculty={faculty}
+                  catalog={catalog}
+                  selectedProgramCode={selectedProgramCode}
+                  onChange={(v) => setValues((prev) => ({ ...prev, [c.colKey]: v }))}
+                />
+              </Field>
+            ))}
 
-        <Field label="Note" hint="Optional context for this row.">
-          <Input value={note} onChange={(e) => setNote(e.target.value)} />
-        </Field>
+            <Field label="Note" hint="Optional context for this row.">
+              <Input value={note} onChange={(e) => setNote(e.target.value)} />
+            </Field>
+          </>
+        )}
       </div>
     </Modal>
   );
-}
-
-/** Keeps a stored code that isn't in the current option list selectable, rather
- *  than letting the Select silently blank it. Covers values typed in before the
- *  field became a dropdown, and a curriculum hidden by the program cascade. */
-function UnrecognisedOption({ value, known }: { value: string; known: string[] }) {
-  if (!value || known.includes(value)) return null;
-  return <option value={value}>{value} — not in the catalog</option>;
-}
-
-function CellInput({
-  column,
-  value,
-  onChange,
-  faculty,
-  catalog,
-  selectedProgramCode,
-}: {
-  column: DataSourceColumn;
-  value: string;
-  onChange: (value: string) => void;
-  faculty: FacultyRecord[];
-  catalog: AcademicCatalog;
-  /** Set when this source also has a program column, to narrow curricula. */
-  selectedProgramCode: string | null;
-}) {
-  switch (column.dataType) {
-    case "select":
-      return (
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">—</option>
-          {(column.options ?? []).map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </Select>
-      );
-    case "faculty":
-      return (
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">—</option>
-          {faculty.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name} — {f.program}
-            </option>
-          ))}
-          {/* Keep a stored person who has since left the roster visible, rather
-              than silently blanking the field on edit. */}
-          {value && !faculty.some((f) => f.id === value) && (
-            <option value={value}>{value} — no longer on the roster</option>
-          )}
-        </Select>
-      );
-    case "program":
-      return (
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">—</option>
-          {catalog.programs.map((p) => (
-            <option key={p.code} value={p.code}>
-              {catalogOptionLabel(p)}
-            </option>
-          ))}
-          <UnrecognisedOption
-            value={value}
-            known={catalog.programs.map((p) => p.code)}
-          />
-        </Select>
-      );
-    case "curriculum": {
-      const offered = curriculaForProgram(catalog.curricula, selectedProgramCode);
-      return (
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">—</option>
-          {offered.map((c) => (
-            <option key={c.code} value={c.code}>
-              {catalogOptionLabel(c)}
-            </option>
-          ))}
-          {/* Also covers a valid curriculum that the chosen program filtered out,
-              so switching program never silently discards what was recorded. */}
-          <UnrecognisedOption value={value} known={offered.map((c) => c.code)} />
-        </Select>
-      );
-    }
-    case "boolean":
-      return (
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">—</option>
-          <option value="true">Yes</option>
-          <option value="false">No</option>
-        </Select>
-      );
-    case "date":
-      return (
-        <Input type="date" value={value} onChange={(e) => onChange(e.target.value)} />
-      );
-    case "url":
-      return (
-        <Input
-          type="url"
-          inputMode="url"
-          placeholder="https://example.com"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      );
-    case "number":
-      return (
-        <Input
-          value={value}
-          inputMode="decimal"
-          onChange={(e) => onChange(e.target.value)}
-        />
-      );
-    default:
-      return <Input value={value} onChange={(e) => onChange(e.target.value)} />;
-  }
 }

@@ -200,6 +200,12 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
   // Scoped to the DATA SOURCE's committee, not the performance record's.
   const canRecord = can("submit_metrics", { committeeId: source.committeeId });
 
+  // The entry dialog needs the source's period grain, which only useDataSource
+  // carries — sourcesByKpi does not. Until it lands, Add Entry would open
+  // nothing, so disable it rather than swallowing the click.
+  const detailReady = !!detailQ.data;
+  const addEntryTitle = detailReady ? undefined : "Loading this data source…";
+
   const exportCsv = () => {
     const headers = ["Period", ...columns.map((c) => c.label), "Note", "Created at"];
     const rows = entries.map((e) => [
@@ -239,7 +245,12 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
             </Button>
           )}
           {canRecord && columns.length > 0 && (
-            <Button icon="add" onClick={() => setAdding(true)}>
+            <Button
+              icon="add"
+              disabled={!detailReady}
+              title={addEntryTitle}
+              onClick={() => setAdding(true)}
+            >
               Add Entry
             </Button>
           )}
@@ -281,7 +292,12 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
             }
             action={
               canRecord ? (
-                <Button icon="add" onClick={() => setAdding(true)}>
+                <Button
+                  icon="add"
+                  disabled={!detailReady}
+                  title={addEntryTitle}
+                  onClick={() => setAdding(true)}
+                >
                   Add Entry
                 </Button>
               ) : undefined
@@ -313,6 +329,7 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
           periodGrain={detailQ.data.periodGrain}
           columns={columns}
           entry={editing}
+          entries={entries}
         />
       )}
     </>

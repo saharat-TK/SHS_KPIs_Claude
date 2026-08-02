@@ -1,4 +1,5 @@
 import type {
+  AcademicCatalog,
   DataSourceCellValue,
   DataSourceColumn,
   DataSourceColumnType,
@@ -418,6 +419,49 @@ export function withResolvedOptions(
       ? { ...c, options: (choices[c.colKey] ?? []).map((x) => x.code) }
       : c,
   );
+}
+
+/** Every constrained column's allowed values, resolved from the two queries the
+ *  entry form's pickers already run.
+ *
+ *  Three surfaces need this same set and must not disagree about it: the CSV
+ *  template's legend (a column that cannot be filled in offline unless the file
+ *  says what it accepts), the import preview's validation, and the batch grid's.
+ *  Deriving it once here is what keeps a template from offering a code the form
+ *  would reject. */
+export function buildColumnChoices(
+  columns: ColumnSpec[],
+  catalog: AcademicCatalog | undefined,
+  faculty: { id: string; name: string; program: string; status: string }[],
+): Record<string, TemplateChoice[]> {
+  const roster = faculty.filter((f) => f.status === "active");
+  const out: Record<string, TemplateChoice[]> = {};
+
+  for (const c of columns) {
+    if (c.dataType === "select") {
+      out[c.colKey] = (c.options ?? []).map((o) => ({ code: o, label: o }));
+    } else if (c.dataType === "program") {
+      out[c.colKey] = (catalog?.programs ?? []).map((p) => ({
+        code: p.code,
+        label: p.label,
+      }));
+    } else if (c.dataType === "curriculum") {
+      out[c.colKey] = (catalog?.curricula ?? []).map((x) => ({
+        code: x.code,
+        label: x.label,
+        hint: x.programCode,
+      }));
+    } else if (c.dataType === "faculty") {
+      // DERIVED_OPTION_SOURCE refuses to list 64 ids in an error message, but
+      // someone filling a spreadsheet offline has no other way to find one.
+      out[c.colKey] = roster.map((f) => ({
+        code: f.id,
+        label: f.name,
+        hint: f.program,
+      }));
+    }
+  }
+  return out;
 }
 
 /** Header cells survive a trip through Excel and a human, so compare them
