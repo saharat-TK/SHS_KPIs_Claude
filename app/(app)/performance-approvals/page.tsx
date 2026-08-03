@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   PageHeader,
   Card,
@@ -9,24 +10,24 @@ import {
   Td,
   Tr,
   Button,
-  Badge,
   Tabs,
   StatusPill,
   QueryBoundary,
   EmptyState,
   Modal,
+  Drawer,
   Field,
   Input,
   Select,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
+import { ApprovalDetailPanel, ApprovalPanelStatus } from "./ApprovalDetailPanel";
 import {
   usePerformanceRecords,
   useCommitteeMemberships,
   useFacultyRecords,
   useRecordApprovals,
-  useKpiApproval,
   useApprovalTransition,
 } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -43,7 +44,7 @@ import type {
   PerfKpiApproval,
   StageRole,
 } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 
 export default function PerformanceApprovalsPage() {
   return (
@@ -77,6 +78,32 @@ const ACTION_TONE: Partial<Record<ApprovalAction, string>> = {
   return: "text-error",
 };
 
+// Workflow order, not alphabetical — matches the tab order in STATE_TABS, so
+// ascending reads as "earliest stage first".
+const STATUS_ORDER: Record<ApprovalState, number> = {
+  draft: 0,
+  submitted: 1,
+  returned: 2,
+  forwarded: 3,
+  approved: 4,
+};
+
+type SortKey = "kpi" | "committee" | "period" | "status";
+type SortState = { key: SortKey; dir: "asc" | "desc" };
+
+/** A figure with its unit beneath, or a bare dash. Shared by the Annual Target
+ *  and Recorded columns so the pair reads identically; the unit sits on its own
+ *  muted line to keep the number scannable in a ~10% column. */
+function NumberCell({ value, unit }: { value?: number | null; unit?: string | null }) {
+  if (value == null) return <>—</>;
+  return (
+    <>
+      {formatNumber(value, 2)}
+      {unit && <span className="block text-caption-sm font-normal text-mute">{unit}</span>}
+    </>
+  );
+}
+
 function ApprovalQueue() {
   const { user } = useAuth();
   const records = usePerformanceRecords();
@@ -87,8 +114,12 @@ function ApprovalQueue() {
   const [yearNo, setYearNo] = useState(1);
   const [quarterNo, setQuarterNo] = useState(1);
   const [tab, setTab] = useState("all");
-  const [actOn, setActOn] = useState<{ row: PerfKpiApproval; action: ApprovalAction } | null>(null);
-  const [detail, setDetail] = useState<PerfKpiApproval | null>(null);
+  // Both hold ids, not row objects: acting from the panel changes a row's
+  // state, and a captured object would keep offering the pre-transition
+  // actions. Same pattern as editingMetricId on the KPI detail page.
+  const [actOn, setActOn] = useState<{ perfKpiId: number; action: ApprovalAction } | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [sort, setSort] = useState<SortState | null>(null);
 
   // Default to the first record once loaded.
   const activeRecord = records.data?.find((r) => r.id === recordId) ?? records.data?.[0];
@@ -134,14 +165,98 @@ function ApprovalQueue() {
     return tab === "all" ? list : list.filter((a) => a.state === tab);
   }, [approvals.data, tab]);
 
+  // Period ties on every row today — the cell renders the page-level
+  // year/quarter selectors, not a per-row field — so sorting by it is
+  // currently a visible no-op. Wired up anyway for header consistency.
+  const sortedRows = useMemo(() => {
+    if (!sort) return rows;
+    const valueFor = (row: PerfKpiApproval): string | number | null => {
+      switch (sort.key) {
+        case "kpi":
+          return row.kpiName ?? null;
+        case "committee":
+          return row.committeeName ?? row.committeeId ?? null;
+        case "period":
+          return yearNo * 4 + quarterNo;
+        case "status":
+          return STATUS_ORDER[row.state as ApprovalState];
+      }
+    };
+    return [...rows].sort((left, right) => {
+      const l = valueFor(left);
+      const r = valueFor(right);
+      // Missing values always follow populated values, regardless of direction.
+      if (l == null) return r == null ? 0 : 1;
+      if (r == null) return -1;
+      const cmp =
+        typeof l === "number" && typeof r === "number"
+          ? l - r
+          : String(l).localeCompare(String(r), undefined, { sensitivity: "base", numeric: true });
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+  }, [rows, sort, yearNo, quarterNo]);
+
+  const toggleSort = (key: SortKey) =>
+    setSort((current) =>
+      current?.key === key
+        ? { key, dir: current.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" },
+    );
+
   const yearLabel = (yn: number) =>
     activeRecord ? `${activeRecord.startYear + yn - 1} (Y${yn})` : `Y${yn}`;
+
+  // Re-derived every render so the panel reflects the current state after a
+  // transition. Resolved against the unfiltered list, not `rows` — otherwise
+  // forwarding from the panel while the Submitted tab is active would drop the
+  // row out of `rows` and the drawer would vanish mid-use.
+  const detail = approvals.data?.find((r) => r.perfKpiId === detailId) ?? null;
+  const actOnRow = approvals.data?.find((r) => r.perfKpiId === actOn?.perfKpiId) ?? null;
 
   // Roles without a committee position — reviewer and viewer — resolve to no
   // stage role, so no row offers them a transition. Say why, rather than
   // leaving a column of dashes to be read as a bug.
   const readOnlyQueue =
     rows.length > 0 && rows.every((row) => stageRolesFor(row.committeeId).length === 0);
+
+  // A plain render helper, not a nested component — a component declared here
+  // would be a new type each render and remount its subtree on every keystroke.
+  // Routes through the same runAction / setActOn path as the row buttons.
+  const panelActions = (row: PerfKpiApproval) => {
+    const actions = availableActions(
+      stageRolesFor(row.committeeId),
+      row.state as ApprovalState,
+    );
+    if (actions.length === 0) {
+      return (
+        <p className="text-body-sm text-mute">
+          {row.state === "approved"
+            ? "Locked after final approval. An administrator can reverse it."
+            : "No actions available to you for this submission."}
+        </p>
+      );
+    }
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-sm">
+        {actions.map((action) => (
+          <Button
+            key={action}
+            size="sm"
+            icon={ACTION_ICONS[action]}
+            className={ACTION_TONE[action]}
+            disabled={transition.isPending}
+            onClick={() =>
+              actionRequiresComment(action)
+                ? setActOn({ perfKpiId: row.perfKpiId, action })
+                : runAction(row, action)
+            }
+          >
+            {ACTION_LABELS[action]}
+          </Button>
+        ))}
+      </div>
+    );
+  };
 
   const runAction = (row: PerfKpiApproval, action: ApprovalAction, comment?: string) =>
     transition.mutate({
@@ -223,36 +338,85 @@ function ApprovalQueue() {
             <EmptyState icon="task_alt" title="Nothing here" message="No KPIs in this state for the selected period." />
           ) : (
             <Table>
+              {/* Auto layout on purpose (no table-fixed): the percentages act
+                  as targets, the `1%` + nowrap columns shrink to their content,
+                  and whatever is left over widens the KPI column. minWidth
+                  scrolls the wrapper on narrow screens instead of crushing. */}
+              <colgroup>
+                <col style={{ width: "35%", minWidth: "260px" }} />
+                <col style={{ width: "20%", minWidth: "160px" }} />
+                <col style={{ width: "10%", minWidth: "90px" }} />
+                <col style={{ width: "10%", minWidth: "90px" }} />
+                <col style={{ width: "1%" }} />
+                <col style={{ width: "1%" }} />
+                <col style={{ width: "1%" }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <Th>KPI</Th>
-                  <Th>Committee</Th>
-                  <Th align="right">Value</Th>
-                  <Th>Period</Th>
-                  <Th>Status</Th>
-                  <Th align="right">Actions</Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "kpi" ? sort.dir : null}
+                    onSort={() => toggleSort("kpi")}
+                  >
+                    KPI
+                  </Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "committee" ? sort.dir : null}
+                    onSort={() => toggleSort("committee")}
+                  >
+                    Committee
+                  </Th>
+                  <Th align="right">Annual Target</Th>
+                  <Th align="right">Recorded</Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "period" ? sort.dir : null}
+                    onSort={() => toggleSort("period")}
+                    className="whitespace-nowrap"
+                  >
+                    Period
+                  </Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "status" ? sort.dir : null}
+                    onSort={() => toggleSort("status")}
+                    className="whitespace-nowrap"
+                  >
+                    Status
+                  </Th>
+                  <Th align="right" className="whitespace-nowrap">
+                    Actions
+                  </Th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => {
+                {sortedRows.map((row) => {
                   const actions = availableActions(
                     stageRolesFor(row.committeeId),
                     row.state as ApprovalState,
                   );
                   return (
-                    <Tr key={row.perfKpiId} onClick={() => setDetail(row)}>
+                    <Tr key={row.perfKpiId} onClick={() => setDetailId(row.perfKpiId)}>
                       <Td className="font-medium">{row.kpiName}</Td>
                       <Td className="text-mute">{row.committeeName ?? row.committeeId}</Td>
                       <Td align="right" className="font-medium">
-                        {row.progressValue ?? "—"} {row.unit ?? ""}
+                        <NumberCell value={row.annualTarget} unit={row.unit} />
                       </Td>
-                      <Td className="text-mute">
+                      <Td align="right" className="font-medium">
+                        <NumberCell value={row.progressValue} unit={row.unit} />
+                      </Td>
+                      <Td className="whitespace-nowrap text-mute">
                         {yearLabel(yearNo)} · Q{quarterNo}
                       </Td>
-                      <Td>
+                      <Td className="whitespace-nowrap">
                         <StatusPill status={row.state as ApprovalState} kind="approval" />
                       </Td>
-                      <Td align="right" onClick={(e) => e.stopPropagation()}>
+                      <Td
+                        align="right"
+                        className="whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {actions.length === 0 ? (
                           <span className="text-caption-sm text-mute">
                             {row.state === "approved" ? "Locked" : "—"}
@@ -269,7 +433,7 @@ function ApprovalQueue() {
                                 disabled={transition.isPending}
                                 onClick={() =>
                                   actionRequiresComment(action)
-                                    ? setActOn({ row, action })
+                                    ? setActOn({ perfKpiId: row.perfKpiId, action })
                                     : runAction(row, action)
                                 }
                               >
@@ -288,11 +452,41 @@ function ApprovalQueue() {
         </QueryBoundary>
       </Card>
 
-      {/* Note-required action (send back / reject) */}
-      {actOn && (
+      {/* Performance detail + history + actions. Stays open across a
+          transition — useApprovalTransition invalidates both the queue and the
+          per-KPI approval, so the panel refreshes in place and the reviewer
+          watches the new state and event land. */}
+      <Drawer
+        open={detail != null}
+        onClose={() => setDetailId(null)}
+        title={detail?.kpiName ?? "KPI"}
+        subtitle={`${detail?.committeeName ?? detail?.committeeId ?? ""} · ${yearLabel(yearNo)} Q${quarterNo}`}
+        headerActions={
+          detail && (
+            <Link
+              href={`/kpi-management/performance/${detail.recordId}/kpis/${detail.perfKpiId}`}
+              aria-label="Open full KPI performance record"
+              title="Open full KPI performance record"
+              className="text-mute hover:text-on-surface rounded p-xs hover:bg-surface-soft transition-colors"
+            >
+              <Icon name="open_in_new" size={20} />
+            </Link>
+          )
+        }
+        headerExtra={detail && <ApprovalPanelStatus row={detail} />}
+        // Escape must dismiss only the topmost surface: while the note modal is
+        // open it owns the key, or one press would close both.
+        closeOnEscape={!actOn}
+        footer={detail && panelActions(detail)}
+      >
+        {detail && <ApprovalDetailPanel row={detail} yearLabel={yearLabel(yearNo)} />}
+      </Drawer>
+
+      {/* Note-required action (send back / reject) — layers over the drawer */}
+      {actOn && actOnRow && (
         <NoteModal
           title={ACTION_LABELS[actOn.action]}
-          subtitle={actOn.row.kpiName ?? ""}
+          subtitle={actOnRow.kpiName ?? ""}
           hint={
             actOn.action === "return"
               ? "The submission moves to 'Returned' for the committee member to revise."
@@ -301,86 +495,12 @@ function ApprovalQueue() {
           submitting={transition.isPending}
           onClose={() => setActOn(null)}
           onSend={(text) => {
-            runAction(actOn.row, actOn.action, text);
+            runAction(actOnRow, actOn.action, text);
             setActOn(null);
           }}
         />
       )}
-
-      {/* Detail + audit thread */}
-      {detail && activeRecord && (
-        <DetailModal
-          row={detail}
-          yearLabel={yearLabel(yearNo)}
-          quarterNo={quarterNo}
-          onClose={() => setDetail(null)}
-        />
-      )}
     </>
-  );
-}
-
-function DetailModal({
-  row,
-  yearLabel,
-  quarterNo,
-  onClose,
-}: {
-  row: PerfKpiApproval;
-  yearLabel: string;
-  quarterNo: number;
-  onClose: () => void;
-}) {
-  const q = useKpiApproval(row.perfKpiId, row.yearNo, row.quarterNo);
-  const events = q.data?.events ?? [];
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={row.kpiName ?? "KPI"}
-      subtitle={`${row.committeeName ?? row.committeeId ?? ""} · ${yearLabel} Q${quarterNo}`}
-      size="lg"
-    >
-      <div className="flex flex-col gap-lg">
-        <div className="flex flex-wrap items-center gap-md">
-          <Badge tone="neutral">
-            Value: {row.progressValue ?? "—"} {row.unit ?? ""}
-          </Badge>
-          <StatusPill status={row.state as ApprovalState} kind="approval" />
-          {row.state === "approved" && (
-            <span className="inline-flex items-center gap-xs text-caption-sm text-mute">
-              <Icon name="lock" size={16} /> Locked after final approval
-            </span>
-          )}
-        </div>
-        <div className="flex flex-col gap-sm">
-          <p className="text-label-md text-on-surface">Approval history</p>
-          <QueryBoundary isLoading={q.isLoading} isError={q.isError}>
-            {events.length === 0 ? (
-              <p className="text-body-sm text-mute">Not yet submitted.</p>
-            ) : (
-              events.map((e) => (
-                <div key={e.id} className="rounded-lg border border-hairline bg-surface-soft p-md">
-                  <div className="flex items-center gap-sm">
-                    <Icon name="account_circle" size={18} className="text-mute" />
-                    <span className="text-label-md">{e.actorName ?? "—"}</span>
-                    <Badge tone="neutral">{ACTION_LABELS[e.action] ?? e.action}</Badge>
-                    {e.actorRole && (
-                      <span className="text-caption-sm text-mute">{e.actorRole}</span>
-                    )}
-                    <span className="ml-auto text-caption-sm text-mute">{formatDate(e.createdAt)}</span>
-                  </div>
-                  <p className="mt-xs text-caption-sm text-mute">
-                    {e.fromState ?? "draft"} → {e.toState}
-                  </p>
-                  {e.comment && <p className="mt-xs text-body-sm">{e.comment}</p>}
-                </div>
-              ))
-            )}
-          </QueryBoundary>
-        </div>
-      </div>
-    </Modal>
   );
 }
 
