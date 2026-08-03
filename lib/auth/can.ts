@@ -52,9 +52,12 @@ export function can(
   return true;
 }
 
+// The "committee" role spans every committee position — member, lead and
+// counselor alike. The specific position comes from committee_memberships and
+// is surfaced separately (see RoleSwitcher), so this label stays generic.
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrator",
   reviewer: "Reviewer",
-  committee: "Committee Lead",
+  committee: "Committee Member",
   viewer: "Viewer",
 };

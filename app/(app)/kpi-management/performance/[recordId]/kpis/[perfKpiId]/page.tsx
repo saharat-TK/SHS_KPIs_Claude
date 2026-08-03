@@ -32,6 +32,7 @@ import {
   useSaveKpiProgress,
   useKpiApproval,
   useCommitteeMemberships,
+  useFacultyRecords,
   useApprovalTransition,
 } from "@/lib/data/hooks";
 import {
@@ -45,7 +46,7 @@ import {
   actionRequiresComment,
   availableActions,
   resolvePositionFromMemberships,
-  resolveStageRole,
+  resolveStageRoles,
 } from "@/lib/kpi/approvalWorkflow";
 import { formatNumber } from "@/lib/utils";
 import type { ApprovalAction, ApprovalState, PerfMetric } from "@/lib/types";
@@ -97,6 +98,7 @@ function PerfKpiProgress() {
   const sourcesQ = usePerfKpiSources(perfKpiId);
   const save = useSaveKpiProgress(perfKpiId);
   const membershipsQ = useCommitteeMemberships();
+  const facultyQ = useFacultyRecords();
   const approvalTransition = useApprovalTransition(recordId);
   // Approval lock for the currently-selected quarter (defined after year/quarter).
 
@@ -157,20 +159,24 @@ function PerfKpiProgress() {
   };
   const selectedApprovalState: ApprovalState = approvalStatesByQuarter[quarter] ?? "draft";
   const selectedApprovalLock = approvalLockForState(selectedApprovalState);
-  const stageRole = useMemo(() => {
+  // Admin authority comes from faculty.system_role (matching the server),
+  // not the demo persona's coarse app role — see resolveStageRoles.
+  const isSystemAdmin =
+    facultyQ.data?.find((f) => f.id === user.facultyId)?.systemRole === "admin";
+  const stageRoles = useMemo(() => {
     const position = resolvePositionFromMemberships(
       membershipsQ.data,
       user.facultyId,
       kpi?.committeeId,
     );
-    return resolveStageRole(position, user.role);
-  }, [kpi?.committeeId, membershipsQ.data, user.facultyId, user.role]);
+    return resolveStageRoles(position, isSystemAdmin);
+  }, [kpi?.committeeId, membershipsQ.data, user.facultyId, isSystemAdmin]);
   const directActions = useMemo(
     () =>
       !recordReadOnly && selectedApprovalState
-        ? availableActions(stageRole, selectedApprovalState).filter((action) => action !== "reverse")
+        ? availableActions(stageRoles, selectedApprovalState).filter((action) => action !== "reverse")
         : [],
-    [recordReadOnly, selectedApprovalState, stageRole],
+    [recordReadOnly, selectedApprovalState, stageRoles],
   );
   const approvalActionBusy =
     selectedApprovalQuery.isLoading ||
@@ -187,7 +193,6 @@ function PerfKpiProgress() {
         quarterNo: quarter,
         actorId: user.facultyId,
         actorName: user.name,
-        userRole: user.role,
         comment,
       },
     });
@@ -221,9 +226,10 @@ function PerfKpiProgress() {
   const approvalActionsAfterSave = directActions
     .filter((action) => action === "submit" || action === "forward" || action === "approve")
     .map(toQuarterAction);
-  const allowSubmittedLeadEditing = selectedApprovalState === "submitted" && stageRole === "lead";
+  const allowSubmittedLeadEditing =
+    selectedApprovalState === "submitted" && stageRoles.includes("lead");
   const allowForwardedCounselorEditing =
-    selectedApprovalState === "forwarded" && stageRole === "counselor";
+    selectedApprovalState === "forwarded" && stageRoles.includes("counselor");
   const allowApprovalLockedEditing = allowSubmittedLeadEditing || allowForwardedCounselorEditing;
   const hideApprovalLockMessage =
     (selectedApprovalState === "forwarded" &&
@@ -309,7 +315,6 @@ function PerfKpiProgress() {
                   quarterNo,
                   recordedBy: user?.email,
                   actorId: user.facultyId,
-                  userRole: user.role,
                 })
               }
               rightColumnContent={

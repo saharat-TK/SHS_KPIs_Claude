@@ -617,7 +617,6 @@ export const performanceRecordsRepo = {
       solution: string;
       recordedBy?: string;
       actorId?: string;
-      userRole?: string;
     },
   ): Promise<QuarterProgress[]> =>
     jsonOrThrow(
@@ -638,7 +637,6 @@ export const performanceRecordsRepo = {
       solution: string;
       recordedBy?: string;
       actorId?: string;
-      userRole?: string;
     },
   ): Promise<QuarterProgress[]> =>
     jsonOrThrow(
@@ -652,13 +650,15 @@ export const performanceRecordsRepo = {
 };
 
 // ── Performance approval workflow (member → lead → counselor, DB-backed) ─────
+// No userRole here on purpose: the server resolves both the committee position
+// and the system role from the DB using actorId, so a role sent by the client
+// would be ignored.
 export interface ApprovalTransitionInput {
   action: ApprovalAction;
   yearNo: number;
   quarterNo: number;
   actorId?: string;
   actorName?: string;
-  userRole?: string;
   comment?: string;
 }
 

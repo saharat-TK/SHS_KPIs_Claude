@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
-import type { ApprovalState, Role } from "@/lib/types";
+import type { ApprovalState } from "@/lib/types";
 import { unitNeedsDivisor, kpiValueFromVariables } from "@/lib/kpi/progress";
 import { KPI_QUARTER_PROGRESS_FIELDS } from "@/lib/kpi/fields";
-import { getApprovalState, resolvePosition } from "@/lib/kpi/approvalServer";
-import { approvalLockForState, resolveStageRole } from "@/lib/kpi/approvalWorkflow";
+import { getApprovalState, resolvePosition, resolveSystemRole } from "@/lib/kpi/approvalServer";
+import { approvalLockForState, resolveStageRoles } from "@/lib/kpi/approvalWorkflow";
 
 export const dynamic = "force-dynamic";
 
@@ -70,16 +70,17 @@ export async function PUT(
     const approvalState = await getApprovalState(pool, params.id, yearNo, quarterNo);
     const approvalLock = approvalLockForState(approvalState);
     const actorId: string | null = b.actorId ?? null;
-    const userRole = b.userRole as Role | undefined;
+    // Position and system role both come from the DB keyed by actorId; a role
+    // asserted in the request body is ignored.
     const position = actorId
       ? await resolvePosition(pool, actorId, kpiRows[0].committeeId)
       : null;
+    const isAdmin = (await resolveSystemRole(pool, actorId)) === "admin";
+    const stageRoles = resolveStageRoles(position, isAdmin);
     const canLeadEditSubmitted =
-      approvalState === ("submitted" as ApprovalState) &&
-      resolveStageRole(position, userRole) === "lead";
+      approvalState === ("submitted" as ApprovalState) && stageRoles.includes("lead");
     const canCounselorEditForwarded =
-      approvalState === ("forwarded" as ApprovalState) &&
-      resolveStageRole(position, userRole) === "counselor";
+      approvalState === ("forwarded" as ApprovalState) && stageRoles.includes("counselor");
     if (approvalLock?.locked && !canLeadEditSubmitted && !canCounselorEditForwarded) {
       return NextResponse.json(
         { error: approvalLock.label },
