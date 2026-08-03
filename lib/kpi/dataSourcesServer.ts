@@ -228,9 +228,11 @@ export async function loadSourceShape(
 
 /** Mirror of lib/auth/can.ts for entry writes, applied server-side.
  *
- *  The app has no session layer — routes trust the client-supplied actorId /
- *  userRole exactly as app/api/perf-kpis/[id]/progress/route.ts does. This is a
- *  consistency guard, not a security boundary; real enforcement needs authn.
+ *  The app has no session layer, and unlike the approval/progress routes — which
+ *  now resolve the actor's role from faculty.system_role — this still trusts the
+ *  client-supplied userRole, because it branches on "committee" rather than
+ *  "admin" and has no DB column to read that from. A consistency guard, not a
+ *  security boundary; real enforcement needs authn.
  *
  *  Returns an error message, or null when the write is allowed. */
 export async function checkEntryWriteAccess(

@@ -86,13 +86,10 @@ export function approvalLockForState(
   return state ? APPROVAL_LOCK[state] ?? null : null;
 }
 
-/** Map a committee membership position (+ app role) to the acting stage role.
- *  Admin role always wins so an administrator can reverse locked records. */
-export function resolveStageRole(
+/** The stage a committee position acts as, ignoring any admin rights. */
+export function stageForPosition(
   position: Position | null | undefined,
-  userRole: Role | null | undefined,
 ): StageRole | null {
-  if (userRole === "admin") return "admin";
   switch (position) {
     case "Counselor":
       return "counselor";
@@ -104,6 +101,34 @@ export function resolveStageRole(
     default:
       return null;
   }
+}
+
+/** Every stage a person may act as.
+ *
+ *  Admin is **additive**, not a replacement: an administrator who also sits on
+ *  the committee keeps their position's transitions and gains `reverse` on top.
+ *  Collapsing the two would silently strip a Committee Lead who happens to hold
+ *  the admin system role of their ability to forward. */
+export function resolveStageRoles(
+  position: Position | null | undefined,
+  isAdmin: boolean,
+): StageRole[] {
+  const stages: StageRole[] = [];
+  const positionStage = stageForPosition(position);
+  if (positionStage) stages.push(positionStage);
+  if (isAdmin) stages.push("admin");
+  return stages;
+}
+
+/** Map a committee membership position (+ app role) to a single acting stage.
+ *  Prefer `resolveStageRoles` — this collapses admin over position and exists
+ *  for callers that genuinely need one value. */
+export function resolveStageRole(
+  position: Position | null | undefined,
+  userRole: Role | null | undefined,
+): StageRole | null {
+  if (userRole === "admin") return "admin";
+  return stageForPosition(position);
 }
 
 /** Resolve a user's position for a target committee from loaded memberships.
@@ -134,16 +159,31 @@ export function ruleFor(action: ApprovalAction): TransitionRule | undefined {
   return TRANSITIONS.find((t) => t.action === action);
 }
 
-/** True when `stageRole` may move an approval from `fromState` via `action`. */
+function stageList(stages: StageRole | StageRole[] | null | undefined): StageRole[] {
+  if (!stages) return [];
+  return Array.isArray(stages) ? stages : [stages];
+}
+
+/** The stage that authorises this transition, or null if none does. Used for
+ *  the audit trail, which records one acting role per event. */
+export function authorizingStage(
+  stages: StageRole | StageRole[] | null,
+  fromState: ApprovalState,
+  action: ApprovalAction,
+): StageRole | null {
+  const rule = ruleFor(action);
+  if (!rule || !rule.from.includes(fromState)) return null;
+  return stageList(stages).find((s) => s === rule.stage) ?? null;
+}
+
+/** True when the actor — acting as any of `stages` — may move an approval from
+ *  `fromState` via `action`. */
 export function canTransition(
-  stageRole: StageRole | null,
+  stages: StageRole | StageRole[] | null,
   fromState: ApprovalState,
   action: ApprovalAction,
 ): boolean {
-  if (!stageRole) return false;
-  const rule = ruleFor(action);
-  if (!rule) return false;
-  return rule.stage === stageRole && rule.from.includes(fromState);
+  return authorizingStage(stages, fromState, action) !== null;
 }
 
 /** Resulting state for an action; null if the action is unknown. */
@@ -154,12 +194,13 @@ export function nextState(action: ApprovalAction): ApprovalState | null {
 /** Actions the given stage role may perform from the given state — drives the
  *  per-row buttons in the queue UI. */
 export function availableActions(
-  stageRole: StageRole | null,
+  stages: StageRole | StageRole[] | null,
   state: ApprovalState,
 ): ApprovalAction[] {
-  if (!stageRole) return [];
+  const list = stageList(stages);
+  if (list.length === 0) return [];
   return TRANSITIONS.filter(
-    (t) => t.stage === stageRole && t.from.includes(state),
+    (t) => list.includes(t.stage) && t.from.includes(state),
   ).map((t) => t.action);
 }
 

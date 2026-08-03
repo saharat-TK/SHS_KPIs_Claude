@@ -138,7 +138,6 @@ export function MetricProgressModal({
                 quarterNo: quarter,
                 recordedBy: user?.email,
                 actorId: user.facultyId,
-                userRole: user.role,
               })
             }
           />

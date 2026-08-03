@@ -1,7 +1,7 @@
 // Server-only helpers for the performance-approval workflow. Never import from a
 // "use client" component — it pulls in the MySQL pool.
 import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
-import type { ApprovalState, Position } from "@/lib/types";
+import type { ApprovalState, Position, SystemRole } from "@/lib/types";
 
 type Db = Pool | PoolConnection;
 
@@ -26,6 +26,21 @@ export async function getApprovalState(
     [perfKpiId, yearNo, quarterNo],
   );
   return (rows[0]?.state as ApprovalState) ?? "draft";
+}
+
+/** The actor's app-level system role, straight from the DB. Absent or unknown
+ *  faculty ⇒ "user". Never derived from the request body: the client used to
+ *  supply its own `userRole`, which let any caller claim admin. */
+export async function resolveSystemRole(
+  db: Db,
+  facultyId: string | null,
+): Promise<SystemRole> {
+  if (!facultyId) return "user";
+  const [rows] = await db.query<RowDataPacket[]>(
+    `SELECT system_role FROM faculty WHERE id = ?`,
+    [facultyId],
+  );
+  return rows[0]?.system_role === "admin" ? "admin" : "user";
 }
 
 /** Resolve a person's committee position for a specific committee, or null. */

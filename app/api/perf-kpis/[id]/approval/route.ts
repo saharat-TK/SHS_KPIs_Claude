@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
-import type { ApprovalAction, ApprovalState, Role } from "@/lib/types";
+import type { ApprovalAction, ApprovalState } from "@/lib/types";
 import {
-  canTransition,
+  authorizingStage,
   nextState,
   actionRequiresComment,
-  resolveStageRole,
+  resolveStageRoles,
 } from "@/lib/kpi/approvalWorkflow";
-import { APPROVAL_SELECT, resolvePosition } from "@/lib/kpi/approvalServer";
+import { APPROVAL_SELECT, resolvePosition, resolveSystemRole } from "@/lib/kpi/approvalServer";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +130,6 @@ export async function POST(
     const quarterNo = Number(b.quarterNo);
     const actorId: string | null = b.actorId ?? null;
     const actorName: string | null = b.actorName ?? null;
-    const userRole = b.userRole as Role | undefined;
     const comment: string | null = b.comment?.trim() ? b.comment.trim() : null;
 
     if (!(yearNo >= 1 && yearNo <= 5) || !(quarterNo >= 1 && quarterNo <= 4)) {
@@ -155,11 +154,15 @@ export async function POST(
       }
       const kpi = kpiRows[0];
 
-      // Resolve the actor's stage role from their committee position (+ app role).
+      // Resolve the actor's stage role from their committee position and their
+      // system role. Both come from the DB keyed by actorId — a role asserted
+      // in the request body is ignored, so a caller cannot claim admin and
+      // reverse a locked record.
       const position = actorId
         ? await resolvePosition(conn, actorId, kpi.committeeId)
         : null;
-      const stageRole = resolveStageRole(position, userRole);
+      const isAdmin = (await resolveSystemRole(conn, actorId)) === "admin";
+      const stageRoles = resolveStageRoles(position, isAdmin);
 
       const [existing] = await conn.query<RowDataPacket[]>(
         `SELECT id, state FROM perf_kpi_approval
@@ -168,7 +171,10 @@ export async function POST(
       );
       const fromState: ApprovalState = (existing[0]?.state as ApprovalState) ?? "draft";
 
-      if (!canTransition(stageRole, fromState, action)) {
+      // The stage that actually authorises this move is what the audit trail
+      // records — an admin who is also a lead forwards *as* the lead.
+      const actingStage = authorizingStage(stageRoles, fromState, action);
+      if (!actingStage) {
         await conn.rollback();
         return NextResponse.json(
           {
@@ -214,7 +220,7 @@ export async function POST(
         `INSERT INTO perf_kpi_approval_event
            (approval_id, actor_id, actor_name, actor_role, action, from_state, to_state, comment)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [approvalId, actorId, actorName, stageRole, action, fromState, toState, comment],
+        [approvalId, actorId, actorName, actingStage, action, fromState, toState, comment],
       );
 
       await conn.commit();

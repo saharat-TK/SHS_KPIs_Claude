@@ -760,7 +760,6 @@ type ProgressInput = {
   solution: string;
   recordedBy?: string;
   actorId?: string;
-  userRole?: string;
 };
 
 export function useSaveKpiProgress(perfKpiId: number) {

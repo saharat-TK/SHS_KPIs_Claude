@@ -24,6 +24,7 @@ import { RequirePermission } from "@/components/shell/Guard";
 import {
   usePerformanceRecords,
   useCommitteeMemberships,
+  useFacultyRecords,
   useRecordApprovals,
   useKpiApproval,
   useApprovalTransition,
@@ -32,7 +33,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import {
   availableActions,
   resolvePositionFromMemberships,
-  resolveStageRole,
+  resolveStageRoles,
   actionRequiresComment,
   ACTION_LABELS,
 } from "@/lib/kpi/approvalWorkflow";
@@ -80,6 +81,7 @@ function ApprovalQueue() {
   const { user } = useAuth();
   const records = usePerformanceRecords();
   const memberships = useCommitteeMemberships();
+  const faculty = useFacultyRecords();
 
   const [recordId, setRecordId] = useState(0);
   const [yearNo, setYearNo] = useState(1);
@@ -97,15 +99,23 @@ function ApprovalQueue() {
   const approvals = useRecordApprovals(activeRecord?.id ?? 0, yearNo, quarterNo);
   const transition = useApprovalTransition(activeRecord?.id ?? 0);
 
-  // Resolve the acting persona's stage role for a given KPI's committee.
-  const stageRoleFor = (committeeId: string | null): StageRole | null => {
-    if (user.role === "admin") return "admin";
+  // Admin authority comes from faculty.system_role, exactly as the server
+  // resolves it — not from the demo persona's coarse app role. A person can
+  // be a real committee lead *and* a real admin (e.g. fac-022), and the
+  // reverse button must appear for them precisely when the server would
+  // actually grant reverse.
+  const isSystemAdmin = faculty.data?.find((f) => f.id === user.facultyId)?.systemRole === "admin";
+
+  // Resolve every stage the acting persona may act as for a KPI's committee.
+  // Admin is additive, matching the server: an administrator who also sits on
+  // the committee keeps their position's actions and gains reverse.
+  const stageRolesFor = (committeeId: string | null): StageRole[] => {
     const position = resolvePositionFromMemberships(
       memberships.data,
       user.facultyId,
       committeeId,
     );
-    return resolveStageRole(position, user.role);
+    return resolveStageRoles(position, isSystemAdmin);
   };
 
   const counts = useMemo(() => {
@@ -127,6 +137,12 @@ function ApprovalQueue() {
   const yearLabel = (yn: number) =>
     activeRecord ? `${activeRecord.startYear + yn - 1} (Y${yn})` : `Y${yn}`;
 
+  // Roles without a committee position — reviewer and viewer — resolve to no
+  // stage role, so no row offers them a transition. Say why, rather than
+  // leaving a column of dashes to be read as a bug.
+  const readOnlyQueue =
+    rows.length > 0 && rows.every((row) => stageRolesFor(row.committeeId).length === 0);
+
   const runAction = (row: PerfKpiApproval, action: ApprovalAction, comment?: string) =>
     transition.mutate({
       perfKpiId: row.perfKpiId,
@@ -136,7 +152,6 @@ function ApprovalQueue() {
         quarterNo,
         actorId: user.facultyId,
         actorName: user.name,
-        userRole: user.role,
         comment,
       },
     });
@@ -188,6 +203,17 @@ function ApprovalQueue() {
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
+      {readOnlyQueue && (
+        <div className="mb-md flex items-center gap-sm rounded border border-hairline bg-surface-soft px-md py-sm text-body-sm text-mute">
+          <Icon name="visibility" size={18} className="shrink-0" />
+          <span>
+            Read-only view. Submitting, forwarding and approving are tied to a
+            committee position — you hold none on these committees, so no
+            actions are available.
+          </span>
+        </div>
+      )}
+
       <Card className="overflow-hidden">
         <QueryBoundary
           isLoading={records.isLoading || approvals.isLoading}
@@ -209,8 +235,10 @@ function ApprovalQueue() {
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const stageRole = stageRoleFor(row.committeeId);
-                  const actions = availableActions(stageRole, row.state as ApprovalState);
+                  const actions = availableActions(
+                    stageRolesFor(row.committeeId),
+                    row.state as ApprovalState,
+                  );
                   return (
                     <Tr key={row.perfKpiId} onClick={() => setDetail(row)}>
                       <Td className="font-medium">{row.kpiName}</Td>
