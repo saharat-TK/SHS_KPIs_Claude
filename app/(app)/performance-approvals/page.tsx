@@ -9,24 +9,24 @@ import {
   Td,
   Tr,
   Button,
-  Badge,
   Tabs,
   StatusPill,
   QueryBoundary,
   EmptyState,
   Modal,
+  Drawer,
   Field,
   Input,
   Select,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
+import { ApprovalDetailPanel, ApprovalPanelStatus } from "./ApprovalDetailPanel";
 import {
   usePerformanceRecords,
   useCommitteeMemberships,
   useFacultyRecords,
   useRecordApprovals,
-  useKpiApproval,
   useApprovalTransition,
 } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -87,8 +87,11 @@ function ApprovalQueue() {
   const [yearNo, setYearNo] = useState(1);
   const [quarterNo, setQuarterNo] = useState(1);
   const [tab, setTab] = useState("all");
-  const [actOn, setActOn] = useState<{ row: PerfKpiApproval; action: ApprovalAction } | null>(null);
-  const [detail, setDetail] = useState<PerfKpiApproval | null>(null);
+  // Both hold ids, not row objects: acting from the panel changes a row's
+  // state, and a captured object would keep offering the pre-transition
+  // actions. Same pattern as editingMetricId on the KPI detail page.
+  const [actOn, setActOn] = useState<{ perfKpiId: number; action: ApprovalAction } | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
 
   // Default to the first record once loaded.
   const activeRecord = records.data?.find((r) => r.id === recordId) ?? records.data?.[0];
@@ -137,11 +140,57 @@ function ApprovalQueue() {
   const yearLabel = (yn: number) =>
     activeRecord ? `${activeRecord.startYear + yn - 1} (Y${yn})` : `Y${yn}`;
 
+  // Re-derived every render so the panel reflects the current state after a
+  // transition. Resolved against the unfiltered list, not `rows` — otherwise
+  // forwarding from the panel while the Submitted tab is active would drop the
+  // row out of `rows` and the drawer would vanish mid-use.
+  const detail = approvals.data?.find((r) => r.perfKpiId === detailId) ?? null;
+  const actOnRow = approvals.data?.find((r) => r.perfKpiId === actOn?.perfKpiId) ?? null;
+
   // Roles without a committee position — reviewer and viewer — resolve to no
   // stage role, so no row offers them a transition. Say why, rather than
   // leaving a column of dashes to be read as a bug.
   const readOnlyQueue =
     rows.length > 0 && rows.every((row) => stageRolesFor(row.committeeId).length === 0);
+
+  // A plain render helper, not a nested component — a component declared here
+  // would be a new type each render and remount its subtree on every keystroke.
+  // Routes through the same runAction / setActOn path as the row buttons.
+  const panelActions = (row: PerfKpiApproval) => {
+    const actions = availableActions(
+      stageRolesFor(row.committeeId),
+      row.state as ApprovalState,
+    );
+    if (actions.length === 0) {
+      return (
+        <p className="text-body-sm text-mute">
+          {row.state === "approved"
+            ? "Locked after final approval. An administrator can reverse it."
+            : "No actions available to you for this submission."}
+        </p>
+      );
+    }
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-sm">
+        {actions.map((action) => (
+          <Button
+            key={action}
+            size="sm"
+            icon={ACTION_ICONS[action]}
+            className={ACTION_TONE[action]}
+            disabled={transition.isPending}
+            onClick={() =>
+              actionRequiresComment(action)
+                ? setActOn({ perfKpiId: row.perfKpiId, action })
+                : runAction(row, action)
+            }
+          >
+            {ACTION_LABELS[action]}
+          </Button>
+        ))}
+      </div>
+    );
+  };
 
   const runAction = (row: PerfKpiApproval, action: ApprovalAction, comment?: string) =>
     transition.mutate({
@@ -240,7 +289,7 @@ function ApprovalQueue() {
                     row.state as ApprovalState,
                   );
                   return (
-                    <Tr key={row.perfKpiId} onClick={() => setDetail(row)}>
+                    <Tr key={row.perfKpiId} onClick={() => setDetailId(row.perfKpiId)}>
                       <Td className="font-medium">{row.kpiName}</Td>
                       <Td className="text-mute">{row.committeeName ?? row.committeeId}</Td>
                       <Td align="right" className="font-medium">
@@ -269,7 +318,7 @@ function ApprovalQueue() {
                                 disabled={transition.isPending}
                                 onClick={() =>
                                   actionRequiresComment(action)
-                                    ? setActOn({ row, action })
+                                    ? setActOn({ perfKpiId: row.perfKpiId, action })
                                     : runAction(row, action)
                                 }
                               >
@@ -288,11 +337,29 @@ function ApprovalQueue() {
         </QueryBoundary>
       </Card>
 
-      {/* Note-required action (send back / reject) */}
-      {actOn && (
+      {/* Performance detail + history + actions. Stays open across a
+          transition — useApprovalTransition invalidates both the queue and the
+          per-KPI approval, so the panel refreshes in place and the reviewer
+          watches the new state and event land. */}
+      <Drawer
+        open={detail != null}
+        onClose={() => setDetailId(null)}
+        title={detail?.kpiName ?? "KPI"}
+        subtitle={`${detail?.committeeName ?? detail?.committeeId ?? ""} · ${yearLabel(yearNo)} Q${quarterNo}`}
+        headerExtra={detail && <ApprovalPanelStatus row={detail} />}
+        // Escape must dismiss only the topmost surface: while the note modal is
+        // open it owns the key, or one press would close both.
+        closeOnEscape={!actOn}
+        footer={detail && panelActions(detail)}
+      >
+        {detail && <ApprovalDetailPanel row={detail} yearLabel={yearLabel(yearNo)} />}
+      </Drawer>
+
+      {/* Note-required action (send back / reject) — layers over the drawer */}
+      {actOn && actOnRow && (
         <NoteModal
           title={ACTION_LABELS[actOn.action]}
-          subtitle={actOn.row.kpiName ?? ""}
+          subtitle={actOnRow.kpiName ?? ""}
           hint={
             actOn.action === "return"
               ? "The submission moves to 'Returned' for the committee member to revise."
@@ -301,86 +368,12 @@ function ApprovalQueue() {
           submitting={transition.isPending}
           onClose={() => setActOn(null)}
           onSend={(text) => {
-            runAction(actOn.row, actOn.action, text);
+            runAction(actOnRow, actOn.action, text);
             setActOn(null);
           }}
         />
       )}
-
-      {/* Detail + audit thread */}
-      {detail && activeRecord && (
-        <DetailModal
-          row={detail}
-          yearLabel={yearLabel(yearNo)}
-          quarterNo={quarterNo}
-          onClose={() => setDetail(null)}
-        />
-      )}
     </>
-  );
-}
-
-function DetailModal({
-  row,
-  yearLabel,
-  quarterNo,
-  onClose,
-}: {
-  row: PerfKpiApproval;
-  yearLabel: string;
-  quarterNo: number;
-  onClose: () => void;
-}) {
-  const q = useKpiApproval(row.perfKpiId, row.yearNo, row.quarterNo);
-  const events = q.data?.events ?? [];
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={row.kpiName ?? "KPI"}
-      subtitle={`${row.committeeName ?? row.committeeId ?? ""} · ${yearLabel} Q${quarterNo}`}
-      size="lg"
-    >
-      <div className="flex flex-col gap-lg">
-        <div className="flex flex-wrap items-center gap-md">
-          <Badge tone="neutral">
-            Value: {row.progressValue ?? "—"} {row.unit ?? ""}
-          </Badge>
-          <StatusPill status={row.state as ApprovalState} kind="approval" />
-          {row.state === "approved" && (
-            <span className="inline-flex items-center gap-xs text-caption-sm text-mute">
-              <Icon name="lock" size={16} /> Locked after final approval
-            </span>
-          )}
-        </div>
-        <div className="flex flex-col gap-sm">
-          <p className="text-label-md text-on-surface">Approval history</p>
-          <QueryBoundary isLoading={q.isLoading} isError={q.isError}>
-            {events.length === 0 ? (
-              <p className="text-body-sm text-mute">Not yet submitted.</p>
-            ) : (
-              events.map((e) => (
-                <div key={e.id} className="rounded-lg border border-hairline bg-surface-soft p-md">
-                  <div className="flex items-center gap-sm">
-                    <Icon name="account_circle" size={18} className="text-mute" />
-                    <span className="text-label-md">{e.actorName ?? "—"}</span>
-                    <Badge tone="neutral">{ACTION_LABELS[e.action] ?? e.action}</Badge>
-                    {e.actorRole && (
-                      <span className="text-caption-sm text-mute">{e.actorRole}</span>
-                    )}
-                    <span className="ml-auto text-caption-sm text-mute">{formatDate(e.createdAt)}</span>
-                  </div>
-                  <p className="mt-xs text-caption-sm text-mute">
-                    {e.fromState ?? "draft"} → {e.toState}
-                  </p>
-                  {e.comment && <p className="mt-xs text-body-sm">{e.comment}</p>}
-                </div>
-              ))
-            )}
-          </QueryBoundary>
-        </div>
-      </div>
-    </Modal>
   );
 }
 
