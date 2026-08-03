@@ -26,6 +26,7 @@ export function Drawer({
   onClose,
   title,
   subtitle,
+  headerActions,
   headerExtra,
   footer,
   children,
@@ -38,6 +39,10 @@ export function Drawer({
   title: string;
   /** ReactNode, unlike Modal's string — a status pill often belongs here. */
   subtitle?: React.ReactNode;
+  /** Rendered inline before the close button — the panel's literal upper-right
+   *  corner. For a link or icon button tied to the current selection, e.g.
+   *  "open the full record". */
+  headerActions?: React.ReactNode;
   headerExtra?: React.ReactNode;
   footer?: React.ReactNode;
   children: React.ReactNode;
@@ -163,13 +168,16 @@ export function Drawer({
               </h2>
               {subtitle && <p className="text-caption-sm text-mute mt-tiny">{subtitle}</p>}
             </div>
-            <button
-              aria-label="Close"
-              onClick={onClose}
-              className="text-mute hover:text-on-surface rounded p-xs hover:bg-surface-soft transition-colors shrink-0"
-            >
-              <Icon name="close" size={20} />
-            </button>
+            <div className="flex items-center gap-xs shrink-0">
+              {headerActions}
+              <button
+                aria-label="Close"
+                onClick={onClose}
+                className="text-mute hover:text-on-surface rounded p-xs hover:bg-surface-soft transition-colors"
+              >
+                <Icon name="close" size={20} />
+              </button>
+            </div>
           </div>
           {headerExtra && <div className="mt-sm">{headerExtra}</div>}
         </div>

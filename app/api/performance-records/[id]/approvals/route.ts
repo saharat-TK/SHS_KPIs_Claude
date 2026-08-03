@@ -37,6 +37,7 @@ export async function GET(
          k.has_children             AS hasChildren,
          ?                          AS yearNo,
          ?                          AS quarterNo,
+         tgt.target_value           AS annualTarget,
          qp.progress_value          AS progressValue,
          COALESCE(p.is_open, 0)     AS isOpen,
          a.id                       AS id,
@@ -49,6 +50,8 @@ export async function GET(
          a.approved_at              AS approvedAt
        FROM perf_kpi k
        LEFT JOIN committees c ON c.id = k.committee_id
+       LEFT JOIN perf_kpi_annual_target tgt
+         ON tgt.perf_kpi_id = k.id AND tgt.year_no = ?
        LEFT JOIN perf_kpi_quarter_progress qp
          ON qp.perf_kpi_id = k.id AND qp.year_no = ? AND qp.quarter_no = ?
        LEFT JOIN perf_kpi_approval a
@@ -59,6 +62,7 @@ export async function GET(
        ORDER BY k.sort_order, k.id`,
       [
         yearNo, quarterNo,
+        yearNo,            // annual target join
         yearNo, quarterNo, // qp join
         yearNo, quarterNo, // approval join
         yearNo, quarterNo, // period join

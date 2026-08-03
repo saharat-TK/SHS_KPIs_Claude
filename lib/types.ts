@@ -524,6 +524,8 @@ export interface PerfKpiApproval {
   kpiName?: string;
   committeeName?: string;
   unit?: string | null;
+  /** Target for this row's yearNo, from perf_kpi_annual_target. */
+  annualTarget?: number | null;
   progressValue?: number | null;
   hasChildren?: boolean;
 }

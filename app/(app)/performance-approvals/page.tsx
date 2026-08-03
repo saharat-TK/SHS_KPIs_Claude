@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   PageHeader,
   Card,
@@ -43,7 +44,7 @@ import type {
   PerfKpiApproval,
   StageRole,
 } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 
 export default function PerformanceApprovalsPage() {
   return (
@@ -77,6 +78,32 @@ const ACTION_TONE: Partial<Record<ApprovalAction, string>> = {
   return: "text-error",
 };
 
+// Workflow order, not alphabetical — matches the tab order in STATE_TABS, so
+// ascending reads as "earliest stage first".
+const STATUS_ORDER: Record<ApprovalState, number> = {
+  draft: 0,
+  submitted: 1,
+  returned: 2,
+  forwarded: 3,
+  approved: 4,
+};
+
+type SortKey = "kpi" | "committee" | "period" | "status";
+type SortState = { key: SortKey; dir: "asc" | "desc" };
+
+/** A figure with its unit beneath, or a bare dash. Shared by the Annual Target
+ *  and Recorded columns so the pair reads identically; the unit sits on its own
+ *  muted line to keep the number scannable in a ~10% column. */
+function NumberCell({ value, unit }: { value?: number | null; unit?: string | null }) {
+  if (value == null) return <>—</>;
+  return (
+    <>
+      {formatNumber(value, 2)}
+      {unit && <span className="block text-caption-sm font-normal text-mute">{unit}</span>}
+    </>
+  );
+}
+
 function ApprovalQueue() {
   const { user } = useAuth();
   const records = usePerformanceRecords();
@@ -92,6 +119,7 @@ function ApprovalQueue() {
   // actions. Same pattern as editingMetricId on the KPI detail page.
   const [actOn, setActOn] = useState<{ perfKpiId: number; action: ApprovalAction } | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [sort, setSort] = useState<SortState | null>(null);
 
   // Default to the first record once loaded.
   const activeRecord = records.data?.find((r) => r.id === recordId) ?? records.data?.[0];
@@ -136,6 +164,44 @@ function ApprovalQueue() {
     const list = approvals.data ?? [];
     return tab === "all" ? list : list.filter((a) => a.state === tab);
   }, [approvals.data, tab]);
+
+  // Period ties on every row today — the cell renders the page-level
+  // year/quarter selectors, not a per-row field — so sorting by it is
+  // currently a visible no-op. Wired up anyway for header consistency.
+  const sortedRows = useMemo(() => {
+    if (!sort) return rows;
+    const valueFor = (row: PerfKpiApproval): string | number | null => {
+      switch (sort.key) {
+        case "kpi":
+          return row.kpiName ?? null;
+        case "committee":
+          return row.committeeName ?? row.committeeId ?? null;
+        case "period":
+          return yearNo * 4 + quarterNo;
+        case "status":
+          return STATUS_ORDER[row.state as ApprovalState];
+      }
+    };
+    return [...rows].sort((left, right) => {
+      const l = valueFor(left);
+      const r = valueFor(right);
+      // Missing values always follow populated values, regardless of direction.
+      if (l == null) return r == null ? 0 : 1;
+      if (r == null) return -1;
+      const cmp =
+        typeof l === "number" && typeof r === "number"
+          ? l - r
+          : String(l).localeCompare(String(r), undefined, { sensitivity: "base", numeric: true });
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+  }, [rows, sort, yearNo, quarterNo]);
+
+  const toggleSort = (key: SortKey) =>
+    setSort((current) =>
+      current?.key === key
+        ? { key, dir: current.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" },
+    );
 
   const yearLabel = (yn: number) =>
     activeRecord ? `${activeRecord.startYear + yn - 1} (Y${yn})` : `Y${yn}`;
@@ -272,18 +338,60 @@ function ApprovalQueue() {
             <EmptyState icon="task_alt" title="Nothing here" message="No KPIs in this state for the selected period." />
           ) : (
             <Table>
+              {/* Auto layout on purpose (no table-fixed): the percentages act
+                  as targets, the `1%` + nowrap columns shrink to their content,
+                  and whatever is left over widens the KPI column. minWidth
+                  scrolls the wrapper on narrow screens instead of crushing. */}
+              <colgroup>
+                <col style={{ width: "35%", minWidth: "260px" }} />
+                <col style={{ width: "20%", minWidth: "160px" }} />
+                <col style={{ width: "10%", minWidth: "90px" }} />
+                <col style={{ width: "10%", minWidth: "90px" }} />
+                <col style={{ width: "1%" }} />
+                <col style={{ width: "1%" }} />
+                <col style={{ width: "1%" }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <Th>KPI</Th>
-                  <Th>Committee</Th>
-                  <Th align="right">Value</Th>
-                  <Th>Period</Th>
-                  <Th>Status</Th>
-                  <Th align="right">Actions</Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "kpi" ? sort.dir : null}
+                    onSort={() => toggleSort("kpi")}
+                  >
+                    KPI
+                  </Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "committee" ? sort.dir : null}
+                    onSort={() => toggleSort("committee")}
+                  >
+                    Committee
+                  </Th>
+                  <Th align="right">Annual Target</Th>
+                  <Th align="right">Recorded</Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "period" ? sort.dir : null}
+                    onSort={() => toggleSort("period")}
+                    className="whitespace-nowrap"
+                  >
+                    Period
+                  </Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "status" ? sort.dir : null}
+                    onSort={() => toggleSort("status")}
+                    className="whitespace-nowrap"
+                  >
+                    Status
+                  </Th>
+                  <Th align="right" className="whitespace-nowrap">
+                    Actions
+                  </Th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => {
+                {sortedRows.map((row) => {
                   const actions = availableActions(
                     stageRolesFor(row.committeeId),
                     row.state as ApprovalState,
@@ -293,15 +401,22 @@ function ApprovalQueue() {
                       <Td className="font-medium">{row.kpiName}</Td>
                       <Td className="text-mute">{row.committeeName ?? row.committeeId}</Td>
                       <Td align="right" className="font-medium">
-                        {row.progressValue ?? "—"} {row.unit ?? ""}
+                        <NumberCell value={row.annualTarget} unit={row.unit} />
                       </Td>
-                      <Td className="text-mute">
+                      <Td align="right" className="font-medium">
+                        <NumberCell value={row.progressValue} unit={row.unit} />
+                      </Td>
+                      <Td className="whitespace-nowrap text-mute">
                         {yearLabel(yearNo)} · Q{quarterNo}
                       </Td>
-                      <Td>
+                      <Td className="whitespace-nowrap">
                         <StatusPill status={row.state as ApprovalState} kind="approval" />
                       </Td>
-                      <Td align="right" onClick={(e) => e.stopPropagation()}>
+                      <Td
+                        align="right"
+                        className="whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {actions.length === 0 ? (
                           <span className="text-caption-sm text-mute">
                             {row.state === "approved" ? "Locked" : "—"}
@@ -346,6 +461,18 @@ function ApprovalQueue() {
         onClose={() => setDetailId(null)}
         title={detail?.kpiName ?? "KPI"}
         subtitle={`${detail?.committeeName ?? detail?.committeeId ?? ""} · ${yearLabel(yearNo)} Q${quarterNo}`}
+        headerActions={
+          detail && (
+            <Link
+              href={`/kpi-management/performance/${detail.recordId}/kpis/${detail.perfKpiId}`}
+              aria-label="Open full KPI performance record"
+              title="Open full KPI performance record"
+              className="text-mute hover:text-on-surface rounded p-xs hover:bg-surface-soft transition-colors"
+            >
+              <Icon name="open_in_new" size={20} />
+            </Link>
+          )
+        }
         headerExtra={detail && <ApprovalPanelStatus row={detail} />}
         // Escape must dismiss only the topmost surface: while the note modal is
         // open it owns the key, or one press would close both.
