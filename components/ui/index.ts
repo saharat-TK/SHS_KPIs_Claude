@@ -8,6 +8,7 @@ export { UnitSelect } from "./UnitSelect";
 export { RadioGroup, type RadioOption } from "./RadioGroup";
 export { Tabs, type TabItem } from "./Tabs";
 export { Modal } from "./Modal";
+export { Drawer } from "./Drawer";
 export { HoverPopover } from "./HoverPopover";
 export { StatCard } from "./StatCard";
 export { CountUp, useReducedMotion } from "./CountUp";
