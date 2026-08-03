@@ -28,10 +28,10 @@ import {
   useAcademicCatalog,
 } from "@/lib/data/hooks";
 import {
+  buildColumnChoices,
   buildEntryTemplateCsv,
   formatCellValue,
   formatEntryPeriod,
-  type TemplateChoice,
 } from "@/lib/kpi/dataSources";
 import { describeMapping } from "@/lib/kpi/dataSourceFilters";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
@@ -114,37 +114,10 @@ function DataSourceDetail({ id }: { id: number }) {
   // it accepts, so the template's legend enumerates every allowed value. The
   // codes come from the same two queries the entry form's pickers use, so the
   // template can never offer something the form would reject.
-  const templateChoices = useMemo(() => {
-    const catalog = catalogQ.data;
-    const roster = (facultyQ.data ?? []).filter((f) => f.status === "active");
-    const out: Record<string, TemplateChoice[]> = {};
-
-    for (const c of columns) {
-      if (c.dataType === "select") {
-        out[c.colKey] = (c.options ?? []).map((o) => ({ code: o, label: o }));
-      } else if (c.dataType === "program") {
-        out[c.colKey] = (catalog?.programs ?? []).map((p) => ({
-          code: p.code,
-          label: p.label,
-        }));
-      } else if (c.dataType === "curriculum") {
-        out[c.colKey] = (catalog?.curricula ?? []).map((x) => ({
-          code: x.code,
-          label: x.label,
-          hint: x.programCode,
-        }));
-      } else if (c.dataType === "faculty") {
-        // DERIVED_OPTION_SOURCE refuses to list 64 ids in an error message, but
-        // someone filling a spreadsheet offline has no other way to find one.
-        out[c.colKey] = roster.map((f) => ({
-          code: f.id,
-          label: f.name,
-          hint: f.program,
-        }));
-      }
-    }
-    return out;
-  }, [columns, catalogQ.data, facultyQ.data]);
+  const templateChoices = useMemo(
+    () => buildColumnChoices(columns, catalogQ.data, facultyQ.data ?? []),
+    [columns, catalogQ.data, facultyQ.data],
+  );
 
   const downloadTemplate = () => {
     if (!source) return;
@@ -405,6 +378,7 @@ function DataSourceDetail({ id }: { id: number }) {
               periodGrain={source.periodGrain}
               columns={columns}
               entry={editing}
+              entries={entries}
             />
           )}
         </>
