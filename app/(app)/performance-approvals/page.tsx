@@ -10,6 +10,7 @@ import {
   Td,
   Tr,
   Button,
+  Badge,
   Tabs,
   StatusPill,
   QueryBoundary,
@@ -38,6 +39,7 @@ import {
   actionRequiresComment,
   ACTION_LABELS,
 } from "@/lib/kpi/approvalWorkflow";
+import { healthOf, percentOfTarget, HEALTH_TONE } from "@/lib/kpi/progress";
 import type {
   ApprovalAction,
   ApprovalState,
@@ -102,6 +104,31 @@ function NumberCell({ value, unit }: { value?: number | null; unit?: string | nu
       {unit && <span className="block text-caption-sm font-normal text-mute">{unit}</span>}
     </>
   );
+}
+
+/** Percent of Annual Target achieved, colored by the KPI's own threshold
+ *  bucket — the same green/amber/red used everywhere else in the app. Divides
+ *  by Annual Target (not a derived quarter target) on purpose: it's the only
+ *  target number visible in this row, so the math stays transparent. No color
+ *  without both a percent and configured thresholds. */
+function ProgressBadge({
+  current,
+  target,
+  thresholdGreen,
+  thresholdAmber,
+}: {
+  current?: number | null;
+  target?: number | null;
+  thresholdGreen?: number | null;
+  thresholdAmber?: number | null;
+}) {
+  const pct = percentOfTarget(current, target);
+  const hasThresholds = thresholdGreen != null && thresholdAmber != null;
+  const health =
+    hasThresholds && pct != null ? healthOf(pct, { green: thresholdGreen, amber: thresholdAmber }) : null;
+
+  if (pct == null) return <span className="text-caption-sm text-mute">—</span>;
+  return <Badge tone={health ? HEALTH_TONE[health] : "neutral"}>{formatNumber(pct, 0)}%</Badge>;
 }
 
 function ApprovalQueue() {
@@ -350,6 +377,7 @@ function ApprovalQueue() {
                 <col style={{ width: "1%" }} />
                 <col style={{ width: "1%" }} />
                 <col style={{ width: "1%" }} />
+                <col style={{ width: "1%" }} />
               </colgroup>
               <thead>
                 <tr>
@@ -369,6 +397,9 @@ function ApprovalQueue() {
                   </Th>
                   <Th align="right">Annual Target</Th>
                   <Th align="right">Recorded</Th>
+                  <Th align="center" className="whitespace-nowrap">
+                    % Progress
+                  </Th>
                   <Th
                     sortable
                     sortDir={sort?.key === "period" ? sort.dir : null}
@@ -405,6 +436,14 @@ function ApprovalQueue() {
                       </Td>
                       <Td align="right" className="font-medium">
                         <NumberCell value={row.progressValue} unit={row.unit} />
+                      </Td>
+                      <Td align="center" className="whitespace-nowrap">
+                        <ProgressBadge
+                          current={row.progressValue}
+                          target={row.annualTarget}
+                          thresholdGreen={row.thresholdGreen}
+                          thresholdAmber={row.thresholdAmber}
+                        />
                       </Td>
                       <Td className="whitespace-nowrap text-mute">
                         {yearLabel(yearNo)} · Q{quarterNo}
