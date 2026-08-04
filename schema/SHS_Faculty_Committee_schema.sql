@@ -68,11 +68,15 @@ CREATE TABLE faculty (
 -- ── committee_memberships ────────────────────────────────────────────────────
 -- The faculty <-> committee bridge. position/kpi_focus are per-membership:
 -- the same faculty member can hold a different position and focus on each
--- committee they sit on.
+-- committee they sit on. The PK is (faculty_id, committee_id) — one row per
+-- person per committee — so a person holding both Counselor and Committee
+-- Lead on the same committee is represented by the single combined position
+-- value below (scripts/migrate-committee-counselor-lead-position.mjs), not by
+-- two rows.
 CREATE TABLE committee_memberships (
   faculty_id    VARCHAR(20)  NOT NULL,               -- FK -> faculty.id, added below
   committee_id  VARCHAR(30)  NOT NULL,                -- FK -> committees.id, added below
-  position      ENUM('Counselor','Committee Lead','Committee','Committee and Secretary') NOT NULL,
+  position      ENUM('Counselor','Committee Lead','Committee','Committee and Secretary','Counselor and Committee Lead') NOT NULL,
   kpi_focus     VARCHAR(255) NOT NULL,
   created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

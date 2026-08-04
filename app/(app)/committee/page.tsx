@@ -18,6 +18,7 @@ import {
   Field,
   Input,
   Select,
+  Combobox,
   TransferList,
   useToast,
   useConfirm,
@@ -25,20 +26,35 @@ import {
 import { Icon } from "@/components/ui/Icon";
 import {
   useCommittees,
-  useFaculty,
+  useCommitteeUsage,
   useCreateCommittee,
+  useUpdateCommittee,
+  useDeleteCommittee,
   useFacultyRecords,
   useCommitteeMemberships,
   useCreateCommitteeMembership,
   useUpdateCommitteeMembership,
   useDeleteCommitteeMembership,
+  type CommitteeInput,
 } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
-import type { Committee, CommitteeMembership, FacultyRecord, Position } from "@/lib/types";
+import {
+  describeCommitteeUsage,
+  diffCounselorLeadSlots,
+  diffOneSlot,
+  type MembershipAction,
+  type SlotState,
+} from "@/lib/kpi/committee";
+import type {
+  Committee,
+  CommitteeMembership,
+  EntityStatus,
+  FacultyRecord,
+  Position,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type SingletonSlotKey = "counselor" | "committeeLead" | "committeeAndSecretary";
-type SlotState = { facultyId: string; kpiFocus: string } | null;
 interface RosterState {
   counselor: SlotState;
   committeeLead: SlotState;
@@ -46,10 +62,16 @@ interface RosterState {
   committeeMembers: { facultyId: string; kpiFocus: string }[];
 }
 
-const SINGLETON_SLOTS: { key: SingletonSlotKey; position: Position; label: string }[] = [
-  { key: "counselor", position: "Counselor", label: "Counselor" },
-  { key: "committeeLead", position: "Committee Lead", label: "Committee Lead" },
-  { key: "committeeAndSecretary", position: "Committee and Secretary", label: "Committee and Secretary" },
+/** One state for both flows, discriminated by `"id" in editing` — the same
+ *  shape the Units admin page uses. */
+type Editing = Committee | { isNew: true } | null;
+
+const STATUS_OPTIONS: EntityStatus[] = ["active", "inactive", "draft"];
+
+const SINGLETON_SLOTS: { key: SingletonSlotKey; label: string }[] = [
+  { key: "counselor", label: "Counselor" },
+  { key: "committeeLead", label: "Committee Lead" },
+  { key: "committeeAndSecretary", label: "Committee and Secretary" },
 ];
 
 function buildRosterState(memberships: CommitteeMembership[]): RosterState {
@@ -64,7 +86,12 @@ function buildRosterState(memberships: CommitteeMembership[]): RosterState {
     if (m.position === "Counselor") state.counselor = slot;
     else if (m.position === "Committee Lead") state.committeeLead = slot;
     else if (m.position === "Committee and Secretary") state.committeeAndSecretary = slot;
-    else state.committeeMembers.push(slot);
+    // A combined row fills both slots with the same person and the same
+    // shared KPI Focus text — see diffCounselorLeadSlots for the save side.
+    else if (m.position === "Counselor and Committee Lead") {
+      state.counselor = slot;
+      state.committeeLead = { ...slot };
+    } else state.committeeMembers.push(slot);
   }
   return state;
 }
@@ -74,28 +101,31 @@ function diffRoster(
   draft: RosterState,
   ops: {
     create: (facultyId: string, position: Position, kpiFocus: string) => Promise<unknown>;
-    update: (facultyId: string, kpiFocus: string) => Promise<unknown>;
+    update: (facultyId: string, kpiFocus: string, position?: Position) => Promise<unknown>;
     remove: (facultyId: string) => Promise<unknown>;
   },
 ): Array<() => Promise<unknown>> {
   const actions: Array<() => Promise<unknown>> = [];
 
-  for (const { key, position } of SINGLETON_SLOTS) {
-    const old = initial[key];
-    const next = draft[key];
-    if (!old && next) {
-      actions.push(() => ops.create(next.facultyId, position, next.kpiFocus));
-    } else if (old && !next) {
-      actions.push(() => ops.remove(old.facultyId));
-    } else if (old && next) {
-      if (old.facultyId !== next.facultyId) {
-        actions.push(() => ops.remove(old.facultyId));
-        actions.push(() => ops.create(next.facultyId, position, next.kpiFocus));
-      } else if (old.kpiFocus !== next.kpiFocus) {
-        actions.push(() => ops.update(old.facultyId, next.kpiFocus));
-      }
+  const applyMembershipActions = (membershipActions: MembershipAction[]) => {
+    for (const a of membershipActions) {
+      if (a.type === "create") actions.push(() => ops.create(a.facultyId, a.position, a.kpiFocus));
+      else if (a.type === "update") actions.push(() => ops.update(a.facultyId, a.kpiFocus, a.position));
+      else actions.push(() => ops.remove(a.facultyId));
     }
-  }
+  };
+
+  // Counselor and Committee Lead may be the same person (one combined row),
+  // so they're reconciled together rather than as two independent slots.
+  applyMembershipActions(
+    diffCounselorLeadSlots(
+      { counselor: initial.counselor, committeeLead: initial.committeeLead },
+      { counselor: draft.counselor, committeeLead: draft.committeeLead },
+    ),
+  );
+  applyMembershipActions(
+    diffOneSlot(initial.committeeAndSecretary, draft.committeeAndSecretary, "Committee and Secretary"),
+  );
 
   const oldMembers = new Map(initial.committeeMembers.map((m) => [m.facultyId, m.kpiFocus]));
   const newMembers = new Map(draft.committeeMembers.map((m) => [m.facultyId, m.kpiFocus]));
@@ -119,16 +149,17 @@ function diffRoster(
 export default function CommitteePage() {
   const { can } = useAuth();
   const committees = useCommittees();
-  const faculty = useFaculty();
   const facultyRecords = useFacultyRecords();
   const memberships = useCommitteeMemberships();
   const create = useCreateCommittee();
+  const update = useUpdateCommittee();
+  const del = useDeleteCommittee();
   const createMembership = useCreateCommitteeMembership();
   const updateMembership = useUpdateCommitteeMembership();
   const deleteMembership = useDeleteCommitteeMembership();
   const confirm = useConfirm();
   const [selected, setSelected] = useState<string | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState<Editing>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
 
   const facultyById = useMemo(() => {
@@ -150,8 +181,23 @@ export default function CommitteePage() {
     (m) => m.committeeId === activeId,
   );
   const leadName = activeCommittee?.headId
-    ? faculty.data?.find((f) => f.id === activeCommittee.headId)?.name
+    ? facultyById.get(activeCommittee.headId)?.name
     : undefined;
+
+  // Data sources and library KPIs/metrics aren't in this page's cache, so the
+  // reason a delete is blocked has to come from the server.
+  const usage = useCommitteeUsage(can("manage_faculty") ? activeId : null);
+  const deleteBlockedBy = usage.data ? describeCommitteeUsage(usage.data) : null;
+  // Fail closed: until the counts have actually arrived we don't know that
+  // deleting is safe, so an unanswered or failed check keeps the button off.
+  const canDelete = !!usage.data && !deleteBlockedBy;
+  const deleteTitle = deleteBlockedBy
+    ? deleteBlockedBy
+    : usage.isError
+      ? "Couldn't check what is attached to this committee — reload and try again."
+      : usage.data
+        ? "Delete committee"
+        : "Checking what is attached…";
 
   return (
     <>
@@ -160,7 +206,11 @@ export default function CommitteePage() {
         description="Organizational structure of the School of Health Sciences."
         actions={
           can("manage_faculty") && (
-            <Button icon="add" variant="outline" onClick={() => setShowAdd(true)}>
+            <Button
+              icon="add"
+              variant="outline"
+              onClick={() => setEditing({ isNew: true })}
+            >
               Add Committee
             </Button>
           )
@@ -168,7 +218,9 @@ export default function CommitteePage() {
       />
 
       <QueryBoundary
-        isLoading={committees.isLoading || faculty.isLoading || memberships.isLoading}
+        isLoading={
+          committees.isLoading || facultyRecords.isLoading || memberships.isLoading
+        }
         isError={committees.isError}
       >
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-lg">
@@ -228,13 +280,45 @@ export default function CommitteePage() {
                         {committeeMemberships.length} members
                       </Badge>
                       {can("manage_faculty") && (
-                        <Button
-                          size="sm"
-                          icon="groups"
-                          onClick={() => setRosterOpen(true)}
-                        >
-                          Manage Roster
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            icon="groups"
+                            onClick={() => setRosterOpen(true)}
+                          >
+                            Manage Roster
+                          </Button>
+                          <button
+                            aria-label="Edit committee"
+                            title="Edit committee"
+                            className="text-mute hover:text-on-surface p-xs rounded hover:bg-surface-soft disabled:opacity-50"
+                            disabled={update.isPending || del.isPending}
+                            onClick={() => setEditing(activeCommittee)}
+                          >
+                            <Icon name="edit" size={18} />
+                          </button>
+                          <button
+                            aria-label="Delete committee"
+                            title={deleteTitle}
+                            className="text-mute hover:text-error p-xs rounded hover:bg-surface-soft disabled:opacity-50 disabled:hover:text-mute"
+                            disabled={del.isPending || !canDelete}
+                            onClick={async () => {
+                              if (
+                                await confirm({
+                                  title: "Delete committee",
+                                  message: `Delete "${activeCommittee.name}"? This can't be undone.`,
+                                  confirmLabel: "Delete",
+                                })
+                              ) {
+                                del.mutate(activeCommittee.id, {
+                                  onSuccess: () => setSelected(null),
+                                });
+                              }
+                            }}
+                          >
+                            <Icon name="delete" size={18} />
+                          </button>
+                        </>
                       )}
                     </div>
                   }
@@ -299,20 +383,32 @@ export default function CommitteePage() {
         </div>
       </QueryBoundary>
 
-      <AddCommitteeModal
-        open={showAdd}
-        onClose={() => setShowAdd(false)}
-        faculty={(faculty.data ?? []).map((f) => ({ id: f.id, name: f.name }))}
-        submitting={create.isPending}
-        onSubmit={(input) =>
-          create.mutate(input, {
-            onSuccess: (d) => {
-              setShowAdd(false);
-              setSelected(d.id);
-            },
-          })
-        }
-      />
+      {editing && (
+        <CommitteeModal
+          editing={editing}
+          faculty={facultyRecords.data ?? []}
+          submitting={create.isPending || update.isPending}
+          error={
+            (create.error instanceof Error && create.error.message) ||
+            (update.error instanceof Error && update.error.message) ||
+            undefined
+          }
+          onClose={() => setEditing(null)}
+          onSave={(payload) => {
+            if ("id" in payload) {
+              const { id, ...patch } = payload;
+              update.mutate({ id, patch }, { onSuccess: () => setEditing(null) });
+            } else {
+              create.mutate(payload, {
+                onSuccess: (d) => {
+                  setEditing(null);
+                  setSelected(d.id);
+                },
+              });
+            }
+          }}
+        />
+      )}
 
       {rosterOpen && activeCommittee && (
         <CommitteeRosterModal
@@ -371,8 +467,21 @@ function CommitteeRosterModal({
     label: facultyName(m.facultyId),
   }));
 
-  const singletonOptions = (currentId: string | undefined) =>
-    faculty.filter((f) => !assignedIds.has(f.id) || f.id === currentId);
+  // Counselor and Committee Lead may be the same person — each one's dropdown
+  // additionally allows whoever currently occupies the other of the pair.
+  // Committee and Secretary keeps the plain single-exception exclusion.
+  const optionsFor = (key: SingletonSlotKey) => {
+    const currentId = draft[key]?.facultyId;
+    const alsoAllow =
+      key === "counselor"
+        ? draft.committeeLead?.facultyId
+        : key === "committeeLead"
+          ? draft.counselor?.facultyId
+          : undefined;
+    return faculty.filter(
+      (f) => !assignedIds.has(f.id) || f.id === currentId || f.id === alsoAllow,
+    );
+  };
 
   const missingKpiFocusCount = [
     draft.counselor,
@@ -402,8 +511,12 @@ function CommitteeRosterModal({
     const actions = diffRoster(initial, draft, {
       create: (facultyId, position, kpiFocus) =>
         createMembership.mutateAsync({ facultyId, committeeId, position, kpiFocus }),
-      update: (facultyId, kpiFocus) =>
-        updateMembership.mutateAsync({ facultyId, committeeId, patch: { kpiFocus } }),
+      update: (facultyId, kpiFocus, position) =>
+        updateMembership.mutateAsync({
+          facultyId,
+          committeeId,
+          patch: position ? { position, kpiFocus } : { kpiFocus },
+        }),
       remove: (facultyId) => deleteMembership.mutateAsync({ facultyId, committeeId }),
     });
     const results = await Promise.allSettled(actions.map((run) => run()));
@@ -447,21 +560,16 @@ function CommitteeRosterModal({
       <div className="flex flex-col gap-lg">
         {SINGLETON_SLOTS.map(({ key, label }) => {
           const slot = draft[key];
-          const options = singletonOptions(slot?.facultyId);
+          const options = optionsFor(key);
           return (
             <div key={key} className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
               <Field label={label}>
-                <Select
+                <Combobox
                   value={slot?.facultyId ?? ""}
-                  onChange={(e) => updateSlot(key, { facultyId: e.target.value })}
-                >
-                  <option value="">None</option>
-                  {options.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={(facultyId) => updateSlot(key, { facultyId })}
+                  options={options.map((f) => ({ id: f.id, label: f.name }))}
+                  placeholder="None"
+                />
               </Field>
               <Field label="KPI Focus">
                 <Input
@@ -518,59 +626,66 @@ function CommitteeRosterModal({
   );
 }
 
-function AddCommitteeModal({
-  open,
-  onClose,
+function CommitteeModal({
+  editing,
   faculty,
-  onSubmit,
+  onClose,
+  onSave,
   submitting,
+  error,
 }: {
-  open: boolean;
+  editing: Editing;
+  faculty: FacultyRecord[];
   onClose: () => void;
-  faculty: { id: string; name: string }[];
-  onSubmit: (input: Omit<Committee, "id">) => void;
+  onSave: (payload: CommitteeInput | (CommitteeInput & { id: string })) => void;
   submitting: boolean;
+  error?: string;
 }) {
-  const [name, setName] = useState("");
-  const [headId, setHeadId] = useState("");
+  const existing = editing && "id" in editing ? editing : null;
+  const [name, setName] = useState(existing?.name ?? "");
+  const [keyMetric, setKeyMetric] = useState(
+    existing && existing.keyMetric !== "—" ? existing.keyMetric : "",
+  );
+  const [status, setStatus] = useState<EntityStatus>(existing?.status ?? "active");
+  const [headId, setHeadId] = useState(existing?.headId ?? "");
 
-  const close = () => {
-    setName("");
-    setHeadId("");
-    onClose();
-  };
-
-  const valid = name.trim().length > 1 && headId !== "";
+  const valid = name.trim().length > 1;
 
   return (
     <Modal
-      open={open}
-      onClose={close}
-      title="Add Committee"
-      subtitle="Create a new standing committee (stored in-session for this prototype)."
+      open
+      onClose={onClose}
+      title={existing ? "Edit Committee" : "Add Committee"}
+      subtitle="A standing committee of the School of Health Sciences."
       footer={
         <>
-          <Button variant="ghost" onClick={close}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button
             disabled={!valid || submitting}
-            onClick={() =>
-              onSubmit({
+            onClick={() => {
+              const base = {
                 name: name.trim(),
-                faculty: "School of Health Science",
-                status: "active",
-                keyMetric: "—",
-                headId,
-              })
-            }
+                // The column is NOT NULL and the cards render an em dash for "unset".
+                keyMetric: keyMetric.trim() || "—",
+                status,
+                headId: headId.trim(),
+              };
+              onSave(existing ? { ...base, id: existing.id } : base);
+            }}
           >
-            {submitting ? "Saving…" : "Add Committee"}
+            {submitting ? "Saving…" : existing ? "Save Changes" : "Add Committee"}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-lg">
+        {error && (
+          <div className="rounded border border-error/30 bg-error/10 px-md py-sm text-body-sm text-error">
+            {error}
+          </div>
+        )}
         <Field label="Committee Name">
           <Input
             value={name}
@@ -578,17 +693,34 @@ function AddCommitteeModal({
             placeholder="e.g. Quality Assurance Committee"
           />
         </Field>
-        <Field label="Lead Faculty">
-          <Select value={headId} onChange={(e) => setHeadId(e.target.value)}>
-            <option value="" disabled>
-              Select lead faculty…
-            </option>
-            {faculty.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </Select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
+          <Field label="Key Metric" hint="Optional">
+            <Input
+              value={keyMetric}
+              onChange={(e) => setKeyMetric(e.target.value)}
+              placeholder="e.g. Curriculum Quality"
+            />
+          </Field>
+          <Field label="Status" hint="Set to Inactive to archive without deleting">
+            <Select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as EntityStatus)}
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s[0].toUpperCase() + s.slice(1)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <Field label="Lead Faculty" hint="Optional">
+          <Combobox
+            value={headId}
+            onChange={setHeadId}
+            options={faculty.map((f) => ({ id: f.id, label: f.name }))}
+            placeholder="None"
+          />
         </Field>
       </div>
     </Modal>

@@ -125,7 +125,12 @@ export const RANKS: Rank[] = [
  *  which is almost never meant to include administrative staff. */
 export const ACADEMIC_RANKS: Rank[] = RANKS.filter((r) => r !== "Support Staff");
 
-export type Position = "Counselor" | "Committee Lead" | "Committee" | "Committee and Secretary";
+export type Position =
+  | "Counselor"
+  | "Committee Lead"
+  | "Committee"
+  | "Committee and Secretary"
+  | "Counselor and Committee Lead";
 
 export interface FacultyMember {
   id: string;

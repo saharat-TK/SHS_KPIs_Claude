@@ -108,14 +108,25 @@ export function stageForPosition(
  *  Admin is **additive**, not a replacement: an administrator who also sits on
  *  the committee keeps their position's transitions and gains `reverse` on top.
  *  Collapsing the two would silently strip a Committee Lead who happens to hold
- *  the admin system role of their ability to forward. */
+ *  the admin system role of their ability to forward.
+ *
+ *  "Counselor and Committee Lead" is additive the same way: it's one combined
+ *  membership row (committee_memberships has no room for two positions per
+ *  person per committee — see the roster's diffCounselorLeadSlots), and a
+ *  person holding it gets both stages, not just one. That intentionally lets
+ *  them forward their own submission and then give it final approval — the
+ *  two-step check only holds when Counselor and Lead are different people. */
 export function resolveStageRoles(
   position: Position | null | undefined,
   isAdmin: boolean,
 ): StageRole[] {
   const stages: StageRole[] = [];
-  const positionStage = stageForPosition(position);
-  if (positionStage) stages.push(positionStage);
+  if (position === "Counselor and Committee Lead") {
+    stages.push("counselor", "lead");
+  } else {
+    const positionStage = stageForPosition(position);
+    if (positionStage) stages.push(positionStage);
+  }
   if (isAdmin) stages.push("admin");
   return stages;
 }

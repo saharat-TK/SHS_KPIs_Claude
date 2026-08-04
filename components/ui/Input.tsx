@@ -13,21 +13,20 @@ export const Input = forwardRef<
 ));
 Input.displayName = "Input";
 
-export function SearchInput({
-  className,
-  ...rest
-}: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <div className="relative w-full">
-      <Icon
-        name="search"
-        size={20}
-        className="absolute left-md top-1/2 -translate-y-1/2 text-mute pointer-events-none"
-      />
-      <input className={cn(base, "h-[34px] pl-[36px]", className)} {...rest} />
-    </div>
-  );
-}
+export const SearchInput = forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(({ className, ...rest }, ref) => (
+  <div className="relative w-full">
+    <Icon
+      name="search"
+      size={20}
+      className="absolute left-md top-1/2 -translate-y-1/2 text-mute pointer-events-none"
+    />
+    <input ref={ref} className={cn(base, "h-[34px] pl-[36px]", className)} {...rest} />
+  </div>
+));
+SearchInput.displayName = "SearchInput";
 
 export const Select = forwardRef<
   HTMLSelectElement,
