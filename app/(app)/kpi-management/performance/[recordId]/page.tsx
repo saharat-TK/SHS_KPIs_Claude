@@ -357,7 +357,7 @@ function PerformanceRecordDetail() {
                     sortable
                     sortDir={sort?.key === "currentProgress" ? sort.dir : null}
                     onSort={() => toggleSort("currentProgress")}
-                    align="center"
+                    align="right"
                   >
                     Current Progress
                   </Th>
@@ -407,11 +407,11 @@ function PerformanceRecordDetail() {
                           ? "—"
                           : `${formatNumber(annualTarget, 2)} ${k.unit ?? ""}`}
                       </Td>
-                      <Td align="center">
+                      <Td align="right">
                         {current == null ? (
                           <span className="text-caption-sm text-mute">—</span>
                         ) : (
-                          <div className="flex items-center justify-center gap-sm">
+                          <div className="flex items-center justify-end gap-sm">
                             <span>{`${formatNumber(current, 2)} ${k.unit ?? ""}`}</span>
                             {pct != null && (
                               // Badge takes no title, so the status label rides
