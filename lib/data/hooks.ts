@@ -70,6 +70,7 @@ declare module "@tanstack/react-query" {
 
 export const qk = {
   committees: ["committees"] as const,
+  committeeUsage: (id: string) => ["committeeUsage", id] as const,
   faculty: ["faculty"] as const,
   kpis: ["kpis"] as const,
   kpi: (id: string) => ["kpis", id] as const,
@@ -114,6 +115,13 @@ export const qk = {
 // Queries --------------------------------------------------------------------
 export const useCommittees = () =>
   useQuery({ queryKey: qk.committees, queryFn: committeesRepo.list });
+
+export const useCommitteeUsage = (id: string | null) =>
+  useQuery({
+    queryKey: qk.committeeUsage(id ?? ""),
+    queryFn: () => committeesRepo.usage(id as string),
+    enabled: !!id,
+  });
 
 export const useFaculty = () =>
   useQuery({ queryKey: qk.faculty, queryFn: facultyRepo.list });
@@ -160,12 +168,42 @@ export const useValidations = () =>
   useQuery({ queryKey: qk.validations, queryFn: validationsRepo.list });
 
 // Mutations ------------------------------------------------------------------
+
+/** `faculty` is optional on the way in: the route defaults it to the school. */
+export type CommitteeInput = Omit<Committee, "id" | "faculty"> & { faculty?: string };
+
 export function useCreateCommittee() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Omit<Committee, "id">) => committeesRepo.create(input),
+    mutationFn: (input: CommitteeInput) => committeesRepo.create(input),
     meta: { toast: (d) => `Committee "${(d as Committee).name}" added` },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.committees }),
+  });
+}
+
+export function useUpdateCommittee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<Omit<Committee, "id">> }) =>
+      committeesRepo.update(id, patch),
+    meta: { toast: "Committee updated" },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.committees }),
+  });
+}
+
+export function useDeleteCommittee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => committeesRepo.remove(id),
+    meta: { toast: "Committee deleted" },
+    // The route refuses while anything is attached, so in practice there is no
+    // roster left to drop — but committee_memberships cascades, so the cached
+    // list would still be stale if that guard is ever relaxed.
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: qk.committees });
+      qc.invalidateQueries({ queryKey: qk.committeeMemberships });
+      qc.removeQueries({ queryKey: qk.committeeUsage(id) });
+    },
   });
 }
 
@@ -238,7 +276,12 @@ export function useCreateCommitteeMembership() {
       toast: (d) => `${(d as CommitteeMembership).facultyName} assigned to committee`,
       errorToast: "Failed to assign faculty member",
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.committeeMemberships }),
+    // The roster size is one of the things that blocks deleting a committee,
+    // so the usage counts go stale whenever a membership appears or disappears.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.committeeMemberships });
+      qc.invalidateQueries({ queryKey: ["committeeUsage"] });
+    },
   });
 }
 
@@ -265,7 +308,10 @@ export function useDeleteCommitteeMembership() {
     mutationFn: ({ facultyId, committeeId }: { facultyId: string; committeeId: string }) =>
       committeeMembershipsRepo.remove(facultyId, committeeId),
     meta: { toast: "Membership removed" },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.committeeMemberships }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.committeeMemberships });
+      qc.invalidateQueries({ queryKey: ["committeeUsage"] });
+    },
   });
 }
 

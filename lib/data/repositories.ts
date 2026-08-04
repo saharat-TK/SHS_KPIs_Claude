@@ -41,6 +41,7 @@ import type {
   ValidationStatus,
   ValidationSubmission,
 } from "@/lib/types";
+import type { CommitteeUsage } from "@/lib/kpi/committee";
 import { delay, getDB, uid } from "./store";
 
 // Shared helper for the DB-backed KPI-management repos: throw the API's error
@@ -57,16 +58,46 @@ async function jsonOrThrow<T>(res: Response, fallback: string): Promise<T> {
 // Every function is async and returns plain data. Phase 2 reimplements the
 // bodies against Firebase/Supabase/Postgres; hooks and components are untouched.
 
-// Committees ----------------------------------------------------------------
+// Committees — real MySQL-backed (shs_kpis_claude.committees). The id is a
+// readable slug minted server-side ("cmt-curriculum"), so a newly created
+// committee can immediately be referenced by committee_memberships.committee_id.
+// Uses jsonOrThrow so the delete-blocked 409 explains itself in the error toast.
 export const committeesRepo = {
-  list: () => delay(getDB().committees),
-  get: (id: string) =>
-    delay(getDB().committees.find((d) => d.id === id) ?? null),
-  create: async (input: Omit<Committee, "id">) => {
-    const committee: Committee = { ...input, id: uid("cmt") };
-    getDB().committees.push(committee);
-    return delay(committee);
-  },
+  list: async (): Promise<Committee[]> =>
+    jsonOrThrow(await fetch("/api/committees"), "Failed to load committees"),
+  get: async (id: string): Promise<Committee> =>
+    jsonOrThrow(await fetch(`/api/committees/${id}`), "Failed to load committee"),
+  // `faculty` is optional: the route defaults it to the school name.
+  create: async (
+    input: Omit<Committee, "id" | "faculty"> & { faculty?: string },
+  ): Promise<Committee> =>
+    jsonOrThrow(
+      await fetch("/api/committees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to create committee",
+    ),
+  update: async (id: string, patch: Partial<Omit<Committee, "id">>): Promise<Committee> =>
+    jsonOrThrow(
+      await fetch(`/api/committees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+      "Failed to update committee",
+    ),
+  remove: async (id: string): Promise<{ id: string }> =>
+    jsonOrThrow(
+      await fetch(`/api/committees/${id}`, { method: "DELETE" }),
+      "Failed to delete committee",
+    ),
+  usage: async (id: string): Promise<CommitteeUsage> =>
+    jsonOrThrow(
+      await fetch(`/api/committees/${id}/usage`),
+      "Failed to load committee usage",
+    ),
 };
 
 // Faculty --------------------------------------------------------------------
@@ -91,11 +122,11 @@ export const facultyRepo = {
   },
 };
 
-// Faculty records — real MySQL-backed (shs_kpis_claude.faculty), used only by
-// the Faculty Management page (app/(app)/faculty/management/page.tsx).
-// Parallel to, not a replacement for, facultyRepo above — the mock-data pages
-// (export, and the committee-entity CRUD on the committee page) keep using
-// facultyRepo/committeesRepo untouched.
+// Faculty records — real MySQL-backed (shs_kpis_claude.faculty). Parallel to,
+// not a replacement for, facultyRepo above: the remaining mock-data pages
+// (faculty/export) keep using facultyRepo. Anything that writes a faculty id
+// into MySQL — committee memberships, a committee's head_id — must source it
+// from here, since facultyRepo's ids are generated and exist only in memory.
 export const facultyRecordsRepo = {
   list: async (): Promise<FacultyRecord[]> => {
     const res = await fetch("/api/faculty");

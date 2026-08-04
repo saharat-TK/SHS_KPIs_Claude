@@ -144,6 +144,25 @@ test("resolveStageRoles makes admin additive, not a replacement", () => {
   assert.deepEqual(resolveStageRoles(null, false), []);
 });
 
+// A combined "Counselor and Committee Lead" row is one person holding both
+// roles on the same committee — see diffCounselorLeadSlots in lib/kpi/committee.ts
+// for how the roster editor keeps that to a single DB row.
+test("resolveStageRoles grants both stages for a combined Counselor and Committee Lead", () => {
+  assert.deepEqual(resolveStageRoles("Counselor and Committee Lead", false), [
+    "counselor",
+    "lead",
+  ]);
+  assert.deepEqual(resolveStageRoles("Counselor and Committee Lead", true), [
+    "counselor",
+    "lead",
+    "admin",
+  ]);
+});
+
+test("stageForPosition itself stays single-valued — the combined case is resolveStageRoles' job", () => {
+  assert.equal(stageForPosition("Counselor and Committee Lead"), null);
+});
+
 test("a lead who is also an admin keeps every lead transition and gains reverse", () => {
   const stages = resolveStageRoles("Committee Lead", true);
 
