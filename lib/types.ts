@@ -527,6 +527,8 @@ export interface PerfKpiApproval {
   /** Target for this row's yearNo, from perf_kpi_annual_target. */
   annualTarget?: number | null;
   progressValue?: number | null;
+  thresholdGreen?: number | null;
+  thresholdAmber?: number | null;
   hasChildren?: boolean;
 }
 

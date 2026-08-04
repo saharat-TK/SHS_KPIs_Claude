@@ -35,6 +35,8 @@ export async function GET(
          c.name                     AS committeeName,
          k.unit                     AS unit,
          k.has_children             AS hasChildren,
+         k.threshold_green          AS thresholdGreen,
+         k.threshold_amber          AS thresholdAmber,
          ?                          AS yearNo,
          ?                          AS quarterNo,
          tgt.target_value           AS annualTarget,
