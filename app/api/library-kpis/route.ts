@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { LIBRARY_KPI_FIELDS } from "@/lib/kpi/fields";
 import { syncActiveRecordsForSet } from "@/lib/kpi/performance";
+import { DEFAULT_THRESHOLDS } from "@/lib/kpi/progress";
 import { isCalculationType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -55,16 +56,18 @@ export async function POST(req: NextRequest) {
 
       const [ins] = await conn.query<ResultSetHeader>(
         `INSERT INTO library_kpi
-           (set_id, name, description, category_id, kpi_type, data_collect_method,
+           (set_id, name, description, category_id, routine_category_id, kpi_type,
+            data_collect_method,
             collection_period, data_source_url, committee_id, person_in_charge_id,
             weight, unit, five_year_target, calculation_type, calculation_logic,
             formula_id, threshold_green, threshold_amber, sort_order)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           b.setId,
           b.name.trim(),
           b.description?.trim() || null,
           b.categoryId || null,
+          b.routineCategoryId || null,
           b.kpiType || "operational",
           b.dataCollectMethod?.trim() || null,
           b.collectionPeriod || "every_quarter",
@@ -77,8 +80,11 @@ export async function POST(req: NextRequest) {
           b.calculationType || "weighted_sum",
           b.calculationLogic?.trim() || null,
           b.formulaId ?? null,
-          b.thresholdGreen ?? null,
-          b.thresholdAmber ?? null,
+          // `in` rather than `??`: the editor always sends both keys, so an
+          // explicit null means "the user cleared this" and must survive. Only
+          // an absent key falls back to the standard band.
+          "thresholdGreen" in b ? b.thresholdGreen : DEFAULT_THRESHOLDS.green,
+          "thresholdAmber" in b ? b.thresholdAmber : DEFAULT_THRESHOLDS.amber,
           sortOrder,
         ],
       );

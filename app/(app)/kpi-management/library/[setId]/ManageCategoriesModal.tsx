@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Modal, Button, Field, Input, useConfirm } from "@/components/ui";
+import { Modal, Button, Field, Input, Select, useConfirm } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import {
   useCreateKpiCategory,
   useUpdateKpiCategory,
   useDeleteKpiCategory,
   useReorderKpiCategories,
+  useKpiTypes,
 } from "@/lib/data/hooks";
-import type { KpiCategoryRecord } from "@/lib/types";
+import type { KpiCategoryRecord, KpiTypeRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // Set-scoped category manager. Reused by the strategic-set detail page (with a
@@ -30,14 +31,21 @@ export function ManageCategoriesModal({
 }) {
   const createCat = useCreateKpiCategory();
   const reorderCat = useReorderKpiCategories(setId);
+  // Strategic / Routine only — Operational classifies KPIs, not categories.
+  const kpiTypesQ = useKpiTypes({ forCategories: true });
+  const kpiTypes = kpiTypesQ.data ?? [];
   const [newLabel, setNewLabel] = useState("");
+  const [newType, setNewType] = useState("strategic");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const canAdd = newLabel.trim().length > 1;
 
   const addCategory = () => {
     if (!canAdd) return;
-    createCat.mutate({ setId, label: newLabel.trim() }, { onSuccess: () => setNewLabel("") });
+    createCat.mutate(
+      { setId, label: newLabel.trim(), kpiType: newType },
+      { onSuccess: () => setNewLabel("") },
+    );
   };
 
   // Dropping on a row moves the dragged category to just before it.
@@ -56,7 +64,7 @@ export function ManageCategoriesModal({
       open={open}
       onClose={onClose}
       title="Manage Categories"
-      subtitle="Rename, describe, reorder or remove this set's KPI categories."
+      subtitle="Rename, describe, retype, reorder or remove this set's KPI categories."
       size="lg"
       footer={
         <Button variant="ghost" onClick={onClose}>
@@ -73,6 +81,7 @@ export function ManageCategoriesModal({
               <CategoryRow
                 key={c.id}
                 category={c}
+                kpiTypes={kpiTypes}
                 inUse={kpiCountFor(c.id)}
                 dragging={draggingId === c.id}
                 dragOver={overId === c.id && draggingId !== null && draggingId !== c.id}
@@ -97,6 +106,17 @@ export function ManageCategoriesModal({
               onKeyDown={(e) => e.key === "Enter" && addCategory()}
             />
           </Field>
+          <div className="w-[150px] shrink-0">
+            <Field label="Type">
+              <Select value={newType} onChange={(e) => setNewType(e.target.value)}>
+                {kpiTypes.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.kpiTypeName}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
           <Button icon="add" disabled={!canAdd || createCat.isPending} onClick={addCategory}>
             {createCat.isPending ? "Adding…" : "Add"}
           </Button>
@@ -108,6 +128,7 @@ export function ManageCategoriesModal({
 
 function CategoryRow({
   category,
+  kpiTypes,
   inUse,
   dragging,
   dragOver,
@@ -117,6 +138,7 @@ function CategoryRow({
   onDrop,
 }: {
   category: KpiCategoryRecord;
+  kpiTypes: KpiTypeRecord[];
   inUse: number;
   dragging: boolean;
   dragOver: boolean;
@@ -130,16 +152,19 @@ function CategoryRow({
   const confirm = useConfirm();
   const [label, setLabel] = useState(category.label);
   const [description, setDescription] = useState(category.description ?? "");
+  const [kpiType, setKpiType] = useState(category.kpiType);
 
   const dirty =
-    label.trim() !== category.label || description.trim() !== (category.description ?? "");
+    label.trim() !== category.label ||
+    description.trim() !== (category.description ?? "") ||
+    kpiType !== category.kpiType;
   const canSave = dirty && label.trim().length > 1;
 
   const save = () => {
     if (!canSave) return;
     updateCat.mutate({
       id: category.id,
-      patch: { label: label.trim(), description: description.trim() },
+      patch: { label: label.trim(), description: description.trim(), kpiType },
     });
   };
 
@@ -172,7 +197,7 @@ function CategoryRow({
       >
         <Icon name="drag_indicator" size={18} />
       </button>
-      <div className="grid flex-1 grid-cols-1 sm:grid-cols-2 gap-sm min-w-0">
+      <div className="grid flex-1 grid-cols-1 sm:grid-cols-[1fr_1fr_150px] gap-sm min-w-0">
         <Input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
@@ -183,6 +208,22 @@ function CategoryRow({
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Description (optional)"
         />
+        <Select
+          value={kpiType}
+          aria-label="Category type"
+          onChange={(e) => setKpiType(e.target.value)}
+        >
+          {/* Guard against a row typed with something not in the list (e.g.
+              while the types query is still in flight) silently retyping itself. */}
+          {kpiTypes.some((t) => t.id === kpiType) ? null : (
+            <option value={kpiType}>{kpiType}</option>
+          )}
+          {kpiTypes.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.kpiTypeName}
+            </option>
+          ))}
+        </Select>
       </div>
       <div className="flex items-center gap-xs shrink-0">
         <Button

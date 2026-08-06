@@ -19,6 +19,12 @@ export function healthOf(value: number, t: Thresholds): Health {
   return "at_risk";
 }
 
+/** Standard band for a new KPI: on-target at 100 % of target, watch at 70 %.
+ *  Percent-of-target, like every other threshold in this module — so it is
+ *  meaningful whatever the KPI's unit. Shared by the create route and the
+ *  library editor so the two cannot drift. */
+export const DEFAULT_THRESHOLDS: Thresholds = { green: 100, amber: 70 };
+
 export const HEALTH_LABEL: Record<Health, string> = {
   healthy: "On Target",
   watch: "Watch",

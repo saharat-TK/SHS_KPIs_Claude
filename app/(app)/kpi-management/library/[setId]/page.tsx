@@ -19,6 +19,8 @@ import {
   Modal,
   Field,
   Input,
+  ActionMenu,
+  useConfirm,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
 import { useBreadcrumbLabel } from "@/components/shell/BreadcrumbLabels";
@@ -26,16 +28,22 @@ import {
   useStrategicSet,
   useLibraryKpis,
   useCreateLibraryKpi,
+  useDeleteLibraryKpi,
   useKpiCategories,
+  useKpiTypes,
 } from "@/lib/data/hooks";
 import {
   KPI_TYPES,
   type KpiType,
   type LibraryKpi,
 } from "@/lib/types";
+import { categoriesOfType } from "@/lib/kpi/categories";
+import { describeKpiDeletion } from "@/lib/kpi/deletion";
 import { ManageCategoriesModal } from "./ManageCategoriesModal";
 
-const TYPE_TONE: Record<KpiType, "primary" | "info" | "neutral"> = {
+// Keyed on the seeded ids; kpi_type is user-extensible now, so unknown ids fall
+// back to a neutral tone rather than rendering undefined.
+const TYPE_TONE: Record<string, "primary" | "info" | "neutral"> = {
   strategic: "primary",
   operational: "info",
   routine: "neutral",
@@ -57,7 +65,10 @@ function SetDetail() {
   const setQ = useStrategicSet(setId);
   const kpisQ = useLibraryKpis(setId);
   const categoriesQ = useKpiCategories(setId);
+  const kpiTypesQ = useKpiTypes();
   const create = useCreateLibraryKpi();
+  const del = useDeleteLibraryKpi(setId);
+  const confirm = useConfirm();
 
   // Show the set's name (not its id) in the breadcrumb.
   useBreadcrumbLabel(`/kpi-management/library/${setId}`, setQ.data?.name);
@@ -68,10 +79,18 @@ function SetDetail() {
 
   const categories = categoriesQ.data ?? [];
   const kpis = kpisQ.data ?? [];
+  const kpiTypes = kpiTypesQ.data ?? [];
+  // Tabs group by category_id, which holds the Strategic taxonomy only —
+  // routine categories would otherwise show up as permanently-empty tabs.
+  const strategicCategories = categoriesOfType(categories, "strategic");
+  const typeLabel = (id: string) =>
+    kpiTypes.find((t) => t.id === id)?.kpiTypeName ??
+    KPI_TYPES.find((t) => t.id === id)?.label ??
+    id;
 
   const tabs = [
     { id: "all", label: "All", count: kpis.length },
-    ...categories.map((c) => ({
+    ...strategicCategories.map((c) => ({
       id: c.id,
       label: c.label,
       count: kpis.filter((k) => k.categoryId === c.id).length,
@@ -84,6 +103,22 @@ function SetDetail() {
   );
 
   const set = setQ.data;
+
+  // No usage pre-check: the API refuses with a 409 when an active record holds
+  // recorded progress, and jsonOrThrow surfaces that message in the error
+  // toast. Same shape as the sub-KPI delete in MetricEditor.
+  const askDelete = async (k: LibraryKpi) => {
+    if (
+      await confirm({
+        title: "Delete KPI",
+        message: describeKpiDeletion(k.name, k.metricCount ?? 0),
+        confirmLabel: "Delete",
+        confirmPhrase: "DELETE",
+      })
+    ) {
+      del.mutate(k.id);
+    }
+  };
 
   return (
     <>
@@ -152,22 +187,32 @@ function SetDetail() {
                   >
                     <Td className="font-medium">{k.name}</Td>
                     <Td align="center">
-                      <Badge tone={TYPE_TONE[k.kpiType]}>{k.kpiType}</Badge>
+                      <Badge tone={TYPE_TONE[k.kpiType] ?? "neutral"}>
+                        {typeLabel(k.kpiType)}
+                      </Badge>
                     </Td>
                     <Td align="center">{k.weight}%</Td>
                     <Td align="center">{k.metricCount ?? 0}</Td>
-                    <Td align="right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconRight="chevron_right"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/kpi-management/library/${setId}/kpis/${k.id}`);
-                        }}
-                      >
-                        Configure
-                      </Button>
+                    {/* The whole cell stops propagation so the row's own
+                        navigate-on-click can't fire behind the menu. */}
+                    <Td align="right" onClick={(e) => e.stopPropagation()}>
+                      <ActionMenu
+                        label={`Actions for ${k.name}`}
+                        items={[
+                          {
+                            icon: "tune",
+                            label: "Configure",
+                            onSelect: () =>
+                              router.push(`/kpi-management/library/${setId}/kpis/${k.id}`),
+                          },
+                          {
+                            icon: "delete",
+                            label: "Delete",
+                            tone: "danger",
+                            onSelect: () => askDelete(k),
+                          },
+                        ]}
+                      />
                     </Td>
                   </Tr>
                 ))}
@@ -180,7 +225,8 @@ function SetDetail() {
       <CreateKpiModal
         open={showCreate}
         submitting={create.isPending}
-        categories={categories}
+        categories={strategicCategories}
+        kpiTypes={kpiTypes.map((t) => ({ id: t.id, label: t.kpiTypeName }))}
         onClose={() => setShowCreate(false)}
         onCreate={(input) =>
           create.mutate(
@@ -202,7 +248,11 @@ function SetDetail() {
         onClose={() => setShowManageCats(false)}
         setId={setId}
         categories={categories}
-        kpiCountFor={(id) => kpis.filter((k) => k.categoryId === id).length}
+        kpiCountFor={(id) =>
+          // Either taxonomy counts as "in use" — a Routine category is
+          // referenced through routineCategoryId, not categoryId.
+          kpis.filter((k) => k.categoryId === id || k.routineCategoryId === id).length
+        }
       />
     </>
   );
@@ -213,6 +263,7 @@ function CreateKpiModal({
   onClose,
   onCreate,
   categories,
+  kpiTypes,
   submitting,
 }: {
   open: boolean;
@@ -225,6 +276,7 @@ function CreateKpiModal({
     unit: string;
   }) => void;
   categories: { id: string; label: string }[];
+  kpiTypes: { id: string; label: string }[];
   submitting: boolean;
 }) {
   const [name, setName] = useState("");
@@ -294,7 +346,7 @@ function CreateKpiModal({
           </Field>
           <Field label="KPI Type">
             <Select value={kpiType} onChange={(e) => setKpiType(e.target.value as KpiType)}>
-              {KPI_TYPES.map((t) => (
+              {(kpiTypes.length > 0 ? kpiTypes : KPI_TYPES).map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.label}
                 </option>

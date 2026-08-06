@@ -5,7 +5,7 @@ import type { RowDataPacket, ResultSetHeader } from "mysql2";
 export const dynamic = "force-dynamic";
 
 const SELECT_FIELDS =
-  "id, name AS label, description, sort_order AS sortOrder";
+  "id, set_id AS setId, kpi_type AS kpiType, name AS label, description, sort_order AS sortOrder";
 
 // Only editable fields; `id` (the stable slug) is intentionally immutable so
 // existing KPIs keep mapping after a rename.
@@ -13,6 +13,7 @@ const COLUMN_MAP: Record<string, string> = {
   label: "name",
   description: "description",
   sortOrder: "sort_order",
+  kpiType: "kpi_type",
 };
 
 export async function PATCH(

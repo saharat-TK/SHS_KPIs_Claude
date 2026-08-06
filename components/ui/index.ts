@@ -23,6 +23,7 @@ export {
   HEALTH_FILL,
 } from "./Charts";
 export { ThresholdBar, healthOf, HEALTH_LABEL, type Health } from "./ThresholdBar";
+export { ActionMenu, type ActionMenuItem } from "./ActionMenu";
 export { StatusPill } from "./StatusPill";
 export { EmptyState } from "./EmptyState";
 export { PageHeader } from "./PageHeader";

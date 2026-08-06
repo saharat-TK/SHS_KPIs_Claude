@@ -11,9 +11,20 @@ export type KpiCategory = string;
 export interface KpiCategoryRecord {
   id: string; // stable, globally-unique slug, e.g. "student_success"
   setId?: number | null; // owning strategic set (null = legacy/global)
+  kpiType: string; // which taxonomy: "strategic" | "routine" (see kpi_type table)
   label: string; // display name (DB column `name`, aliased on read)
   description?: string;
   sortOrder: number;
+}
+
+// Admin-managed KPI type (shs_kpis_claude.kpi_type). Backs the "KPI Type"
+// dropdown and, via `appliesToCategories`, the category taxonomy split —
+// Operational is a KPI-only type, so a category is Strategic or Routine.
+export interface KpiTypeRecord {
+  id: string; // "strategic" | "operational" | "routine"
+  kpiTypeName: string; // display label, e.g. "Strategic"
+  sortOrder: number;
+  appliesToCategories: boolean;
 }
 
 // Admin-managed measurement unit for KPIs/metrics (shs_kpis_claude.units).
@@ -294,6 +305,11 @@ export type CollectionPeriod = "Q1" | "Q2" | "Q3" | "Q4" | "every_quarter";
 export type StrategicSetStatus = "draft" | "active" | "archived";
 export type PerformanceStatus = "active" | "inactive" | "completed";
 
+// KPI types are now user-managed and DB-backed (table `kpi_type`, exposed via
+// /api/kpi-types). This const mirrors the seed rows and is used as a
+// loading/offline fallback so the type dropdowns never render empty — the same
+// role KPI_CATEGORIES plays above. `KpiType` stays a union because the badge
+// tone maps are keyed on it; unknown ids fall back to a neutral tone.
 export const KPI_TYPES: { id: KpiType; label: string }[] = [
   { id: "strategic", label: "Strategic" },
   { id: "operational", label: "Operational" },
@@ -338,7 +354,11 @@ export interface LibraryKpi {
   setId: number;
   name: string;
   description: string | null;
+  /** Strategic-taxonomy category (kpi_categories where kpi_type = 'strategic'). */
   categoryId: string | null;
+  /** Routine-taxonomy category — the ด้านที่ 1–7 operating areas. Independent
+   *  of categoryId; a KPI may carry one of each. */
+  routineCategoryId: string | null;
   kpiType: KpiType;
   dataCollectMethod: string | null;
   collectionPeriod: CollectionPeriod;

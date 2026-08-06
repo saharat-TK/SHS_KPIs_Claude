@@ -34,6 +34,7 @@ import {
   useCommitteeMemberships,
   useFacultyRecords,
   useApprovalTransition,
+  useKpiTypes,
 } from "@/lib/data/hooks";
 import {
   targetForYear,
@@ -49,7 +50,12 @@ import {
   resolveStageRoles,
 } from "@/lib/kpi/approvalWorkflow";
 import { formatNumber } from "@/lib/utils";
-import type { ApprovalAction, ApprovalState, PerfMetric } from "@/lib/types";
+import {
+  KPI_TYPES,
+  type ApprovalAction,
+  type ApprovalState,
+  type PerfMetric,
+} from "@/lib/types";
 import { ProgressPanel, type QuarterEntryAction } from "./ProgressPanel";
 import { MetricProgressModal } from "./MetricProgressModal";
 import { AnnualQuarterProgressMatrix } from "./AnnualQuarterProgressMatrix";
@@ -92,6 +98,7 @@ function PerfKpiProgress() {
   const perfKpiId = Number(params.perfKpiId);
 
   const kpiQ = usePerfKpi(perfKpiId);
+  const kpiTypesQ = useKpiTypes();
   const recordQ = usePerformanceRecord(recordId);
   const periodsQ = usePerformancePeriods(recordId);
   const metricsQ = usePerfMetricsByKpi(perfKpiId);
@@ -248,7 +255,15 @@ function PerfKpiProgress() {
     <>
       <PageHeader
         title={kpi?.name ?? "KPI Progress"}
-        description={kpi ? `${kpi.kpiType} · weight ${kpi.weight}%` : "Loading…"}
+        description={
+          kpi
+            ? `${
+                kpiTypesQ.data?.find((t) => t.id === kpi.kpiType)?.kpiTypeName ??
+                KPI_TYPES.find((t) => t.id === kpi.kpiType)?.label ??
+                kpi.kpiType
+              } · weight ${kpi.weight}%`
+            : "Loading…"
+        }
         actions={
           <Button
             variant="ghost"

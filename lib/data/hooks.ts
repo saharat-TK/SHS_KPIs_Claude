@@ -46,6 +46,7 @@ import {
   facultyRecordsRepo,
   formulasRepo,
   kpiCategoriesRepo,
+  kpiTypesRepo,
   kpisRepo,
   libraryKpisRepo,
   libraryMetricsRepo,
@@ -76,6 +77,7 @@ export const qk = {
   kpi: (id: string) => ["kpis", id] as const,
   kpiCategories: ["kpiCategories"] as const,
   kpiCategoriesFor: (setId?: number) => ["kpiCategories", setId ?? null] as const,
+  kpiTypesFor: (forCategories?: boolean) => ["kpiTypes", !!forCategories] as const,
   units: ["units"] as const,
   metrics: ["metrics"] as const,
   metricsByKpi: (id: string) => ["metrics", "byKpi", id] as const,
@@ -143,6 +145,15 @@ export const useKpiCategories = (setId?: number, opts?: { enabled?: boolean }) =
     queryKey: qk.kpiCategoriesFor(setId),
     queryFn: () => kpiCategoriesRepo.list(setId),
     enabled: opts?.enabled ?? true,
+  });
+
+// Reference data that never changes at runtime — no mutation invalidates it.
+// `forCategories` narrows to the types a category may be classified as.
+export const useKpiTypes = (opts?: { forCategories?: boolean }) =>
+  useQuery({
+    queryKey: qk.kpiTypesFor(opts?.forCategories),
+    queryFn: () => kpiTypesRepo.list(opts),
+    staleTime: Infinity,
   });
 
 export const useMetrics = () =>
@@ -323,6 +334,7 @@ export function useCreateKpiCategory() {
       label: string;
       description?: string;
       sortOrder?: number;
+      kpiType?: string;
     }) => kpiCategoriesRepo.create(input),
     meta: { toast: (d) => `Category "${(d as KpiCategoryRecord).label}" added` },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.kpiCategories }),
@@ -337,7 +349,7 @@ export function useUpdateKpiCategory() {
       patch,
     }: {
       id: string;
-      patch: { label?: string; description?: string; sortOrder?: number };
+      patch: { label?: string; description?: string; sortOrder?: number; kpiType?: string };
     }) => kpiCategoriesRepo.update(id, patch),
     meta: { toast: "Category updated" },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.kpiCategories }),
@@ -565,11 +577,15 @@ export const useLibraryKpis = (setId: number) =>
     enabled: Number.isFinite(setId) && setId > 0,
   });
 
-export const useLibraryKpi = (id: number) =>
+// `opts.enabled` lets the detail page stand the query down while it deletes the
+// KPI it is showing: removeQueries on a query that still has a mounted observer
+// makes React Query re-subscribe and refetch, which fetched the row it had just
+// deleted and logged a 404 on the way out.
+export const useLibraryKpi = (id: number, opts?: { enabled?: boolean }) =>
   useQuery({
     queryKey: qk.libraryKpi(id),
     queryFn: () => libraryKpisRepo.get(id),
-    enabled: Number.isFinite(id) && id > 0,
+    enabled: (opts?.enabled ?? true) && Number.isFinite(id) && id > 0,
   });
 
 export function useCreateLibraryKpi() {
@@ -604,7 +620,13 @@ export function useDeleteLibraryKpi(setId: number) {
   return useMutation({
     mutationFn: (id: number) => libraryKpisRepo.remove(id),
     meta: { toast: "KPI deleted" },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      // remove, not invalidate: deleting from the KPI's own detail page leaves
+      // these two queries mounted for the moment before the route changes, and
+      // invalidating would send them off to refetch a row that no longer
+      // exists — a burst of 404s.
+      qc.removeQueries({ queryKey: qk.libraryKpi(id) });
+      qc.removeQueries({ queryKey: qk.libraryMetrics(id) });
       qc.invalidateQueries({ queryKey: qk.libraryKpis(setId) });
       qc.invalidateQueries({ queryKey: qk.strategicSets });
     },

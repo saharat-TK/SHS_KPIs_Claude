@@ -16,18 +16,22 @@ import {
   RadioGroup,
   ThresholdBar,
   QueryBoundary,
+  useConfirm,
 } from "@/components/ui";
+import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
 import { useBreadcrumbLabel } from "@/components/shell/BreadcrumbLabels";
 import {
   useLibraryKpi,
   useStrategicSet,
   useKpiCategories,
+  useKpiTypes,
   useCommittees,
   useCommitteeMemberships,
   useFacultyRecords,
   useFormulas,
   useUpdateLibraryKpi,
+  useDeleteLibraryKpi,
   useSaveLibraryKpiTargets,
   useLibraryMetrics,
 } from "@/lib/data/hooks";
@@ -45,8 +49,10 @@ import {
   type QuarterlyTargetMode,
 } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
-import { unitNeedsDivisor } from "@/lib/kpi/progress";
+import { unitNeedsDivisor, DEFAULT_THRESHOLDS } from "@/lib/kpi/progress";
 import { weightSumWarning } from "@/lib/kpi/weight";
+import { categoriesOfType } from "@/lib/kpi/categories";
+import { describeKpiDeletion } from "@/lib/kpi/deletion";
 import { personsForCommittee } from "@/lib/kpi/committee";
 import { MetricEditor } from "./MetricEditor";
 
@@ -91,6 +97,7 @@ type Draft = {
   name: string;
   description: string;
   categoryId: string;
+  routineCategoryId: string;
   kpiType: KpiType;
   dataCollectMethod: string;
   collectionPeriod: CollectionPeriod;
@@ -117,6 +124,7 @@ function draftOf(k: LibraryKpi): Draft {
     name: k.name,
     description: k.description ?? "",
     categoryId: k.categoryId ?? "",
+    routineCategoryId: k.routineCategoryId ?? "",
     kpiType: k.kpiType,
     dataCollectMethod: k.dataCollectMethod ?? "",
     collectionPeriod: k.collectionPeriod,
@@ -134,8 +142,11 @@ function draftOf(k: LibraryKpi): Draft {
     variable1Unit: k.variable1Unit?.trim() || "Item",
     variable2Name: k.variable2Name ?? "",
     variable2Unit: k.variable2Unit?.trim() || "Item",
-    thresholdGreen: k.thresholdGreen,
-    thresholdAmber: k.thresholdAmber,
+    // Standard band for anything created before the create route defaulted
+    // these. Applied symmetrically to draft and original, so loading the page
+    // never looks like an unsaved edit.
+    thresholdGreen: k.thresholdGreen ?? DEFAULT_THRESHOLDS.green,
+    thresholdAmber: k.thresholdAmber ?? DEFAULT_THRESHOLDS.amber,
   };
 }
 
@@ -145,9 +156,13 @@ function KpiDetail() {
   const setId = Number(params.setId);
   const kpiId = Number(params.kpiId);
 
-  const kpiQ = useLibraryKpi(kpiId);
+  const del = useDeleteLibraryKpi(setId);
+  // Stand the query down as soon as the delete is in flight — otherwise it
+  // refetches the row being deleted while this page unmounts.
+  const kpiQ = useLibraryKpi(kpiId, { enabled: !del.isPending && !del.isSuccess });
   const setQ = useStrategicSet(setId);
   const categoriesQ = useKpiCategories(setId);
+  const kpiTypesQ = useKpiTypes();
 
   // Keep the set name (parent crumb) and KPI name in the breadcrumb; relabel the
   // intermediate "kpis" crumb to "KPIs" (the static map reads it as "KPI Management").
@@ -161,6 +176,7 @@ function KpiDetail() {
   const metricsQ = useLibraryMetrics(kpiId);
   const update = useUpdateLibraryKpi();
   const saveTargets = useSaveLibraryKpiTargets();
+  const confirm = useConfirm();
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [years, setYears] = useState<(number | null)[]>([null, null, null, null, null]);
@@ -236,6 +252,7 @@ function KpiDetail() {
           name: draft.name.trim(),
           description: draft.description,
           categoryId: draft.categoryId || null,
+          routineCategoryId: draft.routineCategoryId || null,
           kpiType: draft.kpiType,
           dataCollectMethod: draft.dataCollectMethod,
           collectionPeriod: draft.collectionPeriod,
@@ -253,8 +270,12 @@ function KpiDetail() {
           variable1Unit: draft.variable1Unit,
           variable2Name: needsDivisor ? draft.variable2Name : null,
           variable2Unit: needsDivisor ? draft.variable2Unit : null,
-          thresholdGreen: draft.thresholdGreen,
-          thresholdAmber: draft.thresholdAmber,
+          // draftOf renders a blank threshold as the default, so storing NULL
+          // here would show up as 100/70 on the next load — the field would
+          // look unsaved. Emptying the input means "reset to the standard
+          // band", and that is what gets written.
+          thresholdGreen: draft.thresholdGreen ?? DEFAULT_THRESHOLDS.green,
+          thresholdAmber: draft.thresholdAmber ?? DEFAULT_THRESHOLDS.amber,
         },
       },
       {
@@ -268,6 +289,12 @@ function KpiDetail() {
   };
 
   const categories = categoriesQ.data ?? [];
+  // The two independent taxonomies, from the one per-set fetch.
+  const strategicCategories = categoriesOfType(categories, "strategic");
+  const routineCategories = categoriesOfType(categories, "routine");
+  // KPI_TYPES is the offline/loading fallback so the dropdown never renders empty.
+  const kpiTypes =
+    kpiTypesQ.data?.map((t) => ({ id: t.id, label: t.kpiTypeName })) ?? KPI_TYPES;
   const committees = committeesQ.data ?? [];
   const memberships = membershipsQ.data ?? [];
   const faculty = facultyQ.data ?? [];
@@ -298,6 +325,24 @@ function KpiDetail() {
     ],
   );
   const canAddMetric = !dirty && !update.isPending && !saveTargets.isPending;
+  const saving = update.isPending || saveTargets.isPending;
+
+  // Not gated on `dirty` — the confirmation already says the delete can't be
+  // undone, so losing unsaved edits along with it is no surprise.
+  const askDelete = async () => {
+    if (
+      await confirm({
+        title: "Delete KPI",
+        message: describeKpiDeletion(kpiQ.data?.name ?? "this KPI", metrics.length),
+        confirmLabel: "Delete",
+        confirmPhrase: "DELETE",
+      })
+    ) {
+      del.mutate(kpiId, {
+        onSuccess: () => router.push(`/kpi-management/library/${setId}`),
+      });
+    }
+  };
 
   return (
     <>
@@ -315,11 +360,24 @@ function KpiDetail() {
             </Button>
             <Button
               icon="save"
-              disabled={!dirty || !!capError || !!varError || update.isPending || saveTargets.isPending}
+              disabled={!dirty || !!capError || !!varError || saving}
               onClick={save}
             >
-              {update.isPending || saveTargets.isPending ? "Saving…" : "Save Changes"}
+              {saving ? "Saving…" : "Save Changes"}
             </Button>
+            {/* Icon-only, so not a <Button> — its px-lg padding would render a
+                lone icon as a wide red slab. 36px matches Button size="md".
+                `enabled:` prefixes keep a disabled bin from lighting up red. */}
+            <button
+              type="button"
+              aria-label="Delete KPI"
+              title="Delete KPI"
+              disabled={saving || del.isPending}
+              onClick={askDelete}
+              className="flex h-[36px] w-[36px] items-center justify-center rounded-DEFAULT text-mute transition-colors enabled:hover:bg-error/10 enabled:hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Icon name="delete" size={18} />
+            </button>
           </>
         }
       />
@@ -341,7 +399,27 @@ function KpiDetail() {
                       onChange={(e) => set("categoryId", e.target.value)}
                     >
                       <option value="">Uncategorised</option>
-                      {categories.map((c) => (
+                      {strategicCategories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field
+                    label="Routine Category"
+                    hint={
+                      routineCategories.length === 0
+                        ? "No routine categories in this set — add one under Manage Categories."
+                        : undefined
+                    }
+                  >
+                    <Select
+                      value={draft.routineCategoryId}
+                      onChange={(e) => set("routineCategoryId", e.target.value)}
+                    >
+                      <option value="">Uncategorised</option>
+                      {routineCategories.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.label}
                         </option>
@@ -353,7 +431,7 @@ function KpiDetail() {
                       value={draft.kpiType}
                       onChange={(e) => set("kpiType", e.target.value as KpiType)}
                     >
-                      {KPI_TYPES.map((t) => (
+                      {kpiTypes.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.label}
                         </option>
@@ -687,7 +765,7 @@ function KpiDetail() {
                 parentTargets={parentTargets}
                 parentDefaults={parentDefaults}
                 canAddMetric={canAddMetric}
-                categories={categories}
+                categories={strategicCategories}
                 committees={committees}
                 committeeMemberships={memberships}
                 faculty={faculty}
@@ -697,12 +775,20 @@ function KpiDetail() {
             {/* Threshold Settings sidebar */}
             <div className="flex flex-col gap-lg">
               <Card>
-                <CardHeader title="Threshold Settings" />
+                <CardHeader
+                  title="Threshold Settings"
+                  subtitle="Percent of target — ≥ on-target is healthy, ≥ watch is amber, below is at risk."
+                />
                 <CardBody className="flex flex-col gap-lg">
                   <div className="flex flex-col gap-sm">
                     <span className="text-caption-sm text-mute">Preview at 5-year target</span>
+                    {/* Hitting the 5-year target exactly IS 100% of target, and
+                        ThresholdBar reads `value` as a percent — feeding it the
+                        raw fiveYearTarget compared a Ratio of 0.25 against a
+                        percent cutoff and painted the bar red. */}
                     <ThresholdBar
-                      value={draft.fiveYearTarget ?? 0}
+                      value={100}
+                      max={100}
                       thresholds={{
                         green: draft.thresholdGreen ?? 0,
                         amber: draft.thresholdAmber ?? 0,
