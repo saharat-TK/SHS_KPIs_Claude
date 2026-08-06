@@ -27,12 +27,14 @@ import {
   usePerformanceRecord,
   usePerfKpis,
   useKpiCategories,
+  useKpiTypes,
   usePerformancePeriods,
   useSyncPerformanceRecord,
   useRecomputeFromDataSources,
   useRecordApprovals,
 } from "@/lib/data/hooks";
 import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
+import { categoriesOfType } from "@/lib/kpi/categories";
 import {
   openPeriodSummary,
   openQuartersForYear,
@@ -45,14 +47,16 @@ import {
   HEALTH_TONE,
 } from "@/lib/kpi/progress";
 import { formatDate, formatNumber } from "@/lib/utils";
-import type { KpiType, PerformanceStatus } from "@/lib/types";
+import { KPI_TYPES, type PerformanceStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
   active: "success",
   inactive: "neutral",
   completed: "warning",
 };
-const TYPE_TONE: Record<KpiType, "primary" | "info" | "neutral"> = {
+// Keyed on the seeded ids; kpi_type is user-extensible now, so unknown ids fall
+// back to a neutral tone rather than rendering undefined.
+const TYPE_TONE: Record<string, "primary" | "info" | "neutral"> = {
   strategic: "primary",
   operational: "info",
   routine: "neutral",
@@ -78,6 +82,7 @@ function PerformanceRecordDetail() {
   const kpisQ = usePerfKpis(recordId);
   const record = recordQ.data;
   const categoriesQ = useKpiCategories(record?.sourceSetId, { enabled: !!record });
+  const kpiTypesQ = useKpiTypes();
   const periodsQ = usePerformancePeriods(recordId);
   const sync = useSyncPerformanceRecord();
   const recompute = useRecomputeFromDataSources();
@@ -93,6 +98,11 @@ function PerformanceRecordDetail() {
 
   const categories = categoriesQ.data ?? [];
   const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
+  const kpiTypes = useMemo(() => kpiTypesQ.data ?? [], [kpiTypesQ.data]);
+  const typeLabel = (id: string) =>
+    kpiTypes.find((t) => t.id === id)?.kpiTypeName ??
+    KPI_TYPES.find((t) => t.id === id)?.label ??
+    id;
   const isAdmin = can("configure_kpis");
   const recordIsActive = record?.status === "active";
   const q1Approvals = useRecordApprovals(recordId, selectedYear, 1);
@@ -121,9 +131,11 @@ function PerformanceRecordDetail() {
     .filter(Boolean)
     .join(" · ");
 
+  // Tabs group by category_id, which holds the Strategic taxonomy only —
+  // routine categories would otherwise show up as permanently-empty tabs.
   const tabs = [
     { id: "all", label: "All", count: kpis.length },
-    ...categories.map((c) => ({
+    ...categoriesOfType(categories, "strategic").map((c) => ({
       id: c.id,
       label: c.label,
       count: kpis.filter((k) => k.categoryId === c.id).length,
@@ -155,7 +167,9 @@ function PerformanceRecordDetail() {
         case "name":
           return kpi.name;
         case "type":
-          return kpi.kpiType;
+          // Sort by the type's own order (Strategic → Operational → Routine),
+          // not alphabetically by its id.
+          return kpiTypes.find((t) => t.id === kpi.kpiType)?.sortOrder ?? 99;
         case "annualTarget":
           return targetForYear(kpi.annualTargets, selectedYear);
         case "currentProgress":
@@ -186,7 +200,7 @@ function PerformanceRecordDetail() {
             });
       return sort.dir === "asc" ? comparison : -comparison;
     });
-  }, [rows, sort, selectedYear, approvalLockForKpi]);
+  }, [rows, sort, selectedYear, approvalLockForKpi, kpiTypes]);
   const toggleSort = (key: SortKey) =>
     setSort((current) =>
       current?.key === key
@@ -400,7 +414,9 @@ function PerformanceRecordDetail() {
                     >
                       <Td className="font-medium">{k.name}</Td>
                       <Td align="center">
-                        <Badge tone={TYPE_TONE[k.kpiType]}>{k.kpiType}</Badge>
+                        <Badge tone={TYPE_TONE[k.kpiType] ?? "neutral"}>
+                          {typeLabel(k.kpiType)}
+                        </Badge>
                       </Td>
                       <Td align="right">
                         {annualTarget == null

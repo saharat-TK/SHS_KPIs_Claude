@@ -17,11 +17,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
 } from "react";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
+import { Input } from "./Input";
 import { cn } from "@/lib/utils";
 
 export type ConfirmTone = "danger" | "default";
@@ -37,6 +39,17 @@ export interface ConfirmOptions {
   cancelLabel?: string;
   /** Visual emphasis. "danger" (default) for destructive actions. */
   tone?: ConfirmTone;
+  /**
+   * Opt-in type-to-confirm. When set, the confirm button stays disabled until
+   * this exact phrase is typed (trimmed, case-insensitive) — for deletes bad
+   * enough that a reflex click on a familiar dialog is a real risk.
+   *
+   * Keep it short and ASCII. The obvious choice, "make them type the record's
+   * name", does not survive contact with this data: most KPIs here are named in
+   * Thai, so it would force an IME switch or a copy-paste, and a phrase people
+   * paste guards nothing.
+   */
+  confirmPhrase?: string;
 }
 
 interface ConfirmValue {
@@ -51,6 +64,14 @@ interface ActiveConfirm extends ConfirmOptions {
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState<ActiveConfirm | null>(null);
+  const [typed, setTyped] = useState("");
+
+  // The provider is mounted once for the whole app, so the input has to be
+  // cleared per invocation — otherwise the second delete opens already unlocked
+  // with the first one's text still in the box.
+  useEffect(() => {
+    if (active) setTyped("");
+  }, [active]);
 
   const confirm = useCallback(
     (options: ConfirmOptions) =>
@@ -70,6 +91,8 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isDanger = (active?.tone ?? "danger") === "danger";
+  const phrase = active?.confirmPhrase;
+  const unlocked = !phrase || typed.trim().toLowerCase() === phrase.trim().toLowerCase();
 
   return (
     <ConfirmCtx.Provider value={{ confirm }}>
@@ -87,7 +110,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               </Button>
               <Button
                 variant={isDanger ? "danger" : "primary"}
-                autoFocus
+                // With a phrase to type, focus belongs in the input, not here.
+                autoFocus={!phrase}
+                disabled={!unlocked}
+                className={cn(!unlocked && "opacity-40")}
                 onClick={() => close(true)}
               >
                 {active.confirmLabel ?? (isDanger ? "Delete" : "Confirm")}
@@ -104,7 +130,37 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             >
               <Icon name={isDanger ? "warning" : "help"} size={22} />
             </div>
-            <div className="pt-tiny text-body-sm text-on-surface">{active.message}</div>
+            <div className="flex min-w-0 flex-1 flex-col gap-md pt-tiny">
+              <div className="text-body-sm text-on-surface">{active.message}</div>
+              {phrase && (
+                <div className="flex flex-col gap-xs">
+                  <label
+                    htmlFor="confirm-phrase"
+                    className="text-caption-sm text-mute"
+                  >
+                    Type <span className="font-mono text-on-surface">{phrase}</span> to
+                    confirm
+                  </label>
+                  <Input
+                    id="confirm-phrase"
+                    autoFocus
+                    autoComplete="off"
+                    value={typed}
+                    onChange={(e) => setTyped(e.target.value)}
+                    // Enter is the natural way to finish typing; only honour it
+                    // once the phrase matches, or it becomes the reflex click
+                    // this guard exists to prevent.
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && unlocked) {
+                        e.preventDefault();
+                        close(true);
+                      }
+                    }}
+                    placeholder={phrase}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </Modal>
       )}

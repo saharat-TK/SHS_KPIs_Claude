@@ -1,21 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
+import { slugify } from "@/lib/kpi/slug";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 
 export const dynamic = "force-dynamic";
 
 const SELECT_FIELDS =
-  "id, set_id AS setId, name AS label, description, sort_order AS sortOrder";
-
-// Turn a display name into a stable slug id (e.g. "Research Output" -> "research_output").
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 40);
-}
+  "id, set_id AS setId, kpi_type AS kpiType, name AS label, description, sort_order AS sortOrder";
 
 export async function GET(req: NextRequest) {
   try {
@@ -46,19 +37,20 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, description, sortOrder, setId } = body;
+    const { name, description, sortOrder, setId, kpiType } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
     const set = setId == null ? null : Number(setId);
+    const type = kpiType || "strategic";
 
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
 
       // Generate a unique slug id, adding a numeric suffix on collision.
-      const base = slugify(name) || "category";
+      const base = slugify(name);
       let id = base;
       let n = 1;
       // eslint-disable-next-line no-constant-condition
@@ -72,22 +64,23 @@ export async function POST(req: NextRequest) {
         id = `${base}_${n}`.slice(0, 40);
       }
 
-      // Default sort order to the end of this set's list when not provided.
+      // Default sort order to the end of this set's list for this taxonomy —
+      // Strategic and Routine categories are ordered independently.
       let order = sortOrder;
       if (order === undefined || order === null) {
         const [maxRow] = await conn.query<RowDataPacket[]>(
           set == null
-            ? "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM kpi_categories WHERE set_id IS NULL"
-            : "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM kpi_categories WHERE set_id = ?",
-          set == null ? [] : [set],
+            ? "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM kpi_categories WHERE set_id IS NULL AND kpi_type = ?"
+            : "SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM kpi_categories WHERE set_id = ? AND kpi_type = ?",
+          set == null ? [type] : [set, type],
         );
         order = maxRow[0]?.next ?? 1;
       }
 
       await conn.query<ResultSetHeader>(
-        `INSERT INTO kpi_categories (id, set_id, name, description, sort_order)
-         VALUES (?, ?, ?, ?, ?)`,
-        [id, set, name.trim(), description?.trim() || null, order],
+        `INSERT INTO kpi_categories (id, set_id, kpi_type, name, description, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, set, type, name.trim(), description?.trim() || null, order],
       );
 
       await conn.commit();

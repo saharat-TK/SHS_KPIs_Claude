@@ -10,8 +10,11 @@
 --
 --  Design decisions locked with the product owner (2026-07-03):
 --    1. A set spans 5 INCLUSIVE years:  end_year = start_year + 4  (5 target rows).
---    2. Categories are GLOBAL: KPIs/metrics reference the existing
---       `kpi_categories` table; sets do NOT own their own category list.
+--    2. Categories live in the shared `kpi_categories` table, SET-SCOPED: each
+--       strategic set owns its own category rows (kpi_categories.set_id), and
+--       category ids stay globally-unique slugs so these FKs need no change.
+--       Categories are split by kpi_categories.kpi_type into two independent
+--       taxonomies: Strategic (category_id) and Routine (routine_category_id).
 --    3. One committee_in_charge + one person_in_charge per KPI and per metric.
 --    4. Library->Performance sync is a FULL re-sync (definitions AND targets
 --       overwrite the snapshot) EXCEPT already-entered quarterly progress,
@@ -130,8 +133,9 @@ CREATE TABLE library_kpi (
   -- Core configuration
   name                VARCHAR(500) NOT NULL,
   description         TEXT NULL,
-  category_id         VARCHAR(40)  NULL,                    -- FK -> kpi_categories.id (global)
-  kpi_type            ENUM('strategic','operational','routine') NOT NULL,
+  category_id         VARCHAR(40)  NULL,                    -- FK -> kpi_categories.id (Strategic taxonomy)
+  routine_category_id VARCHAR(40)  NULL,                    -- FK -> kpi_categories.id (Routine taxonomy, ด้านที่ 1–7)
+  kpi_type            VARCHAR(20)  NOT NULL,                -- FK -> kpi_type.id
   data_collect_method VARCHAR(500) NULL,                    -- "Data collecting method"
   collection_period   ENUM('Q1','Q2','Q3','Q4','every_quarter') NOT NULL,
   data_source_url     VARCHAR(1000) NULL,                   -- "Data source (link url)"
@@ -161,6 +165,9 @@ CREATE TABLE library_kpi (
   updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_lkpi_set       FOREIGN KEY (set_id)              REFERENCES strategic_set(id)  ON DELETE CASCADE,
   CONSTRAINT fk_lkpi_category  FOREIGN KEY (category_id)         REFERENCES kpi_categories(id) ON DELETE SET NULL,
+  CONSTRAINT fk_lkpi_routine_category
+                               FOREIGN KEY (routine_category_id) REFERENCES kpi_categories(id) ON DELETE SET NULL,
+  CONSTRAINT fk_lkpi_type      FOREIGN KEY (kpi_type)            REFERENCES kpi_type(id)       ON DELETE RESTRICT,
   CONSTRAINT fk_lkpi_committee FOREIGN KEY (committee_id)        REFERENCES committees(id)     ON DELETE SET NULL,
   CONSTRAINT fk_lkpi_person    FOREIGN KEY (person_in_charge_id) REFERENCES faculty(id)        ON DELETE SET NULL,
   CONSTRAINT fk_lkpi_formula   FOREIGN KEY (formula_id)          REFERENCES formula(id)        ON DELETE SET NULL
@@ -168,6 +175,7 @@ CREATE TABLE library_kpi (
 
 CREATE INDEX idx_lkpi_set      ON library_kpi(set_id);
 CREATE INDEX idx_lkpi_category ON library_kpi(category_id);
+CREATE INDEX idx_lkpi_routine_category ON library_kpi(routine_category_id);
 
 -- ── library_kpi_annual_target ────────────────────────────────────────────────
 -- Per-year target for a KPI. year_no 1..5 maps to start_year..start_year+4.
@@ -266,8 +274,9 @@ CREATE TABLE perf_kpi (
   -- Copied definition (same columns as library_kpi)
   name                VARCHAR(500) NOT NULL,
   description         TEXT NULL,
-  category_id         VARCHAR(40)  NULL,
-  kpi_type            ENUM('strategic','operational','routine') NOT NULL,
+  category_id         VARCHAR(40)  NULL,                   -- no FK: a snapshot must survive its source category being deleted
+  routine_category_id VARCHAR(40)  NULL,                   -- ditto, Routine taxonomy
+  kpi_type            VARCHAR(20)  NOT NULL,               -- mirrors kpi_type.id; no FK, same reason
   data_collect_method VARCHAR(500) NULL,
   collection_period   ENUM('Q1','Q2','Q3','Q4','every_quarter') NOT NULL,
   data_source_url     VARCHAR(1000) NULL,

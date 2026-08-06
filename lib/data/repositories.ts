@@ -22,6 +22,7 @@ import type {
   ApprovalEvent,
   Kpi,
   KpiCategoryRecord,
+  KpiTypeRecord,
   LibraryKpi,
   LibraryMetric,
   Measurement,
@@ -227,6 +228,7 @@ export const kpiCategoriesRepo = {
     label: string;
     description?: string;
     sortOrder?: number;
+    kpiType?: string;
   }): Promise<KpiCategoryRecord> => {
     const res = await fetch("/api/kpi-categories", {
       method: "POST",
@@ -236,6 +238,7 @@ export const kpiCategoriesRepo = {
         description: input.description,
         sortOrder: input.sortOrder,
         setId: input.setId,
+        kpiType: input.kpiType,
       }),
     });
     if (!res.ok) throw new Error("Failed to create category");
@@ -243,7 +246,7 @@ export const kpiCategoriesRepo = {
   },
   update: async (
     id: string,
-    patch: { label?: string; description?: string; sortOrder?: number },
+    patch: { label?: string; description?: string; sortOrder?: number; kpiType?: string },
   ): Promise<KpiCategoryRecord> => {
     const res = await fetch(`/api/kpi-categories/${id}`, {
       method: "PATCH",
@@ -267,6 +270,16 @@ export const kpiCategoriesRepo = {
     if (!res.ok) throw new Error("Failed to reorder categories");
     return res.json();
   },
+};
+
+// KPI types — MySQL-backed reference list (shs_kpis_claude.kpi_type). Read-only:
+// the three rows are seeded by migration and there is no UI to edit them.
+export const kpiTypesRepo = {
+  list: async (opts?: { forCategories?: boolean }): Promise<KpiTypeRecord[]> =>
+    jsonOrThrow(
+      await fetch(opts?.forCategories ? "/api/kpi-types?forCategories=1" : "/api/kpi-types"),
+      "Failed to load KPI types",
+    ),
 };
 
 // Units — real MySQL-backed (shs_kpis_claude.units), admin-managed reference

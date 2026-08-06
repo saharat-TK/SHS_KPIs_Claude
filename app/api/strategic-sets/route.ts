@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
+import { slugify } from "@/lib/kpi/slug";
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
 
 export const dynamic = "force-dynamic";
@@ -37,19 +38,9 @@ const DEFAULT_KPI_CATEGORIES: { name: string; description: string }[] = [
   { name: "Financial Health", description: "Cost and financial sustainability measures." },
 ];
 
-// Turn a name into a stable slug id (matches app/api/kpi-categories/route.ts).
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 40);
-}
-
 // A globally-unique category id (slug + numeric suffix on collision).
 async function nextCategoryId(conn: PoolConnection, name: string): Promise<string> {
-  const base = slugify(name) || "category";
+  const base = slugify(name);
   let id = base;
   let n = 1;
   // eslint-disable-next-line no-constant-condition
@@ -64,13 +55,14 @@ async function nextCategoryId(conn: PoolConnection, name: string): Promise<strin
   }
 }
 
-// Seed the default categories for a fresh (non-cloned) set.
+// Seed the default categories for a fresh (non-cloned) set. All Strategic —
+// the Routine taxonomy is authored per set through the manage-categories modal.
 async function seedDefaultCategories(conn: PoolConnection, setId: number) {
   let sort = 1;
   for (const c of DEFAULT_KPI_CATEGORIES) {
     const id = await nextCategoryId(conn, c.name);
     await conn.query(
-      "INSERT INTO kpi_categories (id, set_id, name, description, sort_order) VALUES (?,?,?,?,?)",
+      "INSERT INTO kpi_categories (id, set_id, kpi_type, name, description, sort_order) VALUES (?,?,'strategic',?,?,?)",
       [id, setId, c.name, c.description, sort++],
     );
   }
@@ -87,15 +79,15 @@ async function cloneSetContents(
 ) {
   // Clone categories, building an old id → new id map for the remap below.
   const [srcCats] = await conn.query<RowDataPacket[]>(
-    "SELECT id, name, description, sort_order FROM kpi_categories WHERE set_id = ? ORDER BY sort_order, id",
+    "SELECT id, kpi_type, name, description, sort_order FROM kpi_categories WHERE set_id = ? ORDER BY sort_order, id",
     [sourceSetId],
   );
   const catIdMap = new Map<string, string>();
   for (const c of srcCats) {
     const newId = await nextCategoryId(conn, c.name);
     await conn.query(
-      "INSERT INTO kpi_categories (id, set_id, name, description, sort_order) VALUES (?,?,?,?,?)",
-      [newId, newSetId, c.name, c.description, c.sort_order],
+      "INSERT INTO kpi_categories (id, set_id, kpi_type, name, description, sort_order) VALUES (?,?,?,?,?,?)",
+      [newId, newSetId, c.kpi_type, c.name, c.description, c.sort_order],
     );
     catIdMap.set(c.id, newId);
   }
@@ -109,13 +101,15 @@ async function cloneSetContents(
   for (const k of srcKpis) {
     const [ins] = await conn.query<ResultSetHeader>(
       `INSERT INTO library_kpi
-         (set_id, name, description, category_id, kpi_type, data_collect_method,
+         (set_id, name, description, category_id, routine_category_id, kpi_type,
+          data_collect_method,
           collection_period, data_source_url, committee_id, person_in_charge_id,
           weight, unit, five_year_target, calculation_type, calculation_logic,
           formula_id, threshold_green, threshold_amber, sort_order)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
-        newSetId, k.name, k.description, mapCat(k.category_id), k.kpi_type,
+        newSetId, k.name, k.description, mapCat(k.category_id),
+        mapCat(k.routine_category_id), k.kpi_type,
         k.data_collect_method, k.collection_period, k.data_source_url,
         k.committee_id, k.person_in_charge_id, k.weight, k.unit,
         k.five_year_target, k.calculation_type, k.calculation_logic,

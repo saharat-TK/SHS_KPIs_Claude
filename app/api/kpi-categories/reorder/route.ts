@@ -5,7 +5,7 @@ import type { RowDataPacket } from "mysql2";
 export const dynamic = "force-dynamic";
 
 const SELECT_FIELDS =
-  "id, name AS label, description, sort_order AS sortOrder";
+  "id, set_id AS setId, kpi_type AS kpiType, name AS label, description, sort_order AS sortOrder";
 
 // Bulk reorder: body is the full list of category ids in the desired order.
 // Renormalizes sort_order to a clean 1..N based on array position — this also

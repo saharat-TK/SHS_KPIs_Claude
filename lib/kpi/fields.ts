@@ -5,6 +5,7 @@
 
 export const LIBRARY_KPI_FIELDS = `
   k.id, k.set_id AS setId, k.name, k.description, k.category_id AS categoryId,
+  k.routine_category_id AS routineCategoryId,
   k.kpi_type AS kpiType, k.data_collect_method AS dataCollectMethod,
   k.collection_period AS collectionPeriod, k.data_source_url AS dataSourceUrl,
   k.committee_id AS committeeId, k.person_in_charge_id AS personInChargeId,
@@ -31,7 +32,8 @@ export const LIBRARY_METRIC_FIELDS = `
 // Performance-layer snapshot rows (aliased k. / m.).
 export const PERF_KPI_FIELDS = `
   k.id, k.record_id AS recordId, k.source_kpi_id AS sourceKpiId, k.name, k.description,
-  k.category_id AS categoryId, k.kpi_type AS kpiType, k.data_collect_method AS dataCollectMethod,
+  k.category_id AS categoryId, k.routine_category_id AS routineCategoryId,
+  k.kpi_type AS kpiType, k.data_collect_method AS dataCollectMethod,
   k.collection_period AS collectionPeriod, k.data_source_url AS dataSourceUrl,
   k.committee_id AS committeeId, k.person_in_charge_id AS personInChargeId,
   k.weight, k.unit, k.five_year_target AS fiveYearTarget,
