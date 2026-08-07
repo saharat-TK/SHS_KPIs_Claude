@@ -3,6 +3,9 @@ import test from "node:test";
 
 import {
   categorySeries,
+  categoryDetail,
+  kpisOfType,
+  countByType,
   groupsInUse,
   healthMix,
   kpiStatusAsOf,
@@ -11,6 +14,11 @@ import {
   quarterSeries,
   statusesAsOf,
   summarize,
+  targetsMet,
+  recordingStateAsOf,
+  recordingMix,
+  recordingSlices,
+  issuesAsOf,
   yearSeries,
   UNCATEGORISED,
 } from "../lib/kpi/dashboard.ts";
@@ -33,12 +41,15 @@ function kpi(over = {}) {
   };
 }
 
-const q = (yearNo, quarterNo, progressValue) => ({
+// `notes` is optional so the 300-odd existing three-arg calls keep their
+// issue/solution nulls.
+const q = (yearNo, quarterNo, progressValue, notes = {}) => ({
   yearNo,
   quarterNo,
   progressValue,
   issue: null,
   solution: null,
+  ...notes,
 });
 
 // ── valueAsOfQuarter ────────────────────────────────────────────────────────
@@ -336,4 +347,344 @@ test("yearSeries spans the record and labels calendar years from startYear", () 
   assert.equal(rows[0].recorded, 1);
   assert.equal(rows[2].recorded, 0);
   assert.ok(rows.every((r) => r.target === 100));
+});
+
+// ── targetsMet ──────────────────────────────────────────────────────────────
+
+// The same mixed scope the summarize test uses, so the two headline numbers can
+// be compared directly.
+function mixedScope() {
+  return statusesAsOf(
+    [
+      kpi({ id: 1, unit: "Item", progress: [q(1, 4, 100)] }), // 100% healthy
+      kpi({ id: 2, unit: "Percent", progress: [q(1, 4, 65)] }), // 65% watch
+      kpi({ id: 3, unit: "Ratio", progress: [q(1, 4, 10)] }), // 10% at risk
+      kpi({ id: 4, thresholdGreen: null, thresholdAmber: null, progress: [q(1, 4, 90)] }),
+      kpi({ id: 5 }), // nothing recorded
+    ],
+    1,
+    4,
+  );
+}
+
+test("targetsMet divides by every KPI in scope, not just the graded ones", () => {
+  const t = targetsMet(mixedScope());
+  assert.equal(t.met, 1);
+  assert.equal(t.graded, 3);
+  assert.equal(t.total, 5);
+  assert.equal(t.pctOfAll, 20);
+});
+
+test("targetsMet is a different quantity from summarize().pctOnTarget", () => {
+  // This gap is the whole point: 1 of 5 KPIs met target, but pctOnTarget reports
+  // 1 of the 3 that could be graded and reads 33%. Both are true; only one
+  // answers "how many KPIs met target".
+  const statuses = mixedScope();
+  const t = targetsMet(statuses);
+  const s = summarize(statuses);
+  assert.ok(t.pctOfAll < s.pctOnTarget);
+  assert.equal(t.met, s.onTarget);
+  assert.equal(t.graded, s.graded);
+});
+
+test("targetsMet of an empty scope reports null, not zero percent", () => {
+  const t = targetsMet([]);
+  assert.equal(t.total, 0);
+  assert.equal(t.met, 0);
+  assert.equal(t.pctOfAll, null);
+});
+
+test("targetsMet reaches 100 only when every KPI in scope met target", () => {
+  const statuses = statusesAsOf(
+    [kpi({ id: 1, progress: [q(1, 4, 100)] }), kpi({ id: 2, progress: [q(1, 4, 120)] })],
+    1,
+    4,
+  );
+  assert.equal(targetsMet(statuses).pctOfAll, 100);
+});
+
+// ── recordingStateAsOf ──────────────────────────────────────────────────────
+
+test("a value entered for the asked quarter is recorded", () => {
+  assert.equal(recordingStateAsOf(kpi({ progress: [q(1, 3, 50)] }), 1, 3), "recorded");
+});
+
+test("a value from an earlier quarter of the same year is carried, not recorded", () => {
+  // The use_annual shape: Q3 holds the number, Q4 is empty, and the rest of the
+  // dashboard still shows 50 at Q4 via valueAsOfQuarter.
+  const k = kpi({ progress: [q(1, 3, 50), q(1, 4, null)] });
+  assert.equal(recordingStateAsOf(k, 1, 4), "carried");
+  assert.equal(valueAsOfQuarter(k.progress, 1, 4), 50);
+});
+
+test("a quarter row that exists with no value is missing, not recorded", () => {
+  // An issue can be typed before the number arrives, which creates the row.
+  const k = kpi({ progress: [q(1, 4, null, { issue: "late data" })] });
+  assert.equal(recordingStateAsOf(k, 1, 4), "missing");
+});
+
+test("recording state never reaches across years", () => {
+  assert.equal(recordingStateAsOf(kpi({ progress: [q(1, 4, 50)] }), 2, 4), "missing");
+});
+
+test("recording state never looks forward", () => {
+  assert.equal(recordingStateAsOf(kpi({ progress: [q(1, 4, 50)] }), 1, 2), "missing");
+});
+
+// ── recordingMix / recordingSlices ──────────────────────────────────────────
+
+test("recordingMix counts the three states and they sum to the total", () => {
+  const kpis = [
+    kpi({ id: 1, progress: [q(1, 4, 10)] }), // recorded
+    kpi({ id: 2, progress: [q(1, 2, 10)] }), // carried
+    kpi({ id: 3, progress: [q(1, 4, null)] }), // missing (row, no value)
+    kpi({ id: 4 }), // missing (no rows at all)
+  ];
+  const m = recordingMix(kpis, 1, 4);
+  assert.equal(m.recorded, 1);
+  assert.equal(m.carried, 1);
+  assert.equal(m.missing, 2);
+  assert.equal(m.total, 4);
+  assert.equal(m.recorded + m.carried + m.missing, m.total);
+});
+
+test("recordingMix separates this quarter's entries from any reading at all", () => {
+  const kpis = [kpi({ id: 1, progress: [q(1, 4, 10)] }), kpi({ id: 2, progress: [q(1, 2, 10)] })];
+  const m = recordingMix(kpis, 1, 4);
+  assert.equal(m.pctThisQuarter, 50); // only one was entered for Q4
+  assert.equal(m.pctWithReading, 100); // but both show a number as of Q4
+  assert.notEqual(m.pctThisQuarter, m.pctWithReading);
+});
+
+test("recordingMix of an empty scope reports nulls, not zeros", () => {
+  const m = recordingMix([], 1, 4);
+  assert.equal(m.total, 0);
+  assert.equal(m.pctThisQuarter, null);
+  assert.equal(m.pctWithReading, null);
+});
+
+test("recordingSlices keeps a fixed key order so the donut colours never shuffle", () => {
+  const slices = recordingSlices(recordingMix([kpi({ progress: [q(1, 4, 10)] })], 1, 4));
+  assert.deepEqual(
+    slices.map((s) => s.key),
+    ["recorded", "carried", "missing"],
+  );
+  assert.equal(slices[0].value, 1);
+});
+
+// ── issuesAsOf ──────────────────────────────────────────────────────────────
+
+test("issuesAsOf returns only rows with an issue actually typed", () => {
+  const kpis = [
+    kpi({
+      id: 1,
+      name: "Graduate employment",
+      progress: [
+        q(1, 1, 10, { issue: "  ", solution: "ignored" }), // whitespace only
+        q(1, 2, 10), // both null
+        q(1, 3, 10, { issue: "Survey returns late", solution: "Chase deans" }),
+      ],
+    }),
+  ];
+  const rows = issuesAsOf(kpis, 1, 4);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].issue, "Survey returns late");
+  assert.equal(rows[0].solution, "Chase deans");
+  assert.equal(rows[0].kpiName, "Graduate employment");
+  assert.equal(rows[0].quarterNo, 3);
+});
+
+test("issuesAsOf keeps an issue that has no remedy yet", () => {
+  const rows = issuesAsOf([kpi({ progress: [q(1, 2, 10, { issue: "No data source" })] })], 1, 4);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].solution, null);
+});
+
+test("issuesAsOf is cumulative and inclusive of the asked quarter", () => {
+  const k = kpi({
+    progress: [
+      q(1, 1, 10, { issue: "Q1 problem" }),
+      q(1, 2, 10, { issue: "Q2 problem" }),
+      q(1, 3, 10, { issue: "Q3 problem" }),
+    ],
+  });
+  const rows = issuesAsOf([k], 1, 2);
+  assert.deepEqual(
+    rows.map((r) => r.quarterNo),
+    [2, 1],
+  );
+});
+
+test("issuesAsOf defaults to the whole year", () => {
+  const k = kpi({
+    progress: [q(1, 1, 10, { issue: "a" }), q(1, 4, 10, { issue: "b" })],
+  });
+  assert.equal(issuesAsOf([k], 1).length, 2);
+});
+
+test("issuesAsOf leads with the newest quarter, then the KPIs' own order", () => {
+  const kpis = [
+    kpi({ id: 1, name: "First", progress: [q(1, 2, 10, { issue: "older" })] }),
+    kpi({ id: 2, name: "Second", progress: [q(1, 4, 10, { issue: "newest" })] }),
+    kpi({ id: 3, name: "Third", progress: [q(1, 2, 10, { issue: "also older" })] }),
+  ];
+  const rows = issuesAsOf(kpis, 1, 4);
+  assert.deepEqual(
+    rows.map((r) => r.kpiName),
+    ["Second", "First", "Third"],
+  );
+});
+
+test("issuesAsOf never reaches into another year", () => {
+  const k = kpi({
+    progress: [q(1, 4, 10, { issue: "year one" }), q(2, 4, 10, { issue: "year two" })],
+  });
+  const rows = issuesAsOf([k], 2, 4);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].issue, "year two");
+});
+
+// ── categoryDetail ──────────────────────────────────────────────────────────
+
+test("categoryDetail divides met by the group total, not by the graded count", () => {
+  const kpis = [
+    kpi({ id: 1, categoryId: "research_output", progress: [q(1, 4, 100)] }), // healthy
+    kpi({ id: 2, categoryId: "research_output", progress: [q(1, 4, 10)] }), // at risk
+    kpi({ id: 3, categoryId: "research_output" }), // nothing recorded
+  ];
+  const row = categoryDetail(kpis, CATEGORIES, 1, 4)[0];
+  assert.equal(row.onTarget, 1);
+  assert.equal(row.total, 3);
+  assert.ok(Math.abs(row.pctMet - 100 / 3) < 1e-9);
+});
+
+test("pctMet and pct answer different questions and can diverge sharply", () => {
+  // Both KPIs over-achieve on average, but only one clears its threshold — the
+  // group averages 105% while half its KPIs missed. Leading with the average
+  // would flatter the group, which is why the card highlights pctMet.
+  const kpis = [
+    kpi({ id: 1, categoryId: "research_output", progress: [q(1, 4, 140)] }), // 140% healthy
+    kpi({ id: 2, categoryId: "research_output", progress: [q(1, 4, 70)] }), // 70% watch
+  ];
+  const row = categoryDetail(kpis, CATEGORIES, 1, 4)[0];
+  assert.equal(row.pct, 105);
+  assert.equal(row.pctMet, 50);
+  assert.notEqual(row.pct, row.pctMet);
+});
+
+test("categoryDetail attaches the group's own KPIs in input order", () => {
+  const kpis = [
+    kpi({ id: 7, categoryId: "research_output", progress: [q(1, 4, 100)] }),
+    kpi({ id: 3, categoryId: "student_success" }),
+    kpi({ id: 9, categoryId: "research_output" }),
+  ];
+  const rows = categoryDetail(kpis, CATEGORIES, 1, 4);
+  const research = rows.find((r) => r.id === "research_output");
+  assert.deepEqual(
+    research.statuses.map((s) => s.kpiId),
+    [7, 9],
+  );
+  assert.equal(research.statuses.length, research.total);
+  assert.equal(rows.find((r) => r.id === "student_success").statuses.length, 1);
+});
+
+test("a group with no gradable data reports pctMet 0, and null achievement", () => {
+  // 0 is right here, not null: the group HAS a KPI, and none of them met target.
+  // Only an empty group has nothing to divide by.
+  const row = categoryDetail([kpi({ id: 1, categoryId: "research_output" })], CATEGORIES, 1, 4)[0];
+  assert.equal(row.pctMet, 0);
+  assert.equal(row.pct, null);
+  assert.equal(row.health, null);
+});
+
+test("categorySeries is exactly categoryDetail without the extra fields", () => {
+  // Guards the delegation: the bar chart's row must not gain or lose anything.
+  const kpis = [
+    kpi({ id: 1, categoryId: "research_output", progress: [q(1, 4, 100)] }),
+    kpi({ id: 2, categoryId: "student_success", progress: [q(1, 4, 10)] }),
+  ];
+  const lean = categorySeries(kpis, CATEGORIES, 1, 4);
+  const full = categoryDetail(kpis, CATEGORIES, 1, 4);
+  assert.deepEqual(
+    lean,
+    full.map(({ pctMet, statuses, ...rest }) => rest),
+  );
+  assert.deepEqual(Object.keys(lean[0]).sort(), [
+    "health",
+    "id",
+    "label",
+    "onTarget",
+    "pct",
+    "total",
+  ]);
+});
+
+// ── kpisOfType / countByType ────────────────────────────────────────────────
+
+// The live record-2 shape: a strategic KPI, an operational one sitting in a
+// strategic category, and a routine one carrying BOTH a strategic category and
+// a ด้านที่ area — which is the case that proves the projection matters.
+const TYPED = () => [
+  kpi({ id: 1, kpiType: "strategic", categoryId: "student_success" }),
+  kpi({ id: 2, kpiType: "operational", categoryId: "research_output" }),
+  kpi({
+    id: 3,
+    kpiType: "routine",
+    categoryId: "research_output",
+    routineCategoryId: "routine_area_2",
+  }),
+];
+
+test("kpisOfType returns only the KPIs of that type", () => {
+  assert.deepEqual(kpisOfType(TYPED(), "strategic").map((k) => k.id), [1]);
+  assert.deepEqual(kpisOfType(TYPED(), "operational").map((k) => k.id), [2]);
+  assert.deepEqual(kpisOfType(TYPED(), "routine").map((k) => k.id), [3]);
+});
+
+test("the routine projection swaps categoryId for the routine area", () => {
+  // KPI 3's strategic category is research_output; in a routine view it must
+  // group by routine_area_2 instead, or the view is grouping by the wrong axis.
+  const [k] = kpisOfType(TYPED(), "routine");
+  assert.equal(k.categoryId, "routine_area_2");
+  assert.equal(k.routineCategoryId, "routine_area_2");
+});
+
+test("a routine KPI with no routine area falls to Uncategorised, not its strategic category", () => {
+  const kpis = [kpi({ id: 1, kpiType: "routine", categoryId: "research_output" })];
+  assert.equal(kpisOfType(kpis, "routine")[0].categoryId, null);
+});
+
+test("non-routine types keep their strategic category untouched", () => {
+  assert.equal(kpisOfType(TYPED(), "operational")[0].categoryId, "research_output");
+});
+
+test("the projection does not mutate the input", () => {
+  const source = TYPED();
+  kpisOfType(source, "routine");
+  assert.equal(source[2].categoryId, "research_output");
+});
+
+test("a routine view groups by the ด้านที่ area, never the strategic category", () => {
+  // End to end: the projection feeding groupsInUse is the whole point.
+  const categories = [
+    { id: "research_output", label: "Research Output" },
+    { id: "routine_area_2", label: "ด้านที่ 2" },
+  ];
+  const groups = groupsInUse(kpisOfType(TYPED(), "routine"), categories);
+  assert.deepEqual(groups.map((g) => g.id), ["routine_area_2"]);
+});
+
+test("an unrecognised type matches nothing rather than falling back", () => {
+  assert.deepEqual(kpisOfType(TYPED(), "nonsense"), []);
+});
+
+test("countByType counts every type and sums to the whole record", () => {
+  const kpis = TYPED();
+  const counts = countByType(kpis);
+  assert.deepEqual(counts, { strategic: 1, operational: 1, routine: 1 });
+  assert.equal(
+    Object.values(counts).reduce((a, b) => a + b, 0),
+    kpis.length,
+  );
+  assert.deepEqual(countByType([]), {});
 });

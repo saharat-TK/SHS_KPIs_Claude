@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   PageHeader,
@@ -13,6 +13,7 @@ import {
   Input,
   Select,
   QueryBoundary,
+  Spinner,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
@@ -25,7 +26,12 @@ import { cn } from "@/lib/utils";
 export default function FormulaBuilderPage() {
   return (
     <RequirePermission action="configure_kpis">
-      <FormulaBuilder />
+      {/* FormulaBuilder reads ?formula= via useSearchParams, which opts this
+          route out of static prerendering. Next 14 requires the bailout to sit
+          behind a Suspense boundary or `next build` fails on this page. */}
+      <Suspense fallback={<Spinner label="Loading builder…" />}>
+        <FormulaBuilder />
+      </Suspense>
     </RequirePermission>
   );
 }

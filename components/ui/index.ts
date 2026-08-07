@@ -8,10 +8,12 @@ export { UnitSelect } from "./UnitSelect";
 export { Combobox, type ComboboxOption } from "./Combobox";
 export { RadioGroup, type RadioOption } from "./RadioGroup";
 export { Tabs, type TabItem } from "./Tabs";
+export { SegmentedControl, type SegmentItem } from "./SegmentedControl";
 export { Modal } from "./Modal";
 export { Drawer } from "./Drawer";
 export { HoverPopover } from "./HoverPopover";
 export { StatCard } from "./StatCard";
+export { RingGauge } from "./RingGauge";
 export { CountUp, useReducedMotion } from "./CountUp";
 export {
   TrendLineChart,
@@ -19,8 +21,10 @@ export {
   AchievementTrendChart,
   GroupAchievementChart,
   HealthDonut,
+  RecordingDonut,
   TargetVsActualChart,
   HEALTH_FILL,
+  RECORDING_FILL,
 } from "./Charts";
 export { ThresholdBar, healthOf, HEALTH_LABEL, type Health } from "./ThresholdBar";
 export { ActionMenu, type ActionMenuItem } from "./ActionMenu";

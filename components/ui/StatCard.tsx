@@ -20,6 +20,14 @@ const TONES = {
   default: { card: "", muted: "text-mute" },
   soft: { card: "!bg-[#f2f8ea] !border-[#cfe3b4]", muted: "text-[#2f6500]" },
   ...HEALTH_SURFACE,
+  // Dashboard-only headline tones put semantic colour in the card surface.
+  // Every foreground becomes light so the compact figures, labels, and deltas
+  // remain legible against the darker fills.
+  headline_neutral: { card: "!bg-inverse-surface !border-white/20", muted: "text-white/80" },
+  headline_green: { card: "!bg-[#2f6500] !border-[#2f6500]", muted: "text-white/80" },
+  headline_healthy: { card: "!bg-[#2f6500] !border-[#2f6500]", muted: "text-white/80" },
+  headline_watch: { card: "!bg-[#8a4b00] !border-[#8a4b00]", muted: "text-white/80" },
+  headline_at_risk: { card: "!bg-[#93000a] !border-[#93000a]", muted: "text-white/80" },
 } as const;
 
 export function StatCard({
@@ -32,6 +40,9 @@ export function StatCard({
   className,
   animate = false,
   digits = 0,
+  emphasis = "default",
+  title,
+  visual,
 }: {
   label: string;
   value: string | number;
@@ -47,14 +58,29 @@ export function StatCard({
   animate?: boolean;
   /** Decimal places for the animated value. */
   digits?: number;
+  /** "figure" is the dashboard headline hierarchy: tiny uppercase label, larger
+   *  figure, unit demoted beside it. Everywhere else keeps the default — this
+   *  card is used on four other pages that are not headlines. */
+  emphasis?: "default" | "figure";
+  /** Native tooltip, for naming a second reading of the same number (e.g. the
+   *  graded-only percentage behind a met-of-total figure). */
+  title?: string;
+  /** A small graphic restating this card's own number — a ring, a sparkline.
+   *  Sits to the right of the figure and takes the icon's place, so pass one or
+   *  the other, not both. */
+  visual?: React.ReactNode;
 }) {
   const toneClasses = TONES[tone];
+  const figure = emphasis === "figure";
+  const inverse = tone.startsWith("headline_");
   const dirColor =
-    delta?.direction === "up"
-      ? "text-success"
-      : delta?.direction === "down"
-        ? "text-error"
-        : "text-mute";
+    inverse
+      ? "text-white/85"
+      : delta?.direction === "up"
+        ? "text-success"
+        : delta?.direction === "down"
+          ? "text-error"
+          : "text-mute";
   const dirIcon =
     delta?.direction === "up"
       ? "trending_up"
@@ -62,27 +88,65 @@ export function StatCard({
         ? "trending_down"
         : "trending_flat";
 
-  return (
-    <Card className={cn("p-lg flex flex-col gap-sm", toneClasses.card, className)}>
+  const body = (
+    <>
       <div className="flex items-center justify-between">
-        <span className={cn("text-label-md", toneClasses.muted)}>{label}</span>
-        {icon && <Icon name={icon} size={20} className="text-primary" />}
+        <span
+          className={cn(
+            figure ? "text-utility-xs uppercase" : "text-label-md",
+            toneClasses.muted,
+          )}
+        >
+          {label}
+        </span>
+        {icon && !visual && <Icon name={icon} size={20} className={inverse ? "text-white" : "text-primary"} />}
       </div>
       <div className="flex items-end gap-xs">
-        <span className="text-display-md text-on-surface leading-none tabular-nums">
+        <span
+          className={cn(
+            inverse ? "text-white" : "text-on-surface",
+            "leading-none tabular-nums",
+            figure ? "text-display-lg" : "text-display-md",
+          )}
+        >
           {animate && typeof value === "number" ? (
             <CountUp value={value} digits={digits} />
           ) : (
             value
           )}
         </span>
-        {unit && <span className={cn("text-body-sm mb-tiny", toneClasses.muted)}>{unit}</span>}
+        {unit && (
+          <span className={cn("text-body-sm", figure ? "mb-xs" : "mb-tiny", toneClasses.muted)}>
+            {unit}
+          </span>
+        )}
       </div>
       {delta && (
         <span className={cn("inline-flex items-center gap-xs text-caption-sm", dirColor)}>
           <Icon name={dirIcon} size={16} />
           {delta.value}
         </span>
+      )}
+    </>
+  );
+
+  return (
+    <Card
+      title={title}
+      className={cn(
+        visual ? "flex items-center gap-md" : "flex flex-col gap-sm",
+        figure ? "p-md" : "p-lg",
+        toneClasses.card,
+        className,
+      )}
+    >
+      {visual ? (
+        <>
+          <div className="flex min-w-0 flex-1 flex-col gap-sm">{body}</div>
+          {visual}
+        </>
+      ) : (
+        body
       )}
     </Card>
   );
