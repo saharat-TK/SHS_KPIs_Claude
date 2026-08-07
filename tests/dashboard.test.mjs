@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   categorySeries,
   categoryDetail,
+  kpisOfType,
+  countByType,
   groupsInUse,
   healthMix,
   kpiStatusAsOf,
@@ -615,4 +617,74 @@ test("categorySeries is exactly categoryDetail without the extra fields", () => 
     "pct",
     "total",
   ]);
+});
+
+// ── kpisOfType / countByType ────────────────────────────────────────────────
+
+// The live record-2 shape: a strategic KPI, an operational one sitting in a
+// strategic category, and a routine one carrying BOTH a strategic category and
+// a ด้านที่ area — which is the case that proves the projection matters.
+const TYPED = () => [
+  kpi({ id: 1, kpiType: "strategic", categoryId: "student_success" }),
+  kpi({ id: 2, kpiType: "operational", categoryId: "research_output" }),
+  kpi({
+    id: 3,
+    kpiType: "routine",
+    categoryId: "research_output",
+    routineCategoryId: "routine_area_2",
+  }),
+];
+
+test("kpisOfType returns only the KPIs of that type", () => {
+  assert.deepEqual(kpisOfType(TYPED(), "strategic").map((k) => k.id), [1]);
+  assert.deepEqual(kpisOfType(TYPED(), "operational").map((k) => k.id), [2]);
+  assert.deepEqual(kpisOfType(TYPED(), "routine").map((k) => k.id), [3]);
+});
+
+test("the routine projection swaps categoryId for the routine area", () => {
+  // KPI 3's strategic category is research_output; in a routine view it must
+  // group by routine_area_2 instead, or the view is grouping by the wrong axis.
+  const [k] = kpisOfType(TYPED(), "routine");
+  assert.equal(k.categoryId, "routine_area_2");
+  assert.equal(k.routineCategoryId, "routine_area_2");
+});
+
+test("a routine KPI with no routine area falls to Uncategorised, not its strategic category", () => {
+  const kpis = [kpi({ id: 1, kpiType: "routine", categoryId: "research_output" })];
+  assert.equal(kpisOfType(kpis, "routine")[0].categoryId, null);
+});
+
+test("non-routine types keep their strategic category untouched", () => {
+  assert.equal(kpisOfType(TYPED(), "operational")[0].categoryId, "research_output");
+});
+
+test("the projection does not mutate the input", () => {
+  const source = TYPED();
+  kpisOfType(source, "routine");
+  assert.equal(source[2].categoryId, "research_output");
+});
+
+test("a routine view groups by the ด้านที่ area, never the strategic category", () => {
+  // End to end: the projection feeding groupsInUse is the whole point.
+  const categories = [
+    { id: "research_output", label: "Research Output" },
+    { id: "routine_area_2", label: "ด้านที่ 2" },
+  ];
+  const groups = groupsInUse(kpisOfType(TYPED(), "routine"), categories);
+  assert.deepEqual(groups.map((g) => g.id), ["routine_area_2"]);
+});
+
+test("an unrecognised type matches nothing rather than falling back", () => {
+  assert.deepEqual(kpisOfType(TYPED(), "nonsense"), []);
+});
+
+test("countByType counts every type and sums to the whole record", () => {
+  const kpis = TYPED();
+  const counts = countByType(kpis);
+  assert.deepEqual(counts, { strategic: 1, operational: 1, routine: 1 });
+  assert.equal(
+    Object.values(counts).reduce((a, b) => a + b, 0),
+    kpis.length,
+  );
+  assert.deepEqual(countByType([]), {});
 });

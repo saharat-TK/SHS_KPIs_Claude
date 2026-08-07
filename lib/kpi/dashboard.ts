@@ -48,6 +48,12 @@ export interface DashboardKpi {
   quarterlyTargetMode: QuarterlyTargetMode;
   annualTargets?: AnnualTarget[];
   progress?: QuarterProgress[];
+  /** Routine-taxonomy category — the ด้านที่ 1–7 operating areas. Wholly
+   *  independent of categoryId: a KPI may carry one of each. */
+  routineCategoryId?: string | null;
+  /** 'strategic' | 'operational' | 'routine'. Left as a string, not a closed
+   *  union, because kpi_type is a DB table rather than a constant. */
+  kpiType?: string | null;
 }
 
 /** A category as the dashboard groups by it. KpiCategoryRecord satisfies this. */
@@ -187,6 +193,44 @@ export function healthMix(
     { key: "at_risk", label: "At Risk", value: summary.atRisk },
     { key: "no_data", label: "No Data", value: summary.noData },
   ];
+}
+
+// ── KPI type ─────────────────────────────────────────────────────────────────
+
+/**
+ * The KPIs of one type, projected so `categoryId` carries the taxonomy that type
+ * is actually grouped by: routine KPIs group by their ด้านที่ area, every other
+ * type by its strategic category. Operational has no taxonomy of its own
+ * (kpi_type.applies_to_categories = 0), so it rides along with strategic.
+ *
+ * Doing the swap here is what keeps the rest of this module to ONE grouping key
+ * — groupsInUse, kpisInGroup, categoryDetail and quarterSeries need no
+ * parameterising, because the caller has already decided what categoryId means
+ * for the view being built.
+ *
+ * The match on kpiType is exact. Coercing an unrecognised slug to "strategic"
+ * would quietly file a KPI under the wrong view; instead the type toggle is
+ * driven off the kpi_type table, so a new type gets its own option rather than
+ * disappearing into someone else's.
+ */
+export function kpisOfType(kpis: DashboardKpi[], type: string): DashboardKpi[] {
+  const mine = kpis.filter((k) => k.kpiType === type);
+  if (type !== "routine") return mine;
+  // Copy rather than mutate — the caller still holds the unprojected list to
+  // count types from.
+  return mine.map((k) => ({ ...k, categoryId: k.routineCategoryId ?? null }));
+}
+
+/** How many KPIs of each type the record holds, over EVERY KPI regardless of
+ *  the current selection. Drives the type toggle's counts and which of its
+ *  options are worth offering. */
+export function countByType(kpis: DashboardKpi[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const k of kpis) {
+    const t = k.kpiType ?? "";
+    counts[t] = (counts[t] ?? 0) + 1;
+  }
+  return counts;
 }
 
 // ── Targets met ──────────────────────────────────────────────────────────────
