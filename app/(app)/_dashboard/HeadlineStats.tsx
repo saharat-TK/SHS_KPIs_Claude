@@ -1,8 +1,9 @@
 "use client";
 
-import { StatCard } from "@/components/ui";
+import { StatCard, RingGauge, HEALTH_FILL } from "@/components/ui";
 import type { DashboardSummary, RecordingMix, TargetsMet } from "@/lib/kpi/dashboard";
 import { formatNumber } from "@/lib/utils";
+import { metBand } from "./metBand";
 
 /**
  * The four numbers the overview leads with.
@@ -24,29 +25,33 @@ export function HeadlineStats({
 }) {
   const ungradable = targets.total - targets.graded;
   const notRecorded = recording.carried + recording.missing;
+  // One expression drives the figure's tint and its ring, so the two can never
+  // disagree about how the same ratio is doing.
+  const metTone = metBand(targets.pctOfAll);
   return (
     <div className="grid grid-cols-2 gap-md lg:grid-cols-4">
       <StatCard
         label="KPIs Met Target"
         value={targets.met}
         unit={`of ${targets.total}`}
-        icon="check_circle"
         emphasis="figure"
         animate
+        // The ring restates the figure on purpose: it makes the proportion
+        // readable without the reader dividing 4 by 8 themselves.
+        visual={
+          <RingGauge
+            value={targets.met}
+            total={targets.total}
+            fill={HEALTH_FILL[metTone ?? "no_data"]}
+            label={`${targets.met} of ${targets.total} KPIs met target`}
+          />
+        }
         title={
           targets.graded === 0
             ? "No KPI in scope has both a value and thresholds, so none can be graded yet."
             : `${targets.met} of ${targets.graded} gradable KPIs — ${formatNumber(summary.pctOnTarget ?? 0, 1)}% of those that can be judged.`
         }
-        tone={
-          targets.pctOfAll == null
-            ? "default"
-            : targets.pctOfAll >= 80
-              ? "healthy"
-              : targets.pctOfAll >= 50
-                ? "watch"
-                : "at_risk"
-        }
+        tone={metTone ?? "default"}
         delta={{
           value:
             ungradable > 0

@@ -27,6 +27,7 @@ import {
   usePerformancePeriods,
 } from "@/lib/data/hooks";
 import {
+  categoryDetail,
   categorySeries,
   groupsInUse,
   issuesAsOf,
@@ -104,6 +105,12 @@ export function Dashboard() {
   const trend = useMemo(
     () => quarterSeries(scoped, activeGroup === "all" ? categories : [], year),
     [scoped, categories, activeGroup, year],
+  );
+  // Both read every group, never `scoped` — the scorecards are how you get INTO
+  // a group, so they have to survive one being selected.
+  const byCategoryDetail = useMemo(
+    () => categoryDetail(kpis, categories, year, quarter),
+    [kpis, categories, year, quarter],
   );
   const byCategory = useMemo(
     () => categorySeries(kpis, categories, year, quarter),
@@ -222,10 +229,11 @@ export function Dashboard() {
             {/* On "All Groups" the scorecards are the way into a strategy; inside
                 one, the same space shows that group's own KPIs. */}
             {activeGroup === "all" ? (
-              byCategory.length > 0 && (
+              byCategoryDetail.length > 0 && (
                 <StrategyScorecards
-                  rows={byCategory}
+                  rows={byCategoryDetail}
                   onSelect={(g) => setFilters({ group: g })}
+                  onOpenKpi={openKpi}
                 />
               )
             ) : (
