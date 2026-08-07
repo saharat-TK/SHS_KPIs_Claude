@@ -34,6 +34,7 @@ export function StatCard({
   digits = 0,
   emphasis = "default",
   title,
+  visual,
 }: {
   label: string;
   value: string | number;
@@ -56,6 +57,10 @@ export function StatCard({
   /** Native tooltip, for naming a second reading of the same number (e.g. the
    *  graded-only percentage behind a met-of-total figure). */
   title?: string;
+  /** A small graphic restating this card's own number — a ring, a sparkline.
+   *  Sits to the right of the figure and takes the icon's place, so pass one or
+   *  the other, not both. */
+  visual?: React.ReactNode;
 }) {
   const toneClasses = TONES[tone];
   const figure = emphasis === "figure";
@@ -72,16 +77,8 @@ export function StatCard({
         ? "trending_down"
         : "trending_flat";
 
-  return (
-    <Card
-      title={title}
-      className={cn(
-        "flex flex-col gap-sm",
-        figure ? "p-md" : "p-lg",
-        toneClasses.card,
-        className,
-      )}
-    >
+  const body = (
+    <>
       <div className="flex items-center justify-between">
         <span
           className={cn(
@@ -91,7 +88,7 @@ export function StatCard({
         >
           {label}
         </span>
-        {icon && <Icon name={icon} size={20} className="text-primary" />}
+        {icon && !visual && <Icon name={icon} size={20} className="text-primary" />}
       </div>
       <div className="flex items-end gap-xs">
         <span
@@ -117,6 +114,27 @@ export function StatCard({
           <Icon name={dirIcon} size={16} />
           {delta.value}
         </span>
+      )}
+    </>
+  );
+
+  return (
+    <Card
+      title={title}
+      className={cn(
+        visual ? "flex items-center gap-md" : "flex flex-col gap-sm",
+        figure ? "p-md" : "p-lg",
+        toneClasses.card,
+        className,
+      )}
+    >
+      {visual ? (
+        <>
+          <div className="flex min-w-0 flex-1 flex-col gap-sm">{body}</div>
+          {visual}
+        </>
+      ) : (
+        body
       )}
     </Card>
   );

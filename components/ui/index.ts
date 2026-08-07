@@ -12,6 +12,7 @@ export { Modal } from "./Modal";
 export { Drawer } from "./Drawer";
 export { HoverPopover } from "./HoverPopover";
 export { StatCard } from "./StatCard";
+export { RingGauge } from "./RingGauge";
 export { CountUp, useReducedMotion } from "./CountUp";
 export {
   TrendLineChart,
