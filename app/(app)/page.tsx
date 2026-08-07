@@ -59,8 +59,8 @@ import type { PerformanceRecord, PerformanceStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
   active: "success",
-  closed: "neutral",
-  archived: "warning",
+  inactive: "neutral",
+  completed: "warning",
 };
 
 export default function DashboardPage() {
