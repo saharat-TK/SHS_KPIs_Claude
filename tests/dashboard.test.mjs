@@ -11,6 +11,11 @@ import {
   quarterSeries,
   statusesAsOf,
   summarize,
+  targetsMet,
+  recordingStateAsOf,
+  recordingMix,
+  recordingSlices,
+  issuesAsOf,
   yearSeries,
   UNCATEGORISED,
 } from "../lib/kpi/dashboard.ts";
@@ -33,12 +38,15 @@ function kpi(over = {}) {
   };
 }
 
-const q = (yearNo, quarterNo, progressValue) => ({
+// `notes` is optional so the 300-odd existing three-arg calls keep their
+// issue/solution nulls.
+const q = (yearNo, quarterNo, progressValue, notes = {}) => ({
   yearNo,
   quarterNo,
   progressValue,
   issue: null,
   solution: null,
+  ...notes,
 });
 
 // ── valueAsOfQuarter ────────────────────────────────────────────────────────
@@ -336,4 +344,199 @@ test("yearSeries spans the record and labels calendar years from startYear", () 
   assert.equal(rows[0].recorded, 1);
   assert.equal(rows[2].recorded, 0);
   assert.ok(rows.every((r) => r.target === 100));
+});
+
+// ── targetsMet ──────────────────────────────────────────────────────────────
+
+// The same mixed scope the summarize test uses, so the two headline numbers can
+// be compared directly.
+function mixedScope() {
+  return statusesAsOf(
+    [
+      kpi({ id: 1, unit: "Item", progress: [q(1, 4, 100)] }), // 100% healthy
+      kpi({ id: 2, unit: "Percent", progress: [q(1, 4, 65)] }), // 65% watch
+      kpi({ id: 3, unit: "Ratio", progress: [q(1, 4, 10)] }), // 10% at risk
+      kpi({ id: 4, thresholdGreen: null, thresholdAmber: null, progress: [q(1, 4, 90)] }),
+      kpi({ id: 5 }), // nothing recorded
+    ],
+    1,
+    4,
+  );
+}
+
+test("targetsMet divides by every KPI in scope, not just the graded ones", () => {
+  const t = targetsMet(mixedScope());
+  assert.equal(t.met, 1);
+  assert.equal(t.graded, 3);
+  assert.equal(t.total, 5);
+  assert.equal(t.pctOfAll, 20);
+});
+
+test("targetsMet is a different quantity from summarize().pctOnTarget", () => {
+  // This gap is the whole point: 1 of 5 KPIs met target, but pctOnTarget reports
+  // 1 of the 3 that could be graded and reads 33%. Both are true; only one
+  // answers "how many KPIs met target".
+  const statuses = mixedScope();
+  const t = targetsMet(statuses);
+  const s = summarize(statuses);
+  assert.ok(t.pctOfAll < s.pctOnTarget);
+  assert.equal(t.met, s.onTarget);
+  assert.equal(t.graded, s.graded);
+});
+
+test("targetsMet of an empty scope reports null, not zero percent", () => {
+  const t = targetsMet([]);
+  assert.equal(t.total, 0);
+  assert.equal(t.met, 0);
+  assert.equal(t.pctOfAll, null);
+});
+
+test("targetsMet reaches 100 only when every KPI in scope met target", () => {
+  const statuses = statusesAsOf(
+    [kpi({ id: 1, progress: [q(1, 4, 100)] }), kpi({ id: 2, progress: [q(1, 4, 120)] })],
+    1,
+    4,
+  );
+  assert.equal(targetsMet(statuses).pctOfAll, 100);
+});
+
+// ── recordingStateAsOf ──────────────────────────────────────────────────────
+
+test("a value entered for the asked quarter is recorded", () => {
+  assert.equal(recordingStateAsOf(kpi({ progress: [q(1, 3, 50)] }), 1, 3), "recorded");
+});
+
+test("a value from an earlier quarter of the same year is carried, not recorded", () => {
+  // The use_annual shape: Q3 holds the number, Q4 is empty, and the rest of the
+  // dashboard still shows 50 at Q4 via valueAsOfQuarter.
+  const k = kpi({ progress: [q(1, 3, 50), q(1, 4, null)] });
+  assert.equal(recordingStateAsOf(k, 1, 4), "carried");
+  assert.equal(valueAsOfQuarter(k.progress, 1, 4), 50);
+});
+
+test("a quarter row that exists with no value is missing, not recorded", () => {
+  // An issue can be typed before the number arrives, which creates the row.
+  const k = kpi({ progress: [q(1, 4, null, { issue: "late data" })] });
+  assert.equal(recordingStateAsOf(k, 1, 4), "missing");
+});
+
+test("recording state never reaches across years", () => {
+  assert.equal(recordingStateAsOf(kpi({ progress: [q(1, 4, 50)] }), 2, 4), "missing");
+});
+
+test("recording state never looks forward", () => {
+  assert.equal(recordingStateAsOf(kpi({ progress: [q(1, 4, 50)] }), 1, 2), "missing");
+});
+
+// ── recordingMix / recordingSlices ──────────────────────────────────────────
+
+test("recordingMix counts the three states and they sum to the total", () => {
+  const kpis = [
+    kpi({ id: 1, progress: [q(1, 4, 10)] }), // recorded
+    kpi({ id: 2, progress: [q(1, 2, 10)] }), // carried
+    kpi({ id: 3, progress: [q(1, 4, null)] }), // missing (row, no value)
+    kpi({ id: 4 }), // missing (no rows at all)
+  ];
+  const m = recordingMix(kpis, 1, 4);
+  assert.equal(m.recorded, 1);
+  assert.equal(m.carried, 1);
+  assert.equal(m.missing, 2);
+  assert.equal(m.total, 4);
+  assert.equal(m.recorded + m.carried + m.missing, m.total);
+});
+
+test("recordingMix separates this quarter's entries from any reading at all", () => {
+  const kpis = [kpi({ id: 1, progress: [q(1, 4, 10)] }), kpi({ id: 2, progress: [q(1, 2, 10)] })];
+  const m = recordingMix(kpis, 1, 4);
+  assert.equal(m.pctThisQuarter, 50); // only one was entered for Q4
+  assert.equal(m.pctWithReading, 100); // but both show a number as of Q4
+  assert.notEqual(m.pctThisQuarter, m.pctWithReading);
+});
+
+test("recordingMix of an empty scope reports nulls, not zeros", () => {
+  const m = recordingMix([], 1, 4);
+  assert.equal(m.total, 0);
+  assert.equal(m.pctThisQuarter, null);
+  assert.equal(m.pctWithReading, null);
+});
+
+test("recordingSlices keeps a fixed key order so the donut colours never shuffle", () => {
+  const slices = recordingSlices(recordingMix([kpi({ progress: [q(1, 4, 10)] })], 1, 4));
+  assert.deepEqual(
+    slices.map((s) => s.key),
+    ["recorded", "carried", "missing"],
+  );
+  assert.equal(slices[0].value, 1);
+});
+
+// ── issuesAsOf ──────────────────────────────────────────────────────────────
+
+test("issuesAsOf returns only rows with an issue actually typed", () => {
+  const kpis = [
+    kpi({
+      id: 1,
+      name: "Graduate employment",
+      progress: [
+        q(1, 1, 10, { issue: "  ", solution: "ignored" }), // whitespace only
+        q(1, 2, 10), // both null
+        q(1, 3, 10, { issue: "Survey returns late", solution: "Chase deans" }),
+      ],
+    }),
+  ];
+  const rows = issuesAsOf(kpis, 1, 4);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].issue, "Survey returns late");
+  assert.equal(rows[0].solution, "Chase deans");
+  assert.equal(rows[0].kpiName, "Graduate employment");
+  assert.equal(rows[0].quarterNo, 3);
+});
+
+test("issuesAsOf keeps an issue that has no remedy yet", () => {
+  const rows = issuesAsOf([kpi({ progress: [q(1, 2, 10, { issue: "No data source" })] })], 1, 4);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].solution, null);
+});
+
+test("issuesAsOf is cumulative and inclusive of the asked quarter", () => {
+  const k = kpi({
+    progress: [
+      q(1, 1, 10, { issue: "Q1 problem" }),
+      q(1, 2, 10, { issue: "Q2 problem" }),
+      q(1, 3, 10, { issue: "Q3 problem" }),
+    ],
+  });
+  const rows = issuesAsOf([k], 1, 2);
+  assert.deepEqual(
+    rows.map((r) => r.quarterNo),
+    [2, 1],
+  );
+});
+
+test("issuesAsOf defaults to the whole year", () => {
+  const k = kpi({
+    progress: [q(1, 1, 10, { issue: "a" }), q(1, 4, 10, { issue: "b" })],
+  });
+  assert.equal(issuesAsOf([k], 1).length, 2);
+});
+
+test("issuesAsOf leads with the newest quarter, then the KPIs' own order", () => {
+  const kpis = [
+    kpi({ id: 1, name: "First", progress: [q(1, 2, 10, { issue: "older" })] }),
+    kpi({ id: 2, name: "Second", progress: [q(1, 4, 10, { issue: "newest" })] }),
+    kpi({ id: 3, name: "Third", progress: [q(1, 2, 10, { issue: "also older" })] }),
+  ];
+  const rows = issuesAsOf(kpis, 1, 4);
+  assert.deepEqual(
+    rows.map((r) => r.kpiName),
+    ["Second", "First", "Third"],
+  );
+});
+
+test("issuesAsOf never reaches into another year", () => {
+  const k = kpi({
+    progress: [q(1, 4, 10, { issue: "year one" }), q(2, 4, 10, { issue: "year two" })],
+  });
+  const rows = issuesAsOf([k], 2, 4);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].issue, "year two");
 });
