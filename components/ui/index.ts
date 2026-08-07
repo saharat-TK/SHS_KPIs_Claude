@@ -19,8 +19,10 @@ export {
   AchievementTrendChart,
   GroupAchievementChart,
   HealthDonut,
+  RecordingDonut,
   TargetVsActualChart,
   HEALTH_FILL,
+  RECORDING_FILL,
 } from "./Charts";
 export { ThresholdBar, healthOf, HEALTH_LABEL, type Health } from "./ThresholdBar";
 export { ActionMenu, type ActionMenuItem } from "./ActionMenu";

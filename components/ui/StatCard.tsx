@@ -32,6 +32,8 @@ export function StatCard({
   className,
   animate = false,
   digits = 0,
+  emphasis = "default",
+  title,
 }: {
   label: string;
   value: string | number;
@@ -47,8 +49,16 @@ export function StatCard({
   animate?: boolean;
   /** Decimal places for the animated value. */
   digits?: number;
+  /** "figure" is the dashboard headline hierarchy: tiny uppercase label, larger
+   *  figure, unit demoted beside it. Everywhere else keeps the default — this
+   *  card is used on four other pages that are not headlines. */
+  emphasis?: "default" | "figure";
+  /** Native tooltip, for naming a second reading of the same number (e.g. the
+   *  graded-only percentage behind a met-of-total figure). */
+  title?: string;
 }) {
   const toneClasses = TONES[tone];
+  const figure = emphasis === "figure";
   const dirColor =
     delta?.direction === "up"
       ? "text-success"
@@ -63,20 +73,44 @@ export function StatCard({
         : "trending_flat";
 
   return (
-    <Card className={cn("p-lg flex flex-col gap-sm", toneClasses.card, className)}>
+    <Card
+      title={title}
+      className={cn(
+        "flex flex-col gap-sm",
+        figure ? "p-md" : "p-lg",
+        toneClasses.card,
+        className,
+      )}
+    >
       <div className="flex items-center justify-between">
-        <span className={cn("text-label-md", toneClasses.muted)}>{label}</span>
+        <span
+          className={cn(
+            figure ? "text-utility-xs uppercase" : "text-label-md",
+            toneClasses.muted,
+          )}
+        >
+          {label}
+        </span>
         {icon && <Icon name={icon} size={20} className="text-primary" />}
       </div>
       <div className="flex items-end gap-xs">
-        <span className="text-display-md text-on-surface leading-none tabular-nums">
+        <span
+          className={cn(
+            "text-on-surface leading-none tabular-nums",
+            figure ? "text-display-lg" : "text-display-md",
+          )}
+        >
           {animate && typeof value === "number" ? (
             <CountUp value={value} digits={digits} />
           ) : (
             value
           )}
         </span>
-        {unit && <span className={cn("text-body-sm mb-tiny", toneClasses.muted)}>{unit}</span>}
+        {unit && (
+          <span className={cn("text-body-sm", figure ? "mb-xs" : "mb-tiny", toneClasses.muted)}>
+            {unit}
+          </span>
+        )}
       </div>
       {delta && (
         <span className={cn("inline-flex items-center gap-xs text-caption-sm", dirColor)}>

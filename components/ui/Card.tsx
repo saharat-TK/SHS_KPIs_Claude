@@ -2,13 +2,18 @@ import { cn } from "@/lib/utils";
 
 export function Card({
   className,
+  title,
   children,
 }: {
   className?: string;
+  /** Native tooltip. For a second reading of the card's own number, not for a
+   *  heading — use CardHeader for that. */
+  title?: string;
   children: React.ReactNode;
 }) {
   return (
     <section
+      title={title}
       className={cn(
         "bg-surface-lowest rounded-lg border border-hairline",
         className,

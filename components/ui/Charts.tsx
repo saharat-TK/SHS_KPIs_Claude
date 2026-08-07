@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import { useReducedMotion } from "./CountUp";
 import type { Health } from "@/lib/kpi/progress";
+import type { RecordingState } from "@/lib/kpi/dashboard";
 
 // Colours are the tailwind.config.ts tokens, repeated here because recharts
 // takes SVG paint values, not class names. Keep them in step with the theme.
@@ -55,6 +56,15 @@ export const HEALTH_FILL: Record<Health | "no_data", string> = {
   watch: WARNING,
   at_risk: ERROR,
   no_data: SURFACE_DIM,
+};
+
+/** Recording completeness, kept beside HEALTH_FILL so the two status palettes
+ *  stay visibly distinct. Blue for "carried" on purpose: it is a normal state
+ *  for a use_annual KPI, not a warning, and must not read as one. */
+export const RECORDING_FILL: Record<RecordingState, string> = {
+  recorded: PRIMARY_BRIGHT,
+  carried: LINK_BLUE,
+  missing: SURFACE_DIM,
 };
 
 /**
@@ -351,26 +361,29 @@ export function GroupAchievementChart({
   );
 }
 
-/** KPI health mix. The centre label is supplied by the caller so it can carry a
- *  count-up number without this module knowing about it. */
-export function HealthDonut({
-  data,
-  height = 240,
+/** The shared donut body. Keeping the two public donuts on one implementation
+ *  means the reveal wrapper and the recharts-animation opt-out cannot drift
+ *  between them — both are satisfied here by construction. */
+function DonutChart<K extends string>({
+  slices,
+  fill,
+  height,
   centre,
 }: {
-  data: { key: Health | "no_data"; label: string; value: number }[];
-  height?: number;
+  slices: { key: K; label: string; value: number }[];
+  fill: Record<K, string>;
+  height: number;
   centre?: React.ReactNode;
 }) {
-  const slices = data.filter((d) => d.value > 0);
+  const drawn = slices.filter((d) => d.value > 0);
   return (
-    <ChartReveal height={height} replay={slices} variant="pop">
+    <ChartReveal height={height} replay={drawn} variant="pop">
       <div className="relative">
         <ResponsiveContainer width="100%" height={height}>
           <PieChart>
             <Tooltip {...TOOLTIP} />
             <Pie
-              data={slices}
+              data={drawn}
               dataKey="value"
               nameKey="label"
               innerRadius="62%"
@@ -379,8 +392,8 @@ export function HealthDonut({
               strokeWidth={0}
               {...NO_RECHARTS_ANIMATION}
             >
-              {slices.map((s) => (
-                <Cell key={s.key} fill={HEALTH_FILL[s.key]} />
+              {drawn.map((s) => (
+                <Cell key={s.key} fill={fill[s.key]} />
               ))}
             </Pie>
             <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -396,6 +409,38 @@ export function HealthDonut({
         )}
       </div>
     </ChartReveal>
+  );
+}
+
+/** KPI health mix. The centre label is supplied by the caller so it can carry a
+ *  count-up number without this module knowing about it. */
+export function HealthDonut({
+  data,
+  height = 240,
+  centre,
+}: {
+  data: { key: Health | "no_data"; label: string; value: number }[];
+  height?: number;
+  centre?: React.ReactNode;
+}) {
+  return (
+    <DonutChart slices={data} fill={HEALTH_FILL} height={height} centre={centre} />
+  );
+}
+
+/** Recording completeness. A different question from HealthDonut: whether a
+ *  number was entered at all, not whether it was any good. */
+export function RecordingDonut({
+  data,
+  height = 240,
+  centre,
+}: {
+  data: { key: RecordingState; label: string; value: number }[];
+  height?: number;
+  centre?: React.ReactNode;
+}) {
+  return (
+    <DonutChart slices={data} fill={RECORDING_FILL} height={height} centre={centre} />
   );
 }
 
