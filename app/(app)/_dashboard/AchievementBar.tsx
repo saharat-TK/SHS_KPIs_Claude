@@ -11,15 +11,18 @@ export function AchievementBar({
   pct,
   health,
   size = "md",
+  showValue = true,
   className,
 }: {
   pct: number | null;
   health: Health | null;
   /** "sm" drops the track to a fixed-free full width for the compact tiles. */
   size?: "sm" | "md";
+  /** Lets compact tiles place the percentage alongside their other readings. */
+  showValue?: boolean;
   className?: string;
 }) {
-  if (pct == null) return <span className="text-caption-sm text-mute">—</span>;
+  if (pct == null) return showValue ? <span className="text-caption-sm text-mute">—</span> : null;
   const width = Math.max(2, Math.min(100, pct));
   const small = size === "sm";
   return (
@@ -35,14 +38,16 @@ export function AchievementBar({
           style={{ width: `${width}%`, background: HEALTH_FILL[health ?? "no_data"] }}
         />
       </div>
-      <span
-        className={cn(
-          "tabular-nums text-on-surface",
-          small ? "text-utility-xs shrink-0" : "text-caption-sm",
-        )}
-      >
-        {formatNumber(pct, 0)}%
-      </span>
+      {showValue && (
+        <span
+          className={cn(
+            "tabular-nums text-on-surface",
+            small ? "text-utility-xs shrink-0" : "text-caption-sm",
+          )}
+        >
+          {formatNumber(pct, 0)}%
+        </span>
+      )}
     </div>
   );
 }

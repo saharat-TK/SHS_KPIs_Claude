@@ -22,6 +22,8 @@ export function RingGauge({
   fill,
   label,
   className,
+  centerTextClassName,
+  contrast = "default",
 }: {
   value: number;
   total: number;
@@ -32,6 +34,10 @@ export function RingGauge({
   /** Read out in place of the graphic; the visible centre is hidden from AT. */
   label: string;
   className?: string;
+  /** Optional size/style override for a specific gauge's visible centre value. */
+  centerTextClassName?: string;
+  /** Inverse foreground for use on a dark card surface. */
+  contrast?: "default" | "inverse";
 }) {
   const reduced = useReducedMotion();
   // Sweep from empty to the real arc on mount. Under reduced motion the first
@@ -60,7 +66,7 @@ export function RingGauge({
             r={radius}
             fill="none"
             strokeWidth={stroke}
-            className="stroke-surface-container-high"
+            className={contrast === "inverse" ? "stroke-white/35" : "stroke-surface-container-high"}
           />
           <circle
             cx={size / 2}
@@ -82,7 +88,11 @@ export function RingGauge({
       </svg>
       <span
         aria-hidden
-        className="absolute inset-0 flex items-center justify-center text-caption-sm font-bold tabular-nums text-on-surface"
+        className={cn(
+          "absolute inset-0 flex items-center justify-center font-bold tabular-nums",
+          centerTextClassName ?? "text-caption-sm",
+          contrast === "inverse" ? "text-white" : "text-on-surface",
+        )}
       >
         {Math.round(pct * 100)}%
       </span>

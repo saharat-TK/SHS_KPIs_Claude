@@ -7,6 +7,14 @@ import { cn, formatNumber } from "@/lib/utils";
 import { KpiMiniBars } from "./KpiMiniBars";
 import { metBand } from "./metBand";
 
+// Category scorecards are deliberately lighter than HEALTH_SURFACE: blend each
+// existing fill 60/40 with white while keeping the status label and border.
+const CATEGORY_CARD_SURFACE = {
+  healthy: { card: "!bg-[#f2f8eb] !border-[#bcd99a]", muted: HEALTH_SURFACE.healthy.muted },
+  watch: { card: "!bg-[#fdf5e6] !border-[#e9c98a]", muted: HEALTH_SURFACE.watch.muted },
+  at_risk: { card: "!bg-[#ffe9e6] !border-[#f0b6b0]", muted: HEALTH_SURFACE.at_risk.muted },
+} as const;
+
 /**
  * One strategic group: how many of its KPIs met target, how far it got on
  * average, and every KPI in it.
@@ -31,26 +39,27 @@ function ScorecardTile({
   // The !important prefixes are load-bearing — cn() is a plain join, so an
   // un-important tint loses to Card's own bg-surface-lowest.
   const band = metBand(row.pctMet);
-  const tint = band ? HEALTH_SURFACE[band] : null;
+  const tint = band ? CATEGORY_CARD_SURFACE[band] : null;
   const muted = tint?.muted ?? "text-mute";
 
   return (
     <Card className={cn("flex flex-col gap-md p-md", tint?.card)}>
-      <h3 className={cn("text-utility-xs uppercase", muted)}>{row.label}</h3>
+      <h3 className={cn("text-heading-md uppercase", muted)}>{row.label}</h3>
 
       <div className="flex flex-col gap-md lg:flex-row lg:items-start">
         {/* Column 1 — the two summary readings. They routinely disagree (a group
             can average 106% with only 3 of 5 met), so each keeps its own label. */}
-        <div className="flex flex-col gap-md lg:w-[180px] lg:shrink-0">
-          <div className="flex items-center gap-md lg:flex-col lg:items-start">
+        <div className="flex flex-col gap-md lg:w-[180px] lg:shrink-0 lg:items-center">
+          <div className="flex items-center gap-md lg:flex-col lg:items-center">
             <RingGauge
               value={row.onTarget}
               total={row.total}
               size={88}
               fill={HEALTH_FILL[band ?? "no_data"]}
               label={`${row.onTarget} of ${row.total} KPIs met target`}
+              centerTextClassName="text-[25px] leading-none"
             />
-            <div>
+            <div className="lg:text-center">
               <p className={cn("text-utility-xs uppercase", muted)}>KPIs met target</p>
               <p className={cn("text-caption-sm mt-tiny", muted)}>
                 {row.onTarget} of {row.total}
@@ -58,13 +67,10 @@ function ScorecardTile({
             </div>
           </div>
 
-          <div>
-            <div className="flex items-end gap-xs">
-              <span className="text-display-md leading-none text-on-surface tabular-nums">
-                {row.pct == null ? "—" : formatNumber(row.pct, 0)}
-              </span>
-              {row.pct != null && <span className={cn("text-body-sm mb-tiny", muted)}>%</span>}
-            </div>
+          <div className="lg:text-center">
+            <span className="text-[30px] leading-none font-bold text-on-surface tabular-nums">
+              {row.pct == null ? "—" : `${formatNumber(row.pct, 0)}%`}
+            </span>
             <p className={cn("text-utility-xs uppercase mt-xs", muted)}>Avg achievement</p>
             <p className={cn("text-caption-sm mt-tiny", muted)}>
               {row.total} KPI{row.total === 1 ? "" : "s"}
@@ -76,7 +82,11 @@ function ScorecardTile({
             columns stack, since a left border on a full-width block would just
             be a stray line down the page. */}
         <div className="min-w-0 flex-1 border-t border-hairline pt-md lg:border-l lg:border-t-0 lg:pl-md lg:pt-0">
-          <KpiMiniBars statuses={row.statuses} onOpenKpi={onOpenKpi} layout="row" />
+          <KpiMiniBars
+            statuses={row.statuses}
+            onOpenKpi={onOpenKpi}
+            layout="row"
+          />
         </div>
 
         {/* Column 3 — the drill-through. */}

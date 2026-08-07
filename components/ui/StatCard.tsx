@@ -20,6 +20,14 @@ const TONES = {
   default: { card: "", muted: "text-mute" },
   soft: { card: "!bg-[#f2f8ea] !border-[#cfe3b4]", muted: "text-[#2f6500]" },
   ...HEALTH_SURFACE,
+  // Dashboard-only headline tones put semantic colour in the card surface.
+  // Every foreground becomes light so the compact figures, labels, and deltas
+  // remain legible against the darker fills.
+  headline_neutral: { card: "!bg-inverse-surface !border-white/20", muted: "text-white/80" },
+  headline_green: { card: "!bg-[#2f6500] !border-[#2f6500]", muted: "text-white/80" },
+  headline_healthy: { card: "!bg-[#2f6500] !border-[#2f6500]", muted: "text-white/80" },
+  headline_watch: { card: "!bg-[#8a4b00] !border-[#8a4b00]", muted: "text-white/80" },
+  headline_at_risk: { card: "!bg-[#93000a] !border-[#93000a]", muted: "text-white/80" },
 } as const;
 
 export function StatCard({
@@ -64,12 +72,15 @@ export function StatCard({
 }) {
   const toneClasses = TONES[tone];
   const figure = emphasis === "figure";
+  const inverse = tone.startsWith("headline_");
   const dirColor =
-    delta?.direction === "up"
-      ? "text-success"
-      : delta?.direction === "down"
-        ? "text-error"
-        : "text-mute";
+    inverse
+      ? "text-white/85"
+      : delta?.direction === "up"
+        ? "text-success"
+        : delta?.direction === "down"
+          ? "text-error"
+          : "text-mute";
   const dirIcon =
     delta?.direction === "up"
       ? "trending_up"
@@ -88,12 +99,13 @@ export function StatCard({
         >
           {label}
         </span>
-        {icon && !visual && <Icon name={icon} size={20} className="text-primary" />}
+        {icon && !visual && <Icon name={icon} size={20} className={inverse ? "text-white" : "text-primary"} />}
       </div>
       <div className="flex items-end gap-xs">
         <span
           className={cn(
-            "text-on-surface leading-none tabular-nums",
+            inverse ? "text-white" : "text-on-surface",
+            "leading-none tabular-nums",
             figure ? "text-display-lg" : "text-display-md",
           )}
         >

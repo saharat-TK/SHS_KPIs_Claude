@@ -1,9 +1,15 @@
 "use client";
 
-import { StatCard, RingGauge, HEALTH_FILL } from "@/components/ui";
+import { StatCard, RingGauge } from "@/components/ui";
 import type { DashboardSummary, RecordingMix, TargetsMet } from "@/lib/kpi/dashboard";
 import { formatNumber } from "@/lib/utils";
 import { metBand } from "./metBand";
+
+const HEADLINE_MET_TONE = {
+  healthy: "headline_healthy",
+  watch: "headline_watch",
+  at_risk: "headline_at_risk",
+} as const;
 
 /**
  * The four numbers the overview leads with.
@@ -28,6 +34,7 @@ export function HeadlineStats({
   // One expression drives the figure's tint and its ring, so the two can never
   // disagree about how the same ratio is doing.
   const metTone = metBand(targets.pctOfAll);
+  const headlineMetTone = metTone ? HEADLINE_MET_TONE[metTone] : "headline_neutral";
   return (
     <div className="grid grid-cols-2 gap-md lg:grid-cols-4">
       <StatCard
@@ -42,8 +49,9 @@ export function HeadlineStats({
           <RingGauge
             value={targets.met}
             total={targets.total}
-            fill={HEALTH_FILL[metTone ?? "no_data"]}
+            fill="#ffffff"
             label={`${targets.met} of ${targets.total} KPIs met target`}
+            contrast="inverse"
           />
         }
         title={
@@ -51,7 +59,7 @@ export function HeadlineStats({
             ? "No KPI in scope has both a value and thresholds, so none can be graded yet."
             : `${targets.met} of ${targets.graded} gradable KPIs — ${formatNumber(summary.pctOnTarget ?? 0, 1)}% of those that can be judged.`
         }
-        tone={metTone ?? "default"}
+        tone={headlineMetTone}
         delta={{
           value:
             ungradable > 0
@@ -69,7 +77,7 @@ export function HeadlineStats({
         icon="speed"
         emphasis="figure"
         animate
-        tone="soft"
+        tone="headline_green"
         delta={{ value: `${summary.withData} KPI(s) with data`, direction: "flat" }}
         className="animate-fade-up [animation-delay:60ms]"
       />
