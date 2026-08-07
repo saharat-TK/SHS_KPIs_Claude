@@ -1,17 +1,20 @@
 "use client";
 
-import { Field, Select } from "@/components/ui";
+import { Field, Select, SegmentedControl, type SegmentItem } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { PERFORMANCE_YEAR_COUNT, yearForYearNo } from "@/lib/kpi/performancePeriods";
 
-/** The Year/Quarter controls the record page also uses. Everything below them on
- *  the dashboard reads from these two. */
+/** The KPI type toggle plus the Year/Quarter controls the record page also uses.
+ *  Everything below them on the dashboard reads from these three. */
 export function DashboardFilterBar({
   year,
   quarter,
   startYear,
   openQuarters,
+  kpiType,
+  kpiTypeItems,
   onChange,
+  onTypeChange,
 }: {
   year: number;
   quarter: number;
@@ -19,11 +22,28 @@ export function DashboardFilterBar({
    *  while the record is still loading. */
   startYear?: number;
   openQuarters: number[];
+  kpiType: string;
+  /** Built by the caller from the live kpi_type table, with per-type counts and
+   *  the empty ones already marked disabled. */
+  kpiTypeItems: SegmentItem[];
   onChange: (patch: { year?: number; quarter?: number }) => void;
+  onTypeChange: (typeId: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-md rounded-lg border border-hairline bg-surface-lowest px-md py-sm lg:flex-row lg:items-end lg:justify-between">
       <div className="flex flex-wrap items-end gap-md">
+        {/* Not a <Field>: that renders a <label>, and a label wrapping a button
+            group makes its text activate the first button. The control carries
+            its own aria-label instead. */}
+        <div className="flex flex-col gap-xs">
+          <span className="text-label-md text-on-surface">KPI Type</span>
+          <SegmentedControl
+            items={kpiTypeItems}
+            active={kpiType}
+            onChange={onTypeChange}
+            ariaLabel="KPI type"
+          />
+        </div>
         <Field label="Year">
           <Select
             value={String(year)}

@@ -24,12 +24,16 @@ import {
   usePerformanceRecords,
   usePerfKpis,
   useKpiCategories,
+  useKpiTypes,
   usePerformancePeriods,
 } from "@/lib/data/hooks";
+import { KPI_TYPES } from "@/lib/types";
 import {
   categoryDetail,
   categorySeries,
+  countByType,
   groupsInUse,
+  kpisOfType,
   issuesAsOf,
   kpisInGroup,
   pickActiveRecord,
@@ -46,7 +50,7 @@ import { openQuartersForYear, yearForYearNo } from "@/lib/kpi/performancePeriods
 import { formatDate } from "@/lib/utils";
 import type { PerformanceRecord, PerformanceStatus } from "@/lib/types";
 import { DashboardFilterBar } from "./DashboardFilterBar";
-import { useDashboardFilters } from "./useDashboardFilters";
+import { DEFAULT_KPI_TYPE, useDashboardFilters } from "./useDashboardFilters";
 import { HeadlineStats } from "./HeadlineStats";
 import { KpiDetailTable } from "./KpiDetailTable";
 import { IssuesTable } from "./IssuesTable";
@@ -64,7 +68,8 @@ export function Dashboard() {
   const { user } = useAuth();
   const recordsQ = usePerformanceRecords();
 
-  const { recordId, year, quarter, group, setFilters } = useDashboardFilters();
+  const { recordId, year, quarter, group, type, setFilters } = useDashboardFilters();
+  const kpiTypesQ = useKpiTypes();
 
   const activeRecords = useMemo(
     () => (recordsQ.data ?? []).filter((r) => r.status === "active"),
@@ -85,13 +90,44 @@ export function Dashboard() {
   const categories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
   const periods = periodsQ.data ?? [];
 
-  const groups = useMemo(() => groupsInUse(kpis, categories), [kpis, categories]);
-  // A group the record no longer has (after switching records) would silently
-  // filter everything away, so fall back to All.
+  // The three toggle options come from the kpi_type table rather than a constant
+  // so a type added there gets an option instead of vanishing from every view.
+  // KPI_TYPES is the loading fallback, the same idiom the library editor uses.
+  const kpiTypeOptions = useMemo(
+    () =>
+      kpiTypesQ.data
+        ?.slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((t) => ({ id: t.id, label: t.kpiTypeName })) ?? KPI_TYPES,
+    [kpiTypesQ.data],
+  );
+  // Counts read the WHOLE record — they are what tells you a type is empty.
+  const typeCounts = useMemo(() => countByType(kpis), [kpis]);
+  const kpiTypeItems = useMemo(
+    () =>
+      kpiTypeOptions.map((t) => ({
+        id: t.id,
+        label: t.label,
+        count: typeCounts[t.id] ?? 0,
+        disabled: (typeCounts[t.id] ?? 0) === 0,
+      })),
+    [kpiTypeOptions, typeCounts],
+  );
+  // A ?t= naming a type this deployment does not have would scope the page to
+  // nothing, so fall back rather than render an empty dashboard.
+  const activeType = kpiTypeOptions.some((t) => t.id === type) ? type : DEFAULT_KPI_TYPE;
+
+  // Everything below this line is scoped to one type. `typed` also carries the
+  // routine-taxonomy swap, so `categoryId` already means the right column.
+  const typed = useMemo(() => kpisOfType(kpis, activeType), [kpis, activeType]);
+
+  const groups = useMemo(() => groupsInUse(typed, categories), [typed, categories]);
+  // A group the record no longer has (after switching records or types) would
+  // silently filter everything away, so fall back to All.
   const activeGroup = group !== "all" && !groups.some((g) => g.id === group) ? "all" : group;
   const scoped = useMemo(
-    () => (activeGroup === "all" ? kpis : kpisInGroup(kpis, activeGroup, categories)),
-    [kpis, activeGroup, categories],
+    () => (activeGroup === "all" ? typed : kpisInGroup(typed, activeGroup, categories)),
+    [typed, activeGroup, categories],
   );
 
   const statuses = useMemo(() => statusesAsOf(scoped, year, quarter), [scoped, year, quarter]);
@@ -106,15 +142,15 @@ export function Dashboard() {
     () => quarterSeries(scoped, activeGroup === "all" ? categories : [], year),
     [scoped, categories, activeGroup, year],
   );
-  // Both read every group, never `scoped` — the scorecards are how you get INTO
-  // a group, so they have to survive one being selected.
+  // Both read every group of the selected type, never `scoped` — the scorecards
+  // are how you get INTO a group, so they have to survive one being selected.
   const byCategoryDetail = useMemo(
-    () => categoryDetail(kpis, categories, year, quarter),
-    [kpis, categories, year, quarter],
+    () => categoryDetail(typed, categories, year, quarter),
+    [typed, categories, year, quarter],
   );
   const byCategory = useMemo(
-    () => categorySeries(kpis, categories, year, quarter),
-    [kpis, categories, year, quarter],
+    () => categorySeries(typed, categories, year, quarter),
+    [typed, categories, year, quarter],
   );
   const byYear = useMemo(
     () => yearSeries(scoped, quarter, record?.startYear ?? 0),
@@ -197,7 +233,13 @@ export function Dashboard() {
         quarter={quarter}
         startYear={record?.startYear}
         openQuarters={openQuarters}
+        kpiType={activeType}
+        kpiTypeItems={kpiTypeItems}
         onChange={setFilters}
+        // A group id belongs to one taxonomy, so it cannot survive a type
+        // change. The stale-group guard above would catch the render either
+        // way; clearing it here stops a dead ?g= lingering in the URL.
+        onTypeChange={(t) => setFilters({ type: t, group: "all" })}
       />
 
       <QueryBoundary isLoading={loading} isError={recordsQ.isError || kpisQ.isError}>
@@ -209,15 +251,25 @@ export function Dashboard() {
               message="It was activated from a strategic set with no KPIs, or the sync has not run yet."
             />
           </Card>
+        ) : typed.length === 0 ? (
+          // The toggle disables empty types, so this needs a hand-edited ?t= to
+          // reach — but it must not render a blank page when it is reached.
+          <Card>
+            <EmptyState
+              icon="filter_alt_off"
+              title="No KPIs of this type"
+              message={`This record has ${kpis.length} KPI(s), none of them ${activeType}. Pick another type above.`}
+            />
+          </Card>
         ) : (
           <>
             <Tabs
               items={[
-                { id: "all", label: "All Groups", count: kpis.length },
+                { id: "all", label: "All Groups", count: typed.length },
                 ...groups.map((g) => ({
                   id: g.id,
                   label: g.label,
-                  count: kpisInGroup(kpis, g.id, categories).length,
+                  count: kpisInGroup(typed, g.id, categories).length,
                 })),
               ]}
               active={activeGroup}
@@ -288,7 +340,10 @@ export function Dashboard() {
               {activeGroup === "all" && byCategory.length > 0 && (
                 <Card className="animate-fade-up">
                   <CardHeader
-                    title="By Strategic Group"
+                    // The grouping axis follows the type, so the title has to as
+                    // well — routine KPIs are plotted by ด้านที่ area here, not
+                    // by strategic category.
+                    title={activeType === "routine" ? "By Routine Area" : "By Strategic Group"}
                     subtitle="Average achievement of each group, coloured by its worst KPI"
                   />
                   <CardBody className="pt-0">

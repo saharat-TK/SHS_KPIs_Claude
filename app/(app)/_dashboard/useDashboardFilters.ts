@@ -12,6 +12,9 @@ export interface DashboardFilters {
   quarter: number;
   /** "all", a category id, or UNCATEGORISED. */
   group: string;
+  /** A kpi_type slug. Not validated here — kpi_type is a DB table, so the live
+   *  list decides what is real. Dashboard falls back when it isn't. */
+  type: string;
 }
 
 /** Defaults applied when the key is absent. A key whose value equals its default
@@ -19,6 +22,7 @@ export interface DashboardFilters {
 const DEFAULT_YEAR = 1;
 const DEFAULT_QUARTER = 4;
 const DEFAULT_GROUP = "all";
+export const DEFAULT_KPI_TYPE = "strategic";
 
 /** Parse to an integer inside [min, max], or fall back. A hand-edited ?q=9 must
  *  degrade to a usable view, never blank the page. */
@@ -50,6 +54,7 @@ export function useDashboardFilters(): DashboardFilters & {
       year: clampParam(searchParams.get("y"), 1, PERFORMANCE_YEAR_COUNT, DEFAULT_YEAR),
       quarter: clampParam(searchParams.get("q"), 1, 4, DEFAULT_QUARTER),
       group: searchParams.get("g") || DEFAULT_GROUP,
+      type: searchParams.get("t") || DEFAULT_KPI_TYPE,
     };
   }, [searchParams]);
 
@@ -67,6 +72,7 @@ export function useDashboardFilters(): DashboardFilters & {
       if (patch.year != null) put("y", String(patch.year), String(DEFAULT_YEAR));
       if (patch.quarter != null) put("q", String(patch.quarter), String(DEFAULT_QUARTER));
       if (patch.group != null) put("g", patch.group, DEFAULT_GROUP);
+      if (patch.type != null) put("t", patch.type, DEFAULT_KPI_TYPE);
       const qs = next.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
