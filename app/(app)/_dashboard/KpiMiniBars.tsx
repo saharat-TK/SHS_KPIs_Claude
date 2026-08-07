@@ -1,6 +1,6 @@
 "use client";
 
-import { Card } from "@/components/ui";
+import { Card, CountUp } from "@/components/ui";
 import type { KpiStatus } from "@/lib/kpi/dashboard";
 import { cn, formatNumber } from "@/lib/utils";
 import { AchievementBar } from "./AchievementBar";
@@ -48,13 +48,15 @@ export function KpiMiniBars({
             "animate-fade-up rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
             // Two-up on a phone, then fixed-width, 212px desktop tiles keep
             // the category-card row uniform without enlarging mobile tiles.
-            row && "w-[calc(50%-0.1875rem)] sm:w-[180px] lg:h-[212px]",
+            row && "w-[calc(50%-0.1875rem)] sm:w-[168px] lg:h-[212px]",
           )}
           style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
         >
           <Card className="flex h-full flex-col gap-xs p-md transition-shadow hover:shadow-chrome">
             <span className="text-utility-xs uppercase text-mute">K{i + 1}</span>
-            <span className="line-clamp-2 text-caption-sm text-on-surface">{s.name}</span>
+            <span className={cn(row ? "line-clamp-3" : "line-clamp-2", "text-caption-sm text-on-surface")}>
+              {s.name}
+            </span>
             {row ? (
               <>
                 {/* The two component readings sit in the tile's flexible middle
@@ -65,18 +67,18 @@ export function KpiMiniBars({
                 >
                   <span>
                     <span className="font-bold uppercase">Result</span>{" "}
-                    {fmt(s.value)}{s.unit ? ` ${s.unit}` : ""}
+                    {s.value == null ? "—" : <CountUp value={s.value} digits={2} />}{s.unit ? ` ${s.unit}` : ""}
                   </span>
                   <span>
                     <span className="font-bold uppercase">Target</span>{" "}
-                    {fmt(s.quarterTarget)}{s.unit ? ` ${s.unit}` : ""}
+                    {s.quarterTarget == null ? "—" : <CountUp value={s.quarterTarget} digits={2} />}{s.unit ? ` ${s.unit}` : ""}
                   </span>
                 </div>
-                {/* The percentage stays above the full-width track; its 30px
+                {/* The percentage stays above the full-width track; its 25px
                     desktop treatment leaves the compact mobile value intact. */}
                 <div className="flex flex-col gap-tiny">
-                  <span className="self-end text-body-sm font-bold tabular-nums text-on-surface lg:text-[30px] lg:leading-none">
-                    {s.pct == null ? "—" : `${formatNumber(s.pct, 0)}%`}
+                  <span className="self-end text-body-sm font-bold tabular-nums text-on-surface lg:text-[25px] lg:leading-none">
+                    {s.pct == null ? "—" : <CountUp value={s.pct} suffix="%" />}
                   </span>
                   <AchievementBar
                     pct={s.pct}

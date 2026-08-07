@@ -24,10 +24,10 @@ const TONES = {
   // Every foreground becomes light so the compact figures, labels, and deltas
   // remain legible against the darker fills.
   headline_neutral: { card: "!bg-inverse-surface !border-white/20", muted: "text-white/80" },
-  headline_green: { card: "!bg-[#2f6500] !border-[#2f6500]", muted: "text-white/80" },
-  headline_healthy: { card: "!bg-[#2f6500] !border-[#2f6500]", muted: "text-white/80" },
-  headline_watch: { card: "!bg-[#8a4b00] !border-[#8a4b00]", muted: "text-white/80" },
-  headline_at_risk: { card: "!bg-[#93000a] !border-[#93000a]", muted: "text-white/80" },
+  headline_green: { card: "!bg-[#65a30d] !border-[#65a30d]", muted: "text-white/80" },
+  headline_healthy: { card: "!bg-[#65a30d] !border-[#65a30d]", muted: "text-white/80" },
+  headline_watch: { card: "!bg-[#ea580c] !border-[#ea580c]", muted: "text-white/80" },
+  headline_at_risk: { card: "!bg-[#dc2626] !border-[#dc2626]", muted: "text-white/80" },
 } as const;
 
 export function StatCard({

@@ -1,19 +1,23 @@
 "use client";
 
-import { Button, Card, RingGauge, HEALTH_FILL } from "@/components/ui";
-import { HEALTH_SURFACE } from "@/lib/kpi/progress";
+import { Button, Card, CountUp, RingGauge, HEALTH_FILL } from "@/components/ui";
 import type { CategoryDetailRow } from "@/lib/kpi/dashboard";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { KpiMiniBars } from "./KpiMiniBars";
 import { metBand } from "./metBand";
 
-// Category scorecards are deliberately lighter than HEALTH_SURFACE: blend each
-// existing fill 60/40 with white while keeping the status label and border.
+// Category scorecards use pale semantic 50 surfaces with 200-level borders.
+// The 500-level ring sits a shade lighter than the 600-level text.
 const CATEGORY_CARD_SURFACE = {
-  healthy: { card: "!bg-[#f2f8eb] !border-[#bcd99a]", muted: HEALTH_SURFACE.healthy.muted },
-  watch: { card: "!bg-[#fdf5e6] !border-[#e9c98a]", muted: HEALTH_SURFACE.watch.muted },
-  at_risk: { card: "!bg-[#ffe9e6] !border-[#f0b6b0]", muted: HEALTH_SURFACE.at_risk.muted },
+  healthy: { card: "!bg-[#f7fee7] !border-[#d9f99d]", muted: "text-[#65a30d]", donut: "#84cc16" },
+  watch: { card: "!bg-[#fff7ed] !border-[#fed7aa]", muted: "text-[#ea580c]", donut: "#f97316" },
+  at_risk: { card: "!bg-[#fef2f2] !border-[#fecaca]", muted: "text-[#dc2626]", donut: "#ef4444" },
 } as const;
+
+const CATEGORY_KPI_NAME_ORDER = new Intl.Collator("en", {
+  sensitivity: "base",
+  numeric: true,
+});
 
 /**
  * One strategic group: how many of its KPIs met target, how far it got on
@@ -55,25 +59,31 @@ function ScorecardTile({
               value={row.onTarget}
               total={row.total}
               size={88}
-              fill={HEALTH_FILL[band ?? "no_data"]}
+              fill={tint?.donut ?? HEALTH_FILL.no_data}
               label={`${row.onTarget} of ${row.total} KPIs met target`}
               centerTextClassName="text-[25px] leading-none"
+              animateCenterValue
             />
             <div className="lg:text-center">
               <p className={cn("text-utility-xs uppercase", muted)}>KPIs met target</p>
               <p className={cn("text-caption-sm mt-tiny", muted)}>
-                {row.onTarget} of {row.total}
+                <CountUp value={row.onTarget} /> of <CountUp value={row.total} />
               </p>
             </div>
           </div>
 
+          <div
+            aria-hidden="true"
+            className={cn("h-px w-16 shrink-0 bg-current opacity-40", muted)}
+          />
+
           <div className="lg:text-center">
             <span className="text-[30px] leading-none font-bold text-on-surface tabular-nums">
-              {row.pct == null ? "—" : `${formatNumber(row.pct, 0)}%`}
+              {row.pct == null ? "—" : <CountUp value={row.pct} suffix="%" />}
             </span>
             <p className={cn("text-utility-xs uppercase mt-xs", muted)}>Avg achievement</p>
             <p className={cn("text-caption-sm mt-tiny", muted)}>
-              {row.total} KPI{row.total === 1 ? "" : "s"}
+              <CountUp value={row.total} /> KPI{row.total === 1 ? "" : "s"}
             </p>
           </div>
         </div>
@@ -83,7 +93,7 @@ function ScorecardTile({
             be a stray line down the page. */}
         <div className="min-w-0 flex-1 border-t border-hairline pt-md lg:border-l lg:border-t-0 lg:pl-md lg:pt-0">
           <KpiMiniBars
-            statuses={row.statuses}
+            statuses={[...row.statuses].sort((a, b) => CATEGORY_KPI_NAME_ORDER.compare(a.name, b.name))}
             onOpenKpi={onOpenKpi}
             layout="row"
           />

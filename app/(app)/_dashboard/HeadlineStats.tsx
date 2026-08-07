@@ -3,7 +3,7 @@
 import { StatCard, RingGauge } from "@/components/ui";
 import type { DashboardSummary, RecordingMix, TargetsMet } from "@/lib/kpi/dashboard";
 import { formatNumber } from "@/lib/utils";
-import { metBand } from "./metBand";
+import { achievementBand, metBand } from "./metBand";
 
 const HEADLINE_MET_TONE = {
   healthy: "headline_healthy",
@@ -35,6 +35,8 @@ export function HeadlineStats({
   // disagree about how the same ratio is doing.
   const metTone = metBand(targets.pctOfAll);
   const headlineMetTone = metTone ? HEADLINE_MET_TONE[metTone] : "headline_neutral";
+  const averageTone = achievementBand(summary.avgAchievement);
+  const headlineAverageTone = averageTone ? HEADLINE_MET_TONE[averageTone] : "headline_neutral";
   return (
     <div className="grid grid-cols-2 gap-md lg:grid-cols-4">
       <StatCard
@@ -71,13 +73,13 @@ export function HeadlineStats({
       />
       <StatCard
         label="Avg Achievement"
-        value={summary.avgAchievement ?? 0}
-        unit="%"
+        value={summary.avgAchievement ?? "—"}
+        unit={summary.avgAchievement == null ? undefined : "%"}
         digits={1}
         icon="speed"
         emphasis="figure"
         animate
-        tone="headline_green"
+        tone={headlineAverageTone}
         delta={{ value: `${summary.withData} KPI(s) with data`, direction: "flat" }}
         className="animate-fade-up [animation-delay:60ms]"
       />

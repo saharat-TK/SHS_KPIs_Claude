@@ -16,3 +16,11 @@ export function metBand(pct: number | null): Health | null {
   if (pct >= 50) return "watch";
   return "at_risk";
 }
+
+/** Presentation-only status band for the dashboard's average achievement. */
+export function achievementBand(pct: number | null): Health | null {
+  if (pct == null) return null;
+  if (pct >= 100) return "healthy";
+  if (pct >= 70) return "watch";
+  return "at_risk";
+}
