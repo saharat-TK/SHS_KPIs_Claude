@@ -1,10 +1,9 @@
 "use client";
 
-import { Button, Card } from "@/components/ui";
+import { Button, Card, RingGauge, HEALTH_FILL } from "@/components/ui";
 import { HEALTH_SURFACE } from "@/lib/kpi/progress";
 import type { CategoryDetailRow } from "@/lib/kpi/dashboard";
 import { cn, formatNumber } from "@/lib/utils";
-import { AchievementBar } from "./AchievementBar";
 import { KpiMiniBars } from "./KpiMiniBars";
 import { metBand } from "./metBand";
 
@@ -37,54 +36,62 @@ function ScorecardTile({
 
   return (
     <Card className={cn("flex flex-col gap-md p-md", tint?.card)}>
-      <div className="flex items-start justify-between gap-md">
-        <h3 className={cn("text-utility-xs uppercase", muted)}>{row.label}</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconRight="chevron_right"
-          onClick={onSelect}
-          aria-label={`View ${row.label}`}
-          className="shrink-0"
-        >
-          View group
-        </Button>
-      </div>
+      <h3 className={cn("text-utility-xs uppercase", muted)}>{row.label}</h3>
 
-      {/* Two readings of the same group that routinely disagree, so each keeps
-          its own label — a group can average 106% with only 3 of 5 met. */}
-      <div className="flex flex-wrap items-start gap-lg">
-        <div className="min-w-[160px] flex-1">
-          <div className="flex items-end gap-xs">
-            <span className="text-display-lg leading-none text-on-surface tabular-nums">
-              {row.pctMet == null ? "—" : formatNumber(row.pctMet, 0)}
-            </span>
-            {row.pctMet != null && (
-              <span className={cn("text-body-sm mb-xs", muted)}>%</span>
-            )}
+      <div className="flex flex-col gap-md lg:flex-row lg:items-start">
+        {/* Column 1 — the two summary readings. They routinely disagree (a group
+            can average 106% with only 3 of 5 met), so each keeps its own label. */}
+        <div className="flex flex-col gap-md lg:w-[180px] lg:shrink-0">
+          <div className="flex items-center gap-md lg:flex-col lg:items-start">
+            <RingGauge
+              value={row.onTarget}
+              total={row.total}
+              size={88}
+              fill={HEALTH_FILL[band ?? "no_data"]}
+              label={`${row.onTarget} of ${row.total} KPIs met target`}
+            />
+            <div>
+              <p className={cn("text-utility-xs uppercase", muted)}>KPIs met target</p>
+              <p className={cn("text-caption-sm mt-tiny", muted)}>
+                {row.onTarget} of {row.total}
+              </p>
+            </div>
           </div>
-          <p className={cn("text-utility-xs uppercase mt-xs", muted)}>KPIs met target</p>
-          <p className={cn("text-caption-sm mt-tiny", muted)}>
-            {row.onTarget} of {row.total}
-          </p>
-          <AchievementBar pct={row.pctMet} health={band} size="sm" className="mt-sm" />
+
+          <div>
+            <div className="flex items-end gap-xs">
+              <span className="text-display-md leading-none text-on-surface tabular-nums">
+                {row.pct == null ? "—" : formatNumber(row.pct, 0)}
+              </span>
+              {row.pct != null && <span className={cn("text-body-sm mb-tiny", muted)}>%</span>}
+            </div>
+            <p className={cn("text-utility-xs uppercase mt-xs", muted)}>Avg achievement</p>
+            <p className={cn("text-caption-sm mt-tiny", muted)}>
+              {row.total} KPI{row.total === 1 ? "" : "s"}
+            </p>
+          </div>
         </div>
 
-        <div className="min-w-[140px]">
-          <div className="flex items-end gap-xs">
-            <span className="text-display-md leading-none text-on-surface tabular-nums">
-              {row.pct == null ? "—" : formatNumber(row.pct, 0)}
-            </span>
-            {row.pct != null && <span className={cn("text-body-sm mb-tiny", muted)}>%</span>}
-          </div>
-          <p className={cn("text-utility-xs uppercase mt-xs", muted)}>Avg achievement</p>
-          <p className={cn("text-caption-sm mt-tiny", muted)}>
-            {row.total} KPI{row.total === 1 ? "" : "s"}
-          </p>
+        {/* Column 2 — the group's KPIs. The rule turns horizontal when the
+            columns stack, since a left border on a full-width block would just
+            be a stray line down the page. */}
+        <div className="min-w-0 flex-1 border-t border-hairline pt-md lg:border-l lg:border-t-0 lg:pl-md lg:pt-0">
+          <KpiMiniBars statuses={row.statuses} onOpenKpi={onOpenKpi} layout="row" />
+        </div>
+
+        {/* Column 3 — the drill-through. */}
+        <div className="lg:shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            iconRight="chevron_right"
+            onClick={onSelect}
+            aria-label={`View ${row.label}`}
+          >
+            View group
+          </Button>
         </div>
       </div>
-
-      <KpiMiniBars statuses={row.statuses} onOpenKpi={onOpenKpi} layout="row" />
     </Card>
   );
 }
