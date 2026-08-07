@@ -8,6 +8,7 @@ export { UnitSelect } from "./UnitSelect";
 export { Combobox, type ComboboxOption } from "./Combobox";
 export { RadioGroup, type RadioOption } from "./RadioGroup";
 export { Tabs, type TabItem } from "./Tabs";
+export { SegmentedControl, type SegmentItem } from "./SegmentedControl";
 export { Modal } from "./Modal";
 export { Drawer } from "./Drawer";
 export { HoverPopover } from "./HoverPopover";
