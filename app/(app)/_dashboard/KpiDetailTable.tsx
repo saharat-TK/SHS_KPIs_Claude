@@ -6,6 +6,8 @@ import { UNCATEGORISED, type DashboardCategory, type KpiStatus } from "@/lib/kpi
 import { formatNumber } from "@/lib/utils";
 import { AchievementBar } from "./AchievementBar";
 
+const KPI_NAME_ORDER = new Intl.Collator("en", { sensitivity: "base", numeric: true });
+
 export function KpiDetailTable({
   statuses,
   groups,
@@ -17,6 +19,8 @@ export function KpiDetailTable({
   quarter: number;
   onOpenKpi: (kpiId: number) => void;
 }) {
+  const sortedStatuses = [...statuses].sort((a, b) => KPI_NAME_ORDER.compare(a.name, b.name));
+
   if (statuses.length === 0) {
     return (
       <EmptyState
@@ -38,7 +42,7 @@ export function KpiDetailTable({
         </tr>
       </thead>
       <tbody>
-        {statuses.map((s) => {
+        {sortedStatuses.map((s) => {
           const groupLabel =
             groups.find((g) => g.id === (s.categoryId ?? UNCATEGORISED))?.label ?? "—";
           return (

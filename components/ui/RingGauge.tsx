@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useReducedMotion } from "./CountUp";
+import { CountUp, useReducedMotion } from "./CountUp";
 import { cn } from "@/lib/utils";
 
 /**
@@ -23,6 +23,7 @@ export function RingGauge({
   label,
   className,
   centerTextClassName,
+  animateCenterValue = false,
   contrast = "default",
 }: {
   value: number;
@@ -36,6 +37,8 @@ export function RingGauge({
   className?: string;
   /** Optional size/style override for a specific gauge's visible centre value. */
   centerTextClassName?: string;
+  /** Count the visible centre percentage up using the shared metric motion. */
+  animateCenterValue?: boolean;
   /** Inverse foreground for use on a dark card surface. */
   contrast?: "default" | "inverse";
 }) {
@@ -94,7 +97,7 @@ export function RingGauge({
           contrast === "inverse" ? "text-white" : "text-on-surface",
         )}
       >
-        {Math.round(pct * 100)}%
+        {animateCenterValue ? <CountUp value={Math.round(pct * 100)} suffix="%" /> : `${Math.round(pct * 100)}%`}
       </span>
     </div>
   );
