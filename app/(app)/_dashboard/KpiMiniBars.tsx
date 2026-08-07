@@ -2,8 +2,12 @@
 
 import { Card } from "@/components/ui";
 import type { KpiStatus } from "@/lib/kpi/dashboard";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { AchievementBar } from "./AchievementBar";
+
+/** Two decimals, matching KpiDetailTable, so the same KPI reads identically on
+ *  its tile and in the table. */
+const fmt = (n: number | null) => (n == null ? "—" : formatNumber(n, 2));
 
 /**
  * Every KPI in the selected group as a compact tile, so a group's shape reads at
@@ -50,7 +54,23 @@ export function KpiMiniBars({
           <Card className="flex h-full flex-col gap-xs p-md transition-shadow hover:shadow-chrome">
             <span className="text-utility-xs uppercase text-mute">K{i + 1}</span>
             <span className="line-clamp-2 text-caption-sm text-on-surface">{s.name}</span>
-            <AchievementBar pct={s.pct} health={s.health} size="sm" className="mt-auto pt-xs" />
+            {/* The bar and the numbers move together, so a wrapped row keeps one
+                baseline — mt-auto on the bar alone would strand the figures. */}
+            <div className="mt-auto flex flex-col gap-tiny pt-xs">
+              <AchievementBar pct={s.pct} health={s.health} size="sm" />
+              {/* Recorded against THIS quarter's target — the same pair the
+                  detail table shows, and what the bar above is scaled to. A KPI
+                  with neither number says so through the bar's em dash already. */}
+              {(s.value != null || s.quarterTarget != null) && (
+                <span
+                  className="truncate text-utility-xs font-normal tabular-nums text-mute"
+                  title={`Recorded ${fmt(s.value)} against a Q target of ${fmt(s.quarterTarget)}${s.unit ? ` ${s.unit}` : ""}`}
+                >
+                  {fmt(s.value)} / {fmt(s.quarterTarget)}
+                  {s.unit ? ` ${s.unit}` : ""}
+                </span>
+              )}
+            </div>
           </Card>
         </button>
       ))}
