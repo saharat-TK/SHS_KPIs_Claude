@@ -387,14 +387,26 @@ export interface CategoryRow {
   onTarget: number;
 }
 
-/** Achievement per strategic group as of (yearNo, quarterNo). A group's health
- *  is derived from its own mix — healthy only when every graded KPI in it is. */
-export function categorySeries(
+export interface CategoryDetailRow extends CategoryRow {
+  /** onTarget ÷ total × 100 — the share of the group's KPIs that met target,
+   *  over EVERY KPI in it. Same denominator rule as targetsMet().pctOfAll, and
+   *  deliberately a different quantity from `pct`, which is mean achievement:
+   *  a group can average 106% while only 3 of its 5 KPIs met target. */
+  pctMet: number | null;
+  /** The group's own KPIs, in the order they were passed in (the API sorts by
+   *  sort_order then id, so this matches the record page). */
+  statuses: KpiStatus[];
+}
+
+/** Achievement per strategic group as of (yearNo, quarterNo), with the group's
+ *  own KPI readings attached. A group's health is derived from its own mix —
+ *  healthy only when every graded KPI in it is. */
+export function categoryDetail(
   kpis: DashboardKpi[],
   categories: DashboardCategory[],
   yearNo: number,
   quarterNo: number,
-): CategoryRow[] {
+): CategoryDetailRow[] {
   return groupsInUse(kpis, categories).map((g) => {
     const statuses = statusesAsOf(
       kpisInGroup(kpis, g.id, categories),
@@ -416,8 +428,30 @@ export function categorySeries(
               : "healthy",
       total: s.total,
       onTarget: s.onTarget,
+      pctMet: s.total === 0 ? null : (s.onTarget / s.total) * 100,
+      statuses,
     };
   });
+}
+
+/** The lean per-group row the bar chart plots. A projection of categoryDetail,
+ *  so the two can never disagree about a group's achievement or health. */
+export function categorySeries(
+  kpis: DashboardKpi[],
+  categories: DashboardCategory[],
+  yearNo: number,
+  quarterNo: number,
+): CategoryRow[] {
+  return categoryDetail(kpis, categories, yearNo, quarterNo).map(
+    ({ id, label, pct, health, total, onTarget }) => ({
+      id,
+      label,
+      pct,
+      health,
+      total,
+      onTarget,
+    }),
+  );
 }
 
 export interface SeriesLine {

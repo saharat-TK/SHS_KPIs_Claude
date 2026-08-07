@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   categorySeries,
+  categoryDetail,
   groupsInUse,
   healthMix,
   kpiStatusAsOf,
@@ -539,4 +540,79 @@ test("issuesAsOf never reaches into another year", () => {
   const rows = issuesAsOf([k], 2, 4);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].issue, "year two");
+});
+
+// ── categoryDetail ──────────────────────────────────────────────────────────
+
+test("categoryDetail divides met by the group total, not by the graded count", () => {
+  const kpis = [
+    kpi({ id: 1, categoryId: "research_output", progress: [q(1, 4, 100)] }), // healthy
+    kpi({ id: 2, categoryId: "research_output", progress: [q(1, 4, 10)] }), // at risk
+    kpi({ id: 3, categoryId: "research_output" }), // nothing recorded
+  ];
+  const row = categoryDetail(kpis, CATEGORIES, 1, 4)[0];
+  assert.equal(row.onTarget, 1);
+  assert.equal(row.total, 3);
+  assert.ok(Math.abs(row.pctMet - 100 / 3) < 1e-9);
+});
+
+test("pctMet and pct answer different questions and can diverge sharply", () => {
+  // Both KPIs over-achieve on average, but only one clears its threshold — the
+  // group averages 105% while half its KPIs missed. Leading with the average
+  // would flatter the group, which is why the card highlights pctMet.
+  const kpis = [
+    kpi({ id: 1, categoryId: "research_output", progress: [q(1, 4, 140)] }), // 140% healthy
+    kpi({ id: 2, categoryId: "research_output", progress: [q(1, 4, 70)] }), // 70% watch
+  ];
+  const row = categoryDetail(kpis, CATEGORIES, 1, 4)[0];
+  assert.equal(row.pct, 105);
+  assert.equal(row.pctMet, 50);
+  assert.notEqual(row.pct, row.pctMet);
+});
+
+test("categoryDetail attaches the group's own KPIs in input order", () => {
+  const kpis = [
+    kpi({ id: 7, categoryId: "research_output", progress: [q(1, 4, 100)] }),
+    kpi({ id: 3, categoryId: "student_success" }),
+    kpi({ id: 9, categoryId: "research_output" }),
+  ];
+  const rows = categoryDetail(kpis, CATEGORIES, 1, 4);
+  const research = rows.find((r) => r.id === "research_output");
+  assert.deepEqual(
+    research.statuses.map((s) => s.kpiId),
+    [7, 9],
+  );
+  assert.equal(research.statuses.length, research.total);
+  assert.equal(rows.find((r) => r.id === "student_success").statuses.length, 1);
+});
+
+test("a group with no gradable data reports pctMet 0, and null achievement", () => {
+  // 0 is right here, not null: the group HAS a KPI, and none of them met target.
+  // Only an empty group has nothing to divide by.
+  const row = categoryDetail([kpi({ id: 1, categoryId: "research_output" })], CATEGORIES, 1, 4)[0];
+  assert.equal(row.pctMet, 0);
+  assert.equal(row.pct, null);
+  assert.equal(row.health, null);
+});
+
+test("categorySeries is exactly categoryDetail without the extra fields", () => {
+  // Guards the delegation: the bar chart's row must not gain or lose anything.
+  const kpis = [
+    kpi({ id: 1, categoryId: "research_output", progress: [q(1, 4, 100)] }),
+    kpi({ id: 2, categoryId: "student_success", progress: [q(1, 4, 10)] }),
+  ];
+  const lean = categorySeries(kpis, CATEGORIES, 1, 4);
+  const full = categoryDetail(kpis, CATEGORIES, 1, 4);
+  assert.deepEqual(
+    lean,
+    full.map(({ pctMet, statuses, ...rest }) => rest),
+  );
+  assert.deepEqual(Object.keys(lean[0]).sort(), [
+    "health",
+    "id",
+    "label",
+    "onTarget",
+    "pct",
+    "total",
+  ]);
 });
