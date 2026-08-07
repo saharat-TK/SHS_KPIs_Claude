@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -42,6 +42,7 @@ import { openQuartersForYear, yearForYearNo } from "@/lib/kpi/performancePeriods
 import { formatDate } from "@/lib/utils";
 import type { PerformanceRecord, PerformanceStatus } from "@/lib/types";
 import { DashboardFilterBar } from "./DashboardFilterBar";
+import { useDashboardFilters } from "./useDashboardFilters";
 import { HeadlineStats } from "./HeadlineStats";
 import { KpiDetailTable } from "./KpiDetailTable";
 
@@ -56,27 +57,22 @@ export function Dashboard() {
   const { user } = useAuth();
   const recordsQ = usePerformanceRecords();
 
-  // Which record is on screen. Null until the records land, then the active one
-  // that is actually being recorded into; the switcher can override it.
-  const [recordId, setRecordId] = useState<number | null>(null);
+  const { recordId, year, quarter, group, setFilters } = useDashboardFilters();
+
   const activeRecords = useMemo(
     () => (recordsQ.data ?? []).filter((r) => r.status === "active"),
     [recordsQ.data],
   );
+  // Which record is on screen: the one the URL pins, else the active one that is
+  // actually being recorded into. The id is never written back on mount, so a
+  // link without ?record= keeps following whatever is active today.
   const autoRecord = useMemo(() => pickActiveRecord(recordsQ.data ?? []), [recordsQ.data]);
-  useEffect(() => {
-    if (recordId == null && autoRecord) setRecordId(autoRecord.id);
-  }, [recordId, autoRecord]);
   const record: PerformanceRecord | null =
     (recordsQ.data ?? []).find((r) => r.id === recordId) ?? autoRecord;
 
   const kpisQ = usePerfKpis(record?.id ?? 0);
   const categoriesQ = useKpiCategories(record?.sourceSetId, { enabled: !!record });
   const periodsQ = usePerformancePeriods(record?.id ?? 0);
-
-  const [year, setYear] = useState(1);
-  const [quarter, setQuarter] = useState(4);
-  const [group, setGroup] = useState<string>("all");
 
   const kpis = useMemo<DashboardKpi[]>(() => kpisQ.data ?? [], [kpisQ.data]);
   const categories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
@@ -159,7 +155,7 @@ export function Dashboard() {
               <Select
                 aria-label="Performance record"
                 value={String(record?.id ?? "")}
-                onChange={(e) => setRecordId(Number(e.target.value))}
+                onChange={(e) => setFilters({ recordId: Number(e.target.value) })}
                 className="w-auto min-w-[220px] max-w-[320px]"
               >
                 {activeRecords.map((r) => (
@@ -185,10 +181,7 @@ export function Dashboard() {
         quarter={quarter}
         startYear={record?.startYear}
         openQuarters={openQuarters}
-        onChange={(patch) => {
-          if (patch.year != null) setYear(patch.year);
-          if (patch.quarter != null) setQuarter(patch.quarter);
-        }}
+        onChange={setFilters}
       />
 
       <QueryBoundary isLoading={loading} isError={recordsQ.isError || kpisQ.isError}>
@@ -212,7 +205,7 @@ export function Dashboard() {
                 })),
               ]}
               active={activeGroup}
-              onChange={setGroup}
+              onChange={(g) => setFilters({ group: g })}
             />
 
             <HeadlineStats summary={summary} />
