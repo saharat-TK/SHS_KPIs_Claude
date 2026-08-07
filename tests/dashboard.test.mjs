@@ -23,6 +23,7 @@ import {
   UNCATEGORISED,
 } from "../lib/kpi/dashboard.ts";
 import { valueAsOfQuarter } from "../lib/kpi/progress.ts";
+import { subKpiDensity } from "../app/(app)/_dashboard/subKpiDensity.ts";
 
 // A leaf KPI shaped like the perf-kpis payload. `progress` rows carry only the
 // fields the dashboard reads.
@@ -40,6 +41,16 @@ function kpi(over = {}) {
     ...over,
   };
 }
+
+test("sub-KPI card density switches at the dashboard preview boundaries", () => {
+  assert.equal(subKpiDensity(5), "full");
+  assert.equal(subKpiDensity(6), "compact_detail");
+  assert.equal(subKpiDensity(10), "compact_detail");
+  assert.equal(subKpiDensity(11), "compact");
+  assert.equal(subKpiDensity(20), "compact");
+  assert.equal(subKpiDensity(21), "heatmap");
+  assert.equal(subKpiDensity(31), "heatmap");
+});
 
 // `notes` is optional so the 300-odd existing three-arg calls keep their
 // issue/solution nulls.
