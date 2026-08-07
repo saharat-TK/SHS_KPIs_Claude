@@ -16,7 +16,7 @@ import {
   CountUp,
   AchievementTrendChart,
   GroupAchievementChart,
-  HealthDonut,
+  RecordingDonut,
   TargetVsActualChart,
 } from "@/components/ui";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -29,12 +29,15 @@ import {
 import {
   categorySeries,
   groupsInUse,
-  healthMix,
+  issuesAsOf,
   kpisInGroup,
   pickActiveRecord,
   quarterSeries,
+  recordingMix,
+  recordingSlices,
   statusesAsOf,
   summarize,
+  targetsMet,
   yearSeries,
   type DashboardKpi,
 } from "@/lib/kpi/dashboard";
@@ -45,6 +48,9 @@ import { DashboardFilterBar } from "./DashboardFilterBar";
 import { useDashboardFilters } from "./useDashboardFilters";
 import { HeadlineStats } from "./HeadlineStats";
 import { KpiDetailTable } from "./KpiDetailTable";
+import { IssuesTable } from "./IssuesTable";
+import { KpiMiniBars } from "./KpiMiniBars";
+import { StrategyScorecards } from "./StrategyScorecards";
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
   active: "success",
@@ -89,6 +95,9 @@ export function Dashboard() {
 
   const statuses = useMemo(() => statusesAsOf(scoped, year, quarter), [scoped, year, quarter]);
   const summary = useMemo(() => summarize(statuses), [statuses]);
+  const targets = useMemo(() => targetsMet(statuses), [statuses]);
+  const recording = useMemo(() => recordingMix(scoped, year, quarter), [scoped, year, quarter]);
+  const issues = useMemo(() => issuesAsOf(scoped, year, quarter), [scoped, year, quarter]);
   // Passing [] for categories on a group tab is deliberate: groupsInUse then
   // finds every KPI orphaned, returns a single bucket, and quarterSeries emits
   // the overall line only — which is what a single-group view wants.
@@ -208,9 +217,22 @@ export function Dashboard() {
               onChange={(g) => setFilters({ group: g })}
             />
 
-            <HeadlineStats summary={summary} />
+            <HeadlineStats targets={targets} summary={summary} recording={recording} />
 
-            <div className="grid grid-cols-1 gap-lg lg:grid-cols-[1fr_340px]">
+            {/* On "All Groups" the scorecards are the way into a strategy; inside
+                one, the same space shows that group's own KPIs. */}
+            {activeGroup === "all" ? (
+              byCategory.length > 0 && (
+                <StrategyScorecards
+                  rows={byCategory}
+                  onSelect={(g) => setFilters({ group: g })}
+                />
+              )
+            ) : (
+              <KpiMiniBars statuses={statuses} onOpenKpi={openKpi} />
+            )}
+
+            <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_340px]">
               <Card className="animate-fade-up">
                 <CardHeader
                   title="Achievement by Quarter"
@@ -222,37 +244,50 @@ export function Dashboard() {
               </Card>
 
               <Card className="animate-fade-up [animation-delay:60ms]">
-                <CardHeader title="Health Mix" subtitle={`As of Q${quarter}`} />
+                <CardHeader
+                  title="Recording Status"
+                  subtitle={`Year ${year} · as of Q${quarter}`}
+                />
                 <CardBody className="pt-0">
-                  <HealthDonut
-                    data={healthMix(summary)}
-                    centre={
-                      <>
-                        <span className="text-display-md leading-none text-on-surface tabular-nums">
-                          <CountUp value={summary.pctOnTarget ?? 0} suffix="%" />
-                        </span>
-                        <span className="text-caption-sm text-mute">on target</span>
-                      </>
-                    }
-                  />
+                  {recording.total === 0 ? (
+                    <EmptyState title="Nothing to record" />
+                  ) : (
+                    <RecordingDonut
+                      data={recordingSlices(recording)}
+                      centre={
+                        <>
+                          <span className="text-display-md leading-none text-on-surface tabular-nums">
+                            <CountUp value={recording.pctThisQuarter ?? 0} suffix="%" />
+                          </span>
+                          <span className="text-caption-sm text-mute">recorded this quarter</span>
+                        </>
+                      }
+                    />
+                  )}
                 </CardBody>
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 gap-lg lg:grid-cols-2">
-              <Card className="animate-fade-up">
-                <CardHeader
-                  title="By Strategic Group"
-                  subtitle="Average achievement of each group, coloured by its worst KPI"
-                />
-                <CardBody className="pt-0">
-                  {byCategory.length === 0 ? (
-                    <EmptyState title="No groups in this record" />
-                  ) : (
+            <div
+              className={
+                activeGroup === "all"
+                  ? "grid grid-cols-1 gap-md lg:grid-cols-2"
+                  : "grid grid-cols-1 gap-md"
+              }
+            >
+              {/* byCategory always covers every group, so it would contradict a
+                  single-group tab. It belongs to the All view only. */}
+              {activeGroup === "all" && byCategory.length > 0 && (
+                <Card className="animate-fade-up">
+                  <CardHeader
+                    title="By Strategic Group"
+                    subtitle="Average achievement of each group, coloured by its worst KPI"
+                  />
+                  <CardBody className="pt-0">
                     <GroupAchievementChart data={byCategory} />
-                  )}
-                </CardBody>
-              </Card>
+                  </CardBody>
+                </Card>
+              )}
 
               <Card className="animate-fade-up [animation-delay:60ms]">
                 <CardHeader
@@ -288,6 +323,14 @@ export function Dashboard() {
                 quarter={quarter}
                 onOpenKpi={openKpi}
               />
+            </Card>
+
+            <Card className="overflow-hidden animate-fade-up">
+              <CardHeader
+                title="Issues & Remedies"
+                subtitle={`${issues.length} recorded · Year ${year} through Q${quarter}`}
+              />
+              <IssuesTable rows={issues} onOpenKpi={openKpi} />
             </Card>
           </>
         )}

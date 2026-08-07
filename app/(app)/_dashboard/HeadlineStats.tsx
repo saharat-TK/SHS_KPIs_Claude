@@ -1,27 +1,59 @@
 "use client";
 
 import { StatCard } from "@/components/ui";
-import type { DashboardSummary } from "@/lib/kpi/dashboard";
+import type { DashboardSummary, RecordingMix, TargetsMet } from "@/lib/kpi/dashboard";
+import { formatNumber } from "@/lib/utils";
 
-export function HeadlineStats({ summary }: { summary: DashboardSummary }) {
+/**
+ * The four numbers the overview leads with.
+ *
+ * Card 1 is deliberately "met of ALL KPIs", not summarize().pctOnTarget, which
+ * divides by the graded count and so reads high on a record with unrecorded
+ * KPIs. Both readings are true; only one answers "how many KPIs met target".
+ * The graded-only figure is kept in the card's tooltip so the two are visibly
+ * different quantities rather than one silently replacing the other.
+ */
+export function HeadlineStats({
+  targets,
+  summary,
+  recording,
+}: {
+  targets: TargetsMet;
+  summary: DashboardSummary;
+  recording: RecordingMix;
+}) {
+  const ungradable = targets.total - targets.graded;
+  const notRecorded = recording.carried + recording.missing;
   return (
-    <div className="grid grid-cols-2 gap-lg lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-md lg:grid-cols-4">
       <StatCard
-        label="On Target"
-        value={summary.pctOnTarget ?? 0}
-        unit="%"
+        label="KPIs Met Target"
+        value={targets.met}
+        unit={`of ${targets.total}`}
         icon="check_circle"
+        emphasis="figure"
         animate
+        title={
+          targets.graded === 0
+            ? "No KPI in scope has both a value and thresholds, so none can be graded yet."
+            : `${targets.met} of ${targets.graded} gradable KPIs — ${formatNumber(summary.pctOnTarget ?? 0, 1)}% of those that can be judged.`
+        }
         tone={
-          summary.graded === 0
+          targets.pctOfAll == null
             ? "default"
-            : summary.pctOnTarget! >= 80
+            : targets.pctOfAll >= 80
               ? "healthy"
-              : summary.pctOnTarget! >= 50
+              : targets.pctOfAll >= 50
                 ? "watch"
                 : "at_risk"
         }
-        delta={{ value: `${summary.onTarget} of ${summary.graded} graded`, direction: "flat" }}
+        delta={{
+          value:
+            ungradable > 0
+              ? `${ungradable} not yet gradable`
+              : `all ${targets.total} gradable`,
+          direction: "flat",
+        }}
         className="animate-fade-up"
       />
       <StatCard
@@ -30,19 +62,26 @@ export function HeadlineStats({ summary }: { summary: DashboardSummary }) {
         unit="%"
         digits={1}
         icon="speed"
+        emphasis="figure"
         animate
         tone="soft"
         delta={{ value: `${summary.withData} KPI(s) with data`, direction: "flat" }}
         className="animate-fade-up [animation-delay:60ms]"
       />
       <StatCard
-        label="Tracked KPIs"
-        value={summary.total}
-        icon="tune"
+        label="Recorded This Quarter"
+        value={recording.recorded}
+        unit={`of ${recording.total}`}
+        icon="edit_note"
+        emphasis="figure"
         animate
+        title="Carried forward means an earlier quarter of the same year holds the value — normal for a KPI that reports annually."
         delta={{
-          value: summary.noData > 0 ? `${summary.noData} not recorded` : "all recorded",
-          direction: summary.noData > 0 ? "flat" : "up",
+          value:
+            notRecorded === 0
+              ? "fully up to date"
+              : `${recording.carried} carried · ${recording.missing} missing`,
+          direction: recording.missing > 0 ? "down" : "flat",
         }}
         className="animate-fade-up [animation-delay:120ms]"
       />
@@ -50,11 +89,14 @@ export function HeadlineStats({ summary }: { summary: DashboardSummary }) {
         label="At Risk"
         value={summary.atRisk}
         icon="warning"
+        emphasis="figure"
         animate
         tone={summary.atRisk > 0 ? "at_risk" : "default"}
         delta={{
           value: summary.watch > 0 ? `${summary.watch} on watch` : "none on watch",
-          direction: summary.atRisk > 0 ? "down" : "up",
+          // Never "up" here: a green rising arrow beside a zero reads as
+          // "at-risk count climbing", which is the opposite of the news.
+          direction: summary.atRisk > 0 ? "down" : "flat",
         }}
         className="animate-fade-up [animation-delay:180ms]"
       />
