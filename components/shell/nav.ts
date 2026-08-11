@@ -61,7 +61,7 @@ export const NAV: NavGroup[] = [
     label: "Faculty Data",
     items: [
       { label: "Committees", href: "/committee", icon: "account_tree" },
-      { label: "Faculty Roster", href: "/faculty", icon: "groups" },
+      { label: "Faculty Roster", href: "/faculty", icon: "groups", exact: true },
       {
         label: "Faculty Management",
         href: "/faculty/management",

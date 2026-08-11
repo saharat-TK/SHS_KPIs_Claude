@@ -160,6 +160,7 @@ function FacultyManagement() {
                     <Th sortable sortDir={sort.key === "rank" ? sort.dir : null} onSort={() => toggleSort("rank")}>
                       Rank
                     </Th>
+                    <Th>System Role</Th>
                     <Th>Email</Th>
                     <Th>Name (TH)</Th>
                     <Th sortable sortDir={sort.key === "program" ? sort.dir : null} onSort={() => toggleSort("program")}>
@@ -174,6 +175,9 @@ function FacultyManagement() {
                     <Tr key={f.id}>
                       <Td className="font-medium">{f.name}</Td>
                       <Td>{f.rank}</Td>
+                      <Td className="text-mute">
+                        {f.systemRole[0].toUpperCase() + f.systemRole.slice(1)}
+                      </Td>
                       <Td className="text-mute">{f.email ?? "—"}</Td>
                       <Td className="text-mute">{f.nameTh ?? "—"}</Td>
                       <Td>{f.program}</Td>
