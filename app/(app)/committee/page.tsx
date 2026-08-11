@@ -11,6 +11,7 @@ import {
   Tr,
   Badge,
   Button,
+  SearchInput,
   StatusPill,
   QueryBoundary,
   EmptyState,
@@ -161,6 +162,7 @@ export default function CommitteePage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
+  const [cardQuery, setCardQuery] = useState("");
 
   const facultyById = useMemo(() => {
     const m = new Map<string, FacultyRecord>();
@@ -174,6 +176,15 @@ export default function CommitteePage() {
       m.set(mem.committeeId, (m.get(mem.committeeId) ?? 0) + 1);
     return m;
   }, [memberships.data]);
+
+  // Filters only what the left rail shows — selection, the detail panel, and
+  // everything derived from it stay keyed off the full list below, so hiding
+  // the selected committee behind a search never clears the selection.
+  const visibleCommittees = useMemo(() => {
+    const q = cardQuery.trim().toLowerCase();
+    const list = committees.data ?? [];
+    return q ? list.filter((d) => d.name.toLowerCase().includes(q)) : list;
+  }, [committees.data, cardQuery]);
 
   const activeId = selected ?? committees.data?.[0]?.id ?? null;
   const activeCommittee = committees.data?.find((d) => d.id === activeId);
@@ -225,43 +236,61 @@ export default function CommitteePage() {
       >
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-lg">
           <div className="flex flex-col gap-sm">
-            {committees.data?.map((d) => {
-              const on = d.id === activeId;
-              return (
-                <button
-                  key={d.id}
-                  onClick={() => setSelected(d.id)}
-                  className={cn(
-                    "text-left rounded-lg border p-lg transition-colors",
-                    on
-                      ? "border-primary-container bg-surface-soft"
-                      : "border-hairline bg-surface-lowest hover:bg-surface-soft",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-sm">
-                    <div className="min-w-0">
-                      <p className="text-body-strong text-on-surface truncate">
-                        {d.name}
-                      </p>
-                      <p className="text-caption-sm text-mute truncate">
-                        {d.faculty}
-                      </p>
-                    </div>
-                    <StatusPill status={d.status} />
-                  </div>
-                  <div className="mt-md flex items-center gap-lg text-caption-sm text-mute">
-                    <span className="inline-flex items-center gap-xs">
-                      <Icon name="groups" size={16} />
-                      {counts.get(d.id) ?? 0} faculty
-                    </span>
-                    <span className="inline-flex items-center gap-xs">
-                      <Icon name="target" size={16} />
-                      {d.keyMetric}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+            <SearchInput
+              placeholder="Search committees…"
+              value={cardQuery}
+              onChange={(e) => setCardQuery(e.target.value)}
+            />
+            <div
+              // 7 × 91px card height + 6 × 6px gap-sm, measured against the
+              // live data — shows exactly 7 full cards before scrolling.
+              className="flex flex-col gap-sm overflow-y-auto scroll-thin pr-tiny"
+              style={{ maxHeight: 673 }}
+            >
+              {visibleCommittees.length === 0 ? (
+                <p className="text-caption-sm text-mute p-lg text-center">
+                  No committees match.
+                </p>
+              ) : (
+                visibleCommittees.map((d) => {
+                  const on = d.id === activeId;
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => setSelected(d.id)}
+                      className={cn(
+                        "text-left rounded-lg border p-lg transition-colors shrink-0",
+                        on
+                          ? "border-primary-container bg-primary-container/15"
+                          : "border-hairline bg-surface-lowest hover:bg-surface-soft",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-sm">
+                        <div className="min-w-0">
+                          <p className="text-body-strong text-on-surface truncate">
+                            {d.name}
+                          </p>
+                          <p className="text-caption-sm text-mute truncate">
+                            {d.faculty}
+                          </p>
+                        </div>
+                        <StatusPill status={d.status} />
+                      </div>
+                      <div className="mt-md flex items-center gap-lg text-caption-sm text-mute">
+                        <span className="inline-flex items-center gap-xs">
+                          <Icon name="groups" size={16} />
+                          {counts.get(d.id) ?? 0} faculty
+                        </span>
+                        <span className="inline-flex items-center gap-xs">
+                          <Icon name="target" size={16} />
+                          {d.keyMetric}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
 
           <Card className="overflow-hidden h-fit">
