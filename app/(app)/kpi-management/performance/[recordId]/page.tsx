@@ -290,7 +290,9 @@ function PerformanceRecordDetail() {
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-end gap-md lg:justify-end">
+        {/* flex-nowrap: Year and Quarter must stay on one row at every width —
+            their combined min-width comfortably clears a 375px viewport. */}
+        <div className="flex flex-nowrap items-end gap-md lg:justify-end">
           <Field label="Year">
             <Select
               value={String(selectedYear)}
@@ -340,7 +342,6 @@ function PerformanceRecordDetail() {
                 <col />
                 <col />
                 <col />
-                <col />
               </colgroup>
               <thead>
                 <tr>
@@ -375,7 +376,6 @@ function PerformanceRecordDetail() {
                   >
                     Current Progress
                   </Th>
-                  <Th align="center">Weight</Th>
                   <Th align="center">Sub-KPIs</Th>
                   <Th align="center">Roll-up</Th>
                   <Th
@@ -441,7 +441,6 @@ function PerformanceRecordDetail() {
                           </div>
                         )}
                       </Td>
-                      <Td align="center">{k.weight}%</Td>
                       <Td align="center">{k.metricCount ?? 0}</Td>
                       <Td align="center">
                         <Badge tone={k.hasChildren ? "info" : "neutral"}>
