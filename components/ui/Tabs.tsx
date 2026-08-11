@@ -30,7 +30,10 @@ export function Tabs({
             aria-selected={on}
             onClick={() => onChange(t.id)}
             className={cn(
-              "px-md py-sm text-label-md -mb-px border-b-2 transition-colors inline-flex items-center gap-xs",
+              // text-left overrides the browser's default centered button text,
+              // which otherwise centers a long label's wrapped second line
+              // instead of keeping it flush with the first.
+              "px-md py-sm text-label-md text-left -mb-px border-b-2 transition-colors inline-flex items-center gap-xs",
               on
                 ? "border-primary-container text-primary-dark"
                 : "border-transparent text-mute hover:text-on-surface",
