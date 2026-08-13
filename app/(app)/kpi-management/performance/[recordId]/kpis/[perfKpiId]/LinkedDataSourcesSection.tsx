@@ -179,7 +179,7 @@ export function LinkedDataSourcesSection({
 /** One source's raw entries. Knows nothing about links — the feeds list and its
  *  actions live in the section header's pop-up. */
 function SourcePanel({ source }: { source: PerfKpiSource }) {
-  const { can, user } = useAuth();
+  const { can } = useAuth();
   const detailQ = useDataSource(source.id);
   const columnsQ = useDataSourceColumns(source.id);
   const entriesQ = useDataSourceEntries(source.id);
@@ -309,7 +309,6 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
             entries={entries}
             canRecord={canRecord}
             dataSourceId={source.id}
-            actor={{ actorId: user?.facultyId, userRole: user?.role }}
             cellLabels={cellLabels}
             query={findData}
             onEdit={setEditing}

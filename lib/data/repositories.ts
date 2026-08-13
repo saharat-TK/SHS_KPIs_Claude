@@ -467,7 +467,6 @@ export const strategicSetsRepo = {
     description?: string;
     startYear: number;
     cloneFromSetId?: number;
-    createdBy?: string;
   }): Promise<StrategicSet> =>
     jsonOrThrow(
       await fetch("/api/strategic-sets", {
@@ -659,8 +658,6 @@ export const performanceRecordsRepo = {
       variable2Value?: number | null;
       issue: string;
       solution: string;
-      recordedBy?: string;
-      actorId?: string;
     },
   ): Promise<QuarterProgress[]> =>
     jsonOrThrow(
@@ -679,8 +676,6 @@ export const performanceRecordsRepo = {
       progressValue: number | null;
       issue: string;
       solution: string;
-      recordedBy?: string;
-      actorId?: string;
     },
   ): Promise<QuarterProgress[]> =>
     jsonOrThrow(
@@ -694,15 +689,13 @@ export const performanceRecordsRepo = {
 };
 
 // ── Performance approval workflow (member → lead → counselor, DB-backed) ─────
-// No userRole here on purpose: the server resolves both the committee position
-// and the system role from the DB using actorId, so a role sent by the client
-// would be ignored.
+// No actor fields here on purpose: the server takes the caller's identity from
+// the session cookie, then resolves their committee position and system role
+// from the DB against it. Anything the client sent would be ignored.
 export interface ApprovalTransitionInput {
   action: ApprovalAction;
   yearNo: number;
   quarterNo: number;
-  actorId?: string;
-  actorName?: string;
   comment?: string;
 }
 
@@ -762,7 +755,6 @@ export const dataSourcesRepo = {
     description?: string;
     committeeId: string;
     periodGrain: DataSourcePeriodGrain;
-    createdBy?: string;
   }): Promise<DataSource> =>
     jsonOrThrow(
       await fetch("/api/data-sources", {
@@ -859,19 +851,11 @@ export const dataSourcesRepo = {
       }),
       "Failed to update entry",
     ),
-  // The actor rides in the query string: these DELETEs carry no body.
-  removeEntry: async (
-    entryId: number,
-    actor: { actorId?: string; userRole?: string },
-  ): Promise<{ id: number }> => {
-    const qs = new URLSearchParams();
-    if (actor.actorId) qs.set("actorId", actor.actorId);
-    if (actor.userRole) qs.set("userRole", actor.userRole);
-    return jsonOrThrow(
-      await fetch(`/api/data-source-entries/${entryId}?${qs}`, { method: "DELETE" }),
+  removeEntry: async (entryId: number): Promise<{ id: number }> =>
+    jsonOrThrow(
+      await fetch(`/api/data-source-entries/${entryId}`, { method: "DELETE" }),
       "Failed to delete entry",
-    );
-  },
+    ),
 
   links: async (id: number): Promise<DataSourceLink[]> =>
     jsonOrThrow(await fetch(`/api/data-sources/${id}/links`), "Failed to load links"),
@@ -934,8 +918,6 @@ export interface DataSourceEntryInput {
   quarter: number | null;
   values: Record<string, DataSourceCellValue>;
   note?: string | null;
-  actorId?: string;
-  userRole?: string;
 }
 
 /** A CSV import. The actor is carried once for the batch rather than repeated on
@@ -947,8 +929,6 @@ export interface DataSourceBulkEntryInput {
     values: Record<string, DataSourceCellValue>;
     note?: string | null;
   }[];
-  actorId?: string;
-  userRole?: string;
 }
 
 export type {

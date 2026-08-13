@@ -530,7 +530,6 @@ export function useCreateStrategicSet() {
       description?: string;
       startYear: number;
       cloneFromSetId?: number;
-      createdBy?: string;
     }) => strategicSetsRepo.create(input),
     meta: {
       toast: (d, v) =>
@@ -826,8 +825,6 @@ type ProgressInput = {
   variable2Value?: number | null;
   issue: string;
   solution: string;
-  recordedBy?: string;
-  actorId?: string;
 };
 
 export function useSaveKpiProgress(perfKpiId: number) {
@@ -1091,12 +1088,10 @@ export function useDeleteDataSourceEntry() {
   return useMutation({
     mutationFn: ({
       entryId,
-      actor,
     }: {
       dataSourceId: number;
       entryId: number;
-      actor: { actorId?: string; userRole?: string };
-    }) => dataSourcesRepo.removeEntry(entryId, actor),
+    }) => dataSourcesRepo.removeEntry(entryId),
     meta: { toast: "Entry deleted" },
     onSuccess: (_d, { dataSourceId }) => {
       qc.invalidateQueries({ queryKey: ["dataSourceEntries", dataSourceId] });

@@ -10,13 +10,17 @@ import type {
   Role,
 } from "@/lib/types";
 import { DataSourceValidationError } from "@/lib/kpi/dataSources";
+import { actorErrorResponse } from "@/lib/auth/errors";
 import { validateMappings } from "@/lib/kpi/dataSourceFilters";
 import { loadAcademicCatalog } from "@/lib/kpi/academicCatalogServer";
 
 type Db = Pool | PoolConnection;
 
-/** Bad input answers 400 with its message; anything else is a real failure. */
+/** Auth failures answer 401/403, bad input 400 with its message; anything else
+ *  is a real failure. */
 export function errorResponse(err: unknown, fallback: string) {
+  const actorError = actorErrorResponse(err);
+  if (actorError) return actorError;
   if (err instanceof DataSourceValidationError) {
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
@@ -228,27 +232,27 @@ export async function loadSourceShape(
 
 /** Mirror of lib/auth/can.ts for entry writes, applied server-side.
  *
- *  The app has no session layer, and unlike the approval/progress routes — which
- *  now resolve the actor's role from faculty.system_role — this still trusts the
- *  client-supplied userRole, because it branches on "committee" rather than
- *  "admin" and has no DB column to read that from. A consistency guard, not a
- *  security boundary; real enforcement needs authn.
+ *  Both arguments now come from the session (see lib/auth/session.ts), so this
+ *  is a real security boundary rather than the consistency guard it used to be
+ *  when the caller supplied its own role.
+ *
+ *  `reviewer` and `viewer` fall through to the same refusal as any other
+ *  non-committee role — neither records data.
  *
  *  Returns an error message, or null when the write is allowed. */
 export async function checkEntryWriteAccess(
   db: Db,
   source: { committeeId: string; status: string },
-  actorId: string | null,
-  userRole: Role | undefined,
+  actorId: string,
+  actorRole: Role,
 ): Promise<string | null> {
   if (source.status === "archived") {
     return "This data source is archived and no longer accepts entries";
   }
-  if (userRole === "admin") return null;
-  if (userRole !== "committee") {
+  if (actorRole === "admin") return null;
+  if (actorRole !== "committee") {
     return "Your role cannot record data source entries";
   }
-  if (!actorId) return "An actor is required to record entries";
 
   const [rows] = await db.query<RowDataPacket[]>(
     `SELECT 1 FROM committee_memberships WHERE faculty_id = ? AND committee_id = ?`,

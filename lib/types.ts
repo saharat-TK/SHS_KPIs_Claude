@@ -161,7 +161,10 @@ export interface FacultyMember {
 // junction table and isn't modeled here yet.
 export type Program = "BioMed" | "EnvH" | "OHS" | "PH" | "Sport Science" | "SHS Office";
 
-export type SystemRole = "admin" | "user";
+// faculty.system_role. Since real sign-in replaced the mock personas there is
+// no other place an app role could come from, so this is exactly `Role` — the
+// alias is kept because it reads better at the DB boundary.
+export type SystemRole = Role;
 
 export interface FacultyRecord {
   id: string;

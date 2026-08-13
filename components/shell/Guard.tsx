@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/lib/auth/AuthContext";
-import type { Action } from "@/lib/auth/can";
+import { ROLE_LABELS, type Action } from "@/lib/auth/can";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export function RequirePermission({
@@ -17,7 +17,7 @@ export function RequirePermission({
       <EmptyState
         icon="lock"
         title="Access restricted"
-        message={`Your current role (${role}) does not have permission to view this page. Switch to an authorized role from the top-right menu.`}
+        message={`Your role (${ROLE_LABELS[role]}) does not have permission to view this page. If you need access, ask the SHS Office to update your system role on the faculty roster.`}
       />
     );
   }

@@ -9,6 +9,7 @@ import {
   resolveStageRoles,
 } from "@/lib/kpi/approvalWorkflow";
 import { APPROVAL_SELECT, resolvePosition, resolveSystemRole } from "@/lib/kpi/approvalServer";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -124,12 +125,15 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
+    const actor = await requirePermission("record_performance");
     const b = await req.json();
     const action = b.action as ApprovalAction;
     const yearNo = Number(b.yearNo);
     const quarterNo = Number(b.quarterNo);
-    const actorId: string | null = b.actorId ?? null;
-    const actorName: string | null = b.actorName ?? null;
+    // From the session, never the body. The stage-role resolution below was
+    // always DB-backed, but it used to be keyed by an id the caller chose.
+    const actorId: string = actor.facultyId;
+    const actorName: string = actor.name;
     const comment: string | null = b.comment?.trim() ? b.comment.trim() : null;
 
     if (!(yearNo >= 1 && yearNo <= 5) || !(quarterNo >= 1 && quarterNo <= 4)) {
@@ -155,12 +159,9 @@ export async function POST(
       const kpi = kpiRows[0];
 
       // Resolve the actor's stage role from their committee position and their
-      // system role. Both come from the DB keyed by actorId — a role asserted
-      // in the request body is ignored, so a caller cannot claim admin and
-      // reverse a locked record.
-      const position = actorId
-        ? await resolvePosition(conn, actorId, kpi.committeeId)
-        : null;
+      // system role. Both come from the DB keyed by the session's facultyId,
+      // so a caller can neither claim admin nor act as someone else.
+      const position = await resolvePosition(conn, actorId, kpi.committeeId);
       const isAdmin = (await resolveSystemRole(conn, actorId)) === "admin";
       const stageRoles = resolveStageRoles(position, isAdmin);
 
@@ -216,11 +217,25 @@ export async function POST(
       );
       const approvalId = idRows[0].id;
 
+      // The audit trail records the *human who clicked*, not the identity they
+      // were acting as. While an admin is impersonating, the transition is
+      // authorised by the impersonated person's position (that is what
+      // actingStage above resolved), but recording only them would make the
+      // log say someone approved something they never touched.
       await conn.query(
         `INSERT INTO perf_kpi_approval_event
            (approval_id, actor_id, actor_name, actor_role, action, from_state, to_state, comment)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [approvalId, actorId, actorName, actingStage, action, fromState, toState, comment],
+        [
+          approvalId,
+          actor.realFacultyId,
+          actor.impersonating ? `${actor.realName} (as ${actorName})` : actorName,
+          actingStage,
+          action,
+          fromState,
+          toState,
+          comment,
+        ],
       );
 
       await conn.commit();
@@ -234,9 +249,12 @@ export async function POST(
     const data = await loadApproval(params.id, yearNo, quarterNo);
     return NextResponse.json(data);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to update approval" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        { error: err instanceof Error ? err.message : "Failed to update approval" },
+        { status: 500 },
+      )
     );
   }
 }

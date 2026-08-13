@@ -52,9 +52,14 @@ export function can(
   return true;
 }
 
+/** Every app role, in descending order of authority. This is the same set as
+ *  the faculty.system_role ENUM — keep the two in step (see
+ *  scripts/migrate-app-roles.mjs). */
+export const ROLES: Role[] = ["admin", "reviewer", "committee", "viewer"];
+
 // The "committee" role spans every committee position — member, lead and
 // counselor alike. The specific position comes from committee_memberships and
-// is surfaced separately (see RoleSwitcher), so this label stays generic.
+// is surfaced separately (see UserMenu), so this label stays generic.
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrator",
   reviewer: "Reviewer",

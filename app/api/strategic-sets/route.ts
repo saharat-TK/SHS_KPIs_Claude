@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import { slugify } from "@/lib/kpi/slug";
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,12 @@ export async function GET() {
     );
     return NextResponse.json(rows);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to load strategic sets" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        { error: err instanceof Error ? err.message : "Failed to load strategic sets" },
+        { status: 500 },
+      )
     );
   }
 }
@@ -153,8 +157,9 @@ async function cloneSetContents(
 
 export async function POST(req: NextRequest) {
   try {
+    const actor = await requirePermission("configure_kpis");
     const body = await req.json();
-    const { name, description, startYear, cloneFromSetId, createdBy } = body;
+    const { name, description, startYear, cloneFromSetId } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
@@ -176,7 +181,7 @@ export async function POST(req: NextRequest) {
         const [ins] = await conn.query<ResultSetHeader>(
           `INSERT INTO strategic_set (name, description, start_year, status, cloned_from_set_id, created_by)
            VALUES (?, ?, ?, 'draft', ?, ?)`,
-          [name.trim(), description?.trim() || null, start, cloneFromSetId ?? null, createdBy ?? null],
+          [name.trim(), description?.trim() || null, start, cloneFromSetId ?? null, actor.facultyId],
         );
         insertId = ins.insertId;
       } catch (err: unknown) {
@@ -210,9 +215,12 @@ export async function POST(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to create strategic set" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        { error: err instanceof Error ? err.message : "Failed to create strategic set" },
+        { status: 500 },
+      )
     );
   }
 }

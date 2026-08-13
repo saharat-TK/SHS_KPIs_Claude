@@ -1,46 +1,46 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getSessionActor } from "@/lib/auth/session";
+import { AuthProvider } from "@/lib/auth/AuthContext";
+import { AppShellClient } from "@/components/shell/AppShellClient";
 
-import { useEffect, useState } from "react";
-import { Sidebar } from "@/components/shell/Sidebar";
-import { Topbar } from "@/components/shell/Topbar";
-import { BreadcrumbLabelProvider } from "@/components/shell/BreadcrumbLabels";
+// Reads cookies via the session, so it can never be statically rendered.
+export const dynamic = "force-dynamic";
 
-const SIDEBAR_COLLAPSED_KEY = "shs-sidebar-collapsed";
-
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [navOpen, setNavOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    setSidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true");
-  }, []);
-
-  const toggleSidebarCollapsed = () => {
-    setSidebarCollapsed((collapsed) => {
-      const next = !collapsed;
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
-      return next;
-    });
-  };
+/**
+ * The one place a session enters the client tree. Every page under (app) is a
+ * client component and so cannot call auth() itself — they read the same
+ * identity through useAuth(), fed by the AuthProvider below.
+ *
+ * The redirect here is not redundant with middleware: middleware only verifies
+ * the token's signature, and cannot see that the signed-in person's faculty
+ * row has since been deactivated or deleted. getSessionActor() can.
+ */
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const actor = await getSessionActor();
+  if (!actor) redirect("/login");
 
   return (
-    <BreadcrumbLabelProvider>
-      <div className="flex min-h-screen">
-        <Sidebar
-          open={navOpen}
-          onClose={() => setNavOpen(false)}
-          collapsed={sidebarCollapsed}
-          onToggleCollapsed={toggleSidebarCollapsed}
-        />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar onMenu={() => setNavOpen(true)} />
-          <main className="flex-1 px-lg lg:px-xl py-lg">
-            <div className="mx-auto w-full max-w-canvas flex flex-col gap-lg">
-              {children}
-            </div>
-          </main>
-        </div>
-      </div>
-    </BreadcrumbLabelProvider>
+    <AuthProvider
+      initialUser={{
+        id: actor.facultyId,
+        facultyId: actor.facultyId,
+        name: actor.name,
+        email: actor.email,
+        role: actor.role,
+        committeeId: actor.committeeId ?? undefined,
+      }}
+      impersonating={actor.impersonating}
+      realName={actor.realName}
+      // The *real* role, not the effective one: while viewing as a viewer,
+      // `role` is "viewer" and the user menu would otherwise lose the control
+      // that stops the impersonation.
+      isRealAdmin={actor.realRole === "admin"}
+    >
+      <AppShellClient>{children}</AppShellClient>
+    </AuthProvider>
   );
 }

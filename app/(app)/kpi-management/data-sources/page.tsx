@@ -153,7 +153,7 @@ function DataSources() {
         onClose={() => setShowCreate(false)}
         onCreate={(input) =>
           create.mutate(
-            { ...input, createdBy: user?.facultyId },
+            input,
             {
               onSuccess: (created) => {
                 setShowCreate(false);

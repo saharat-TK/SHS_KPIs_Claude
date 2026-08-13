@@ -19,7 +19,6 @@ import {
 } from "@/lib/kpi/progress";
 import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
 import { isPeriodOpen } from "@/lib/kpi/performancePeriods";
-import { useAuth } from "@/lib/auth/AuthContext";
 import { useSaveMetricProgress } from "@/lib/data/hooks";
 import type { ApprovalState, PerformancePeriod, PerfMetric, QuarterlyTargetMode } from "@/lib/types";
 import { QuarterEntry } from "./ProgressPanel";
@@ -58,7 +57,6 @@ export function MetricProgressModal({
    *  Issue / Solution stay editable, since approval still requires them. */
   fedByName?: string | null;
 }) {
-  const { user } = useAuth();
   const save = useSaveMetricProgress(metric.id, perfKpiId);
 
   const yearTarget = targetForYear(metric.annualTargets, year);
@@ -136,8 +134,6 @@ export function MetricProgressModal({
                 ...data,
                 yearNo: year,
                 quarterNo: quarter,
-                recordedBy: user?.email,
-                actorId: user.facultyId,
               })
             }
           />

@@ -2,7 +2,7 @@
 
 import { Icon } from "@/components/ui/Icon";
 import { Breadcrumb } from "./Breadcrumb";
-import { RoleSwitcher } from "./RoleSwitcher";
+import { UserMenu } from "./UserMenu";
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   return (
@@ -28,7 +28,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <Icon name="notifications" size={22} />
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-error" />
         </button>
-        <RoleSwitcher />
+        <UserMenu />
       </div>
     </header>
   );

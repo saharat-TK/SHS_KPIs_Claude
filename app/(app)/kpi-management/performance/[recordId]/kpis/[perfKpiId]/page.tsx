@@ -32,7 +32,6 @@ import {
   useSaveKpiProgress,
   useKpiApproval,
   useCommitteeMemberships,
-  useFacultyRecords,
   useApprovalTransition,
   useKpiTypes,
 } from "@/lib/data/hooks";
@@ -105,7 +104,6 @@ function PerfKpiProgress() {
   const sourcesQ = usePerfKpiSources(perfKpiId);
   const save = useSaveKpiProgress(perfKpiId);
   const membershipsQ = useCommitteeMemberships();
-  const facultyQ = useFacultyRecords();
   const approvalTransition = useApprovalTransition(recordId);
   // Approval lock for the currently-selected quarter (defined after year/quarter).
 
@@ -166,10 +164,10 @@ function PerfKpiProgress() {
   };
   const selectedApprovalState: ApprovalState = approvalStatesByQuarter[quarter] ?? "draft";
   const selectedApprovalLock = approvalLockForState(selectedApprovalState);
-  // Admin authority comes from faculty.system_role (matching the server),
-  // not the demo persona's coarse app role — see resolveStageRoles.
-  const isSystemAdmin =
-    facultyQ.data?.find((f) => f.id === user.facultyId)?.systemRole === "admin";
+  // user.role *is* faculty.system_role now, resolved server-side per request —
+  // no faculty-query round-trip, so no window where this reads false and hides
+  // the reverse button from an admin. See resolveStageRoles.
+  const isSystemAdmin = user.role === "admin";
   const stageRoles = useMemo(() => {
     const position = resolvePositionFromMemberships(
       membershipsQ.data,
@@ -198,8 +196,6 @@ function PerfKpiProgress() {
         action,
         yearNo: year,
         quarterNo: quarter,
-        actorId: user.facultyId,
-        actorName: user.name,
         comment,
       },
     });
@@ -328,8 +324,6 @@ function PerfKpiProgress() {
                   ...data,
                   yearNo,
                   quarterNo,
-                  recordedBy: user?.email,
-                  actorId: user.facultyId,
                 })
               }
               rightColumnContent={

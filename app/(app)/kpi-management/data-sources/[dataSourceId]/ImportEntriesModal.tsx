@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Modal, Button, Badge, Table, Th, Td } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
-import { useAuth } from "@/lib/auth/AuthContext";
 import { useBulkCreateDataSourceEntries } from "@/lib/data/hooks";
 import { parseCsv } from "@/lib/csv";
 import {
@@ -57,7 +56,6 @@ export function ImportEntriesModal({
   cellLabels: Record<string, string>;
   onDownloadTemplate: () => void;
 }) {
-  const { user } = useAuth();
   const bulk = useBulkCreateDataSourceEntries();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -175,8 +173,6 @@ export function ImportEntriesModal({
             values: r.values,
             note: r.note,
           })),
-          actorId: user?.facultyId,
-          userRole: user?.role,
         },
       },
       { onSuccess: close },
