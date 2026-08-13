@@ -31,6 +31,7 @@ import {
   useDeleteLibraryKpi,
   useKpiCategories,
   useKpiTypes,
+  useCommittees,
 } from "@/lib/data/hooks";
 import {
   KPI_TYPES,
@@ -66,6 +67,7 @@ function SetDetail() {
   const kpisQ = useLibraryKpis(setId);
   const categoriesQ = useKpiCategories(setId);
   const kpiTypesQ = useKpiTypes();
+  const committeesQ = useCommittees();
   const create = useCreateLibraryKpi();
   const del = useDeleteLibraryKpi(setId);
   const confirm = useConfirm();
@@ -74,12 +76,14 @@ function SetDetail() {
   useBreadcrumbLabel(`/kpi-management/library/${setId}`, setQ.data?.name);
 
   const [cat, setCat] = useState<string>("all");
+  const [committeeFilter, setCommitteeFilter] = useState<string>("all");
   const [showCreate, setShowCreate] = useState(false);
   const [showManageCats, setShowManageCats] = useState(false);
 
   const categories = categoriesQ.data ?? [];
   const kpis = kpisQ.data ?? [];
   const kpiTypes = kpiTypesQ.data ?? [];
+  const committees = committeesQ.data ?? [];
   // Tabs group by category_id, which holds the Strategic taxonomy only —
   // routine categories would otherwise show up as permanently-empty tabs.
   const strategicCategories = categoriesOfType(categories, "strategic");
@@ -88,18 +92,29 @@ function SetDetail() {
     KPI_TYPES.find((t) => t.id === id)?.label ??
     id;
 
+  // Committee narrows the KPI pool first; the category tabs (and their
+  // counts) operate on that narrowed set, same as the dashboard's KPI-type
+  // toggle scopes its group tabs.
+  const committeeScoped =
+    committeeFilter === "all"
+      ? kpis
+      : kpis.filter((k) => k.committeeId === committeeFilter);
+
   const tabs = [
-    { id: "all", label: "All", count: kpis.length },
+    { id: "all", label: "All", count: committeeScoped.length },
     ...strategicCategories.map((c) => ({
       id: c.id,
       label: c.label,
-      count: kpis.filter((k) => k.categoryId === c.id).length,
+      count: committeeScoped.filter((k) => k.categoryId === c.id).length,
     })),
   ];
 
   const rows = useMemo(
-    () => (cat === "all" ? kpis : kpis.filter((k) => k.categoryId === cat)),
-    [kpis, cat],
+    () =>
+      cat === "all"
+        ? committeeScoped
+        : committeeScoped.filter((k) => k.categoryId === cat),
+    [committeeScoped, cat],
   );
 
   const set = setQ.data;
@@ -151,6 +166,23 @@ function SetDetail() {
           </>
         }
       />
+
+      <div className="flex items-end gap-md">
+        <Field label="Committee">
+          <Select
+            value={committeeFilter}
+            onChange={(e) => setCommitteeFilter(e.target.value)}
+            className="w-auto min-w-[200px]"
+          >
+            <option value="all">All Committees</option>
+            {committees.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
 
       <Tabs items={tabs} active={cat} onChange={setCat} />
 

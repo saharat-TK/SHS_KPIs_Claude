@@ -32,6 +32,7 @@ import {
   useSyncPerformanceRecord,
   useRecomputeFromDataSources,
   useRecordApprovals,
+  useCommittees,
 } from "@/lib/data/hooks";
 import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
 import { categoriesOfType } from "@/lib/kpi/categories";
@@ -83,6 +84,7 @@ function PerformanceRecordDetail() {
   const record = recordQ.data;
   const categoriesQ = useKpiCategories(record?.sourceSetId, { enabled: !!record });
   const kpiTypesQ = useKpiTypes();
+  const committeesQ = useCommittees();
   const periodsQ = usePerformancePeriods(recordId);
   const sync = useSyncPerformanceRecord();
   const recompute = useRecomputeFromDataSources();
@@ -90,6 +92,7 @@ function PerformanceRecordDetail() {
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
 
   const [cat, setCat] = useState<string>("all");
+  const [committeeFilter, setCommitteeFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortState | null>(null);
   // Drives both the Annual Target / Current Progress columns and the approval
   // lookups below; the quarter selector stays approval-only.
@@ -99,6 +102,13 @@ function PerformanceRecordDetail() {
   const categories = categoriesQ.data ?? [];
   const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
   const kpiTypes = useMemo(() => kpiTypesQ.data ?? [], [kpiTypesQ.data]);
+  const committees = committeesQ.data ?? [];
+  // The closed <select> box truncates a long committee name, so the full name
+  // rides on a title tooltip instead of being lost.
+  const committeeFilterLabel =
+    committeeFilter === "all"
+      ? "All Committees"
+      : (committees.find((c) => c.id === committeeFilter)?.name ?? "All Committees");
   const typeLabel = (id: string) =>
     kpiTypes.find((t) => t.id === id)?.kpiTypeName ??
     KPI_TYPES.find((t) => t.id === id)?.label ??
@@ -131,19 +141,31 @@ function PerformanceRecordDetail() {
     .filter(Boolean)
     .join(" · ");
 
+  // Committee narrows the KPI pool first; the category tabs (and their
+  // counts) operate on that narrowed set.
+  const committeeScoped = useMemo(
+    () =>
+      committeeFilter === "all"
+        ? kpis
+        : kpis.filter((k) => k.committeeId === committeeFilter),
+    [kpis, committeeFilter],
+  );
   // Tabs group by category_id, which holds the Strategic taxonomy only —
   // routine categories would otherwise show up as permanently-empty tabs.
   const tabs = [
-    { id: "all", label: "All", count: kpis.length },
+    { id: "all", label: "All", count: committeeScoped.length },
     ...categoriesOfType(categories, "strategic").map((c) => ({
       id: c.id,
       label: c.label,
-      count: kpis.filter((k) => k.categoryId === c.id).length,
+      count: committeeScoped.filter((k) => k.categoryId === c.id).length,
     })),
   ];
   const rows = useMemo(
-    () => (cat === "all" ? kpis : kpis.filter((k) => k.categoryId === cat)),
-    [kpis, cat],
+    () =>
+      cat === "all"
+        ? committeeScoped
+        : committeeScoped.filter((k) => k.categoryId === cat),
+    [committeeScoped, cat],
   );
   const approvalLockForKpi = useCallback((kpiId: number) => {
     const selectedLock = approvalLockForState(
@@ -290,35 +312,61 @@ function PerformanceRecordDetail() {
             )}
           </div>
         </div>
-        {/* flex-nowrap: Year and Quarter must stay on one row at every width —
-            their combined min-width comfortably clears a 375px viewport. */}
-        <div className="flex flex-nowrap items-end gap-md lg:justify-end">
-          <Field label="Year">
+        {/* shrink-0: without it, the long "Recording open: ..." sibling eats
+            the row's width first (default flex-shrink), squeezing this
+            cluster below its one-line content width and forcing Committee to
+            wrap even when there's plenty of room for all three fields. */}
+        <div className="flex flex-wrap items-end gap-md shrink-0 lg:justify-end">
+          <Field label="Committee">
             <Select
-              value={String(selectedYear)}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="min-w-[160px] rounded-xl"
+              value={committeeFilter}
+              onChange={(e) => setCommitteeFilter(e.target.value)}
+              // !w-[...]: an arbitrary-value width utility doesn't reliably
+              // beat the shared Select base's w-full in this build's cascade
+              // order (unlike a named utility such as w-auto) — !important
+              // makes the override unconditional.
+              className="!w-[150px] truncate rounded-xl"
+              title={committeeFilterLabel}
             >
-              {[1, 2, 3, 4, 5].map((yearNo) => (
-                <option key={yearNo} value={yearNo}>
-                  {record ? `Year ${yearNo} · ${record.startYear + yearNo - 1}` : `Year ${yearNo}`}
+              <option value="all">All Committees</option>
+              {committees.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label="Quarter">
-            <Select
-              value={String(approvalQuarter)}
-              onChange={(e) => setApprovalQuarter(Number(e.target.value))}
-              className="min-w-[120px] rounded-xl"
-            >
-              {[1, 2, 3, 4].map((quarterNo) => (
-                <option key={quarterNo} value={quarterNo}>
-                  Quarter {quarterNo}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {/* flex-nowrap: Year and Quarter must stay paired on one row at
+              every width, even if Committee wraps to its own line above
+              them. */}
+          <div className="flex flex-nowrap items-end gap-md">
+            <Field label="Year">
+              <Select
+                value={String(selectedYear)}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="w-auto min-w-[110px] rounded-xl"
+              >
+                {[1, 2, 3, 4, 5].map((yearNo) => (
+                  <option key={yearNo} value={yearNo}>
+                    {record ? `Year ${yearNo} · ${record.startYear + yearNo - 1}` : `Year ${yearNo}`}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Quarter">
+              <Select
+                value={String(approvalQuarter)}
+                onChange={(e) => setApprovalQuarter(Number(e.target.value))}
+                className="w-auto min-w-[90px] rounded-xl"
+              >
+                {[1, 2, 3, 4].map((quarterNo) => (
+                  <option key={quarterNo} value={quarterNo}>
+                    Quarter {quarterNo}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
         </div>
       </div>
 
