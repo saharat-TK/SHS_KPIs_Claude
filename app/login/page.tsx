@@ -1,6 +1,7 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/lib/auth/auth";
-import { Icon } from "@/components/ui/Icon";
+import styles from "./login.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,26 @@ const ERROR_COPY: Record<string, { title: string; message: string }> = {
   },
 };
 
+function SignalField() {
+  return (
+    <svg
+      aria-hidden="true"
+      className={styles.signalField}
+      viewBox="0 0 1000 800"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <path className={styles.signalPath} d="M-80 612 238 454 430 550 724 246 1080 118" />
+      <path className={styles.signalPathMuted} d="M-72 228 230 356 452 202 696 360 1064 220" />
+      <path className={styles.signalPathMuted} d="M118 842 326 634 554 704 808 488 1060 594" />
+      <circle className={`${styles.signalNode} ${styles.signalNodeOne}`} cx="238" cy="454" r="7" />
+      <circle className={`${styles.signalNode} ${styles.signalNodeTwo}`} cx="452" cy="202" r="5" />
+      <circle className={`${styles.signalNode} ${styles.signalNodeThree}`} cx="808" cy="488" r="6" />
+      <circle className={`${styles.signalPulse} ${styles.signalPulseOne}`} cx="430" cy="550" r="5" />
+      <circle className={`${styles.signalPulse} ${styles.signalPulseTwo}`} cx="696" cy="360" r="5" />
+    </svg>
+  );
+}
+
 export default async function LoginPage({
   searchParams,
 }: {
@@ -45,52 +66,86 @@ export default async function LoginPage({
     : null;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-lg">
-      <div className="w-full max-w-[420px] flex flex-col gap-lg">
-        <div className="flex flex-col gap-xs">
-          <p className="text-utility-xs uppercase tracking-wider text-[#8a8a8a]">
-            MFU · School of Health Sciences
-          </p>
-          <h1 className="text-title-lg text-white">KPI System</h1>
-          <p className="text-body-sm text-[#8a8a8a]">
-            Sign in with your university account to continue.
-          </p>
-        </div>
+    <main className={styles.page}>
+      <SignalField />
 
-        {error && (
-          <div
-            role="alert"
-            className="flex gap-sm rounded-DEFAULT border border-error/40 bg-error/10 p-md"
-          >
-            <Icon name="error" size={20} className="mt-tiny shrink-0 text-error" />
-            <div className="flex flex-col gap-tiny">
-              <p className="text-label-md text-white">{error.title}</p>
-              <p className="text-caption-sm text-[#b0b0b0]">{error.message}</p>
-            </div>
+      <div className={styles.layout}>
+        <section className={styles.brandSection} aria-labelledby="login-title">
+          <div className={styles.brandLockup}>
+            <Image
+              className={styles.logo}
+              src="/shs-logo.png"
+              alt="School of Health Sciences"
+              width={774}
+              height={1017}
+              priority
+            />
+            <p className={styles.schoolName}>Mae Fah Luang University · School of Health Sciences</p>
           </div>
-        )}
 
-        <form
-          action={async () => {
-            "use server";
-            // signIn throws NEXT_REDIRECT to navigate — never wrap this in a
-            // try/catch that swallows it.
-            await signIn("google", { redirectTo: callbackUrl });
-          }}
-        >
-          <button
-            type="submit"
-            className="flex h-[44px] w-full items-center justify-center gap-sm rounded-DEFAULT border border-[#272727] bg-[#111] px-md text-label-md text-white transition-colors hover:border-[#3a3a3a] hover:bg-[#161616]"
-          >
-            Continue with Google
-          </button>
-        </form>
+          <div className={styles.brandCopy}>
+            <p className={styles.systemLabel}>Health Sciences Analytics</p>
+            <h1 id="login-title" className={styles.title}>KPI System</h1>
+            <p className={styles.description}>
+              A focused workspace for KPI planning, performance, and reporting.
+            </p>
+          </div>
 
-        <p className="text-caption-sm text-[#6a6a6a]">
-          Use your @mfu.ac.th account. Access follows the faculty roster — your
-          role and committee positions come from it.
-        </p>
+          <p className={styles.brandNote}>
+            Faculty access is governed by the current SHS roster.
+          </p>
+        </section>
+
+        <section className={styles.accessSection} aria-labelledby="access-title">
+          <div className={styles.loginPanel}>
+            <div className={styles.panelHeading}>
+              <p className={styles.panelLabel}>Secure faculty access</p>
+              <h2 id="access-title" className={styles.panelTitle}>Continue to your workspace</h2>
+              <p className={styles.panelDescription}>
+                Sign in with your university Google account to continue.
+              </p>
+            </div>
+
+            {error && (
+              <div id="sign-in-error" role="alert" className={styles.errorAlert}>
+                <span aria-hidden="true" className={styles.errorMarker}>!</span>
+                <div>
+                  <p className={styles.errorTitle}>{error.title}</p>
+                  <p className={styles.errorMessage}>{error.message}</p>
+                </div>
+              </div>
+            )}
+
+            <form
+              className={styles.signInForm}
+              action={async () => {
+                "use server";
+                // signIn throws NEXT_REDIRECT to navigate — never wrap this in
+                // a try/catch that swallows it.
+                await signIn("google", { redirectTo: callbackUrl });
+              }}
+            >
+              <button
+                type="submit"
+                className={styles.googleButton}
+                aria-describedby={error ? "sign-in-error" : undefined}
+              >
+                <span aria-hidden="true" className={styles.googleGlyph}>G</span>
+                Continue with Google
+              </button>
+            </form>
+
+            <p className={styles.accessNote}>
+              Use your @mfu.ac.th account. Your role and committee positions follow the faculty roster.
+            </p>
+          </div>
+        </section>
       </div>
+
+      <footer className={styles.footer}>
+        <p>© 2026 School of Health Sciences, Mae Fah Luang University</p>
+        <p>Designed by Saharat Arreeras</p>
+      </footer>
     </main>
   );
 }

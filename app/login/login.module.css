@@ -1,0 +1,513 @@
+/* Hallmark · pre-emit critique: P5 H4 E5 S5 R5 V4
+ * genre: modern-minimal · macrostructure: Split Studio · tone: technical
+ * theme: SHS system light · anchor hue: SHS green · enrichment: CSS signal field
+ */
+
+:global(html):has(.page),
+:global(body):has(.page) {
+  overflow-x: clip;
+}
+
+.page {
+  --color-page: #f9f9f9;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f3f3f4;
+  --color-surface-strong: #e8e8e8;
+  --color-ink: #1a1c1c;
+  --color-muted: #424936;
+  --color-faint: #757575;
+  --color-line: #c1cab1;
+  --color-line-strong: #727a64;
+  --color-primary: #416900;
+  --color-primary-dark: #284400;
+  --color-primary-soft: #aff74e;
+  --color-error: #e52020;
+  --color-error-surface: #ffdad6;
+  --color-focus: #0046a4;
+  --font-login: var(--font-hanken), var(--font-noto-thai), system-ui, sans-serif;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --radius-panel: 1.25rem;
+  --radius-control: 0.75rem;
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  min-height: 100dvh;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: clip;
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-login);
+}
+
+.signalField {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--color-primary);
+  pointer-events: none;
+}
+
+.signalPath,
+.signalPathMuted {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.signalPath {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  opacity: 0.2;
+}
+
+.signalPathMuted {
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.1;
+}
+
+.signalNode,
+.signalPulse {
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.signalNode {
+  opacity: 0.45;
+}
+
+.signalNodeOne {
+  animation: node-shift-one 12s var(--ease-in-out) infinite;
+}
+
+.signalNodeTwo {
+  animation: node-shift-two 15s var(--ease-in-out) infinite;
+}
+
+.signalNodeThree {
+  animation: node-shift-three 13s var(--ease-in-out) infinite;
+}
+
+.signalPulse {
+  opacity: 0;
+}
+
+.signalPulseOne {
+  animation: signal-pulse 9s var(--ease-in-out) infinite;
+}
+
+.signalPulseTwo {
+  animation: signal-pulse 11s var(--ease-in-out) 2s infinite;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.brandSection,
+.accessSection {
+  min-width: 0;
+}
+
+.brandSection {
+  display: flex;
+  min-height: 57dvh;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-10);
+  padding: clamp(var(--space-6), 7vw, var(--space-16));
+  padding-bottom: var(--space-10);
+}
+
+.brandLockup {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.logo {
+  width: clamp(3.75rem, 9vw, 6.5rem);
+  height: auto;
+  flex: none;
+  filter: drop-shadow(0 12px 22px color-mix(in srgb, var(--color-primary-dark) 15%, transparent));
+}
+
+.schoolName,
+.systemLabel,
+.panelLabel {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.065em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.schoolName {
+  max-width: 24ch;
+  padding-top: var(--space-1);
+}
+
+.brandCopy {
+  max-width: 39rem;
+  animation: enter var(--dur-long) var(--ease-out) both;
+}
+
+.systemLabel {
+  color: var(--color-primary);
+}
+
+.title {
+  max-width: 10ch;
+  margin: var(--space-3) 0 0;
+  font-size: clamp(3.25rem, 8vw, 6.25rem);
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: -0.065em;
+  line-height: 0.94;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  max-width: 35ch;
+  margin: var(--space-5) 0 0;
+  color: var(--color-muted);
+  font-size: clamp(1rem, 1.25vw, 1.125rem);
+  line-height: 1.55;
+}
+
+.brandNote {
+  max-width: 35ch;
+  margin: 0;
+  color: var(--color-faint);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.accessSection {
+  display: grid;
+  align-items: center;
+  padding: var(--space-6);
+}
+
+.loginPanel {
+  width: min(100%, 30rem);
+  margin-inline: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background-color: var(--color-surface);
+  box-shadow: 0 24px 48px color-mix(in srgb, var(--color-primary-dark) 10%, transparent);
+  padding: clamp(var(--space-6), 5vw, var(--space-10));
+  animation: panel-settle var(--dur-long) var(--ease-out) both;
+}
+
+.panelHeading {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.panelLabel {
+  color: var(--color-primary);
+}
+
+.panelTitle {
+  max-width: 16ch;
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.panelDescription,
+.accessNote {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.errorAlert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-control);
+  background-color: var(--color-error-surface);
+  color: var(--color-ink);
+  padding: var(--space-4);
+}
+
+.errorMarker {
+  display: grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+  place-items: center;
+  border: 1px solid var(--color-error);
+  border-radius: 50%;
+  color: var(--color-error);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.errorTitle,
+.errorMessage {
+  margin: 0;
+}
+
+.errorTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.errorMessage {
+  margin-top: var(--space-1);
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.signInForm {
+  margin-top: var(--space-8);
+}
+
+.googleButton {
+  display: inline-flex;
+  min-height: 3rem;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background-color: var(--color-primary);
+  color: var(--color-surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color var(--dur-short) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .googleButton:hover {
+    background-color: var(--color-primary-dark);
+    transform: translateY(-1px);
+  }
+}
+
+.googleButton:active {
+  transform: translateY(1px);
+}
+
+.googleButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.googleButton:disabled {
+  background-color: var(--color-surface-strong);
+  border-color: var(--color-line);
+  color: var(--color-faint);
+  cursor: not-allowed;
+}
+
+.googleGlyph {
+  display: inline-grid;
+  width: 1.375rem;
+  height: 1.375rem;
+  place-items: center;
+  border-radius: 50%;
+  background-color: var(--color-surface);
+  color: var(--color-primary-dark);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.accessNote {
+  margin-top: var(--space-5);
+  color: var(--color-faint);
+  font-size: 0.8125rem;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-inline: clamp(var(--space-6), 7vw, var(--space-16));
+  border-top: 1px solid var(--color-line);
+  color: var(--color-faint);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding-block: var(--space-5);
+}
+
+.footer p {
+  margin: 0;
+}
+
+@media (min-width: 60rem) {
+  .layout {
+    grid-template-columns: minmax(0, 7fr) minmax(22rem, 5fr);
+  }
+
+  .brandSection {
+    min-height: 0;
+    border-inline-end: 1px solid var(--color-line);
+  }
+
+  .accessSection {
+    padding: clamp(var(--space-8), 5vw, var(--space-16));
+  }
+
+  .footer {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: var(--space-6);
+  }
+}
+
+@media (min-width: 90rem) {
+  .brandSection {
+    padding-inline-end: clamp(var(--space-12), 12vw, 12rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brandCopy,
+  .loginPanel {
+    animation: enter-reduced 150ms linear both;
+  }
+
+  .signalNode,
+  .signalPulse {
+    animation: none;
+  }
+
+  .googleButton {
+    transition-duration: 150ms;
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes panel-settle {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes enter-reduced {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes node-shift-one {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translate(0, 0);
+  }
+
+  45% {
+    opacity: 0.8;
+    transform: translate(9rem, -4.5rem);
+  }
+}
+
+@keyframes node-shift-two {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translate(0, 0);
+  }
+
+  48% {
+    opacity: 0.72;
+    transform: translate(7.5rem, 3.75rem);
+  }
+}
+
+@keyframes node-shift-three {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translate(0, 0);
+  }
+
+  52% {
+    opacity: 0.75;
+    transform: translate(8rem, -4rem);
+  }
+}
+
+@keyframes signal-pulse {
+  0%,
+  35%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+
+  44% {
+    opacity: 0.5;
+    transform: scale(1.8);
+  }
+
+  58% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
