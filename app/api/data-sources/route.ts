@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { DATA_SOURCE_FROM, DATA_SOURCE_SELECT } from "@/lib/kpi/dataSourcesServer";
+import {
+  requireActor,
+  requirePermission,
+  actorErrorResponse,
+} from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    await requireActor();
     const committeeId = req.nextUrl.searchParams.get("committeeId");
     const status = req.nextUrl.searchParams.get("status");
 
@@ -29,15 +35,19 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json(rows);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to load data sources" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        { error: err instanceof Error ? err.message : "Failed to load data sources" },
+        { status: 500 },
+      )
     );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
+    const actor = await requirePermission("configure_kpis");
     const b = await req.json();
     const name = (b.name as string)?.trim();
     if (!name) {
@@ -56,7 +66,7 @@ export async function POST(req: NextRequest) {
         b.description?.trim() || null,
         b.committeeId,
         periodGrain,
-        b.createdBy ?? null,
+        actor.facultyId,
       ],
     );
 
@@ -66,9 +76,12 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json(created[0], { status: 201 });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to create data source" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        { error: err instanceof Error ? err.message : "Failed to create data source" },
+        { status: 500 },
+      )
     );
   }
 }

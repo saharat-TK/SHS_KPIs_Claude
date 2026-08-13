@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,9 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
+    // COLUMN_MAP includes systemRole, so this endpoint grants app access.
+    // Unauthenticated, it was a one-request path to admin.
+    await requirePermission("manage_faculty");
     const body = await req.json();
     const setClauses: string[] = [];
     const values: unknown[] = [];
@@ -53,9 +57,15 @@ export async function PATCH(
     );
     return NextResponse.json(rows[0]);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to update faculty member" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        {
+          error:
+            err instanceof Error ? err.message : "Failed to update faculty member",
+        },
+        { status: 500 },
+      )
     );
   }
 }
@@ -65,6 +75,7 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("manage_faculty");
     const [result] = await pool.query<ResultSetHeader>(
       "DELETE FROM faculty WHERE id = ?",
       [params.id],
@@ -76,9 +87,15 @@ export async function DELETE(
 
     return NextResponse.json({ id: params.id });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to remove faculty member" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        {
+          error:
+            err instanceof Error ? err.message : "Failed to remove faculty member",
+        },
+        { status: 500 },
+      )
     );
   }
 }

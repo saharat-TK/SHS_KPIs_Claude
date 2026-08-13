@@ -32,7 +32,6 @@ export function EntriesTable({
   entries,
   canRecord,
   dataSourceId,
-  actor,
   cellLabels,
   query,
   onEdit,
@@ -42,7 +41,6 @@ export function EntriesTable({
   entries: DataSourceEntry[];
   canRecord: boolean;
   dataSourceId: number;
-  actor: { actorId?: string; userRole?: string };
   cellLabels: Record<string, string>;
   query: string;
   onEdit: (entry: DataSourceEntry) => void;
@@ -264,7 +262,7 @@ export function EntriesTable({
                           tone: "danger",
                           confirmLabel: "Delete",
                         });
-                        if (ok) remove.mutate({ dataSourceId, entryId: e.id, actor });
+                        if (ok) remove.mutate({ dataSourceId, entryId: e.id });
                       }}
                       className="grid h-7 w-7 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
                     >

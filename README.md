@@ -3,10 +3,9 @@
 A practical, role-aware KPI management & analytics application for the MFU School
 of Health Sciences. Built with **Next.js 14 (App Router) + TypeScript + Tailwind**.
 
-This is **Phase 1**: a fully interactive app running on a seeded in-memory data
-layer. No backend is required to run or demo it. The data access is hidden behind
-a typed repository seam so Phase 2 can drop in a real backend (Firebase / Supabase /
-Postgres) without changing the UI.
+Sign-in is **Google OAuth**, restricted to active faculty. Most pages are backed
+by MySQL; a few prototype routes still read the seeded in-memory store behind the
+typed repository seam in `lib/data/repositories.ts`.
 
 > The original Stitch mockups that this app was built from are preserved under
 > [`design-reference/`](design-reference/). The page-relationship analysis is in
@@ -43,12 +42,14 @@ source of confusion:
 
 | Axis | Values | Source of truth |
 |---|---|---|
-| **App role** — page and nav access | `admin`, `reviewer`, `committee`, `viewer` | `MATRIX` in [`lib/auth/can.ts`](lib/auth/can.ts) |
+| **App role** — page and nav access | `admin`, `reviewer`, `committee`, `viewer` | `faculty.system_role`, checked against `MATRIX` in [`lib/auth/can.ts`](lib/auth/can.ts) |
 | **Stage role** — approval workflow actions | `member`, `lead`, `counselor`, `admin` | `committee_memberships.position`, resolved by [`lib/kpi/approvalWorkflow.ts`](lib/kpi/approvalWorkflow.ts) |
 
-A demo **persona switcher** lives in the top-right (no login in Phase 1). The
-three committee personas all carry role `committee` and differ only by their
-committee position — that is what gives them different workflow powers.
+Both axes are read server-side from the database on every request by
+`getSessionActor()` ([`lib/auth/session.ts`](lib/auth/session.ts)), never from
+anything the client sends. Administrators get a **View as** control in the user
+menu for testing the workflow as another person; it round-trips through the
+server, so the API authorizes exactly what the UI shows.
 
 ### App role → page access
 
@@ -61,8 +62,9 @@ committee position — that is what gives them different workflow powers.
 | Record performance (approvals queue) | ✓ | ✓ | ✓ | — |
 | Manage faculty / committees / export | ✓ | view | view | view |
 
-Gated nav items and action buttons appear/disappear as you switch personas;
-gated routes show an "access restricted" state.
+Gated nav items and action buttons appear and disappear with the signed-in
+person's role; gated routes show an "access restricted" state. The same policy
+is enforced server-side, so hiding a button is a convenience, not the control.
 
 ### Committee position → workflow actions
 
@@ -92,8 +94,7 @@ Two things worth knowing:
   gains `reverse`; see `resolveStageRoles`. An administrator with no committee
   position can only `reverse`, and cannot submit, forward or approve.
 - **Admin authority is read server-side** from `faculty.system_role`, never
-  from anything the client sends. Run `npm run migrate:admin-system-role` once
-  to seed the administrator row.
+  from anything the client sends.
 
 ## Architecture
 
@@ -102,9 +103,13 @@ app/(app)/*           Routes (dashboard chrome via app/(app)/layout.tsx)
 components/ui/*        Design-system primitives (Button, Card, Table, Modal, …)
 components/shell/*     Sidebar, Topbar, Breadcrumb, RoleSwitcher, route Guard
 lib/types.ts          Domain types
-lib/auth/*            Mock auth context + can() policy
+lib/auth/auth.config.ts   Edge-safe Auth.js config (no DB — middleware builds on it)
+lib/auth/auth.ts          Google provider + the faculty-roster allowlist
+lib/auth/session.ts       getSessionActor / requireActor / requirePermission
+lib/auth/can.ts           The role → action policy matrix
+middleware.ts         Coarse "is there a session" gate
 lib/data/seed.ts      Seed dataset
-lib/data/store.ts     In-memory store (Phase 1 only)
+lib/data/store.ts     In-memory store (remaining prototype pages only)
 lib/data/repositories.ts  The swap seam — typed async data functions
 lib/data/hooks.ts     TanStack Query hooks consumed by pages
 lib/formula.ts        Sandboxed mathjs formula validator
@@ -113,13 +118,34 @@ lib/formula.ts        Sandboxed mathjs formula validator
 Design tokens (the Material palette, type scale, spacing) were ported from the
 mockups' inline Tailwind config into [`tailwind.config.ts`](tailwind.config.ts).
 
-## Phase 2 (deferred)
+## Authentication
 
-1. Pick a backend (Firebase / Supabase / Postgres+Prisma).
-2. Reimplement the function bodies in `lib/data/repositories.ts` against it — the
-   signatures and every consuming hook/component stay the same. Delete
-   `lib/data/store.ts`.
-3. Replace `lib/auth/AuthContext.tsx` with real auth + session-derived roles, and
-   enforce `can()` server-side.
-4. Migrate `lib/data/seed.ts` into the database.
+Sign-in is Google OAuth via Auth.js v5, with a JWT session cookie and no database
+adapter.
+
+**Who may sign in.** Only an address matching an `active` row in `faculty`. There
+is no auto-provisioning: an unknown `@mfu.ac.th` account is refused with
+`AccessDenied`. Deactivating someone in Faculty Management revokes their access on
+their next request, even though their token is still valid. `faculty.email` is
+uniquely indexed and is the login key.
+
+**Setup.** Copy the `AUTH_*` block from `.env.example` into `.env.local`
+(`npx auth secret` generates `AUTH_SECRET`), and register the redirect URI
+`http://localhost:3000/api/auth/callback/google` in the Google Cloud Console.
+
+**Two rules worth knowing before changing any of this:**
+
+1. `middleware.ts` runs on the **edge runtime**, so it builds its Auth.js instance
+   from `lib/auth/auth.config.ts` — which must never import the MySQL pool. It can
+   only answer "is there a valid session cookie". Every role check belongs in a
+   route, via `requireActor()` / `requirePermission()`.
+2. `session.user.role` is stamped at sign-in and can be up to 8h stale. It is for
+   display. **`getSessionActor()` is the authority** — it re-reads the faculty row
+   per request, so a role change takes effect immediately.
+
+## Still deferred
+
+1. Move the remaining prototype pages (`/kpis`, `/metrics`, `/formulas/*`,
+   `/validation`) off `lib/data/store.ts` onto MySQL.
+2. Migrate `lib/data/seed.ts` into the database.
 # SHS_KPIs_Claude

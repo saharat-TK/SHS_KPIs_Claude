@@ -6,6 +6,7 @@ import { unitNeedsDivisor, kpiValueFromVariables } from "@/lib/kpi/progress";
 import { KPI_QUARTER_PROGRESS_FIELDS } from "@/lib/kpi/fields";
 import { getApprovalState, resolvePosition, resolveSystemRole } from "@/lib/kpi/approvalServer";
 import { approvalLockForState, resolveStageRoles } from "@/lib/kpi/approvalWorkflow";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export async function PUT(
   { params }: { params: { id: string } },
 ) {
   try {
+    const actor = await requirePermission("record_performance");
     const b = await req.json();
     const yearNo = Number(b.yearNo);
     const quarterNo = Number(b.quarterNo);
@@ -69,12 +71,10 @@ export async function PUT(
     // (and its metrics') is read-only until it is sent back or reversed.
     const approvalState = await getApprovalState(pool, params.id, yearNo, quarterNo);
     const approvalLock = approvalLockForState(approvalState);
-    const actorId: string | null = b.actorId ?? null;
-    // Position and system role both come from the DB keyed by actorId; a role
-    // asserted in the request body is ignored.
-    const position = actorId
-      ? await resolvePosition(pool, actorId, kpiRows[0].committeeId)
-      : null;
+    // Identity comes from the session; position and system role are then read
+    // from the DB against it. Nothing about the actor is taken from the body.
+    const actorId: string = actor.facultyId;
+    const position = await resolvePosition(pool, actorId, kpiRows[0].committeeId);
     const isAdmin = (await resolveSystemRole(pool, actorId)) === "admin";
     const stageRoles = resolveStageRoles(position, isAdmin);
     const canLeadEditSubmitted =
@@ -156,9 +156,12 @@ export async function PUT(
     );
     return NextResponse.json(rows);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to save progress" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        { error: err instanceof Error ? err.message : "Failed to save progress" },
+        { status: 500 },
+      )
     );
   }
 }

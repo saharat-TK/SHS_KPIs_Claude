@@ -58,7 +58,7 @@ export default function DataSourceDetailPage({
 }
 
 function DataSourceDetail({ id }: { id: number }) {
-  const { can, user } = useAuth();
+  const { can } = useAuth();
   const sourceQ = useDataSource(id);
   const columnsQ = useDataSourceColumns(id);
   const linksQ = useDataSourceLinks(id);
@@ -250,7 +250,6 @@ function DataSourceDetail({ id }: { id: number }) {
                     entries={entries}
                     canRecord={canRecord}
                     dataSourceId={id}
-                    actor={{ actorId: user?.facultyId, userRole: user?.role }}
                     cellLabels={cellLabels}
                     query={findData}
                     onEdit={setEditing}

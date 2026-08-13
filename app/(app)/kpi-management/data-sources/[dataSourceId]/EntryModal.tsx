@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Button, Field, Input, RadioGroup, Select } from "@/components/ui";
-import { useAuth } from "@/lib/auth/AuthContext";
 import {
   useAcademicCatalog,
   useBulkCreateDataSourceEntries,
@@ -62,7 +61,6 @@ export function EntryModal({
   /** Rows already recorded, so a batch can flag one it would repeat. */
   entries?: DataSourceEntry[];
 }) {
-  const { user } = useAuth();
   const create = useCreateDataSourceEntry();
   const update = useUpdateDataSourceEntry();
   const bulk = useBulkCreateDataSourceEntries();
@@ -143,8 +141,6 @@ export function EntryModal({
     : yearValid && requiredFilled;
   const submitting = create.isPending || update.isPending || bulk.isPending;
 
-  const actor = { actorId: user?.facultyId, userRole: user?.role };
-
   const submitBatch = () => {
     bulk.mutate(
       {
@@ -156,7 +152,6 @@ export function EntryModal({
             values: toPayload(row.locked, row.values, columns),
             note: row.note.trim() || null,
           })),
-          ...actor,
         },
       },
       { onSuccess: onClose },
@@ -175,7 +170,6 @@ export function EntryModal({
       quarter: batchQuarter,
       values: payloadValues,
       note: note.trim() || null,
-      ...actor,
     };
 
     if (entry) {

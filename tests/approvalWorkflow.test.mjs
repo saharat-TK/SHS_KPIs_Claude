@@ -144,6 +144,22 @@ test("resolveStageRoles makes admin additive, not a replacement", () => {
   assert.deepEqual(resolveStageRoles(null, false), []);
 });
 
+test("a viewer holds no committee position and so may act at no stage", () => {
+  // Widening faculty.system_role turned ~48 of 65 faculty into viewers — a
+  // role that had no real users before login existed. They reach the approvals
+  // queue read-only: no position, not admin, therefore no stages, therefore
+  // availableActions is empty in every state.
+  const stages = resolveStageRoles(null, false);
+  assert.deepEqual(stages, []);
+  for (const state of STATES) {
+    assert.deepEqual(
+      STAGES.flatMap((s) => (stages.includes(s) ? availableActions(s, state) : [])),
+      [],
+      `a viewer can do nothing while ${state}`,
+    );
+  }
+});
+
 // A combined "Counselor and Committee Lead" row is one person holding both
 // roles on the same committee — see diffCounselorLeadSlots in lib/kpi/committee.ts
 // for how the roster editor keeps that to a single DB row.

@@ -27,7 +27,6 @@ import { ApprovalDetailPanel, ApprovalPanelStatus } from "./ApprovalDetailPanel"
 import {
   usePerformanceRecords,
   useCommitteeMemberships,
-  useFacultyRecords,
   useRecordApprovals,
   useApprovalTransition,
 } from "@/lib/data/hooks";
@@ -135,7 +134,6 @@ function ApprovalQueue() {
   const { user } = useAuth();
   const records = usePerformanceRecords();
   const memberships = useCommitteeMemberships();
-  const faculty = useFacultyRecords();
 
   const [recordId, setRecordId] = useState(0);
   const [yearNo, setYearNo] = useState(1);
@@ -157,12 +155,11 @@ function ApprovalQueue() {
   const approvals = useRecordApprovals(activeRecord?.id ?? 0, yearNo, quarterNo);
   const transition = useApprovalTransition(activeRecord?.id ?? 0);
 
-  // Admin authority comes from faculty.system_role, exactly as the server
-  // resolves it — not from the demo persona's coarse app role. A person can
-  // be a real committee lead *and* a real admin (e.g. fac-022), and the
-  // reverse button must appear for them precisely when the server would
-  // actually grant reverse.
-  const isSystemAdmin = faculty.data?.find((f) => f.id === user.facultyId)?.systemRole === "admin";
+  // user.role *is* faculty.system_role now — resolved server-side per request
+  // by getSessionActor, so it matches what the API will actually authorize.
+  // This used to look the row up in the faculty query, which read false while
+  // that query was still loading and briefly hid the reverse button.
+  const isSystemAdmin = user.role === "admin";
 
   // Resolve every stage the acting persona may act as for a KPI's committee.
   // Admin is additive, matching the server: an administrator who also sits on
@@ -292,8 +289,6 @@ function ApprovalQueue() {
         action,
         yearNo,
         quarterNo,
-        actorId: user.facultyId,
-        actorName: user.name,
         comment,
       },
     });

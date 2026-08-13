@@ -16,3 +16,7 @@ next-env.d.ts
 
 # Real personal data (names/emails) — not for version control
 schema/Faculty_list.csv
+
+# Google OAuth client secrets — the values belong in .env.local, not on disk
+# as a downloaded JSON. See .env.example for the AUTH_* names.
+client_secret_*.json

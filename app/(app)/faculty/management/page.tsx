@@ -23,6 +23,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
+import { ROLES, ROLE_LABELS } from "@/lib/auth/can";
 import {
   useFacultyRecords,
   useCreateFacultyRecord,
@@ -175,9 +176,7 @@ function FacultyManagement() {
                     <Tr key={f.id}>
                       <Td className="font-medium">{f.name}</Td>
                       <Td>{f.rank}</Td>
-                      <Td className="text-mute">
-                        {f.systemRole[0].toUpperCase() + f.systemRole.slice(1)}
-                      </Td>
+                      <Td className="text-mute">{ROLE_LABELS[f.systemRole]}</Td>
                       <Td className="text-mute">{f.email ?? "—"}</Td>
                       <Td className="text-mute">{f.nameTh ?? "—"}</Td>
                       <Td>{f.program}</Td>
@@ -289,7 +288,7 @@ function FacultyModal({
   const [nameTh, setNameTh] = useState(existing?.nameTh ?? "");
   const [program, setProgram] = useState<Program>(existing?.program ?? "BioMed");
   const [status, setStatus] = useState<EntityStatus>(existing?.status ?? "active");
-  const [systemRole, setSystemRole] = useState<SystemRole>(existing?.systemRole ?? "user");
+  const [systemRole, setSystemRole] = useState<SystemRole>(existing?.systemRole ?? "viewer");
 
   const valid = name.trim().length > 1;
 
@@ -368,9 +367,9 @@ function FacultyModal({
           </Field>
           <Field label="System Role">
             <Select value={systemRole} onChange={(e) => setSystemRole(e.target.value as SystemRole)}>
-              {["admin", "user"].map((r) => (
+              {ROLES.map((r) => (
                 <option key={r} value={r}>
-                  {r[0].toUpperCase() + r.slice(1)}
+                  {ROLE_LABELS[r]}
                 </option>
               ))}
             </Select>

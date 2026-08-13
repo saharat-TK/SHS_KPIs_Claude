@@ -56,11 +56,11 @@ CREATE TABLE faculty (
   id          VARCHAR(20)  PRIMARY KEY,              -- e.g. "fac-001"
   name        VARCHAR(255) NOT NULL,
   `rank`      ENUM('Professor','Associate Professor','Assistant Professor','Lecturer','Support Staff') NOT NULL,
-  email       VARCHAR(255) NULL,                     -- not populated by app seed data yet
+  email       VARCHAR(255) NULL,                     -- the Google sign-in identity: a session is resolved by matching LOWER(TRIM(email)); NULL means this person cannot log in
   name_TH     VARCHAR(255) NULL,                     -- Thai-script name, not populated by app seed data yet
   program     ENUM('BioMed','EnvH','OHS','PH','Sport Science','SHS Office') NOT NULL,
-  status      ENUM('active','inactive','draft') NOT NULL DEFAULT 'active',
-  system_role ENUM('admin','user') NOT NULL DEFAULT 'user', -- app access level, not populated by app seed data yet
+  status      ENUM('active','inactive','draft') NOT NULL DEFAULT 'active',  -- only 'active' rows may sign in
+  system_role ENUM('admin','reviewer','committee','viewer') NOT NULL DEFAULT 'viewer', -- app role; the MATRIX in lib/auth/can.ts keys off this (widened from ('admin','user') by scripts/migrate-app-roles.mjs)
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -100,6 +100,9 @@ ALTER TABLE committee_memberships
 -- committee_memberships.faculty_id is already covered by the composite PK's
 -- leading column; committee_id needs its own index for the reverse lookup
 -- ("all members of committee X").
+-- faculty.email is the login key, so it must be unambiguous. MySQL permits
+-- unlimited NULLs in a UNIQUE index, so emailless service rows still insert.
 CREATE INDEX idx_membership_committee ON committee_memberships(committee_id);
+CREATE UNIQUE INDEX uq_faculty_email  ON faculty(email);
 CREATE INDEX idx_faculty_status       ON faculty(status);
 CREATE INDEX idx_committee_status     ON committees(status);

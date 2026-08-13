@@ -29,18 +29,21 @@ export async function getApprovalState(
 }
 
 /** The actor's app-level system role, straight from the DB. Absent or unknown
- *  faculty ⇒ "user". Never derived from the request body: the client used to
- *  supply its own `userRole`, which let any caller claim admin. */
+ *  faculty ⇒ "viewer", the least-privileged role. Never derived from the
+ *  request body: the client used to supply its own `userRole`, which let any
+ *  caller claim admin. */
 export async function resolveSystemRole(
   db: Db,
   facultyId: string | null,
 ): Promise<SystemRole> {
-  if (!facultyId) return "user";
+  if (!facultyId) return "viewer";
   const [rows] = await db.query<RowDataPacket[]>(
     `SELECT system_role FROM faculty WHERE id = ?`,
     [facultyId],
   );
-  return rows[0]?.system_role === "admin" ? "admin" : "user";
+  // Only the admin bit matters to the approval workflow (it grants `reverse`);
+  // the other three roles are equivalent here, so they collapse to the floor.
+  return rows[0]?.system_role === "admin" ? "admin" : "viewer";
 }
 
 /** Resolve a person's committee position for a specific committee, or null. */

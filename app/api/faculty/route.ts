@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import {
+  requireActor,
+  requirePermission,
+  actorErrorResponse,
+} from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -9,20 +14,28 @@ const SELECT_FIELDS =
 
 export async function GET() {
   try {
+    // Every role may read the roster (view_faculty), so signed-in is enough.
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${SELECT_FIELDS} FROM faculty ORDER BY id`,
     );
     return NextResponse.json(rows);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to load faculty" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        { error: err instanceof Error ? err.message : "Failed to load faculty" },
+        { status: 500 },
+      )
     );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
+    // Creating a faculty row also sets its system_role, i.e. it grants app
+    // access — admin-only, same as editing one.
+    await requirePermission("manage_faculty");
     const body = await req.json();
     const { name, rank, email, nameTh, program, status, systemRole } = body;
 
@@ -55,7 +68,7 @@ export async function POST(req: NextRequest) {
           nameTh ?? null,
           program,
           status ?? "active",
-          systemRole ?? "user",
+          systemRole ?? "viewer",
         ],
       );
 
@@ -73,9 +86,15 @@ export async function POST(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to create faculty member" },
-      { status: 500 },
+    return (
+      actorErrorResponse(err) ??
+      NextResponse.json(
+        {
+          error:
+            err instanceof Error ? err.message : "Failed to create faculty member",
+        },
+        { status: 500 },
+      )
     );
   }
 }

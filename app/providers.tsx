@@ -6,16 +6,16 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { AuthProvider } from "@/lib/auth/AuthContext";
 import { ToastProvider, ConfirmProvider, useToast } from "@/components/ui";
 
+// AuthProvider is deliberately *not* here: it needs a signed-in user, and this
+// wraps /login too. It lives in app/(app)/layout.tsx, which resolves the
+// session server-side before rendering anything that needs it.
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <ConfirmProvider>
-        <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </QueryProvider>
+        <QueryProvider>{children}</QueryProvider>
       </ConfirmProvider>
     </ToastProvider>
   );

@@ -9,7 +9,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { ResultSetHeader } from "mysql2";
-import type { Role } from "@/lib/types";
 import {
   checkEntryWriteAccess,
   errorResponse,
@@ -22,6 +21,7 @@ import {
   validateEntryValues,
 } from "@/lib/kpi/dataSources";
 import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
+import { requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,7 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
+    const actor = await requireActor();
     const b = await req.json();
     const rows = Array.isArray(b.rows) ? b.rows : [];
 
@@ -51,8 +52,8 @@ export async function POST(
     const denied = await checkEntryWriteAccess(
       pool,
       source,
-      b.actorId ?? null,
-      b.userRole as Role | undefined,
+      actor.facultyId,
+      actor.role,
     );
     if (denied) return NextResponse.json({ error: denied }, { status: 403 });
 
@@ -81,7 +82,7 @@ export async function POST(
             period.quarter,
             JSON.stringify(cells),
             row.note?.trim() || null,
-            b.actorId ?? null,
+            actor.facultyId,
           ];
         } catch (err) {
           // The client previews with the same rules, so reaching here means the

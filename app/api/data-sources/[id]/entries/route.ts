@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
-import type { Role } from "@/lib/types";
 import {
   ENTRY_FROM,
   ENTRY_SELECT,
@@ -13,6 +12,7 @@ import {
 } from "@/lib/kpi/dataSourcesServer";
 import { normalizeEntryPeriod, validateEntryValues } from "@/lib/kpi/dataSources";
 import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
+import { requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +21,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const year = req.nextUrl.searchParams.get("year");
     const quarter = req.nextUrl.searchParams.get("quarter");
 
@@ -52,6 +53,7 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
+    const actor = await requireActor();
     const b = await req.json();
 
     const source = await loadSourceShape(pool, params.id);
@@ -68,8 +70,8 @@ export async function POST(
     const denied = await checkEntryWriteAccess(
       pool,
       source,
-      b.actorId ?? null,
-      b.userRole as Role | undefined,
+      actor.facultyId,
+      actor.role,
     );
     if (denied) return NextResponse.json({ error: denied }, { status: 403 });
 
@@ -97,7 +99,7 @@ export async function POST(
           quarter,
           JSON.stringify(values),
           b.note?.trim() || null,
-          b.actorId ?? null,
+          actor.facultyId,
         ],
       );
       insertId = ins.insertId;

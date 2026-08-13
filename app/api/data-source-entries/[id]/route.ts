@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
-import type { Role } from "@/lib/types";
 import {
   ENTRY_FROM,
   ENTRY_SELECT,
@@ -11,6 +10,7 @@ import {
   mapEntryRow,
   resolveColumnOptions,
 } from "@/lib/kpi/dataSourcesServer";
+import { requireActor } from "@/lib/auth/session";
 import { normalizeEntryPeriod, validateEntryValues } from "@/lib/kpi/dataSources";
 import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
 
@@ -31,6 +31,7 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
+    const actor = await requireActor();
     const b = await req.json();
 
     const source = await sourceForEntry(params.id);
@@ -41,8 +42,8 @@ export async function PATCH(
     const denied = await checkEntryWriteAccess(
       pool,
       source,
-      b.actorId ?? null,
-      b.userRole as Role | undefined,
+      actor.facultyId,
+      actor.role,
     );
     if (denied) return NextResponse.json({ error: denied }, { status: 403 });
 
@@ -99,17 +100,19 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
-    // DELETE carries no body in the repo's fetch helpers, so the actor comes
-    // through the query string instead.
-    const actorId = req.nextUrl.searchParams.get("actorId");
-    const userRole = req.nextUrl.searchParams.get("userRole") as Role | undefined;
+    const actor = await requireActor();
 
     const source = await sourceForEntry(params.id);
     if (!source) {
       return NextResponse.json({ error: "Entry not found" }, { status: 404 });
     }
 
-    const denied = await checkEntryWriteAccess(pool, source, actorId, userRole);
+    const denied = await checkEntryWriteAccess(
+      pool,
+      source,
+      actor.facultyId,
+      actor.role,
+    );
     if (denied) return NextResponse.json({ error: denied }, { status: 403 });
 
     const conn = await pool.getConnection();
