@@ -23,7 +23,7 @@ import {
   UNCATEGORISED,
 } from "../lib/kpi/dashboard.ts";
 import { valueAsOfQuarter } from "../lib/kpi/progress.ts";
-import { subKpiDensity } from "../app/(app)/_dashboard/subKpiDensity.ts";
+import { subKpiDensity } from "../app/(app)/dashboard/_dashboard/subKpiDensity.ts";
 
 // A leaf KPI shaped like the perf-kpis payload. `progress` rows carry only the
 // fields the dashboard reads.

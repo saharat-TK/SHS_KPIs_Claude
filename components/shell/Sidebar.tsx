@@ -56,7 +56,7 @@ export function Sidebar({
           )}
         >
           <Link
-            href="/"
+            href="/dashboard"
             onClick={onClose}
             aria-label="Dashboard"
             title={collapsed ? "Health Sciences Analytics Platform" : undefined}

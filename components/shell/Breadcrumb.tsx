@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useBreadcrumbLabels } from "./BreadcrumbLabels";
 
 const LABELS: Record<string, string> = {
-  "": "Dashboard",
+  dashboard: "Dashboard",
   committee: "Committees",
   faculty: "Faculty Roster",
   export: "Roster Export",
@@ -32,10 +32,14 @@ export function Breadcrumb() {
   const overrides = useBreadcrumbLabels();
   const segments = pathname.split("/").filter(Boolean);
 
+  // The dashboard is the app's root view, so it doubles as the leading crumb.
+  // On /dashboard itself that would otherwise render as "Dashboard › Dashboard".
+  const rest = segments[0] === "dashboard" ? [] : segments;
+
   const crumbs = [
-    { href: "/", label: "Home" },
-    ...segments.map((seg, i) => {
-      const href = "/" + segments.slice(0, i + 1).join("/");
+    { href: "/dashboard", label: LABELS.dashboard },
+    ...rest.map((seg, i) => {
+      const href = "/" + rest.slice(0, i + 1).join("/");
       return { href, label: overrides[href] ?? LABELS[seg] ?? seg };
     }),
   ];
