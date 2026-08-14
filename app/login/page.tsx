@@ -13,7 +13,7 @@ const ERROR_COPY: Record<string, { title: string; message: string }> = {
   AccessDenied: {
     title: "That account isn’t on the faculty roster",
     message:
-      "Sign-in is limited to active School of Health Sciences faculty. If you " +
+      "Sign-in is limited to active School of Health Science faculty. If you " +
       "should have access, ask the SHS Office to add your mfu.ac.th address to " +
       "the faculty roster.",
   },
@@ -75,16 +75,16 @@ export default async function LoginPage({
             <Image
               className={styles.logo}
               src="/shs-logo.png"
-              alt="School of Health Sciences"
+              alt="School of Health Science"
               width={774}
               height={1017}
               priority
             />
-            <p className={styles.schoolName}>Mae Fah Luang University · School of Health Sciences</p>
+            <p className={styles.schoolName}>Mae Fah Luang University · School of Health Science</p>
           </div>
 
           <div className={styles.brandCopy}>
-            <p className={styles.systemLabel}>Health Sciences Analytics</p>
+            <p className={styles.systemLabel}>Health Science Analytics</p>
             <h1 id="login-title" className={styles.title}>KPI System</h1>
             <p className={styles.description}>
               A focused workspace for KPI planning, performance, and reporting.
@@ -143,7 +143,7 @@ export default async function LoginPage({
       </div>
 
       <footer className={styles.footer}>
-        <p>© 2026 School of Health Sciences, Mae Fah Luang University</p>
+        <p>© 2026 School of Health Science, Mae Fah Luang University</p>
         <p>Designed by Saharat Arreeras</p>
       </footer>
     </main>
