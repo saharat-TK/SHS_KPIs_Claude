@@ -58,7 +58,7 @@ export default async function LoginPage({
 }: {
   searchParams: { error?: string; callbackUrl?: string };
 }) {
-  const callbackUrl = searchParams.callbackUrl ?? "/";
+  const callbackUrl = searchParams.callbackUrl ?? "/dashboard";
   if (await auth()) redirect(callbackUrl);
 
   const error = searchParams.error

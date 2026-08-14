@@ -24,7 +24,7 @@ Other scripts: `npm run build`, `npm run start`, `npm run lint`, `npm run typech
 
 | Route | Page |
 |---|---|
-| `/` | Overview dashboard (KPI health by category, at-risk KPIs, review queue) |
+| `/dashboard` | Overview dashboard (KPI health by category, at-risk KPIs, review queue). `/` redirects here. |
 | `/analytics/student-success` | Deep-dive: quarter filters, trend + bar charts, departmental breakdown |
 | `/committee` | Committees & their faculty rosters |
 | `/faculty` | Global faculty roster — search / filter / sort / paginate / add |
