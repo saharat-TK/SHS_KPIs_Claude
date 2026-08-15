@@ -188,6 +188,71 @@ export function Dashboard() {
   const openKpi = (kpiId: number) =>
     record && router.push(`/kpi-management/performance/${record.id}/kpis/${kpiId}`);
 
+  // Split out so the single-group tab can arrange them three-across while
+  // "All Groups" keeps its own two-row pairing — same cards, different rows.
+  const achievementByQuarterCard = (
+    <Card className="animate-fade-up shadow-chrome !border-0">
+      <CardHeader
+        title="Achievement by Quarter"
+        subtitle={`Year ${year}${record ? ` · ${yearForYearNo(record.startYear, year)}` : ""} — % of each quarter's target, averaged`}
+      />
+      <CardBody className="pt-0">
+        <AchievementTrendChart data={trend.rows} xKey="quarter" lines={trend.lines} />
+      </CardBody>
+    </Card>
+  );
+
+  const recordingStatusCard = (
+    <Card className="animate-fade-up shadow-chrome !border-0 [animation-delay:60ms]">
+      <CardHeader title="Recording Status" subtitle={`Year ${year} · as of Q${quarter}`} />
+      <CardBody className="pt-0">
+        {recording.total === 0 ? (
+          <EmptyState title="Nothing to record" />
+        ) : (
+          <RecordingDonut
+            data={recordingSlices(recording)}
+            centre={
+              <>
+                <span className="text-display-md leading-none text-on-surface tabular-nums">
+                  <CountUp value={recording.pctThisQuarter ?? 0} suffix="%" />
+                </span>
+                <span className="text-caption-sm text-mute">recorded this quarter</span>
+              </>
+            }
+          />
+        )}
+      </CardBody>
+    </Card>
+  );
+
+  const fiveYearTrajectoryCard = (
+    <Card className="animate-fade-up shadow-chrome !border-0 [animation-delay:60ms]">
+      <CardHeader
+        title="Five-Year Trajectory"
+        subtitle={`Achievement at Q${quarter} of each year, against the 100% target line`}
+      />
+      <CardBody className="pt-0">
+        <TargetVsActualChart data={byYear} />
+      </CardBody>
+    </Card>
+  );
+
+  // byCategory always covers every group, so it would contradict a
+  // single-group tab — it belongs to the All view only.
+  const byGroupCard = byCategory.length > 0 && (
+    <Card className="animate-fade-up shadow-chrome !border-0">
+      <CardHeader
+        // The grouping axis follows the type, so the title has to as well —
+        // routine KPIs are plotted by ด้านที่ area here, not by strategic category.
+        title={activeType === "routine" ? "By Routine Area" : "By Strategic Group"}
+        subtitle="Average achievement of each group, coloured by its worst KPI"
+      />
+      <CardBody className="pt-0">
+        <GroupAchievementChart data={byCategory} />
+      </CardBody>
+    </Card>
+  );
+
   return (
     <>
       <PageHeader
@@ -289,78 +354,26 @@ export function Dashboard() {
               />
             )}
 
-            <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_340px]">
-              <Card className="animate-fade-up">
-                <CardHeader
-                  title="Achievement by Quarter"
-                  subtitle={`Year ${year}${record ? ` · ${yearForYearNo(record.startYear, year)}` : ""} — % of each quarter's target, averaged`}
-                />
-                <CardBody className="pt-0">
-                  <AchievementTrendChart data={trend.rows} xKey="quarter" lines={trend.lines} />
-                </CardBody>
-              </Card>
+            {activeGroup === "all" ? (
+              <>
+                <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_340px]">
+                  {achievementByQuarterCard}
+                  {recordingStatusCard}
+                </div>
+                <div className="grid grid-cols-1 gap-md lg:grid-cols-2">
+                  {byGroupCard}
+                  {fiveYearTrajectoryCard}
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-1 gap-md lg:grid-cols-3">
+                {achievementByQuarterCard}
+                {recordingStatusCard}
+                {fiveYearTrajectoryCard}
+              </div>
+            )}
 
-              <Card className="animate-fade-up [animation-delay:60ms]">
-                <CardHeader
-                  title="Recording Status"
-                  subtitle={`Year ${year} · as of Q${quarter}`}
-                />
-                <CardBody className="pt-0">
-                  {recording.total === 0 ? (
-                    <EmptyState title="Nothing to record" />
-                  ) : (
-                    <RecordingDonut
-                      data={recordingSlices(recording)}
-                      centre={
-                        <>
-                          <span className="text-display-md leading-none text-on-surface tabular-nums">
-                            <CountUp value={recording.pctThisQuarter ?? 0} suffix="%" />
-                          </span>
-                          <span className="text-caption-sm text-mute">recorded this quarter</span>
-                        </>
-                      }
-                    />
-                  )}
-                </CardBody>
-              </Card>
-            </div>
-
-            <div
-              className={
-                activeGroup === "all"
-                  ? "grid grid-cols-1 gap-md lg:grid-cols-2"
-                  : "grid grid-cols-1 gap-md"
-              }
-            >
-              {/* byCategory always covers every group, so it would contradict a
-                  single-group tab. It belongs to the All view only. */}
-              {activeGroup === "all" && byCategory.length > 0 && (
-                <Card className="animate-fade-up">
-                  <CardHeader
-                    // The grouping axis follows the type, so the title has to as
-                    // well — routine KPIs are plotted by ด้านที่ area here, not
-                    // by strategic category.
-                    title={activeType === "routine" ? "By Routine Area" : "By Strategic Group"}
-                    subtitle="Average achievement of each group, coloured by its worst KPI"
-                  />
-                  <CardBody className="pt-0">
-                    <GroupAchievementChart data={byCategory} />
-                  </CardBody>
-                </Card>
-              )}
-
-              <Card className="animate-fade-up [animation-delay:60ms]">
-                <CardHeader
-                  title="Five-Year Trajectory"
-                  subtitle={`Achievement at Q${quarter} of each year, against the 100% target line`}
-                />
-                <CardBody className="pt-0">
-                  <TargetVsActualChart data={byYear} />
-                </CardBody>
-              </Card>
-            </div>
-
-            <Card className="overflow-hidden animate-fade-up">
+            <Card className="overflow-hidden animate-fade-up shadow-chrome !border-0">
               <CardHeader
                 title="KPI Detail"
                 subtitle={`${statuses.length} KPI(s) · Year ${year} as of Q${quarter}`}
@@ -385,7 +398,7 @@ export function Dashboard() {
               />
             </Card>
 
-            <Card className="overflow-hidden animate-fade-up">
+            <Card className="overflow-hidden animate-fade-up shadow-chrome !border-0">
               <CardHeader
                 title="Issues & Remedies"
                 subtitle={`${issues.length} recorded · Year ${year} through Q${quarter}`}
