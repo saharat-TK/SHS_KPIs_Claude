@@ -47,8 +47,20 @@ function ScorecardTile({
   const muted = tint?.muted ?? "text-mute";
 
   return (
-    <Card className={cn("flex flex-col gap-md p-md", tint?.card)}>
-      <h3 className={cn("text-heading-md uppercase", muted)}>{row.label}</h3>
+    <Card className={cn("flex flex-col gap-md p-md !border-0", tint?.card)}>
+      <div className="flex items-center justify-between gap-md">
+        <h3 className={cn("text-heading-md uppercase", muted)}>{row.label}</h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconRight="chevron_right"
+          onClick={onSelect}
+          aria-label={`View ${row.label}`}
+          className="shrink-0"
+        >
+          View group
+        </Button>
+      </div>
 
       <div className="flex flex-col gap-md lg:flex-row lg:items-start">
         {/* Column 1 — the two summary readings. They routinely disagree (a group
@@ -97,19 +109,6 @@ function ScorecardTile({
             onOpenKpi={onOpenKpi}
             layout="row"
           />
-        </div>
-
-        {/* Column 3 — the drill-through. */}
-        <div className="lg:shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            iconRight="chevron_right"
-            onClick={onSelect}
-            aria-label={`View ${row.label}`}
-          >
-            View group
-          </Button>
         </div>
       </div>
     </Card>

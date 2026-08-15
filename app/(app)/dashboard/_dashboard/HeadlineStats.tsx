@@ -69,7 +69,7 @@ export function HeadlineStats({
               : `all ${targets.total} gradable`,
           direction: "flat",
         }}
-        className="animate-fade-up"
+        className="animate-fade-up shadow-chrome !border-0"
       />
       <StatCard
         label="Avg Achievement"
@@ -81,7 +81,7 @@ export function HeadlineStats({
         animate
         tone={headlineAverageTone}
         delta={{ value: `${summary.withData} KPI(s) with data`, direction: "flat" }}
-        className="animate-fade-up [animation-delay:60ms]"
+        className="animate-fade-up shadow-chrome !border-0 [animation-delay:60ms]"
       />
       <StatCard
         label="Recorded This Quarter"
@@ -98,7 +98,7 @@ export function HeadlineStats({
               : `${recording.carried} carried · ${recording.missing} missing`,
           direction: recording.missing > 0 ? "down" : "flat",
         }}
-        className="animate-fade-up [animation-delay:120ms]"
+        className="animate-fade-up shadow-chrome !border-0 [animation-delay:120ms]"
       />
       <StatCard
         label="At Risk"
@@ -113,7 +113,7 @@ export function HeadlineStats({
           // "at-risk count climbing", which is the opposite of the news.
           direction: summary.atRisk > 0 ? "down" : "flat",
         }}
-        className="animate-fade-up [animation-delay:180ms]"
+        className="animate-fade-up shadow-chrome !border-0 [animation-delay:180ms]"
       />
     </div>
   );
