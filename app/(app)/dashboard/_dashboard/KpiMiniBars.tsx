@@ -112,7 +112,7 @@ function CompactDetailTile({
         className="h-full w-full min-w-0 animate-fade-up rounded-lg text-left transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:hover:scale-100"
         style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
       >
-        <Card className="flex h-full flex-col gap-tiny p-md !border-0 !bg-cyan-50 shadow-md transition-shadow hover:shadow-lg">
+        <Card className="flex h-full flex-col gap-tiny p-md !border-0 shadow-md transition-[box-shadow,background-color] hover:shadow-lg hover:!bg-cyan-50">
           <span className="text-utility-xs uppercase text-mute">K{index + 1}</span>
           <span className="line-clamp-2 text-caption-sm font-normal text-on-surface">{status.name}</span>
           <div className="mt-auto flex flex-col gap-tiny">
@@ -147,7 +147,7 @@ function CompactTile({
         className="h-full w-full min-w-0 animate-fade-up rounded-lg text-left transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:hover:scale-100"
         style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
       >
-        <Card className="flex h-full flex-col gap-tiny p-xs !border-0 !bg-cyan-50 shadow-md transition-shadow hover:shadow-lg">
+        <Card className="flex h-full flex-col gap-tiny p-xs !border-0 shadow-md transition-[box-shadow,background-color] hover:shadow-lg hover:!bg-cyan-50">
           <span className="line-clamp-3 text-caption-sm text-on-surface">{status.name}</span>
           <div className="mt-auto flex flex-col gap-tiny">
             <span className="self-end text-body-sm font-bold tabular-nums text-on-surface lg:text-[25px] lg:leading-none">
