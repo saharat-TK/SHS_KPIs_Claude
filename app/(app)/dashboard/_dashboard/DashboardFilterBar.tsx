@@ -43,35 +43,41 @@ export function DashboardFilterBar({
             onChange={onTypeChange}
             ariaLabel="KPI type"
             selectionStyle="sliding"
+            className="h-[28px]"
           />
         </div>
-        <Field label="Year">
-          <Select
-            value={String(year)}
-            onChange={(e) => onChange({ year: Number(e.target.value) })}
-            className="h-[28px] min-w-[180px] rounded-lg"
-          >
-            {Array.from({ length: PERFORMANCE_YEAR_COUNT }, (_, i) => i + 1).map((y) => (
-              <option key={y} value={y}>
-                {startYear ? `Year ${y} · ${yearForYearNo(startYear, y)}` : `Year ${y}`}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Quarter">
-          <Select
-            value={String(quarter)}
-            onChange={(e) => onChange({ quarter: Number(e.target.value) })}
-            className="h-[28px] min-w-[150px] rounded-lg"
-          >
-            {[1, 2, 3, 4].map((q) => (
-              <option key={q} value={q}>
-                Quarter {q}
-                {openQuarters.includes(q) ? " · open" : ""}
-              </option>
-            ))}
-          </Select>
-        </Field>
+
+        <div aria-hidden="true" className="hidden self-stretch border-l border-hairline lg:block" />
+
+        <div className="flex flex-wrap items-end gap-md">
+          <Field label="Year">
+            <Select
+              value={String(year)}
+              onChange={(e) => onChange({ year: Number(e.target.value) })}
+              className="h-[28px] min-w-[180px] rounded-lg"
+            >
+              {Array.from({ length: PERFORMANCE_YEAR_COUNT }, (_, i) => i + 1).map((y) => (
+                <option key={y} value={y}>
+                  {startYear ? `Year ${y} · ${yearForYearNo(startYear, y)}` : `Year ${y}`}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Quarter">
+            <Select
+              value={String(quarter)}
+              onChange={(e) => onChange({ quarter: Number(e.target.value) })}
+              className="h-[28px] min-w-[150px] rounded-lg"
+            >
+              {[1, 2, 3, 4].map((q) => (
+                <option key={q} value={q}>
+                  Quarter {q}
+                  {openQuarters.includes(q) ? " · open" : ""}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
       </div>
       <p className="flex items-center gap-sm text-caption-sm text-mute lg:pb-sm">
         <Icon name="history" size={16} className="text-stone" />

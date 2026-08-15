@@ -274,6 +274,7 @@ export function Dashboard() {
               ]}
               active={activeGroup}
               onChange={(g) => setFilters({ group: g })}
+              className="rounded-lg !border-b-0 bg-surface-lowest px-sm shadow-chrome"
             />
 
             <HeadlineStats targets={targets} summary={summary} recording={recording} />
