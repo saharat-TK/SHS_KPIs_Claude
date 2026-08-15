@@ -54,7 +54,6 @@ import { DEFAULT_KPI_TYPE, useDashboardFilters } from "./useDashboardFilters";
 import { HeadlineStats } from "./HeadlineStats";
 import { KpiDetailTable } from "./KpiDetailTable";
 import { IssuesTable } from "./IssuesTable";
-import { KpiMiniBars } from "./KpiMiniBars";
 import { StrategyScorecards } from "./StrategyScorecards";
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
@@ -279,18 +278,15 @@ export function Dashboard() {
 
             <HeadlineStats targets={targets} summary={summary} recording={recording} />
 
-            {/* On "All Groups" the scorecards are the way into a strategy; inside
-                one, the same space shows that group's own KPIs. */}
-            {activeGroup === "all" ? (
-              byCategoryDetail.length > 0 && (
-                <StrategyScorecards
-                  rows={byCategoryDetail}
-                  onSelect={(g) => setFilters({ group: g })}
-                  onOpenKpi={openKpi}
-                />
-              )
-            ) : (
-              <KpiMiniBars statuses={statuses} onOpenKpi={openKpi} />
+            {/* Scorecards are the way into a strategy on "All Groups"; inside one,
+                the KPI Detail table below already covers that group's KPIs, so
+                nothing else renders here. */}
+            {activeGroup === "all" && byCategoryDetail.length > 0 && (
+              <StrategyScorecards
+                rows={byCategoryDetail}
+                onSelect={(g) => setFilters({ group: g })}
+                onOpenKpi={openKpi}
+              />
             )}
 
             <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_340px]">
