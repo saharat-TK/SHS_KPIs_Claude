@@ -11,6 +11,7 @@ import {
   kpiStatusAsOf,
   kpisInGroup,
   pickActiveRecord,
+  quarterOverQuarterDelta,
   quarterSeries,
   statusesAsOf,
   summarize,
@@ -336,6 +337,25 @@ test("quarterSeries adds a line per group once more than one is in scope", () =>
   assert.equal(rows[3].overall, 75);
   assert.equal(rows[3].g_research_output, 100);
   assert.equal(rows[3].g_student_success, 50);
+});
+
+test("quarterOverQuarterDelta is null for Q1 — no prior quarter in the year", () => {
+  const kpis = [kpi({ id: 1, progress: [q(1, 1, 80), q(1, 2, 90)] })];
+  const { rows } = quarterSeries(kpis, CATEGORIES, 1);
+  assert.equal(quarterOverQuarterDelta(rows, 1), null);
+});
+
+test("quarterOverQuarterDelta is the rounded difference between adjacent quarters", () => {
+  const kpis = [kpi({ id: 1, progress: [q(1, 1, 100), q(1, 2, 80)] })];
+  const { rows } = quarterSeries(kpis, CATEGORIES, 1);
+  assert.equal(quarterOverQuarterDelta(rows, 2), rows[1].overall - rows[0].overall);
+});
+
+test("quarterOverQuarterDelta is null when the prior quarter has no data", () => {
+  const kpis = [kpi({ id: 1, progress: [q(1, 3, 90)] })];
+  const { rows } = quarterSeries(kpis, CATEGORIES, 1);
+  assert.equal(rows[1].overall, undefined); // nothing recorded by Q2
+  assert.equal(quarterOverQuarterDelta(rows, 3), null);
 });
 
 test("yearSeries spans the record and labels calendar years from startYear", () => {

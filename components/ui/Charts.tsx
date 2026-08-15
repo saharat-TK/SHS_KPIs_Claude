@@ -213,22 +213,77 @@ export function CategoryBarChart({
 // These all speak achievement percent, so they share a dashed 100% reference
 // line: above it the target is met, below it is not.
 
+/** Dark tooltip for the dashboard's data-point tooltips — AchievementTrendChart,
+ *  DonutChart (RecordingDonut/HealthDonut), and TargetVsActualChart. Every
+ *  other chart in this file keeps the shared light TOOLTIP above. */
+const TOOLTIP_DARK = {
+  contentStyle: {
+    fontSize: 12,
+    borderRadius: 8,
+    border: "none",
+    boxShadow: "0 4px 16px 0 rgba(0,0,0,0.25)",
+    background: INK,
+    color: "#ffffff",
+  },
+  labelStyle: { color: "#ffffff", fontWeight: 700 },
+  itemStyle: { color: "#ffffff" },
+} as const;
+
+/** X-axis tick for AchievementTrendChart that pills-and-bolds the value
+ *  matching `activeKey` (the currently selected quarter), everything else
+ *  rendering as a plain axis label. */
+function ActiveQuarterTick({
+  x,
+  y,
+  payload,
+  activeKey,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+  activeKey?: string;
+}) {
+  const value = payload?.value ?? "";
+  const active = activeKey != null && value === activeKey;
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      {active && (
+        <rect x={-16} y={2} width={32} height={16} rx={8} fill={PRIMARY_BRIGHT} fillOpacity={0.22} />
+      )}
+      <text
+        x={0}
+        y={14}
+        textAnchor="middle"
+        fontSize={11}
+        fontWeight={active ? 700 : 400}
+        fill={active ? PRIMARY : MUTE}
+      >
+        {value}
+      </text>
+    </g>
+  );
+}
+
 /**
  * Achievement over the quarters of a year. The first series is filled with a
- * fading gradient so the overall trend reads behind the per-group lines.
+ * diagonal hatch pattern so the overall trend reads behind the per-group lines.
  */
 export function AchievementTrendChart({
   data,
   xKey,
   lines,
+  activeKey,
   height = 260,
 }: {
   data: Record<string, string | number>[];
   xKey: string;
   lines: { key: string; label: string }[];
+  /** The x value (e.g. "Q3") to highlight on the axis — the quarter currently
+   *  selected elsewhere on the page. Omit to highlight nothing. */
+  activeKey?: string;
   height?: number;
 }) {
-  const gradientId = useId();
+  const hatchId = useId();
   return (
     <ChartReveal height={height} replay={data}>
       <ResponsiveContainer width="100%" height={height}>
@@ -237,15 +292,21 @@ export function AchievementTrendChart({
           margin={{ top: 8, right: 12, bottom: 0, left: -14 }}
         >
           <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={PRIMARY_BRIGHT} stopOpacity={0.28} />
-              <stop offset="100%" stopColor={PRIMARY_BRIGHT} stopOpacity={0} />
-            </linearGradient>
+            <pattern
+              id={hatchId}
+              patternUnits="userSpaceOnUse"
+              width={7}
+              height={7}
+              patternTransform="rotate(45)"
+            >
+              <rect width={7} height={7} fill={PRIMARY_BRIGHT} fillOpacity={0.08} />
+              <line x1={0} y1={0} x2={0} y2={7} stroke={PRIMARY_BRIGHT} strokeOpacity={0.4} strokeWidth={2} />
+            </pattern>
           </defs>
           <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey={xKey}
-            tick={AXIS}
+            tick={<ActiveQuarterTick activeKey={activeKey} />}
             tickLine={false}
             axisLine={{ stroke: GRID }}
           />
@@ -256,7 +317,7 @@ export function AchievementTrendChart({
             tickFormatter={asPercent}
             width={46}
           />
-          <Tooltip {...TOOLTIP} formatter={(v: number) => `${v}%`} />
+          <Tooltip {...TOOLTIP_DARK} formatter={(v: number) => `${v}%`} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <ReferenceLine y={100} stroke={PRIMARY} strokeDasharray="4 4" />
           {lines.map((l, i) =>
@@ -268,7 +329,7 @@ export function AchievementTrendChart({
                 name={l.label}
                 stroke={SERIES[0]}
                 strokeWidth={2.5}
-                fill={`url(#${gradientId})`}
+                fill={`url(#${hatchId})`}
                 dot={{ r: 2.5, strokeWidth: 0, fill: SERIES[0] }}
                 activeDot={{ r: 5 }}
                 connectNulls
@@ -381,7 +442,7 @@ function DonutChart<K extends string>({
       <div className="relative">
         <ResponsiveContainer width="100%" height={height}>
           <PieChart>
-            <Tooltip {...TOOLTIP} />
+            <Tooltip {...TOOLTIP_DARK} />
             <Pie
               data={drawn}
               dataKey="value"
@@ -474,7 +535,7 @@ export function TargetVsActualChart({
             width={46}
           />
           <Tooltip
-            {...TOOLTIP}
+            {...TOOLTIP_DARK}
             cursor={{ fill: "#f3f3f4" }}
             formatter={(v: number) => `${v}%`}
           />
