@@ -51,11 +51,9 @@ export function KpiDetailTable({
   const row = (s: KpiStatus) => (
     <Tr key={s.kpiId} onClick={() => onOpenKpi(s.kpiId)}>
       <Td className="font-medium">{s.name}</Td>
-      {!sectioned && (
-        <Td className="text-mute">
-          {groups.find((g) => g.id === (s.categoryId ?? UNCATEGORISED))?.label ?? "—"}
-        </Td>
-      )}
+      <Td align="right">
+        {s.annualTarget == null ? "—" : `${formatNumber(s.annualTarget, 2)} ${s.unit ?? ""}`}
+      </Td>
       <Td align="right">
         {s.quarterTarget == null ? "—" : `${formatNumber(s.quarterTarget, 2)} ${s.unit ?? ""}`}
       </Td>
@@ -82,7 +80,7 @@ export function KpiDetailTable({
       <thead>
         <tr>
           <Th>KPI</Th>
-          {!sectioned && <Th>Group</Th>}
+          <Th align="right">Annual Target</Th>
           <Th align="right">Q{quarter} Target</Th>
           <Th align="right">Value</Th>
           <Th>Achievement</Th>
@@ -95,7 +93,7 @@ export function KpiDetailTable({
               <Fragment key={group.id}>
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="border-b border-hairline bg-surface-soft px-lg py-xs text-label-md font-bold uppercase text-on-surface"
                   >
                     {group.label}
