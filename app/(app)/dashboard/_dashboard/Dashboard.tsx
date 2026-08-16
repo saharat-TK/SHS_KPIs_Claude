@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -55,6 +55,7 @@ import { HeadlineStats } from "./HeadlineStats";
 import { KpiDetailTable } from "./KpiDetailTable";
 import { IssuesTable } from "./IssuesTable";
 import { StrategyScorecards } from "./StrategyScorecards";
+import { DashboardKpiDrawer } from "./DashboardKpiDrawer";
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
   active: "success",
@@ -181,8 +182,8 @@ export function Dashboard() {
     );
   }
 
-  const openKpi = (kpiId: number) =>
-    record && router.push(`/kpi-management/performance/${record.id}/kpis/${kpiId}`);
+  const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null);
+  const openKpi = (kpiId: number) => setSelectedKpiId(kpiId);
 
   // Split into consts (rather than inlined below) only so JSX order stays
   // easy to scan next to the rest of the render.
@@ -405,6 +406,14 @@ export function Dashboard() {
               />
               <IssuesTable rows={issues} onOpenKpi={openKpi} />
             </Card>
+
+            <DashboardKpiDrawer
+              kpiId={selectedKpiId}
+              recordId={record?.id ?? 0}
+              year={year}
+              quarter={quarter}
+              onClose={() => setSelectedKpiId(null)}
+            />
           </>
         )}
       </QueryBoundary>
