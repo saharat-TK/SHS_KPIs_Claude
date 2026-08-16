@@ -14,8 +14,8 @@ import {
   QueryBoundary,
   EmptyState,
   CountUp,
+  Icon,
   AchievementTrendChart,
-  GroupAchievementChart,
   RecordingDonut,
   TargetVsActualChart,
 } from "@/components/ui";
@@ -30,13 +30,13 @@ import {
 import { KPI_TYPES } from "@/lib/types";
 import {
   categoryDetail,
-  categorySeries,
   countByType,
   groupsInUse,
   kpisOfType,
   issuesAsOf,
   kpisInGroup,
   pickActiveRecord,
+  quarterOverQuarterDelta,
   quarterSeries,
   recordingMix,
   recordingSlices,
@@ -46,7 +46,7 @@ import {
   yearSeries,
   type DashboardKpi,
 } from "@/lib/kpi/dashboard";
-import { openQuartersForYear, yearForYearNo } from "@/lib/kpi/performancePeriods";
+import { openQuartersForYear } from "@/lib/kpi/performancePeriods";
 import { formatDate } from "@/lib/utils";
 import type { PerformanceRecord, PerformanceStatus } from "@/lib/types";
 import { DashboardFilterBar } from "./DashboardFilterBar";
@@ -147,10 +147,6 @@ export function Dashboard() {
     () => categoryDetail(typed, categories, year, quarter),
     [typed, categories, year, quarter],
   );
-  const byCategory = useMemo(
-    () => categorySeries(typed, categories, year, quarter),
-    [typed, categories, year, quarter],
-  );
   const byYear = useMemo(
     () => yearSeries(scoped, quarter, record?.startYear ?? 0),
     [scoped, quarter, record?.startYear],
@@ -187,6 +183,88 @@ export function Dashboard() {
 
   const openKpi = (kpiId: number) =>
     record && router.push(`/kpi-management/performance/${record.id}/kpis/${kpiId}`);
+
+  // Split into consts (rather than inlined below) only so JSX order stays
+  // easy to scan next to the rest of the render.
+  const currentQuarterAchievement = trend.rows.find((r) => r.quarter === `Q${quarter}`)?.overall;
+  const achievementDelta = quarterOverQuarterDelta(trend.rows, quarter);
+  const achievementByQuarterCard = (
+    <Card className="animate-fade-up shadow-chrome !border-0">
+      <CardHeader title="Achievement by Quarter" />
+      <CardBody className="pt-0">
+        <div className="mb-md flex flex-wrap items-end gap-sm">
+          <span className="text-display-lg font-bold leading-none text-on-surface tabular-nums">
+            {typeof currentQuarterAchievement === "number" ? (
+              <CountUp value={currentQuarterAchievement} suffix="%" />
+            ) : (
+              "—"
+            )}
+          </span>
+          {achievementDelta != null && (
+            <span className="inline-flex items-center gap-xs rounded-full bg-on-surface px-sm py-tiny text-caption-sm font-medium">
+              <Icon
+                name={achievementDelta >= 0 ? "trending_up" : "trending_down"}
+                size={14}
+                className={achievementDelta >= 0 ? "text-success" : "text-error"}
+              />
+              <span className={achievementDelta >= 0 ? "text-success" : "text-error"}>
+                {achievementDelta >= 0 ? "+" : ""}
+                {achievementDelta}%
+              </span>
+            </span>
+          )}
+          <span className="text-caption-sm text-mute">
+            {quarter === 1
+              ? "First quarter of the year"
+              : achievementDelta != null
+                ? `vs Q${quarter - 1}`
+                : "No prior data to compare"}
+          </span>
+        </div>
+        <AchievementTrendChart
+          data={trend.rows}
+          xKey="quarter"
+          lines={trend.lines}
+          activeKey={`Q${quarter}`}
+        />
+      </CardBody>
+    </Card>
+  );
+
+  const recordingStatusCard = (
+    <Card className="animate-fade-up shadow-chrome !border-0 [animation-delay:60ms]">
+      <CardHeader title="Recording Status" subtitle={`Year ${year} · as of Q${quarter}`} />
+      <CardBody className="pt-0">
+        {recording.total === 0 ? (
+          <EmptyState title="Nothing to record" />
+        ) : (
+          <RecordingDonut
+            data={recordingSlices(recording)}
+            centre={
+              <>
+                <span className="text-display-md leading-none text-on-surface tabular-nums">
+                  <CountUp value={recording.pctThisQuarter ?? 0} suffix="%" />
+                </span>
+                <span className="text-caption-sm text-mute">recorded this quarter</span>
+              </>
+            }
+          />
+        )}
+      </CardBody>
+    </Card>
+  );
+
+  const fiveYearTrajectoryCard = (
+    <Card className="animate-fade-up shadow-chrome !border-0 [animation-delay:60ms]">
+      <CardHeader
+        title="Five-Year Trajectory"
+        subtitle={`Achievement at Q${quarter} of each year, against the 100% target line`}
+      />
+      <CardBody className="pt-0">
+        <TargetVsActualChart data={byYear} />
+      </CardBody>
+    </Card>
+  );
 
   return (
     <>
@@ -289,78 +367,13 @@ export function Dashboard() {
               />
             )}
 
-            <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_340px]">
-              <Card className="animate-fade-up">
-                <CardHeader
-                  title="Achievement by Quarter"
-                  subtitle={`Year ${year}${record ? ` · ${yearForYearNo(record.startYear, year)}` : ""} — % of each quarter's target, averaged`}
-                />
-                <CardBody className="pt-0">
-                  <AchievementTrendChart data={trend.rows} xKey="quarter" lines={trend.lines} />
-                </CardBody>
-              </Card>
-
-              <Card className="animate-fade-up [animation-delay:60ms]">
-                <CardHeader
-                  title="Recording Status"
-                  subtitle={`Year ${year} · as of Q${quarter}`}
-                />
-                <CardBody className="pt-0">
-                  {recording.total === 0 ? (
-                    <EmptyState title="Nothing to record" />
-                  ) : (
-                    <RecordingDonut
-                      data={recordingSlices(recording)}
-                      centre={
-                        <>
-                          <span className="text-display-md leading-none text-on-surface tabular-nums">
-                            <CountUp value={recording.pctThisQuarter ?? 0} suffix="%" />
-                          </span>
-                          <span className="text-caption-sm text-mute">recorded this quarter</span>
-                        </>
-                      }
-                    />
-                  )}
-                </CardBody>
-              </Card>
+            <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_1fr_340px]">
+              {achievementByQuarterCard}
+              {fiveYearTrajectoryCard}
+              {recordingStatusCard}
             </div>
 
-            <div
-              className={
-                activeGroup === "all"
-                  ? "grid grid-cols-1 gap-md lg:grid-cols-2"
-                  : "grid grid-cols-1 gap-md"
-              }
-            >
-              {/* byCategory always covers every group, so it would contradict a
-                  single-group tab. It belongs to the All view only. */}
-              {activeGroup === "all" && byCategory.length > 0 && (
-                <Card className="animate-fade-up">
-                  <CardHeader
-                    // The grouping axis follows the type, so the title has to as
-                    // well — routine KPIs are plotted by ด้านที่ area here, not
-                    // by strategic category.
-                    title={activeType === "routine" ? "By Routine Area" : "By Strategic Group"}
-                    subtitle="Average achievement of each group, coloured by its worst KPI"
-                  />
-                  <CardBody className="pt-0">
-                    <GroupAchievementChart data={byCategory} />
-                  </CardBody>
-                </Card>
-              )}
-
-              <Card className="animate-fade-up [animation-delay:60ms]">
-                <CardHeader
-                  title="Five-Year Trajectory"
-                  subtitle={`Achievement at Q${quarter} of each year, against the 100% target line`}
-                />
-                <CardBody className="pt-0">
-                  <TargetVsActualChart data={byYear} />
-                </CardBody>
-              </Card>
-            </div>
-
-            <Card className="overflow-hidden animate-fade-up">
+            <Card className="overflow-hidden animate-fade-up shadow-chrome !border-0">
               <CardHeader
                 title="KPI Detail"
                 subtitle={`${statuses.length} KPI(s) · Year ${year} as of Q${quarter}`}
@@ -385,7 +398,7 @@ export function Dashboard() {
               />
             </Card>
 
-            <Card className="overflow-hidden animate-fade-up">
+            <Card className="overflow-hidden animate-fade-up shadow-chrome !border-0">
               <CardHeader
                 title="Issues & Remedies"
                 subtitle={`${issues.length} recorded · Year ${year} through Q${quarter}`}

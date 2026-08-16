@@ -47,7 +47,7 @@ export function Breadcrumb() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="flex flex-nowrap items-center gap-xs overflow-hidden text-caption-sm text-[#8a8a8a]"
+      className="flex flex-nowrap items-center gap-xs overflow-hidden text-caption-sm text-mute"
     >
       {crumbs.map((c, i) => {
         const last = i === crumbs.length - 1;
@@ -57,16 +57,16 @@ export function Breadcrumb() {
             className={cn("flex items-center gap-xs", last ? "min-w-0" : "shrink-0")}
           >
             {i > 0 && (
-              <Icon name="chevron_right" size={16} className="shrink-0 text-[#5e5e5e]" />
+              <Icon name="chevron_right" size={16} className="shrink-0 text-stone" />
             )}
             {last ? (
-              <span className="truncate max-w-[420px] font-medium text-white">
+              <span className="truncate max-w-[420px] font-semibold text-on-surface">
                 {c.label}
               </span>
             ) : (
               <Link
                 href={c.href}
-                className="whitespace-nowrap hover:text-white transition-colors"
+                className="whitespace-nowrap hover:text-on-surface transition-colors"
               >
                 {c.label}
               </Link>

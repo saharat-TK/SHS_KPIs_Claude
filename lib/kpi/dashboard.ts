@@ -532,6 +532,21 @@ export function quarterSeries(
   return { rows, lines };
 }
 
+/** Overall achievement this quarter minus the quarter before it, both read from
+ *  quarterSeries' own rows — null for Q1 (no prior quarter within this year; a
+ *  prior-year Q4 lookback is deliberately out of scope) or when either quarter
+ *  has no recorded overall value yet. */
+export function quarterOverQuarterDelta(
+  rows: Record<string, string | number>[],
+  quarterNo: number,
+): number | null {
+  if (quarterNo <= 1) return null;
+  const current = rows.find((r) => r.quarter === `Q${quarterNo}`)?.overall;
+  const previous = rows.find((r) => r.quarter === `Q${quarterNo - 1}`)?.overall;
+  if (typeof current !== "number" || typeof previous !== "number") return null;
+  return round1(current - previous);
+}
+
 export interface YearRow {
   year: string;
   yearNo: number;

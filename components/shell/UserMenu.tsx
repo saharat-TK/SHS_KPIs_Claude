@@ -75,7 +75,7 @@ export function UserMenu() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex h-[36px] items-center gap-sm rounded-DEFAULT border border-[#272727] bg-black px-md hover:border-[#3a3a3a] transition-colors"
+        className="flex h-[36px] items-center gap-sm rounded-DEFAULT px-sm hover:bg-surface-soft transition-colors"
         title={impersonating ? `Viewing as ${user.name}` : user.email}
       >
         <span
@@ -83,7 +83,7 @@ export function UserMenu() {
             "flex h-7 w-7 items-center justify-center rounded-full text-caption-sm font-medium",
             impersonating
               ? "bg-warning text-black"
-              : "bg-primary-container text-on-tertiary",
+              : "bg-primary-container text-black font-semibold",
           )}
         >
           {user.name
@@ -93,14 +93,14 @@ export function UserMenu() {
             .join("")}
         </span>
         <span className="hidden sm:flex flex-col items-start leading-tight">
-          <span className="max-w-[220px] truncate text-label-md text-white">
+          <span className="max-w-[220px] truncate text-label-md text-on-surface font-medium">
             {user.name}
           </span>
-          <span className="max-w-[220px] truncate text-caption-sm text-[#8a8a8a]">
+          <span className="max-w-[220px] truncate text-caption-sm text-mute">
             {detail ?? ROLE_LABELS[role]}
           </span>
         </span>
-        <Icon name="expand_more" size={18} className="text-[#8a8a8a]" />
+        <Icon name="expand_more" size={18} className="text-stone" />
       </button>
 
       {open && (
