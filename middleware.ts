@@ -25,7 +25,8 @@ export default auth((req) => {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const url = new URL("/login", req.nextUrl.origin);
+  const basePath = req.nextUrl.basePath || "/SHSKPIs";
+  const url = new URL(`${basePath}/login`, req.nextUrl.origin);
   url.searchParams.set("callbackUrl", pathname + search);
   return NextResponse.redirect(url);
 });

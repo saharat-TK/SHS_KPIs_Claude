@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  basePath: "/SHSKPIs",
   reactStrictMode: true,
+  optimizeFonts: false,
+  images: {
+    unoptimized: true,
+  },
   // The dashboard lives at /dashboard; `/` is kept alive only so older
   // bookmarks and shared filter links keep working. 307 rather than 308 —
   // a permanent redirect gets cached hard by browsers and is painful to undo.

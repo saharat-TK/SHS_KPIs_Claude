@@ -17,6 +17,7 @@ import Google from "next-auth/providers/google";
 export const ALLOWED_DOMAIN = process.env.AUTH_ALLOWED_DOMAIN ?? "mfu.ac.th";
 
 export const authConfig = {
+  basePath: "/SHSKPIs/api/auth",
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,

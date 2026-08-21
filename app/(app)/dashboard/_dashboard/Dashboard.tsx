@@ -153,6 +153,9 @@ export function Dashboard() {
     [scoped, quarter, record?.startYear],
   );
 
+  const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null);
+  const openKpi = (kpiId: number) => setSelectedKpiId(kpiId);
+
   const openQuarters = openQuartersForYear(periods, year);
   const loading = recordsQ.isLoading || kpisQ.isLoading;
 
@@ -181,9 +184,6 @@ export function Dashboard() {
       </>
     );
   }
-
-  const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null);
-  const openKpi = (kpiId: number) => setSelectedKpiId(kpiId);
 
   // Split into consts (rather than inlined below) only so JSX order stays
   // easy to scan next to the rest of the render.

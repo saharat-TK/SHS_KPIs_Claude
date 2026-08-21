@@ -88,9 +88,8 @@ const config: Config = {
         xxl: "28px",
       },
       fontFamily: {
-        // Hanken has Latin glyphs; Thai falls through to the single loaded
-        // Noto Sans Thai Light face, preserving the requested weight for Thai.
-        sans: ["var(--font-hanken)", "var(--font-noto-thai)", "system-ui", "sans-serif"],
+        // Hanken has Latin glyphs; Thai falls through to Noto Sans Thai.
+        sans: ["'Hanken Grotesk'", "'Noto Sans Thai'", "system-ui", "-apple-system", "BlinkMacSystemFont", "'Segoe UI'", "Roboto", "sans-serif"],
       },
       fontSize: {
         "display-xl": ["46px", { lineHeight: "1.08", letterSpacing: "-0.5px", fontWeight: "700" }],

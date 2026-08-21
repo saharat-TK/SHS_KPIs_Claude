@@ -2,6 +2,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/lib/auth/auth";
 import styles from "./login.module.css";
+import shsLogo from "@/public/shs-logo.png";
 
 export const dynamic = "force-dynamic";
 
@@ -74,10 +75,8 @@ export default async function LoginPage({
           <div className={styles.brandLockup}>
             <Image
               className={styles.logo}
-              src="/shs-logo.png"
+              src={shsLogo}
               alt="School of Health Science"
-              width={774}
-              height={1017}
               priority
             />
             <p className={styles.schoolName}>Mae Fah Luang University · School of Health Science</p>
