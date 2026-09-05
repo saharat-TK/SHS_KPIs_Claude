@@ -77,13 +77,29 @@ export const NAV: NavGroup[] = [
   {
     label: "Faculty Data",
     items: [
-      { label: "Committees", href: "/committee", icon: "account_tree" },
-      { label: "Faculty Roster", href: "/faculty", icon: "groups", exact: true },
       {
-        label: "Faculty Management",
-        href: "/faculty/management",
-        icon: "manage_accounts",
-        requires: "manage_faculty",
+        label: "Faculty Data",
+        href: "/faculty",
+        icon: "groups",
+        children: [
+          {
+            label: "Faculty Roster",
+            href: "/faculty",
+            icon: "badge",
+            exact: true,
+          },
+          {
+            label: "Committees",
+            href: "/committee",
+            icon: "account_tree",
+          },
+          {
+            label: "Faculty Management",
+            href: "/faculty/management",
+            icon: "manage_accounts",
+            requires: "manage_faculty",
+          },
+        ],
       },
     ],
   },
