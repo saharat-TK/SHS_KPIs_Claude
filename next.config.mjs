@@ -12,7 +12,13 @@ const nextConfig = {
   // bookmarks and shared filter links keep working. 307 rather than 308 —
   // a permanent redirect gets cached hard by browsers and is painful to undo.
   async redirects() {
-    return [{ source: "/", destination: "/dashboard", permanent: false }];
+    return [
+      { source: "/", destination: "/dashboard", permanent: false },
+      // Auto-heal any duplicate basePath in URLs (e.g. /SHSKPIs/SHSKPIs/... -> /SHSKPIs/...)
+      ...(process.env.NODE_ENV === "production"
+        ? [{ source: "/SHSKPIs/:path*", destination: "/:path*", permanent: false }]
+        : []),
+    ];
   },
 };
 

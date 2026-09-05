@@ -26,7 +26,9 @@ export default auth((req) => {
   }
 
   const url = new URL(`${req.nextUrl.basePath}/login`, req.nextUrl.origin);
-  url.searchParams.set("callbackUrl", pathname + search);
+  if (pathname && pathname !== "/" && !pathname.includes("/login")) {
+    url.searchParams.set("callbackUrl", pathname + search);
+  }
   return NextResponse.redirect(url);
 });
 

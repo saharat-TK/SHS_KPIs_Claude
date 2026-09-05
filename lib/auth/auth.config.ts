@@ -56,13 +56,23 @@ export const authConfig = {
     },
     async redirect({ url, baseUrl }) {
       const appBase = `${baseUrl}${BASE_PATH}`;
-      if (url.startsWith("/")) {
-        if (BASE_PATH && url.startsWith(BASE_PATH)) return `${baseUrl}${url}`;
-        return `${appBase}${url}`;
+
+      // Collapse any duplicate BASE_PATH (/SHSKPIs/SHSKPIs/... -> /SHSKPIs/...)
+      let cleanUrl = url;
+      if (BASE_PATH) {
+        const doubleBase = `${BASE_PATH}${BASE_PATH}`;
+        while (cleanUrl.includes(doubleBase)) {
+          cleanUrl = cleanUrl.replaceAll(doubleBase, BASE_PATH);
+        }
       }
-      if (url.startsWith(baseUrl)) {
-        if (url.startsWith(appBase)) return url;
-        return url.replace(baseUrl, appBase);
+
+      if (cleanUrl.startsWith("/")) {
+        if (BASE_PATH && cleanUrl.startsWith(BASE_PATH)) return `${baseUrl}${cleanUrl}`;
+        return `${appBase}${cleanUrl}`;
+      }
+      if (cleanUrl.startsWith(baseUrl)) {
+        if (cleanUrl.startsWith(appBase)) return cleanUrl;
+        return cleanUrl.replace(baseUrl, appBase);
       }
       return `${appBase}/dashboard`;
     },

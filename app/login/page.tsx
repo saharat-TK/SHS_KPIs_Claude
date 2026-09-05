@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/lib/auth/auth";
+import { BASE_PATH } from "@/lib/basePath";
 import styles from "./login.module.css";
 import shsLogo from "@/public/shs-logo.png";
 
@@ -54,13 +55,47 @@ function SignalField() {
   );
 }
 
+/**
+ * Sanitizes the callback URL.
+ * - Extracts pathname if an absolute URL is given.
+ * - Strips any leading BASE_PATH (e.g. /SHSKPIs) because Next.js redirect()
+ *   in the App Router automatically prepends basePath. Passing an already
+ *   prefixed path results in duplicate /SHSKPIs/SHSKPIs/... 404s.
+ * - Ensures authenticated users are never sent to /login or empty root.
+ */
+function getSafeRedirectTarget(raw?: string): string {
+  if (!raw) return "/dashboard";
+  let target = raw.trim();
+
+  if (target.startsWith("http://") || target.startsWith("https://")) {
+    try {
+      const parsed = new URL(target);
+      target = parsed.pathname + parsed.search;
+    } catch {
+      return "/dashboard";
+    }
+  }
+
+  if (BASE_PATH) {
+    while (target.startsWith(BASE_PATH)) {
+      target = target.slice(BASE_PATH.length);
+    }
+  }
+
+  if (!target || target === "/" || target.includes("/login")) {
+    return "/dashboard";
+  }
+
+  return target.startsWith("/") ? target : `/${target}`;
+}
+
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: { error?: string; callbackUrl?: string };
 }) {
-  const callbackUrl = searchParams.callbackUrl ?? "/dashboard";
-  if (await auth()) redirect(callbackUrl);
+  const safeTarget = getSafeRedirectTarget(searchParams.callbackUrl);
+  if (await auth()) redirect(safeTarget);
 
   const error = searchParams.error
     ? (ERROR_COPY[searchParams.error] ?? ERROR_COPY.default)
@@ -121,7 +156,7 @@ export default async function LoginPage({
                 "use server";
                 // signIn throws NEXT_REDIRECT to navigate — never wrap this in
                 // a try/catch that swallows it.
-                await signIn("google", { redirectTo: callbackUrl });
+                await signIn("google", { redirectTo: safeTarget });
               }}
             >
               <button
