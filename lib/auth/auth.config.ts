@@ -43,7 +43,7 @@ export const authConfig = {
 
   // Both point at the same route — one page renders the sign-in button and the
   // rejection copy, keyed off ?error=.
-  pages: { signIn: "/login", error: "/login" },
+  pages: { signIn: "/SHSKPIs/login", error: "/SHSKPIs/login" },
 
   trustHost: true,
 
