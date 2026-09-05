@@ -44,8 +44,8 @@ import type {
 } from "@/lib/types";
 import type { CommitteeUsage } from "@/lib/kpi/committee";
 import { delay, getDB, uid } from "./store";
+import { BASE_PATH } from "@/lib/basePath";
 
-const BASE_PATH = "/SHSKPIs";
 const rawFetch = globalThis.fetch;
 function fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   if (typeof input === "string" && input.startsWith("/api")) {

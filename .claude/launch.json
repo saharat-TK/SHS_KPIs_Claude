@@ -5,7 +5,7 @@
       "name": "shs-kpi-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 3211,
+      "port": 3001,
       "autoPort": true
     }
   ]

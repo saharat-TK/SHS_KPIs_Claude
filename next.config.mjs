@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: "/SHSKPIs",
+  // The deployed application is served beneath this path. Keep local
+  // development at the conventional localhost root described in the README.
+  ...(process.env.NODE_ENV === "production" ? { basePath: "/SHSKPIs" } : {}),
   reactStrictMode: true,
   optimizeFonts: false,
   images: {

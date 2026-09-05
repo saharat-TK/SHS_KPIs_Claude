@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { Icon } from "@/components/ui/Icon";
+import { BASE_PATH } from "@/lib/basePath";
 
 /** Deliberately not dismissible: while this is showing, every write is
  *  attributed to someone else, so it must stay visible the whole time. */
@@ -17,7 +18,7 @@ export function ImpersonationBanner() {
   async function stop() {
     setBusy(true);
     try {
-      await fetch("/SHSKPIs/api/auth/impersonate", { method: "DELETE" });
+      await fetch(`${BASE_PATH}/api/auth/impersonate`, { method: "DELETE" });
       router.refresh();
     } finally {
       setBusy(false);

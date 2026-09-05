@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+import { BASE_PATH } from "@/lib/basePath";
 
 export const metadata: Metadata = {
   title: "Health Sciences Analytics — KPI System",
   description:
     "KPI configuration, faculty management, and performance analytics for the School of Health Sciences.",
   icons: {
-    icon: "/SHSKPIs/shs-logo.png",
-    shortcut: "/SHSKPIs/shs-logo.png",
-    apple: "/SHSKPIs/shs-logo.png",
+    icon: `${BASE_PATH}/shs-logo.png`,
+    shortcut: `${BASE_PATH}/shs-logo.png`,
+    apple: `${BASE_PATH}/shs-logo.png`,
   },
 };
 

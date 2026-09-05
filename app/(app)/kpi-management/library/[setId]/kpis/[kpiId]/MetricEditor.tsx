@@ -21,6 +21,7 @@ import {
   useConfirm,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { BASE_PATH } from "@/lib/basePath";
 import {
   useAcademicCatalog,
   useLibraryMetrics,
@@ -437,7 +438,7 @@ function MetricModal({
   // Editing an existing metric: fetch its annual targets (list rows don't carry them).
   useEffect(() => {
     if (metric) {
-      fetch(`/SHSKPIs/api/library-metrics/${metric.id}`)
+      fetch(`${BASE_PATH}/api/library-metrics/${metric.id}`)
         .then((r) => r.json())
         .then((full: LibraryMetric) => {
           setTargetMode(full.targetMode ?? "manual");

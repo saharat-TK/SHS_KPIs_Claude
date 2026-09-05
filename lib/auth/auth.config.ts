@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
+import { BASE_PATH } from "@/lib/basePath";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  EDGE-SAFE HALF OF THE AUTH CONFIG — DO NOT IMPORT A DATABASE HERE.
@@ -17,7 +18,7 @@ import Google from "next-auth/providers/google";
 export const ALLOWED_DOMAIN = process.env.AUTH_ALLOWED_DOMAIN ?? "mfu.ac.th";
 
 export const authConfig = {
-  basePath: "/SHSKPIs/api/auth",
+  basePath: `${BASE_PATH}/api/auth`,
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
@@ -43,7 +44,7 @@ export const authConfig = {
 
   // Both point at the same route — one page renders the sign-in button and the
   // rejection copy, keyed off ?error=.
-  pages: { signIn: "/SHSKPIs/login", error: "/SHSKPIs/login" },
+  pages: { signIn: `${BASE_PATH}/login`, error: `${BASE_PATH}/login` },
 
   trustHost: true,
 
@@ -54,9 +55,9 @@ export const authConfig = {
       return Boolean(auth?.user);
     },
     async redirect({ url, baseUrl }) {
-      const appBase = `${baseUrl}/SHSKPIs`;
+      const appBase = `${baseUrl}${BASE_PATH}`;
       if (url.startsWith("/")) {
-        if (url.startsWith("/SHSKPIs")) return `${baseUrl}${url}`;
+        if (BASE_PATH && url.startsWith(BASE_PATH)) return `${baseUrl}${url}`;
         return `${appBase}${url}`;
       }
       if (url.startsWith(baseUrl)) {

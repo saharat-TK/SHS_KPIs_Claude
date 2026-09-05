@@ -8,6 +8,7 @@ import { useCommitteeMemberships, useFacultyRecords } from "@/lib/data/hooks";
 import { signOutAction } from "@/app/(app)/actions";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
+import { BASE_PATH } from "@/lib/basePath";
 
 /** The committee position line under the name — the one genuinely useful
  *  detail the old persona switcher showed, kept as-is. */
@@ -58,7 +59,7 @@ export function UserMenu() {
   async function impersonate(facultyId: string) {
     setBusy(true);
     try {
-      await fetch("/SHSKPIs/api/auth/impersonate", {
+      await fetch(`${BASE_PATH}/api/auth/impersonate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ facultyId }),
