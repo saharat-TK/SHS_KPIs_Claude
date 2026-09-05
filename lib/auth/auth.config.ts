@@ -53,5 +53,17 @@ export const authConfig = {
     authorized({ auth }) {
       return Boolean(auth?.user);
     },
+    async redirect({ url, baseUrl }) {
+      const appBase = `${baseUrl}/SHSKPIs`;
+      if (url.startsWith("/")) {
+        if (url.startsWith("/SHSKPIs")) return `${baseUrl}${url}`;
+        return `${appBase}${url}`;
+      }
+      if (url.startsWith(baseUrl)) {
+        if (url.startsWith(appBase)) return url;
+        return url.replace(baseUrl, appBase);
+      }
+      return `${appBase}/dashboard`;
+    },
   },
 } satisfies NextAuthConfig;
