@@ -58,7 +58,7 @@ export function UserMenu() {
   async function impersonate(facultyId: string) {
     setBusy(true);
     try {
-      await fetch("/api/auth/impersonate", {
+      await fetch("/SHSKPIs/api/auth/impersonate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ facultyId }),

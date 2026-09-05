@@ -45,6 +45,15 @@ import type {
 import type { CommitteeUsage } from "@/lib/kpi/committee";
 import { delay, getDB, uid } from "./store";
 
+const BASE_PATH = "/SHSKPIs";
+const rawFetch = globalThis.fetch;
+function fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (typeof input === "string" && input.startsWith("/api")) {
+    return rawFetch(`${BASE_PATH}${input}`, init);
+  }
+  return rawFetch(input, init);
+}
+
 // Shared helper for the DB-backed KPI-management repos: throw the API's error
 // message (so mutation error toasts are meaningful) instead of a generic string.
 async function jsonOrThrow<T>(res: Response, fallback: string): Promise<T> {

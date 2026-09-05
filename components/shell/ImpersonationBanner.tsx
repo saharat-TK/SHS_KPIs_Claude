@@ -17,7 +17,7 @@ export function ImpersonationBanner() {
   async function stop() {
     setBusy(true);
     try {
-      await fetch("/api/auth/impersonate", { method: "DELETE" });
+      await fetch("/SHSKPIs/api/auth/impersonate", { method: "DELETE" });
       router.refresh();
     } finally {
       setBusy(false);

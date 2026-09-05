@@ -437,7 +437,7 @@ function MetricModal({
   // Editing an existing metric: fetch its annual targets (list rows don't carry them).
   useEffect(() => {
     if (metric) {
-      fetch(`/api/library-metrics/${metric.id}`)
+      fetch(`/SHSKPIs/api/library-metrics/${metric.id}`)
         .then((r) => r.json())
         .then((full: LibraryMetric) => {
           setTargetMode(full.targetMode ?? "manual");

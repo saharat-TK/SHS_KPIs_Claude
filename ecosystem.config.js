@@ -12,6 +12,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 3005,
+        NODE_TLS_REJECT_UNAUTHORIZED: "0",
       },
     },
   ],
