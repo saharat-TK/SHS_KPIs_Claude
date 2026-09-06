@@ -18,6 +18,7 @@ import {
   RadioGroup,
   QueryBoundary,
   EmptyState,
+  SectionInputStatusIcon,
   useConfirm,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
@@ -100,6 +101,7 @@ export function MetricEditor({
   parentTargets,
   parentDefaults,
   canAddMetric = true,
+  isComplete,
   categories,
   committees,
   committeeMemberships,
@@ -111,6 +113,7 @@ export function MetricEditor({
   parentTargets: ParentTargets;
   parentDefaults: ParentDefaults;
   canAddMetric?: boolean;
+  isComplete: boolean;
   categories: { id: string; label: string }[];
   committees: Committee[];
   committeeMemberships: CommitteeMembership[];
@@ -179,6 +182,7 @@ export function MetricEditor({
             >
               Add Sub-KPI
             </Button>
+            <SectionInputStatusIcon complete={isComplete} section="Sub-KPIs" />
           </div>
         }
       />
@@ -303,12 +307,31 @@ function BatchConfirmModal({
 }) {
   const create = useCreateLibraryMetric();
   const existing = new Set(existingNames);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
   const rows = entries.map((e) => {
     const name = `${e.abbr}-${parentName}`;
     return { ...e, name, duplicate: existing.has(name) };
   });
-  const toCreate = rows.filter((r) => !r.duplicate);
+  const availableRows = rows.filter((r) => !r.duplicate);
+  const toCreate = availableRows.filter((r) => selected.has(r.abbr));
+  const allAvailableSelected =
+    availableRows.length > 0 && availableRows.every((r) => selected.has(r.abbr));
+
+  const toggleRow = (abbr: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(abbr)) next.delete(abbr);
+      else next.add(abbr);
+      return next;
+    });
+  };
+
+  const toggleAllAvailable = () => {
+    setSelected(() =>
+      allAvailableSelected ? new Set() : new Set(availableRows.map((r) => r.abbr)),
+    );
+  };
 
   const onCreate = async () => {
     for (const row of toCreate) {
@@ -359,6 +382,16 @@ function BatchConfirmModal({
       <Table>
         <thead>
           <tr>
+            <Th className="w-[44px]">
+              <input
+                type="checkbox"
+                aria-label="Select all available sub-KPIs"
+                checked={allAvailableSelected}
+                disabled={availableRows.length === 0 || create.isPending}
+                onChange={toggleAllAvailable}
+                className="accent-primary-container h-4 w-4"
+              />
+            </Th>
             <Th>Sub-KPI name</Th>
             <Th>Program / Curriculum</Th>
             <Th align="right">Status</Th>
@@ -367,6 +400,16 @@ function BatchConfirmModal({
         <tbody>
           {rows.map((r) => (
             <Tr key={r.abbr}>
+              <Td>
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${r.label}`}
+                  checked={!r.duplicate && selected.has(r.abbr)}
+                  disabled={r.duplicate || create.isPending}
+                  onChange={() => toggleRow(r.abbr)}
+                  className="accent-primary-container h-4 w-4"
+                />
+              </Td>
               <Td className={r.duplicate ? "text-mute" : "font-medium"}>{r.name}</Td>
               <Td className="text-mute">{r.label}</Td>
               <Td align="right">

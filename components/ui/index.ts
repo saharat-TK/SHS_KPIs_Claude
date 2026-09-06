@@ -1,4 +1,5 @@
 export { Icon } from "./Icon";
+export { SectionInputStatusIcon } from "./SectionInputStatusIcon";
 export { Button } from "./Button";
 export { Card, CardHeader, CardBody } from "./Card";
 export { Badge } from "./Badge";

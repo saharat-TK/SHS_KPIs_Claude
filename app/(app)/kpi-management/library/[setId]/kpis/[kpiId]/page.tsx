@@ -16,6 +16,7 @@ import {
   RadioGroup,
   ThresholdBar,
   QueryBoundary,
+  SectionInputStatusIcon,
   useConfirm,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
@@ -54,6 +55,7 @@ import { weightSumWarning } from "@/lib/kpi/weight";
 import { categoriesOfType } from "@/lib/kpi/categories";
 import { describeKpiDeletion } from "@/lib/kpi/deletion";
 import { personsForCommittee } from "@/lib/kpi/committee";
+import { kpiEditorSectionCompletion } from "@/lib/kpi/kpiEditorCompletion";
 import { MetricEditor } from "./MetricEditor";
 
 // The pooled calculation types: aggregated from live progress on performance
@@ -301,6 +303,9 @@ function KpiDetail() {
   const formulas = formulasQ.data ?? [];
   const metrics = metricsQ.data ?? [];
   const hasChildren = metrics.length > 0;
+  const sectionCompletion = draft
+    ? kpiEditorSectionCompletion({ draft, years, metricCount: metrics.length })
+    : null;
   // Advisory only — nothing rejects a total other than 100, but weighted_sum
   // scales its answer by it, so the editor is where to say so.
   const weightWarning = weightSumWarning(metrics.map((m) => m.weight));
@@ -388,7 +393,15 @@ function KpiDetail() {
             <div className="flex flex-col gap-lg">
               {/* Core Configuration */}
               <Card>
-                <CardHeader title="Core Configuration" />
+                <CardHeader
+                  title="Core Configuration"
+                  actions={
+                    <SectionInputStatusIcon
+                      complete={sectionCompletion!.core}
+                      section="Core Configuration"
+                    />
+                  }
+                />
                 <CardBody className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
                   <Field label="Name">
                     <Input value={draft.name} onChange={(e) => set("name", e.target.value)} />
@@ -523,6 +536,12 @@ function KpiDetail() {
                 <CardHeader
                   title="Annual Target (5 years)"
                   subtitle="Each year target must not exceed the 5-year target."
+                  actions={
+                    <SectionInputStatusIcon
+                      complete={sectionCompletion!.annualTarget}
+                      section="Annual Target"
+                    />
+                  }
                 />
                 <CardBody className="flex flex-col gap-lg">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-lg">
@@ -584,22 +603,28 @@ function KpiDetail() {
                     KPI_CALCULATION_TYPES.find((t) => t.id === draft.calculationType)?.label
                   }
                   actions={
-                    draft.calculationType === "custom_formula" ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconRight="open_in_new"
-                        onClick={() =>
-                          router.push(
-                            draft.formulaId
-                              ? `/formulas/builder?formula=${draft.formulaId}`
-                              : "/formulas/builder",
-                          )
-                        }
-                      >
-                        Open in builder
-                      </Button>
-                    ) : undefined
+                    <>
+                      {draft.calculationType === "custom_formula" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconRight="open_in_new"
+                          onClick={() =>
+                            router.push(
+                              draft.formulaId
+                                ? `/formulas/builder?formula=${draft.formulaId}`
+                                : "/formulas/builder",
+                            )
+                          }
+                        >
+                          Open in builder
+                        </Button>
+                      )}
+                      <SectionInputStatusIcon
+                        complete={sectionCompletion!.calculationLogic}
+                        section="KPI Calculation Logic"
+                      />
+                    </>
                   }
                 />
                 <CardBody className="flex flex-col gap-lg">
@@ -765,6 +790,7 @@ function KpiDetail() {
                 parentTargets={parentTargets}
                 parentDefaults={parentDefaults}
                 canAddMetric={canAddMetric}
+                isComplete={sectionCompletion!.subKpis}
                 categories={strategicCategories}
                 committees={committees}
                 committeeMemberships={memberships}
@@ -778,6 +804,12 @@ function KpiDetail() {
                 <CardHeader
                   title="Threshold Settings"
                   subtitle="Percent of target — ≥ on-target is healthy, ≥ watch is amber, below is at risk."
+                  actions={
+                    <SectionInputStatusIcon
+                      complete={sectionCompletion!.thresholds}
+                      section="Threshold Settings"
+                    />
+                  }
                 />
                 <CardBody className="flex flex-col gap-lg">
                   <div className="flex flex-col gap-sm">
