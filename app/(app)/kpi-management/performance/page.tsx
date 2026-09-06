@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -514,16 +514,29 @@ function ActivateModal({
   const { user } = useAuth();
   const [sourceSetId, setSourceSetId] = useState<string>("");
   const [name, setName] = useState("");
+  const activeSets = useMemo(() => sets.filter((set) => set.status === "active"), [sets]);
+  const wasOpen = useRef(false);
 
   useEffect(() => {
-    if (open) {
-      setSourceSetId(sets[0] ? String(sets[0].id) : "");
+    if (!open) {
+      wasOpen.current = false;
+      return;
+    }
+
+    const openedNow = !wasOpen.current;
+    wasOpen.current = true;
+    setSourceSetId((current) => {
+      const firstActiveId = activeSets[0] ? String(activeSets[0].id) : "";
+      return openedNow || !activeSets.some((set) => String(set.id) === current)
+        ? firstActiveId
+        : current;
+    });
+    if (openedNow) {
       setName("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [activeSets, open]);
 
-  const valid = sourceSetId !== "";
+  const valid = activeSets.some((set) => String(set.id) === sourceSetId);
 
   return (
     <Modal
@@ -556,11 +569,15 @@ function ActivateModal({
           <p className="text-body-sm text-mute">
             No strategic sets exist yet — create one in the KPIs Library first.
           </p>
+        ) : activeSets.length === 0 ? (
+          <p className="text-body-sm text-mute">
+            No active strategic sets are available — set one to Active in the KPIs Library first.
+          </p>
         ) : (
           <>
             <Field label="Strategic set">
               <Select value={sourceSetId} onChange={(e) => setSourceSetId(e.target.value)}>
-                {sets.map((s) => (
+                {activeSets.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.startYear}–{s.endYear})
                   </option>

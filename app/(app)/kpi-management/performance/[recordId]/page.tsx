@@ -370,7 +370,7 @@ function PerformanceRecordDetail() {
         </div>
       </div>
 
-      <Tabs items={tabs} active={cat} onChange={setCat} />
+      <Tabs items={tabs} active={cat} onChange={setCat} variant="filled" />
 
       <Card className="overflow-hidden">
         <QueryBoundary isLoading={kpisQ.isLoading} isError={kpisQ.isError}>

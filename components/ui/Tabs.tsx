@@ -13,14 +13,24 @@ export function Tabs({
   active,
   onChange,
   className,
+  variant = "underline",
 }: {
   items: TabItem[];
   active: string;
   onChange: (id: string) => void;
   className?: string;
+  /** Filled tabs are opt-in for dense, table-scoped filters. */
+  variant?: "underline" | "filled";
 }) {
   return (
-    <div className={cn("flex items-center gap-xs border-b border-hairline", className)} role="tablist">
+    <div
+      className={cn(
+        "flex gap-xs",
+        variant === "filled" ? "items-stretch" : "items-center border-b border-hairline",
+        className,
+      )}
+      role="tablist"
+    >
       {items.map((t) => {
         const on = t.id === active;
         return (
@@ -33,10 +43,14 @@ export function Tabs({
               // text-left overrides the browser's default centered button text,
               // which otherwise centers a long label's wrapped second line
               // instead of keeping it flush with the first.
-              "px-md py-sm text-label-md text-left -mb-px border-b-2 transition-colors inline-flex items-center gap-xs",
-              on
-                ? "border-primary-container text-primary-dark"
-                : "border-transparent text-mute hover:text-on-surface",
+              "px-md py-sm text-label-md text-left transition-colors inline-flex items-center gap-xs",
+              variant === "underline"
+                ? on
+                  ? "-mb-px border-b-2 border-primary-container text-primary-dark"
+                  : "-mb-px border-b-2 border-transparent text-mute hover:text-on-surface"
+                : on
+                  ? "relative z-10 rounded-t-lg bg-primary-container text-on-primary-container shadow-md"
+                  : "rounded-t-lg bg-surface-container-high text-mute hover:bg-surface-container-highest hover:text-on-surface",
             )}
           >
             {t.label}
@@ -44,7 +58,13 @@ export function Tabs({
               <span
                 className={cn(
                   "rounded-xl px-xs text-utility-xs",
-                  on ? "bg-primary-container text-on-tertiary" : "bg-surface-container-high text-mute",
+                  variant === "filled"
+                    ? on
+                      ? "bg-primary-fixed text-on-primary-container"
+                      : "bg-surface-lowest text-mute"
+                    : on
+                      ? "bg-primary-container text-on-tertiary"
+                      : "bg-surface-container-high text-mute",
                 )}
               >
                 {t.count}
