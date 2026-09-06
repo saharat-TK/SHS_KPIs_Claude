@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -19,8 +19,13 @@ import {
   Select,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
-import { useStrategicSets, useCreateStrategicSet } from "@/lib/data/hooks";
+import {
+  useStrategicSets,
+  useCreateStrategicSet,
+  useUpdateStrategicSet,
+} from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { Icon } from "@/components/ui/Icon";
 import type { StrategicSet, StrategicSetStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<StrategicSetStatus, "neutral" | "success" | "warning"> = {
@@ -41,7 +46,12 @@ function Library() {
   const router = useRouter();
   const setsQ = useStrategicSets();
   const create = useCreateStrategicSet();
+  const updateSet = useUpdateStrategicSet();
   const [showCreate, setShowCreate] = useState(false);
+  const [statusChange, setStatusChange] = useState<{
+    set: StrategicSet;
+    status: StrategicSetStatus;
+  } | null>(null);
 
   const sets = setsQ.data ?? [];
 
@@ -100,17 +110,11 @@ function Library() {
                     </Td>
                     <Td align="center">{s.kpiCount ?? 0}</Td>
                     <Td align="right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconRight="chevron_right"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/kpi-management/library/${s.id}`);
-                        }}
-                      >
-                        Open
-                      </Button>
+                      <SetActions
+                        set={s}
+                        onOpen={() => router.push(`/kpi-management/library/${s.id}`)}
+                        onSetStatus={(status) => setStatusChange({ set: s, status })}
+                      />
                     </Td>
                   </Tr>
                 ))}
@@ -134,7 +138,159 @@ function Library() {
           })
         }
       />
+
+      {statusChange && (
+        <SetStatusConfirmModal
+          set={statusChange.set}
+          status={statusChange.status}
+          submitting={updateSet.isPending}
+          onClose={() => setStatusChange(null)}
+          onConfirm={() =>
+            updateSet.mutate(
+              { id: statusChange.set.id, patch: { status: statusChange.status } },
+              { onSuccess: () => setStatusChange(null) },
+            )
+          }
+        />
+      )}
     </>
+  );
+}
+
+function SetActions({
+  set,
+  onOpen,
+  onSetStatus,
+}: {
+  set: StrategicSet;
+  onOpen: () => void;
+  onSetStatus: (status: StrategicSetStatus) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+
+  const toggleMenu = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const menuHeight = 210;
+    const gap = 4;
+    const top =
+      rect.bottom + gap + menuHeight > window.innerHeight
+        ? Math.max(gap, rect.top - menuHeight - gap)
+        : rect.bottom + gap;
+    setMenuPosition({ top, right: window.innerWidth - rect.right });
+    setOpen((wasOpen) => {
+      if (wasOpen) setStatusOpen(false);
+      return !wasOpen;
+    });
+  };
+
+  return (
+    <div className="relative inline-flex" onClick={(event) => event.stopPropagation()}>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={`Actions for ${set.name}`}
+        title="Actions"
+        className="rounded p-xs text-mute hover:bg-surface-soft hover:text-on-surface"
+        onClick={toggleMenu}
+      >
+        <Icon name="more_vert" size={20} />
+      </button>
+      {open && menuPosition && (
+        <div
+          className="fixed z-[200] min-w-[180px] overflow-hidden rounded border border-hairline bg-surface-lowest shadow-chrome"
+          style={{ top: menuPosition.top, right: menuPosition.right }}
+        >
+          <button
+            type="button"
+            className="flex w-full items-center gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
+            onClick={() => {
+              setOpen(false);
+              setStatusOpen(false);
+              onOpen();
+            }}
+          >
+            <Icon name="open_in_new" size={18} />
+            Open set
+          </button>
+          <div className="border-t border-hairline">
+            <button
+              type="button"
+              aria-expanded={statusOpen}
+              className="flex w-full items-center justify-between gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
+              onClick={() => setStatusOpen((value) => !value)}
+            >
+              <span className="inline-flex items-center gap-sm">
+                <Icon name="change_circle" size={18} />
+                Set status
+              </span>
+              <Icon name={statusOpen ? "expand_less" : "expand_more"} size={18} />
+            </button>
+            {statusOpen && (
+              <div className="border-t border-hairline bg-surface-soft py-xs">
+                {(["draft", "active", "archived"] as const).map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    disabled={status === set.status}
+                    className="flex w-full items-center justify-between gap-sm px-lg py-sm text-left text-body-sm hover:bg-surface-container-high disabled:cursor-default disabled:text-mute"
+                    onClick={() => {
+                      setOpen(false);
+                      setStatusOpen(false);
+                      onSetStatus(status);
+                    }}
+                  >
+                    <span className="capitalize">{status}</span>
+                    {status === set.status && <Icon name="check" size={18} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SetStatusConfirmModal({
+  set,
+  status,
+  submitting,
+  onClose,
+  onConfirm,
+}: {
+  set: StrategicSet;
+  status: StrategicSetStatus;
+  submitting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Change set status"
+      subtitle={set.name}
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" disabled={submitting} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button icon="check" disabled={submitting} onClick={onConfirm}>
+            {submitting ? "Saving…" : `Set ${status}`}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-body-sm text-mute">
+        Set this strategic set to <span className="font-medium capitalize text-on-surface">{status}</span>?
+      </p>
+    </Modal>
   );
 }
 

@@ -49,6 +49,8 @@ const TYPE_TONE: Record<string, "primary" | "info" | "neutral"> = {
   operational: "info",
   routine: "neutral",
 };
+type SortKey = "name" | "type";
+type SortState = { key: SortKey; dir: "asc" | "desc" };
 
 export default function SetDetailPage() {
   return (
@@ -77,12 +79,13 @@ function SetDetail() {
 
   const [cat, setCat] = useState<string>("all");
   const [committeeFilter, setCommitteeFilter] = useState<string>("all");
+  const [sort, setSort] = useState<SortState | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showManageCats, setShowManageCats] = useState(false);
 
   const categories = categoriesQ.data ?? [];
   const kpis = kpisQ.data ?? [];
-  const kpiTypes = kpiTypesQ.data ?? [];
+  const kpiTypes = useMemo(() => kpiTypesQ.data ?? [], [kpiTypesQ.data]);
   const committees = committeesQ.data ?? [];
   // Tabs group by category_id, which holds the Strategic taxonomy only —
   // routine categories would otherwise show up as permanently-empty tabs.
@@ -116,6 +119,36 @@ function SetDetail() {
         : committeeScoped.filter((k) => k.categoryId === cat),
     [committeeScoped, cat],
   );
+  const sortedRows = useMemo(() => {
+    if (!sort) return rows;
+
+    const valueFor = (kpi: (typeof rows)[number]): string | number => {
+      if (sort.key === "name") return kpi.name;
+
+      // Match the Performance table: type order is admin-configurable and is
+      // therefore more meaningful than alphabetical ids or labels.
+      return kpiTypes.find((type) => type.id === kpi.kpiType)?.sortOrder ?? 99;
+    };
+
+    return [...rows].sort((left, right) => {
+      const leftValue = valueFor(left);
+      const rightValue = valueFor(right);
+      const comparison =
+        typeof leftValue === "number" && typeof rightValue === "number"
+          ? leftValue - rightValue
+          : String(leftValue).localeCompare(String(rightValue), undefined, {
+              sensitivity: "base",
+              numeric: true,
+            });
+      return sort.dir === "asc" ? comparison : -comparison;
+    });
+  }, [rows, sort, kpiTypes]);
+  const toggleSort = (key: SortKey) =>
+    setSort((current) =>
+      current?.key === key
+        ? { key, dir: current.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" },
+    );
 
   const set = setQ.data;
 
@@ -184,7 +217,7 @@ function SetDetail() {
         </Field>
       </div>
 
-      <Tabs items={tabs} active={cat} onChange={setCat} />
+      <Tabs items={tabs} active={cat} onChange={setCat} variant="filled" />
 
       <Card className="overflow-hidden">
         <QueryBoundary isLoading={kpisQ.isLoading} isError={kpisQ.isError}>
@@ -202,15 +235,28 @@ function SetDetail() {
             <Table>
               <thead>
                 <tr>
-                  <Th>KPI Name</Th>
-                  <Th align="center">Type</Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "name" ? sort.dir : null}
+                    onSort={() => toggleSort("name")}
+                  >
+                    KPI Name
+                  </Th>
+                  <Th
+                    sortable
+                    sortDir={sort?.key === "type" ? sort.dir : null}
+                    onSort={() => toggleSort("type")}
+                    align="center"
+                  >
+                    Type
+                  </Th>
                   <Th align="center">Weight</Th>
                   <Th align="center">Sub-KPIs</Th>
                   <Th align="right">Actions</Th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((k) => (
+                {sortedRows.map((k) => (
                   <Tr
                     key={k.id}
                     onClick={() =>

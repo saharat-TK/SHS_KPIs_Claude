@@ -42,12 +42,19 @@ export async function POST(req: NextRequest) {
       await conn.beginTransaction();
 
       const [sets] = await conn.query<RowDataPacket[]>(
-        "SELECT name, start_year FROM strategic_set WHERE id = ?",
+        "SELECT name, start_year, status FROM strategic_set WHERE id = ?",
         [b.sourceSetId],
       );
       if (sets.length === 0) {
         await conn.rollback();
         return NextResponse.json({ error: "Strategic set not found" }, { status: 404 });
+      }
+      if (sets[0].status !== "active") {
+        await conn.rollback();
+        return NextResponse.json(
+          { error: "Strategic set must be active before performance activation" },
+          { status: 409 },
+        );
       }
       const name = (b.name?.trim() as string) || `${sets[0].name} — Performance`;
 
