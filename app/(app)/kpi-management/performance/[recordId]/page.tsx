@@ -12,6 +12,7 @@ import {
   Button,
   Badge,
   Tabs,
+  SegmentedControl,
   QueryBoundary,
   EmptyState,
   Field,
@@ -35,7 +36,11 @@ import {
   useCommittees,
 } from "@/lib/data/hooks";
 import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
-import { categoriesOfType } from "@/lib/kpi/categories";
+import {
+  categoriesOfType,
+  categoryIdForKpiType,
+  categoryTaxonomyForKpiType,
+} from "@/lib/kpi/categories";
 import {
   openPeriodSummary,
   openQuartersForYear,
@@ -62,6 +67,9 @@ const TYPE_TONE: Record<string, "primary" | "info" | "neutral"> = {
   operational: "info",
   routine: "neutral",
 };
+const FALLBACK_TYPE_LABELS = new Map<string, string>(
+  KPI_TYPES.map((type) => [type.id, type.label]),
+);
 type SortKey = "name" | "type" | "annualTarget" | "currentProgress" | "approvalLock";
 type SortState = { key: SortKey; dir: "asc" | "desc" };
 
@@ -92,6 +100,7 @@ function PerformanceRecordDetail() {
   useBreadcrumbLabel(`/kpi-management/performance/${recordId}`, recordQ.data?.name);
 
   const [cat, setCat] = useState<string>("all");
+  const [selectedKpiType, setSelectedKpiType] = useState<string>("strategic");
   const [committeeFilter, setCommitteeFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortState | null>(null);
   // Drives both the Annual Target / Current Progress columns and the approval
@@ -99,10 +108,25 @@ function PerformanceRecordDetail() {
   const [selectedYear, setSelectedYear] = useState(1);
   const [approvalQuarter, setApprovalQuarter] = useState(1);
 
-  const categories = categoriesQ.data ?? [];
+  const categories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
   const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
   const kpiTypes = useMemo(() => kpiTypesQ.data ?? [], [kpiTypesQ.data]);
   const committees = committeesQ.data ?? [];
+  const kpiTypeById = useMemo(
+    () => new Map(kpiTypes.map((type) => [type.id, type])),
+    [kpiTypes],
+  );
+  const kpiTypeOptions = useMemo(
+    () =>
+      kpiTypesQ.data
+        ?.slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((type) => ({ id: type.id, label: type.kpiTypeName })) ?? KPI_TYPES,
+    [kpiTypesQ.data],
+  );
+  const activeKpiType = kpiTypeOptions.some((type) => type.id === selectedKpiType)
+    ? selectedKpiType
+    : "strategic";
   // The closed <select> box truncates a long committee name, so the full name
   // rides on a title tooltip instead of being lost.
   const committeeFilterLabel =
@@ -110,9 +134,7 @@ function PerformanceRecordDetail() {
       ? "All Committees"
       : (committees.find((c) => c.id === committeeFilter)?.name ?? "All Committees");
   const typeLabel = (id: string) =>
-    kpiTypes.find((t) => t.id === id)?.kpiTypeName ??
-    KPI_TYPES.find((t) => t.id === id)?.label ??
-    id;
+    kpiTypeById.get(id)?.kpiTypeName ?? FALLBACK_TYPE_LABELS.get(id) ?? id;
   const isAdmin = can("configure_kpis");
   const recordIsActive = record?.status === "active";
   const q1Approvals = useRecordApprovals(recordId, selectedYear, 1);
@@ -141,8 +163,14 @@ function PerformanceRecordDetail() {
     .filter(Boolean)
     .join(" · ");
 
-  // Committee narrows the KPI pool first; the category tabs (and their
-  // counts) operate on that narrowed set.
+  const activeCategories = useMemo(
+    () =>
+      categoriesOfType(categories, categoryTaxonomyForKpiType(activeKpiType)),
+    [categories, activeKpiType],
+  );
+
+  // Committee and KPI type narrow the KPI pool first; the category tabs and
+  // their counts operate on that intersection.
   const committeeScoped = useMemo(
     () =>
       committeeFilter === "all"
@@ -150,22 +178,37 @@ function PerformanceRecordDetail() {
         : kpis.filter((k) => k.committeeId === committeeFilter),
     [kpis, committeeFilter],
   );
-  // Tabs group by category_id, which holds the Strategic taxonomy only —
-  // routine categories would otherwise show up as permanently-empty tabs.
-  const tabs = [
-    { id: "all", label: "All", count: committeeScoped.length },
-    ...categoriesOfType(categories, "strategic").map((c) => ({
-      id: c.id,
-      label: c.label,
-      count: committeeScoped.filter((k) => k.categoryId === c.id).length,
-    })),
-  ];
+  const typeScoped = useMemo(
+    () => committeeScoped.filter((k) => k.kpiType === activeKpiType),
+    [committeeScoped, activeKpiType],
+  );
+  const tabs = useMemo(
+    () => [
+      { id: "all", label: "All", count: typeScoped.length },
+      ...activeCategories.map((category) => ({
+        id: category.id,
+        label: category.label,
+        count: typeScoped.filter(
+          (kpi) => categoryIdForKpiType(kpi, activeKpiType) === category.id,
+        ).length,
+      })),
+    ],
+    [activeCategories, typeScoped, activeKpiType],
+  );
+  const activeCat =
+    cat === "all" || activeCategories.some((category) => category.id === cat) ? cat : "all";
   const rows = useMemo(
     () =>
-      cat === "all"
-        ? committeeScoped
-        : committeeScoped.filter((k) => k.categoryId === cat),
-    [committeeScoped, cat],
+      activeCat === "all"
+        ? typeScoped
+        : typeScoped.filter(
+            (kpi) => categoryIdForKpiType(kpi, activeKpiType) === activeCat,
+          ),
+    [typeScoped, activeCat, activeKpiType],
+  );
+  const selectedTypeTotal = useMemo(
+    () => kpis.filter((kpi) => kpi.kpiType === activeKpiType).length,
+    [kpis, activeKpiType],
   );
   const approvalLockForKpi = useCallback((kpiId: number) => {
     const selectedLock = approvalLockForState(
@@ -191,7 +234,7 @@ function PerformanceRecordDetail() {
         case "type":
           // Sort by the type's own order (Strategic → Operational → Routine),
           // not alphabetically by its id.
-          return kpiTypes.find((t) => t.id === kpi.kpiType)?.sortOrder ?? 99;
+          return kpiTypeById.get(kpi.kpiType)?.sortOrder ?? 99;
         case "annualTarget":
           return targetForYear(kpi.annualTargets, selectedYear);
         case "currentProgress":
@@ -222,7 +265,7 @@ function PerformanceRecordDetail() {
             });
       return sort.dir === "asc" ? comparison : -comparison;
     });
-  }, [rows, sort, selectedYear, approvalLockForKpi, kpiTypes]);
+  }, [rows, sort, selectedYear, approvalLockForKpi, kpiTypeById]);
   const toggleSort = (key: SortKey) =>
     setSort((current) =>
       current?.key === key
@@ -295,7 +338,7 @@ function PerformanceRecordDetail() {
         </span>
       </div>
 
-      <div className="flex flex-col gap-md rounded-lg border border-hairline bg-surface-lowest px-md py-sm lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-md rounded-lg border border-hairline bg-surface-lowest px-md py-sm 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div className="flex flex-col gap-sm">
           <div className="flex flex-wrap items-center gap-sm text-label-md">
             <Icon name="event_available" size={18} className="text-stone" />
@@ -312,11 +355,10 @@ function PerformanceRecordDetail() {
             )}
           </div>
         </div>
-        {/* shrink-0: without it, the long "Recording open: ..." sibling eats
-            the row's width first (default flex-shrink), squeezing this
-            cluster below its one-line content width and forcing Committee to
-            wrap even when there's plenty of room for all three fields. */}
-        <div className="flex flex-wrap items-end gap-md shrink-0 lg:justify-end">
+        {/* Keep the filters on their own full-width row until the viewport is
+            wide enough for the recording summary and all four controls. The
+            toggle is the last independent flex item, so it wraps last. */}
+        <div className="flex w-full flex-wrap items-end gap-md 2xl:w-auto 2xl:shrink-0 2xl:justify-end">
           <Field label="Committee">
             <Select
               value={committeeFilter}
@@ -325,7 +367,7 @@ function PerformanceRecordDetail() {
               // beat the shared Select base's w-full in this build's cascade
               // order (unlike a named utility such as w-auto) — !important
               // makes the override unconditional.
-              className="!w-[150px] truncate rounded-xl"
+              className="!h-[28px] !w-[150px] truncate rounded-xl"
               title={committeeFilterLabel}
             >
               <option value="all">All Committees</option>
@@ -344,7 +386,7 @@ function PerformanceRecordDetail() {
               <Select
                 value={String(selectedYear)}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="w-auto min-w-[110px] rounded-xl"
+                className="!h-[28px] w-auto min-w-[110px] rounded-xl"
               >
                 {[1, 2, 3, 4, 5].map((yearNo) => (
                   <option key={yearNo} value={yearNo}>
@@ -357,7 +399,7 @@ function PerformanceRecordDetail() {
               <Select
                 value={String(approvalQuarter)}
                 onChange={(e) => setApprovalQuarter(Number(e.target.value))}
-                className="w-auto min-w-[90px] rounded-xl"
+                className="!h-[28px] w-auto min-w-[90px] rounded-xl"
               >
                 {[1, 2, 3, 4].map((quarterNo) => (
                   <option key={quarterNo} value={quarterNo}>
@@ -367,17 +409,39 @@ function PerformanceRecordDetail() {
               </Select>
             </Field>
           </div>
+          <div className="flex flex-col gap-xs">
+            <span className="text-label-md text-on-surface">KPI Type</span>
+            <SegmentedControl
+              items={kpiTypeOptions}
+              active={activeKpiType}
+              onChange={(typeId) => {
+                setSelectedKpiType(typeId);
+                setCat("all");
+              }}
+              ariaLabel="KPI type"
+              selectionStyle="sliding"
+              className="h-[28px]"
+            />
+          </div>
         </div>
       </div>
 
-      <Tabs items={tabs} active={cat} onChange={setCat} variant="filled" />
+      <Tabs items={tabs} active={activeCat} onChange={setCat} variant="filled" />
 
       <Card className="overflow-hidden">
         <QueryBoundary isLoading={kpisQ.isLoading} isError={kpisQ.isError}>
           {rows.length === 0 ? (
             <EmptyState
-              title="No KPIs in this record"
-              message="This record was activated from a set with no KPIs, or none match this category."
+              title={
+                selectedTypeTotal === 0
+                  ? `No ${typeLabel(activeKpiType)} KPIs in this record`
+                  : "No KPIs match these filters"
+              }
+              message={
+                selectedTypeTotal === 0
+                  ? `This performance record contains no KPIs assigned the ${typeLabel(activeKpiType)} type.`
+                  : "Try a different committee or category."
+              }
             />
           ) : (
             <Table>
