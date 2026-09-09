@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { categoriesOfType } from "../lib/kpi/categories.ts";
+import {
+  categoriesOfType,
+  categoryIdForKpiType,
+  categoryTaxonomyForKpiType,
+} from "../lib/kpi/categories.ts";
 
 const CATEGORIES = [
   { id: "student_success", kpiType: "strategic", label: "Student Success", sortOrder: 1 },
@@ -37,4 +41,25 @@ test("incoming order is preserved, so the API's sort_order still governs", () =>
 test("a type with no categories yields an empty list, not undefined", () => {
   assert.deepEqual(categoriesOfType(CATEGORIES, "operational"), []);
   assert.deepEqual(categoriesOfType([], "strategic"), []);
+});
+
+test("Strategic and Operational KPI types use the Strategic category taxonomy", () => {
+  assert.equal(categoryTaxonomyForKpiType("strategic"), "strategic");
+  assert.equal(categoryTaxonomyForKpiType("operational"), "strategic");
+});
+
+test("Routine KPI types use the Routine category taxonomy", () => {
+  assert.equal(categoryTaxonomyForKpiType("routine"), "routine");
+});
+
+test("categoryIdForKpiType selects the category column for the active taxonomy", () => {
+  const kpi = {
+    categoryId: "research_output",
+    routineCategoryId: "routine_area_2",
+  };
+
+  assert.equal(categoryIdForKpiType(kpi, "strategic"), "research_output");
+  assert.equal(categoryIdForKpiType(kpi, "operational"), "research_output");
+  assert.equal(categoryIdForKpiType(kpi, "routine"), "routine_area_2");
+  assert.equal(categoryIdForKpiType({ ...kpi, routineCategoryId: null }, "routine"), null);
 });
