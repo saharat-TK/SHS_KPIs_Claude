@@ -12,6 +12,7 @@ import {
   Button,
   Badge,
   Tabs,
+  SegmentedControl,
   Select,
   UnitSelect,
   QueryBoundary,
@@ -38,7 +39,11 @@ import {
   type KpiType,
   type LibraryKpi,
 } from "@/lib/types";
-import { categoriesOfType } from "@/lib/kpi/categories";
+import {
+  categoriesOfType,
+  categoryIdForKpiType,
+  categoryTaxonomyForKpiType,
+} from "@/lib/kpi/categories";
 import { describeKpiDeletion } from "@/lib/kpi/deletion";
 import { ManageCategoriesModal } from "./ManageCategoriesModal";
 
@@ -49,6 +54,9 @@ const TYPE_TONE: Record<string, "primary" | "info" | "neutral"> = {
   operational: "info",
   routine: "neutral",
 };
+const FALLBACK_TYPE_LABELS = new Map<string, string>(
+  KPI_TYPES.map((type) => [type.id, type.label]),
+);
 type SortKey = "name" | "type";
 type SortState = { key: SortKey; dir: "asc" | "desc" };
 
@@ -78,46 +86,89 @@ function SetDetail() {
   useBreadcrumbLabel(`/kpi-management/library/${setId}`, setQ.data?.name);
 
   const [cat, setCat] = useState<string>("all");
+  const [selectedKpiType, setSelectedKpiType] = useState<string>("strategic");
   const [committeeFilter, setCommitteeFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortState | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showManageCats, setShowManageCats] = useState(false);
 
-  const categories = categoriesQ.data ?? [];
-  const kpis = kpisQ.data ?? [];
+  const categories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
+  const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
   const kpiTypes = useMemo(() => kpiTypesQ.data ?? [], [kpiTypesQ.data]);
   const committees = committeesQ.data ?? [];
-  // Tabs group by category_id, which holds the Strategic taxonomy only —
-  // routine categories would otherwise show up as permanently-empty tabs.
-  const strategicCategories = categoriesOfType(categories, "strategic");
+  const kpiTypeById = useMemo(
+    () => new Map(kpiTypes.map((type) => [type.id, type])),
+    [kpiTypes],
+  );
+
+  const kpiTypeOptions = useMemo(
+    () =>
+      kpiTypesQ.data
+        ?.slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((type) => ({ id: type.id, label: type.kpiTypeName })) ?? KPI_TYPES,
+    [kpiTypesQ.data],
+  );
+  const activeKpiType = kpiTypeOptions.some((type) => type.id === selectedKpiType)
+    ? selectedKpiType
+    : "strategic";
+
+  const strategicCategories = useMemo(
+    () => categoriesOfType(categories, "strategic"),
+    [categories],
+  );
+  const activeCategories = useMemo(
+    () =>
+      categoriesOfType(categories, categoryTaxonomyForKpiType(activeKpiType)),
+    [categories, activeKpiType],
+  );
   const typeLabel = (id: string) =>
-    kpiTypes.find((t) => t.id === id)?.kpiTypeName ??
-    KPI_TYPES.find((t) => t.id === id)?.label ??
-    id;
+    kpiTypeById.get(id)?.kpiTypeName ?? FALLBACK_TYPE_LABELS.get(id) ?? id;
 
-  // Committee narrows the KPI pool first; the category tabs (and their
-  // counts) operate on that narrowed set, same as the dashboard's KPI-type
-  // toggle scopes its group tabs.
-  const committeeScoped =
-    committeeFilter === "all"
-      ? kpis
-      : kpis.filter((k) => k.committeeId === committeeFilter);
+  // Committee and KPI type narrow the pool first. The category tabs and their
+  // counts then operate on that intersection.
+  const committeeScoped = useMemo(
+    () =>
+      committeeFilter === "all"
+        ? kpis
+        : kpis.filter((k) => k.committeeId === committeeFilter),
+    [kpis, committeeFilter],
+  );
+  const typeScoped = useMemo(
+    () => committeeScoped.filter((k) => k.kpiType === activeKpiType),
+    [committeeScoped, activeKpiType],
+  );
 
-  const tabs = [
-    { id: "all", label: "All", count: committeeScoped.length },
-    ...strategicCategories.map((c) => ({
-      id: c.id,
-      label: c.label,
-      count: committeeScoped.filter((k) => k.categoryId === c.id).length,
-    })),
-  ];
+  const tabs = useMemo(
+    () => [
+      { id: "all", label: "All", count: typeScoped.length },
+      ...activeCategories.map((c) => ({
+        id: c.id,
+        label: c.label,
+        count: typeScoped.filter(
+          (k) => categoryIdForKpiType(k, activeKpiType) === c.id,
+        ).length,
+      })),
+    ],
+    [activeCategories, typeScoped, activeKpiType],
+  );
+  // A deleted category cannot remain active. Type changes also reset `cat` in
+  // the interaction handler below, before the next taxonomy is rendered.
+  const activeCat =
+    cat === "all" || activeCategories.some((category) => category.id === cat) ? cat : "all";
 
   const rows = useMemo(
     () =>
-      cat === "all"
-        ? committeeScoped
-        : committeeScoped.filter((k) => k.categoryId === cat),
-    [committeeScoped, cat],
+      activeCat === "all"
+        ? typeScoped
+        : typeScoped.filter(
+            (k) => categoryIdForKpiType(k, activeKpiType) === activeCat,
+          ),
+    [typeScoped, activeCat, activeKpiType],
+  );
+  const selectedTypeTotal = useMemo(
+    () => kpis.filter((k) => k.kpiType === activeKpiType).length,
+    [kpis, activeKpiType],
   );
   const sortedRows = useMemo(() => {
     if (!sort) return rows;
@@ -127,7 +178,7 @@ function SetDetail() {
 
       // Match the Performance table: type order is admin-configurable and is
       // therefore more meaningful than alphabetical ids or labels.
-      return kpiTypes.find((type) => type.id === kpi.kpiType)?.sortOrder ?? 99;
+      return kpiTypeById.get(kpi.kpiType)?.sortOrder ?? 99;
     };
 
     return [...rows].sort((left, right) => {
@@ -142,7 +193,7 @@ function SetDetail() {
             });
       return sort.dir === "asc" ? comparison : -comparison;
     });
-  }, [rows, sort, kpiTypes]);
+  }, [rows, sort, kpiTypeById]);
   const toggleSort = (key: SortKey) =>
     setSort((current) =>
       current?.key === key
@@ -200,12 +251,12 @@ function SetDetail() {
         }
       />
 
-      <div className="flex items-end gap-md">
+      <div className="flex flex-wrap items-end gap-md">
         <Field label="Committee">
           <Select
             value={committeeFilter}
             onChange={(e) => setCommitteeFilter(e.target.value)}
-            className="w-auto min-w-[200px]"
+            className="!h-[28px] w-auto min-w-[200px] rounded-lg"
           >
             <option value="all">All Committees</option>
             {committees.map((c) => (
@@ -215,16 +266,38 @@ function SetDetail() {
             ))}
           </Select>
         </Field>
+        <div className="flex flex-col gap-xs">
+          <span className="text-label-md text-on-surface">KPI Type</span>
+          <SegmentedControl
+            items={kpiTypeOptions}
+            active={activeKpiType}
+            onChange={(typeId) => {
+              setSelectedKpiType(typeId);
+              setCat("all");
+            }}
+            ariaLabel="KPI type"
+            selectionStyle="sliding"
+            className="h-[28px]"
+          />
+        </div>
       </div>
 
-      <Tabs items={tabs} active={cat} onChange={setCat} variant="filled" />
+      <Tabs items={tabs} active={activeCat} onChange={setCat} variant="filled" />
 
       <Card className="overflow-hidden">
         <QueryBoundary isLoading={kpisQ.isLoading} isError={kpisQ.isError}>
           {rows.length === 0 ? (
             <EmptyState
-              title="No KPIs here yet"
-              message="Add a KPI to this strategic set to begin defining targets and sub-KPIs."
+              title={
+                selectedTypeTotal === 0
+                  ? `No ${typeLabel(activeKpiType)} KPIs in this set`
+                  : "No KPIs match these filters"
+              }
+              message={
+                selectedTypeTotal === 0
+                  ? `Add a KPI and assign it the ${typeLabel(activeKpiType)} type to populate this view.`
+                  : "Try a different committee or category, or add a KPI to this strategic set."
+              }
               action={
                 <Button icon="add" onClick={() => setShowCreate(true)}>
                   Add KPI
