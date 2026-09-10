@@ -14,6 +14,10 @@ const nextConfig = {
   async redirects() {
     return [
       { source: "/", destination: "/dashboard", permanent: false },
+      { source: "/kpi-management", destination: "/kpi-management/performance", permanent: false },
+      { source: "/analytics", destination: "/analytics/student-success", permanent: false },
+      { source: "/admin", destination: "/admin/units", permanent: false },
+      { source: "/formulas", destination: "/formulas/builder", permanent: false },
       // Auto-heal any duplicate basePath in URLs (e.g. /SHSKPIs/SHSKPIs/... -> /SHSKPIs/...)
       ...(process.env.NODE_ENV === "production"
         ? [{ source: "/SHSKPIs/:path*", destination: "/:path*", permanent: false }]
