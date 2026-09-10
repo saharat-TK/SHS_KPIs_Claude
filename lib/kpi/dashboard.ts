@@ -7,11 +7,11 @@
 // unit-free and comparable, and is graded against each KPI's own green/amber
 // cutoffs.
 //
-// Runtime imports are limited to lib/kpi/progress.ts, which is itself
-// import-free, so tests can load this module directly under node's
-// type-stripping. The ".ts" extension is required for that (node resolves the
-// real file); tsconfig sets allowImportingTsExtensions for it. Do not import a
-// JSX module or anything that reaches the MySQL pool.
+// Runtime imports are limited to pure lib/kpi helpers, so tests can load this
+// module directly under node's type-stripping. The ".ts" extensions are
+// required for that (node resolves the real files); tsconfig sets
+// allowImportingTsExtensions for them. Do not import a JSX module or anything
+// that reaches the MySQL pool.
 import type {
   AnnualTarget,
   PerformanceStatus,
@@ -26,6 +26,10 @@ import {
   valueAsOfQuarter,
   type Health,
 } from "./progress.ts";
+import {
+  categoryIdForKpiType,
+  categoryTaxonomyForKpiType,
+} from "./categories.ts";
 
 export const QUARTERS = [1, 2, 3, 4] as const;
 
@@ -215,10 +219,10 @@ export function healthMix(
  */
 export function kpisOfType(kpis: DashboardKpi[], type: string): DashboardKpi[] {
   const mine = kpis.filter((k) => k.kpiType === type);
-  if (type !== "routine") return mine;
+  if (categoryTaxonomyForKpiType(type) !== "routine") return mine;
   // Copy rather than mutate — the caller still holds the unprojected list to
   // count types from.
-  return mine.map((k) => ({ ...k, categoryId: k.routineCategoryId ?? null }));
+  return mine.map((k) => ({ ...k, categoryId: categoryIdForKpiType(k, type) }));
 }
 
 /** How many KPIs of each type the record holds, over EVERY KPI regardless of
