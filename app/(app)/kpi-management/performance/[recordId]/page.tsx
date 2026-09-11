@@ -17,6 +17,7 @@ import {
   EmptyState,
   Field,
   Select,
+  SearchInput,
   healthOf,
   HEALTH_LABEL,
 } from "@/components/ui";
@@ -52,8 +53,9 @@ import {
   percentOfTarget,
   HEALTH_TONE,
 } from "@/lib/kpi/progress";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber, cn } from "@/lib/utils";
 import { KPI_TYPES, type PerformanceStatus } from "@/lib/types";
+import { PerfKpiDetailDrawer } from "./kpis/[perfKpiId]/PerfKpiDetail";
 
 const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
   active: "success",
@@ -102,7 +104,11 @@ function PerformanceRecordDetail() {
   const [cat, setCat] = useState<string>("all");
   const [selectedKpiType, setSelectedKpiType] = useState<string>("strategic");
   const [committeeFilter, setCommitteeFilter] = useState<string>("all");
+  const [committeeQuery, setCommitteeQuery] = useState("");
   const [sort, setSort] = useState<SortState | null>(null);
+  // Clicking a KPI row opens its full editable detail in a right-side drawer
+  // instead of navigating away.
+  const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null);
   // Drives both the Annual Target / Current Progress columns and the approval
   // lookups below; the quarter selector stays approval-only.
   const [selectedYear, setSelectedYear] = useState(1);
@@ -111,7 +117,7 @@ function PerformanceRecordDetail() {
   const categories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
   const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
   const kpiTypes = useMemo(() => kpiTypesQ.data ?? [], [kpiTypesQ.data]);
-  const committees = committeesQ.data ?? [];
+  const committees = useMemo(() => committeesQ.data ?? [], [committeesQ.data]);
   const kpiTypeById = useMemo(
     () => new Map(kpiTypes.map((type) => [type.id, type])),
     [kpiTypes],
@@ -127,12 +133,22 @@ function PerformanceRecordDetail() {
   const activeKpiType = kpiTypeOptions.some((type) => type.id === selectedKpiType)
     ? selectedKpiType
     : "strategic";
-  // The closed <select> box truncates a long committee name, so the full name
-  // rides on a title tooltip instead of being lost.
-  const committeeFilterLabel =
-    committeeFilter === "all"
-      ? "All Committees"
-      : (committees.find((c) => c.id === committeeFilter)?.name ?? "All Committees");
+  // KPI count per committee across the whole record (before any type/category
+  // filtering) so each card's badge stays stable as the table filters change.
+  const committeeKpiCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const k of kpis) {
+      if (k.committeeId)
+        counts.set(k.committeeId, (counts.get(k.committeeId) ?? 0) + 1);
+    }
+    return counts;
+  }, [kpis]);
+  // Filters only the card rail; the selected committee stays keyed off the full
+  // list, so searching never clears the current selection.
+  const visibleCommittees = useMemo(() => {
+    const q = committeeQuery.trim().toLowerCase();
+    return q ? committees.filter((c) => c.name.toLowerCase().includes(q)) : committees;
+  }, [committees, committeeQuery]);
   const typeLabel = (id: string) =>
     kpiTypeById.get(id)?.kpiTypeName ?? FALLBACK_TYPE_LABELS.get(id) ?? id;
   const isAdmin = can("configure_kpis");
@@ -361,25 +377,6 @@ function PerformanceRecordDetail() {
             wide enough for the recording summary and all four controls. The
             toggle is the last independent flex item, so it wraps last. */}
         <div className="flex w-full flex-wrap items-end gap-md 2xl:w-auto 2xl:shrink-0 2xl:justify-end">
-          <Field label="Committee">
-            <Select
-              value={committeeFilter}
-              onChange={(e) => setCommitteeFilter(e.target.value)}
-              // !w-[...]: an arbitrary-value width utility doesn't reliably
-              // beat the shared Select base's w-full in this build's cascade
-              // order (unlike a named utility such as w-auto) — !important
-              // makes the override unconditional.
-              className="!h-[28px] !w-[150px] truncate rounded-lg"
-              title={committeeFilterLabel}
-            >
-              <option value="all">All Committees</option>
-              {committees.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
           {/* flex-nowrap: Year and Quarter must stay paired on one row at
               every width, even if Committee wraps to its own line above
               them. */}
@@ -428,9 +425,70 @@ function PerformanceRecordDetail() {
         </div>
       </div>
 
-      <Tabs items={tabs} active={activeCat} onChange={setCat} variant="filled" />
+      <div className="grid grid-cols-1 gap-lg lg:grid-cols-[246px_1fr]">
+        <div className="flex flex-col gap-sm">
+          <SearchInput
+            placeholder="Search committees…"
+            value={committeeQuery}
+            onChange={(e) => setCommitteeQuery(e.target.value)}
+          />
+          <div className="flex flex-col gap-sm overflow-y-auto scroll-thin pr-tiny" style={{ maxHeight: 673 }}>
+            {/* Pinned reset card — always shown, unaffected by the search. */}
+            <button
+              onClick={() => setCommitteeFilter("all")}
+              className={cn(
+                "shrink-0 rounded-lg border p-md text-left transition-colors",
+                committeeFilter === "all"
+                  ? "border-primary-container bg-primary-container/15"
+                  : "border-hairline bg-surface-lowest hover:bg-surface-soft",
+              )}
+            >
+              <p className="text-body-strong text-on-surface">All Committees</p>
+              <div className="mt-sm flex items-center gap-lg text-caption-sm text-mute">
+                <span className="inline-flex items-center gap-xs">
+                  <Icon name="assessment" size={16} />
+                  {kpis.length} KPIs
+                </span>
+              </div>
+            </button>
+            {visibleCommittees.length === 0 ? (
+              <p className="p-lg text-center text-caption-sm text-mute">No committees match.</p>
+            ) : (
+              visibleCommittees.map((c) => {
+                const on = c.id === committeeFilter;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setCommitteeFilter(c.id)}
+                    className={cn(
+                      "shrink-0 rounded-lg border p-md text-left transition-colors",
+                      on
+                        ? "border-primary-container bg-primary-container/15"
+                        : "border-hairline bg-surface-lowest hover:bg-surface-soft",
+                    )}
+                  >
+                    <p className="line-clamp-2 leading-tight text-body-strong text-on-surface">{c.name}</p>
+                    <div className="mt-sm flex items-center gap-lg text-caption-sm text-mute">
+                      <span className="inline-flex items-center gap-xs">
+                        <Icon name="target" size={16} />
+                        {c.keyMetric}
+                      </span>
+                      <span className="inline-flex items-center gap-xs">
+                        <Icon name="assessment" size={16} />
+                        {committeeKpiCounts.get(c.id) ?? 0} KPIs
+                      </span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
 
-      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-md">
+          <Tabs items={tabs} active={activeCat} onChange={setCat} variant="filled" />
+
+          <Card className="overflow-hidden">
         <QueryBoundary isLoading={kpisQ.isLoading} isError={kpisQ.isError}>
           {rows.length === 0 ? (
             <EmptyState
@@ -520,12 +578,7 @@ function PerformanceRecordDetail() {
                         })
                       : null;
                   return (
-                    <Tr
-                      key={k.id}
-                      onClick={() =>
-                        router.push(`/kpi-management/performance/${recordId}/kpis/${k.id}`)
-                      }
-                    >
+                    <Tr key={k.id} onClick={() => setSelectedKpiId(k.id)}>
                       <Td className="font-medium">{k.name}</Td>
                       <Td align="center">
                         <Badge tone={TYPE_TONE[k.kpiType] ?? "neutral"}>
@@ -580,7 +633,7 @@ function PerformanceRecordDetail() {
                           className="rounded p-xs text-mute hover:bg-surface-soft hover:text-on-surface"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/kpi-management/performance/${recordId}/kpis/${k.id}`);
+                            setSelectedKpiId(k.id);
                           }}
                         >
                           <Icon name={approvalLock?.lock?.locked ? "visibility" : "edit_note"} size={18} />
@@ -593,7 +646,16 @@ function PerformanceRecordDetail() {
             </Table>
           )}
         </QueryBoundary>
-      </Card>
+          </Card>
+        </div>
+      </div>
+
+      <PerfKpiDetailDrawer
+        recordId={recordId}
+        perfKpiId={selectedKpiId ?? 0}
+        open={selectedKpiId != null}
+        onClose={() => setSelectedKpiId(null)}
+      />
     </>
   );
 }
