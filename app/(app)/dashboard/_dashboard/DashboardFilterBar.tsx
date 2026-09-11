@@ -54,7 +54,7 @@ export function DashboardFilterBar({
             <Select
               value={String(year)}
               onChange={(e) => onChange({ year: Number(e.target.value) })}
-              className="h-[28px] min-w-[180px] rounded-lg"
+              className="!h-[28px] min-w-[180px] rounded-lg"
             >
               {Array.from({ length: PERFORMANCE_YEAR_COUNT }, (_, i) => i + 1).map((y) => (
                 <option key={y} value={y}>
@@ -67,7 +67,7 @@ export function DashboardFilterBar({
             <Select
               value={String(quarter)}
               onChange={(e) => onChange({ quarter: Number(e.target.value) })}
-              className="h-[28px] min-w-[150px] rounded-lg"
+              className="!h-[28px] min-w-[150px] rounded-lg"
             >
               {[1, 2, 3, 4].map((q) => (
                 <option key={q} value={q}>

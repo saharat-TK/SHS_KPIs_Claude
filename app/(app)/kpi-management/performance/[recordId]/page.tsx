@@ -297,6 +297,7 @@ function PerformanceRecordDetail() {
               <Button
                 variant="outline"
                 icon="sync"
+                className="rounded-lg"
                 disabled={sync.isPending || !recordIsActive}
                 title={recordIsActive ? undefined : "Only active records can sync from the library"}
                 onClick={() => sync.mutate(recordId)}
@@ -308,6 +309,7 @@ function PerformanceRecordDetail() {
               <Button
                 variant="outline"
                 icon="database"
+                className="rounded-lg"
                 disabled={recompute.isPending || !recordIsActive}
                 title={
                   recordIsActive
@@ -367,7 +369,7 @@ function PerformanceRecordDetail() {
               // beat the shared Select base's w-full in this build's cascade
               // order (unlike a named utility such as w-auto) — !important
               // makes the override unconditional.
-              className="!h-[28px] !w-[150px] truncate rounded-xl"
+              className="!h-[28px] !w-[150px] truncate rounded-lg"
               title={committeeFilterLabel}
             >
               <option value="all">All Committees</option>
@@ -386,7 +388,7 @@ function PerformanceRecordDetail() {
               <Select
                 value={String(selectedYear)}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="!h-[28px] w-auto min-w-[110px] rounded-xl"
+                className="!h-[28px] w-auto min-w-[110px] rounded-lg"
               >
                 {[1, 2, 3, 4, 5].map((yearNo) => (
                   <option key={yearNo} value={yearNo}>
@@ -399,7 +401,7 @@ function PerformanceRecordDetail() {
               <Select
                 value={String(approvalQuarter)}
                 onChange={(e) => setApprovalQuarter(Number(e.target.value))}
-                className="!h-[28px] w-auto min-w-[90px] rounded-xl"
+                className="!h-[28px] w-auto min-w-[90px] rounded-lg"
               >
                 {[1, 2, 3, 4].map((quarterNo) => (
                   <option key={quarterNo} value={quarterNo}>
