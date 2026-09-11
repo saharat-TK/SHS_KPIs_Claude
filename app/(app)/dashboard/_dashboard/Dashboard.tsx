@@ -298,6 +298,7 @@ export function Dashboard() {
             <Button
               variant="outline"
               iconRight="chevron_right"
+              className="!h-[28px] rounded-lg"
               onClick={() => record && router.push(`/kpi-management/performance/${record.id}`)}
             >
               Open Record
