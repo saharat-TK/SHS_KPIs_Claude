@@ -46,7 +46,7 @@ export function Drawer({
   headerExtra?: React.ReactNode;
   footer?: React.ReactNode;
   children: React.ReactNode;
-  width?: "md" | "lg";
+  width?: "md" | "lg" | "xl";
   closeOnEscape?: boolean;
   closeOnBackdrop?: boolean;
 }) {
@@ -150,7 +150,12 @@ export function Drawer({
           "fixed inset-y-0 right-0 z-[90] flex h-full w-full flex-col outline-none",
           "bg-surface-lowest border-l border-hairline shadow-chrome",
           "transition-transform ease-[cubic-bezier(0.16,1,0.3,1)]",
-          width === "lg" ? "sm:w-[640px]" : "sm:w-[520px]",
+          // xl scales with the window (always ~15% margin) and caps at 1280px.
+          width === "xl"
+            ? "sm:w-[85vw] sm:max-w-[1280px]"
+            : width === "lg"
+              ? "sm:w-[640px]"
+              : "sm:w-[520px]",
           // No `translate-x-0` when open, on purpose: any non-`none` transform
           // would make this a containing block for descendants, which breaks
           // the `fixed` hover tooltip inside AnnualQuarterProgressMatrix (it
