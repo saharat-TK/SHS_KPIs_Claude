@@ -12,6 +12,7 @@ export { SegmentedControl, type SegmentItem } from "./SegmentedControl";
 export { Modal } from "./Modal";
 export { Drawer } from "./Drawer";
 export { HoverPopover } from "./HoverPopover";
+export { HoverInfoCard } from "./HoverInfoCard";
 export { StatCard } from "./StatCard";
 export { RingGauge } from "./RingGauge";
 export { CountUp, useReducedMotion } from "./CountUp";
