@@ -31,6 +31,7 @@ export default async function AppLayout({
         name: actor.name,
         email: actor.email,
         role: actor.role,
+        committeeIds: actor.committeeIds,
         committeeId: actor.committeeId ?? undefined,
       }}
       impersonating={actor.impersonating}

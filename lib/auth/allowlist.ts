@@ -25,6 +25,7 @@ export interface ActorRow {
   name: string;
   email: string;
   role: Role;
+  committeeIds: string[];
   committeeId: string | null;
 }
 

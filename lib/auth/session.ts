@@ -24,35 +24,56 @@ export { ActorError, actorErrorResponse } from "./errors";
  */
 export const IMPERSONATE_COOKIE = "shs-impersonate";
 
-// A person can sit on several committees; this single id exists only for
-// can()'s committee scoping and for display. The approval workflow resolves
-// position against the KPI's own committee via resolvePosition(), which is
-// unaffected by which one we pick here.
+// A person can sit on several committees. Load the full ordered roster for
+// authorization and retain the first id only as a compatibility/display value.
 const ACTOR_SELECT = `
   f.id                AS facultyId,
   f.name              AS name,
   f.email             AS email,
   f.system_role       AS role,
   (SELECT cm.committee_id FROM committee_memberships cm
-    WHERE cm.faculty_id = f.id ORDER BY cm.committee_id LIMIT 1) AS committeeId
+    WHERE cm.faculty_id = f.id ORDER BY cm.committee_id LIMIT 1) AS committeeId,
+  (SELECT GROUP_CONCAT(cm.committee_id ORDER BY cm.committee_id SEPARATOR ',')
+    FROM committee_memberships cm WHERE cm.faculty_id = f.id) AS committeeIdsCsv
 `;
 
+interface ActorDbRow extends RowDataPacket {
+  facultyId: string;
+  name: string;
+  email: string;
+  role: ActorRow["role"];
+  committeeId: string | null;
+  committeeIdsCsv: string | null;
+}
+
+function mapActorRow(row: ActorDbRow | undefined): ActorRow | null {
+  if (!row) return null;
+  return {
+    facultyId: row.facultyId,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    committeeId: row.committeeId,
+    committeeIds: row.committeeIdsCsv ? row.committeeIdsCsv.split(",") : [],
+  };
+}
+
 async function activeFacultyById(id: string): Promise<ActorRow | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await pool.query<ActorDbRow[]>(
     `SELECT ${ACTOR_SELECT} FROM faculty f
       WHERE f.id = ? AND f.status = 'active' LIMIT 1`,
     [id],
   );
-  return (rows[0] as ActorRow | undefined) ?? null;
+  return mapActorRow(rows[0]);
 }
 
 async function activeFacultyByEmail(email: string): Promise<ActorRow | null> {
-  const [rows] = await pool.query<RowDataPacket[]>(
+  const [rows] = await pool.query<ActorDbRow[]>(
     `SELECT ${ACTOR_SELECT} FROM faculty f
       WHERE LOWER(TRIM(f.email)) = ? AND f.status = 'active' LIMIT 1`,
     [email],
   );
-  return (rows[0] as ActorRow | undefined) ?? null;
+  return mapActorRow(rows[0]);
 }
 
 /**
@@ -106,6 +127,7 @@ export async function requirePermission(
       email: actor.email,
       role: actor.role,
       facultyId: actor.facultyId,
+      committeeIds: actor.committeeIds,
       committeeId: actor.committeeId ?? undefined,
     },
     action,
@@ -116,4 +138,3 @@ export async function requirePermission(
   }
   return actor;
 }
-

@@ -3,13 +3,14 @@ import test from "node:test";
 
 import { can, ROLES, ROLE_LABELS } from "../lib/auth/can.ts";
 
-const user = (role, committeeId) => ({
+const user = (role, committeeId, committeeIds) => ({
   id: "fac-001",
   name: "Test Person",
   email: "test@mfu.ac.th",
   role,
   facultyId: "fac-001",
   committeeId,
+  committeeIds,
 });
 
 test("ROLES matches the faculty.system_role ENUM", () => {
@@ -53,12 +54,28 @@ test("viewer cannot record performance", () => {
   }
 });
 
-test("committee writes stay scoped to the person's own committee", () => {
-  const u = user("committee", "cmt-curriculum");
+test("committee writes allow every assigned committee", () => {
+  const u = user(
+    "committee",
+    "cmt-curriculum",
+    ["cmt-curriculum", "cmt-research-ethics"],
+  );
   assert.ok(can(u, "submit_metrics", { committeeId: "cmt-curriculum" }));
-  assert.equal(can(u, "submit_metrics", { committeeId: "cmt-research" }), false);
+  assert.ok(can(u, "submit_metrics", { committeeId: "cmt-research-ethics" }));
+  assert.equal(can(u, "submit_metrics", { committeeId: "cmt-finance" }), false);
   // Admin is not scoped.
   assert.ok(can(user("admin"), "submit_metrics", { committeeId: "cmt-research" }));
+});
+
+test("committee writes fall back to the legacy single committee id", () => {
+  const u = user("committee", "cmt-curriculum");
+  assert.ok(can(u, "submit_metrics", { committeeId: "cmt-curriculum" }));
+  assert.equal(can(u, "submit_metrics", { committeeId: "cmt-research-ethics" }), false);
+});
+
+test("committee writes fail closed when the person has no memberships", () => {
+  const u = user("committee", undefined, []);
+  assert.equal(can(u, "submit_metrics", { committeeId: "cmt-curriculum" }), false);
 });
 
 test("an unknown role and a missing user both deny everything", () => {
