@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   PageHeader,
   Card,
@@ -19,11 +20,14 @@ import { RequirePermission } from "@/components/shell/Guard";
 import { useBreadcrumbLabel } from "@/components/shell/BreadcrumbLabels";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
+  useCommittees,
   useDataSource,
   useDataSourceColumns,
   useDataSourceEntries,
   useDataSourceLinks,
+  useDeleteDataSource,
   useDeleteDataSourceLink,
+  useUpdateDataSource,
   useFacultyRecords,
   useAcademicCatalog,
 } from "@/lib/data/hooks";
@@ -38,6 +42,7 @@ import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import { UTF8_BOM, downloadCsv, toCsv } from "@/lib/csv";
 import { Icon } from "@/components/ui/Icon";
 import type { DataSourceColumn, DataSourceEntry, DataSourceLink } from "@/lib/types";
+import { DataSourceModal } from "../DataSourceModal";
 import { EntryModal } from "./EntryModal";
 import { ImportEntriesModal } from "./ImportEntriesModal";
 import { LinkKpiModal } from "./LinkKpiModal";
@@ -58,13 +63,19 @@ export default function DataSourceDetailPage({
 }
 
 function DataSourceDetail({ id }: { id: number }) {
+  const router = useRouter();
+  const confirm = useConfirm();
   const { can } = useAuth();
   const sourceQ = useDataSource(id);
   const columnsQ = useDataSourceColumns(id);
   const linksQ = useDataSourceLinks(id);
+  const committeesQ = useCommittees();
+  const update = useUpdateDataSource();
+  const remove = useDeleteDataSource();
   const [tab, setTab] = useState("data");
   const [showColumns, setShowColumns] = useState(false);
   const [showLink, setShowLink] = useState(false);
+  const [editingSource, setEditingSource] = useState(false);
   const [editing, setEditing] = useState<DataSourceEntry | null>(null);
   const [editingLink, setEditingLink] = useState<DataSourceLink | null>(null);
   const [adding, setAdding] = useState(false);
@@ -143,16 +154,71 @@ function DataSourceDetail({ id }: { id: number }) {
             }
             actions={
               <div className="flex flex-wrap items-center gap-sm">
+                <Button
+                  variant="ghost"
+                  icon="arrow_back"
+                  onClick={() => router.push("/kpi-management/data-sources")}
+                >
+                  All Data Sources
+                </Button>
+                {isAdmin && (
+                  <>
+                    <ActionDivider />
+                    <Button
+                      variant="ghost"
+                      icon="edit"
+                      onClick={() => setEditingSource(true)}
+                    >
+                      Edit details
+                    </Button>
+                    <ActionDivider />
+                    <Button
+                      variant="ghost"
+                      icon="delete"
+                      className="text-error hover:text-error"
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Delete this data source?",
+                          message: (
+                            <>
+                              Deleting <strong>{source.name}</strong> also removes
+                              its columns, all {source.entryCount ?? entries.length}{" "}
+                              recorded entries, and any {links.length} KPI links.
+                              This cannot be undone. Type{" "}
+                              <strong>DELETE THIS DS</strong> to proceed.
+                            </>
+                          ),
+                          tone: "danger",
+                          confirmLabel: "Delete data source",
+                          confirmPhrase: "DELETE THIS DS",
+                        });
+                        if (ok) {
+                          remove.mutate(id, {
+                            onSuccess: () =>
+                              router.push("/kpi-management/data-sources"),
+                          });
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </>
+                )}
                 {entries.length > 0 && (
-                  <Button variant="ghost" icon="download" onClick={exportCsv}>
-                    Export CSV
-                  </Button>
+                  <>
+                    <ActionDivider />
+                    <Button variant="ghost" icon="download" onClick={exportCsv}>
+                      Export CSV
+                    </Button>
+                  </>
                 )}
                 {tab === "data" && canRecord && columns.length > 0 && (
                   <>
+                    <ActionDivider />
                     <Button variant="ghost" icon="description" onClick={downloadTemplate}>
                       Template
                     </Button>
+                    <ActionDivider />
                     <Button
                       variant="ghost"
                       icon="upload_file"
@@ -337,6 +403,20 @@ function DataSourceDetail({ id }: { id: number }) {
             </Card>
           )}
 
+          <DataSourceModal
+            open={editingSource}
+            source={source}
+            committees={committeesQ.data ?? []}
+            submitting={update.isPending}
+            onClose={() => setEditingSource(false)}
+            onSubmit={(patch) =>
+              update.mutate(
+                { id, patch },
+                { onSuccess: () => setEditingSource(false) },
+              )
+            }
+          />
+
           <ManageColumnsModal
             open={showColumns}
             onClose={() => setShowColumns(false)}
@@ -386,6 +466,14 @@ function DataSourceDetail({ id }: { id: number }) {
   );
 }
 
+
+// A thin vertical rule between header action buttons. Each usage is baked
+// into the same conditional block as the button(s) it introduces, so it only
+// ever renders alongside a visible neighbor on both sides — never orphaned
+// when an admin-only or state-dependent action is hidden.
+function ActionDivider() {
+  return <div aria-hidden="true" className="h-6 w-px shrink-0 bg-hairline" />;
+}
 
 function LinksTable({
   dataSourceId,

@@ -13,16 +13,14 @@ import {
   Badge,
   QueryBoundary,
   EmptyState,
-  Modal,
-  Field,
-  Input,
   Select,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCommittees, useCreateDataSource, useDataSources } from "@/lib/data/hooks";
 import { formatDate } from "@/lib/utils";
-import type { Committee, DataSource, DataSourcePeriodGrain } from "@/lib/types";
+import type { Committee, DataSource } from "@/lib/types";
+import { DataSourceModal, type DataSourceCreateInput } from "./DataSourceModal";
 
 export default function DataSourcesPage() {
   return (
@@ -146,132 +144,20 @@ function DataSources() {
         </QueryBoundary>
       </Card>
 
-      <CreateDataSourceModal
+      <DataSourceModal
         open={showCreate}
         committees={committeesQ.data ?? []}
         submitting={create.isPending}
         onClose={() => setShowCreate(false)}
-        onCreate={(input) =>
-          create.mutate(
-            input,
-            {
-              onSuccess: (created) => {
-                setShowCreate(false);
-                router.push(`/kpi-management/data-sources/${created.id}`);
-              },
+        onSubmit={(input) =>
+          create.mutate(input as DataSourceCreateInput, {
+            onSuccess: (created) => {
+              setShowCreate(false);
+              router.push(`/kpi-management/data-sources/${created.id}`);
             },
-          )
+          })
         }
       />
     </>
-  );
-}
-
-function CreateDataSourceModal({
-  open,
-  committees,
-  submitting,
-  onClose,
-  onCreate,
-}: {
-  open: boolean;
-  committees: Committee[];
-  submitting: boolean;
-  onClose: () => void;
-  onCreate: (input: {
-    name: string;
-    description?: string;
-    committeeId: string;
-    periodGrain: DataSourcePeriodGrain;
-  }) => void;
-}) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [committeeId, setCommitteeId] = useState("");
-  const [periodGrain, setPeriodGrain] = useState<DataSourcePeriodGrain>("quarterly");
-
-  const valid = name.trim().length > 0 && committeeId.length > 0;
-
-  const reset = () => {
-    setName("");
-    setDescription("");
-    setCommitteeId("");
-    setPeriodGrain("quarterly");
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={() => {
-        reset();
-        onClose();
-      }}
-      title="New Data Source"
-      subtitle="The owning committee records data here; you define which columns it collects on the next screen."
-      footer={
-        <>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              reset();
-              onClose();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            disabled={!valid || submitting}
-            onClick={() =>
-              onCreate({
-                name: name.trim(),
-                description: description.trim() || undefined,
-                committeeId,
-                periodGrain,
-              })
-            }
-          >
-            {submitting ? "Creating…" : "Create"}
-          </Button>
-        </>
-      }
-    >
-      <div className="grid gap-md">
-        <Field label="Name">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Graduate employment survey"
-          />
-        </Field>
-        <Field label="Description" hint="Optional — what this data is and where it comes from.">
-          <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </Field>
-        <Field label="Owning committee" hint="Only this committee's members can record entries.">
-          <Select value={committeeId} onChange={(e) => setCommitteeId(e.target.value)}>
-            <option value="">Select a committee…</option>
-            {committees.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field
-          label="Period grain"
-          hint="Quarterly entries carry a year and quarter; annual entries carry only a year. This cannot be changed once data is recorded."
-        >
-          <Select
-            value={periodGrain}
-            onChange={(e) => setPeriodGrain(e.target.value as DataSourcePeriodGrain)}
-          >
-            <option value="quarterly">Quarterly</option>
-            <option value="annual">Annual</option>
-          </Select>
-        </Field>
-      </div>
-    </Modal>
   );
 }
