@@ -9,6 +9,7 @@ const admin = {
   email: "saharat.arr@mfu.ac.th",
   role: "admin",
   committeeId: "cmt-curriculum",
+  committeeIds: ["cmt-curriculum"],
 };
 const member = {
   facultyId: "fac-002",
@@ -16,6 +17,7 @@ const member = {
   email: "jongkon.sai@mfu.ac.th",
   role: "committee",
   committeeId: "cmt-curriculum",
+  committeeIds: ["cmt-curriculum", "cmt-research-ethics"],
 };
 const viewer = {
   facultyId: "fac-049",
@@ -23,6 +25,7 @@ const viewer = {
   email: "suwaporn@mfu.ac.th",
   role: "viewer",
   committeeId: null,
+  committeeIds: [],
 };
 
 test("nobody signed in resolves to no actor", () => {
@@ -45,6 +48,7 @@ test("an admin may view as someone else", () => {
   assert.equal(actor.facultyId, "fac-002", "runs as the target");
   assert.equal(actor.role, "committee", "and with the target's authority");
   assert.equal(actor.committeeId, "cmt-curriculum");
+  assert.deepEqual(actor.committeeIds, ["cmt-curriculum", "cmt-research-ethics"]);
   assert.equal(actor.impersonating, true);
   // The real person must survive: the audit trail records them.
   assert.equal(actor.realFacultyId, "fac-022");

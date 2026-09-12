@@ -40,12 +40,15 @@ export function can(
   const allowed = MATRIX[user.role]?.includes(action) ?? false;
   if (!allowed) return false;
 
-  // Committee users are scoped to their own committee for write actions.
+  // Committee users are scoped to every committee on their membership roster.
+  // Fall back to the legacy single id while older callers and fixtures migrate.
   if (
     user.role === "committee" &&
     (action === "submit_metrics") &&
     resource?.committeeId &&
-    resource.committeeId !== user.committeeId
+    !(user.committeeIds ?? (user.committeeId ? [user.committeeId] : [])).includes(
+      resource.committeeId,
+    )
   ) {
     return false;
   }

@@ -289,6 +289,9 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  /** Every committee this person belongs to. Used for committee-scoped writes. */
+  committeeIds?: string[];
+  /** Legacy deterministic primary committee retained for display compatibility. */
   committeeId?: string;
   /** Links the app user to faculty.id so the performance-approval workflow can
    *  resolve this person's committee_memberships.position (member/lead/counselor). */
