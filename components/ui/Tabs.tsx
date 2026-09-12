@@ -6,6 +6,11 @@ export interface TabItem {
   id: string;
   label: string;
   count?: number;
+  /** Renders the tab invisible and non-interactive while it still occupies its
+   *  normal layout space — for a tab that's empty under the current filter but
+   *  shouldn't shrink the row's footprint (e.g. compared to an "all" view that
+   *  shows every tab). */
+  hidden?: boolean;
 }
 
 export function Tabs({
@@ -38,18 +43,21 @@ export function Tabs({
             key={t.id}
             role="tab"
             aria-selected={on}
+            aria-hidden={t.hidden || undefined}
+            tabIndex={t.hidden ? -1 : undefined}
             onClick={() => onChange(t.id)}
             className={cn(
               // text-left overrides the browser's default centered button text,
               // which otherwise centers a long label's wrapped second line
               // instead of keeping it flush with the first.
               "px-md py-sm text-label-md text-left transition-colors inline-flex items-center gap-xs",
+              t.hidden && "invisible pointer-events-none",
               variant === "underline"
                 ? on
                   ? "-mb-px border-b-2 border-primary-container text-primary-dark"
                   : "-mb-px border-b-2 border-transparent text-mute hover:text-on-surface"
                 : on
-                  ? "relative z-10 rounded-t-lg bg-primary-container text-on-primary-container shadow-md"
+                  ? "relative z-10 rounded-t-lg bg-primary-container text-white shadow-md"
                   : "rounded-t-lg bg-surface-container-high text-mute hover:bg-surface-container-highest hover:text-on-surface",
             )}
           >

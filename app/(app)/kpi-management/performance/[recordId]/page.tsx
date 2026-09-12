@@ -35,6 +35,7 @@ import {
   useRecomputeFromDataSources,
   useRecordApprovals,
   useCommittees,
+  useCommitteeMemberships,
 } from "@/lib/data/hooks";
 import { approvalLockForState } from "@/lib/kpi/approvalWorkflow";
 import {
@@ -85,7 +86,7 @@ export default function PerformanceRecordPage() {
 
 function PerformanceRecordDetail() {
   const router = useRouter();
-  const { can } = useAuth();
+  const { can, role, user } = useAuth();
   const params = useParams<{ recordId: string }>();
   const recordId = Number(params.recordId);
 
@@ -95,6 +96,7 @@ function PerformanceRecordDetail() {
   const categoriesQ = useKpiCategories(record?.sourceSetId, { enabled: !!record });
   const kpiTypesQ = useKpiTypes();
   const committeesQ = useCommittees();
+  const membershipsQ = useCommitteeMemberships();
   const periodsQ = usePerformancePeriods(recordId);
   const sync = useSyncPerformanceRecord();
   const recompute = useRecomputeFromDataSources();
@@ -143,12 +145,44 @@ function PerformanceRecordDetail() {
     }
     return counts;
   }, [kpis]);
+  // Admins/reviewers/viewers oversee every committee, so the rail stays
+  // unrestricted for them. A "committee"-role user only sees the committee(s)
+  // they belong to — keyed by facultyId (not the session's single,
+  // arbitrarily-picked user.committeeId), mirroring
+  // resolvePositionFromMemberships in lib/kpi/approvalWorkflow.ts.
+  const isCommitteeRestricted = role === "committee";
+  const myCommitteeIds = useMemo(() => {
+    if (!isCommitteeRestricted) return null; // null = unrestricted
+    return new Set(
+      (membershipsQ.data ?? [])
+        .filter((m) => m.facultyId === user.facultyId)
+        .map((m) => m.committeeId),
+    );
+  }, [isCommitteeRestricted, membershipsQ.data, user.facultyId]);
+  // A committee-role user with no membership rows is a data anomaly, not a
+  // normal case — fall back to the unrestricted view rather than leaving them
+  // with a broken, empty rail.
+  const restrictionActive = isCommitteeRestricted && !!myCommitteeIds && myCommitteeIds.size > 0;
+  const defaultRestrictedCommitteeId = useMemo(
+    () => [...(myCommitteeIds ?? [])].sort()[0] ?? null,
+    [myCommitteeIds],
+  );
+  // A restricted user must never actually be scoped to "all" — the raw
+  // committeeFilter state still defaults to "all" (there's no card to select
+  // it from for them), so resolve it to their first committee instead.
+  const effectiveCommitteeFilter =
+    restrictionActive && committeeFilter === "all"
+      ? (defaultRestrictedCommitteeId ?? "all")
+      : committeeFilter;
   // Filters only the card rail; the selected committee stays keyed off the full
   // list, so searching never clears the current selection.
   const visibleCommittees = useMemo(() => {
+    const base = restrictionActive
+      ? committees.filter((c) => myCommitteeIds!.has(c.id))
+      : committees;
     const q = committeeQuery.trim().toLowerCase();
-    return q ? committees.filter((c) => c.name.toLowerCase().includes(q)) : committees;
-  }, [committees, committeeQuery]);
+    return q ? base.filter((c) => c.name.toLowerCase().includes(q)) : base;
+  }, [committees, committeeQuery, restrictionActive, myCommitteeIds]);
   const typeLabel = (id: string) =>
     kpiTypeById.get(id)?.kpiTypeName ?? FALLBACK_TYPE_LABELS.get(id) ?? id;
   const isAdmin = can("configure_kpis");
@@ -189,30 +223,65 @@ function PerformanceRecordDetail() {
   // their counts operate on that intersection.
   const committeeScoped = useMemo(
     () =>
-      committeeFilter === "all"
+      effectiveCommitteeFilter === "all"
         ? kpis
-        : kpis.filter((k) => k.committeeId === committeeFilter),
-    [kpis, committeeFilter],
+        : kpis.filter((k) => k.committeeId === effectiveCommitteeFilter),
+    [kpis, effectiveCommitteeFilter],
   );
   const typeScoped = useMemo(
     () => committeeScoped.filter((k) => k.kpiType === activeKpiType),
     [committeeScoped, activeKpiType],
   );
-  const tabs = useMemo(
-    () => [
-      { id: "all", label: "All", count: typeScoped.length },
-      ...activeCategories.map((category) => ({
+  // KPI-type scope WITHOUT the committee filter — i.e. what "All Committees"
+  // already shows. Used only as a stable reference for tab labels/counts so
+  // the tab bar's rendered width never changes across committee selections
+  // (see `tabs` below).
+  const typeOnlyScoped = useMemo(
+    () => kpis.filter((k) => k.kpiType === activeKpiType),
+    [kpis, activeKpiType],
+  );
+  // Every category tab always renders (same labels/counts as "All
+  // Committees"), so the row's footprint is identical no matter which
+  // committee is selected. Categories with no KPIs under the *currently
+  // selected* committee are marked hidden — invisible and non-interactive,
+  // but still occupying their slot — rather than removed, so the tab bar
+  // never shrinks or grows when switching committees. The "All" (category)
+  // tab is unaffected: always visible, count reflects the current selection.
+  const tabs = useMemo(() => {
+    const visibleCategoryIds =
+      effectiveCommitteeFilter === "all"
+        ? null // null = every category is visible; no need to build the set.
+        : new Set(
+            activeCategories
+              .filter((category) =>
+                typeScoped.some(
+                  (kpi) => categoryIdForKpiType(kpi, activeKpiType) === category.id,
+                ),
+              )
+              .map((category) => category.id),
+          );
+    const categoryTabs = activeCategories
+      .map((category) => ({
         id: category.id,
         label: category.label,
-        count: typeScoped.filter(
+        count: typeOnlyScoped.filter(
           (kpi) => categoryIdForKpiType(kpi, activeKpiType) === category.id,
         ).length,
-      })),
-    ],
-    [activeCategories, typeScoped, activeKpiType],
-  );
-  const activeCat =
-    cat === "all" || activeCategories.some((category) => category.id === cat) ? cat : "all";
+        hidden: visibleCategoryIds != null && !visibleCategoryIds.has(category.id),
+      }))
+      // Visible tabs stay packed to the left, right next to "All"; hidden
+      // (empty-for-this-committee) tabs are pushed after them. A stable sort
+      // keeps each group in its original category order.
+      .sort((a, b) => Number(a.hidden) - Number(b.hidden));
+    return [
+      { id: "all", label: "All", count: typeScoped.length, hidden: false },
+      ...categoryTabs,
+    ];
+  }, [activeCategories, typeScoped, typeOnlyScoped, activeKpiType, effectiveCommitteeFilter]);
+  // Falls back to "all" whenever the active category's tab isn't in the list
+  // above, or is present but hidden — e.g. it disappeared after switching to a
+  // committee/type with no KPIs left in that category.
+  const activeCat = tabs.some((tab) => tab.id === cat && !tab.hidden) ? cat : "all";
   const rows = useMemo(
     () =>
       activeCat === "all"
@@ -433,29 +502,45 @@ function PerformanceRecordDetail() {
             onChange={(e) => setCommitteeQuery(e.target.value)}
           />
           <div className="flex flex-col gap-sm overflow-y-auto scroll-thin pr-tiny" style={{ maxHeight: 673 }}>
-            {/* Pinned reset card — always shown, unaffected by the search. */}
-            <button
-              onClick={() => setCommitteeFilter("all")}
-              className={cn(
-                "shrink-0 rounded-lg border p-md text-left transition-colors",
-                committeeFilter === "all"
-                  ? "border-primary-container bg-primary-container/15"
-                  : "border-hairline bg-surface-lowest hover:bg-surface-soft",
-              )}
-            >
-              <p className="text-body-strong text-on-surface">All Committees</p>
-              <div className="mt-sm flex items-center gap-lg text-caption-sm text-mute">
-                <span className="inline-flex items-center gap-xs">
-                  <Icon name="assessment" size={16} />
-                  {kpis.length} KPIs
-                </span>
-              </div>
-            </button>
+            {/* Pinned reset card — always shown, unaffected by the search.
+                Hidden for a committee-role user restricted to their own
+                committee(s): they never see the record's full KPI total. */}
+            {!restrictionActive && (
+              <button
+                onClick={() => setCommitteeFilter("all")}
+                className={cn(
+                  "shrink-0 rounded-lg border p-md text-left transition-colors",
+                  effectiveCommitteeFilter === "all"
+                    ? "border-primary-container bg-primary-container text-white shadow-md"
+                    : "border-hairline bg-surface-lowest hover:bg-surface-soft",
+                )}
+              >
+                <p
+                  className={cn(
+                    "text-body-strong",
+                    effectiveCommitteeFilter === "all" ? "text-white" : "text-on-surface",
+                  )}
+                >
+                  All Committees
+                </p>
+                <div
+                  className={cn(
+                    "mt-sm flex items-center gap-lg text-caption-sm",
+                    effectiveCommitteeFilter === "all" ? "text-white/80" : "text-mute",
+                  )}
+                >
+                  <span className="inline-flex items-center gap-xs">
+                    <Icon name="assessment" size={16} />
+                    {kpis.length} KPIs
+                  </span>
+                </div>
+              </button>
+            )}
             {visibleCommittees.length === 0 ? (
               <p className="p-lg text-center text-caption-sm text-mute">No committees match.</p>
             ) : (
               visibleCommittees.map((c) => {
-                const on = c.id === committeeFilter;
+                const on = c.id === effectiveCommitteeFilter;
                 return (
                   <button
                     key={c.id}
@@ -463,12 +548,24 @@ function PerformanceRecordDetail() {
                     className={cn(
                       "shrink-0 rounded-lg border p-md text-left transition-colors",
                       on
-                        ? "border-primary-container bg-primary-container/15"
+                        ? "border-primary-container bg-primary-container text-white shadow-md"
                         : "border-hairline bg-surface-lowest hover:bg-surface-soft",
                     )}
                   >
-                    <p className="line-clamp-2 leading-tight text-body-strong text-on-surface">{c.name}</p>
-                    <div className="mt-sm flex items-center gap-lg text-caption-sm text-mute">
+                    <p
+                      className={cn(
+                        "line-clamp-2 leading-tight text-body-strong",
+                        on ? "text-white" : "text-on-surface",
+                      )}
+                    >
+                      {c.name}
+                    </p>
+                    <div
+                      className={cn(
+                        "mt-sm flex items-center gap-lg text-caption-sm",
+                        on ? "text-white/80" : "text-mute",
+                      )}
+                    >
                       <span className="inline-flex items-center gap-xs">
                         <Icon name="target" size={16} />
                         {c.keyMetric}
