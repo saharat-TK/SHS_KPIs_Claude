@@ -61,6 +61,7 @@ import { ProgressPanel, type QuarterEntryAction } from "./ProgressPanel";
 import { MetricProgressModal } from "./MetricProgressModal";
 import { AnnualQuarterProgressMatrix } from "./AnnualQuarterProgressMatrix";
 import { LinkedDataSourcesSection } from "./LinkedDataSourcesSection";
+import { KpiInfoTrigger } from "./KpiInfoTrigger";
 
 const DIRECT_ACTION_LABEL: Partial<Record<ApprovalAction, string>> = {
   submit: "Submit to Committee lead",
@@ -257,6 +258,7 @@ export function PerfKpiDetailBody({
       {variant === "page" && (
         <PageHeader
           title={kpi?.name ?? "KPI Progress"}
+          titleAdornment={kpi && <KpiInfoTrigger kpi={kpi} />}
           description={
             kpi
               ? `${
@@ -598,6 +600,7 @@ export function PerfKpiDetailDrawer({
       onClose={onClose}
       width="xl"
       title={kpi?.name ?? "KPI Details"}
+      titleAdornment={kpi && <KpiInfoTrigger kpi={kpi} />}
       subtitle={kpi ? `${typeName} · weight ${kpi.weight}%` : undefined}
       headerActions={
         <Link

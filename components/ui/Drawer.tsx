@@ -25,6 +25,7 @@ export function Drawer({
   open,
   onClose,
   title,
+  titleAdornment,
   subtitle,
   headerActions,
   headerExtra,
@@ -37,6 +38,10 @@ export function Drawer({
   open: boolean;
   onClose: () => void;
   title: string;
+  /** Rendered as a sibling right after the title text — not nested inside the
+   *  <h2> — so an interactive control here (e.g. an info-icon trigger) never
+   *  pollutes the heading's accessible name. */
+  titleAdornment?: React.ReactNode;
   /** ReactNode, unlike Modal's string — a status pill often belongs here. */
   subtitle?: React.ReactNode;
   /** Rendered inline before the close button — the panel's literal upper-right
@@ -168,9 +173,12 @@ export function Drawer({
         <div className="shrink-0 border-b border-hairline px-lg py-md">
           <div className="flex items-start justify-between gap-md">
             <div className="min-w-0">
-              <h2 id={titleId} className="text-heading-md text-on-surface">
-                {title}
-              </h2>
+              <div className="flex items-center gap-xs">
+                <h2 id={titleId} className="text-heading-md text-on-surface">
+                  {title}
+                </h2>
+                {titleAdornment}
+              </div>
               {subtitle && <p className="text-caption-sm text-mute mt-tiny">{subtitle}</p>}
             </div>
             <div className="flex items-center gap-xs shrink-0">
