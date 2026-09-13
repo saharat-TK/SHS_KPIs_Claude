@@ -2,6 +2,8 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/lib/auth/auth";
 import { BASE_PATH } from "@/lib/basePath";
+import { getServerT } from "@/lib/i18n/server";
+import type { TranslationKey } from "@/lib/i18n/dictionaries";
 import styles from "./login.module.css";
 import shsLogo from "@/public/shs-logo.png";
 
@@ -11,27 +13,24 @@ export const dynamic = "force-dynamic";
 // the base providers — none of the Sidebar/Topbar chrome, which assumes a
 // signed-in user.
 
-const ERROR_COPY: Record<string, { title: string; message: string }> = {
+// Maps a NextAuth error code to the i18n keys for its copy. Resolved with the
+// server translator inside the page so it follows the cookie locale.
+const ERROR_KEYS: Record<string, { title: TranslationKey; message: TranslationKey }> = {
   AccessDenied: {
-    title: "That account isn’t on the faculty roster",
-    message:
-      "Sign-in is limited to active School of Health Science faculty. If you " +
-      "should have access, ask the SHS Office to add your mfu.ac.th address to " +
-      "the faculty roster.",
+    title: "login.errors.accessDeniedTitle",
+    message: "login.errors.accessDeniedMessage",
   },
   Configuration: {
-    title: "Sign-in isn’t configured",
-    message:
-      "The server is missing its Google OAuth settings. Check AUTH_SECRET, " +
-      "AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET in .env.local.",
+    title: "login.errors.configurationTitle",
+    message: "login.errors.configurationMessage",
   },
   Verification: {
-    title: "Your Google email isn’t verified",
-    message: "Verify your address with Google, then try again.",
+    title: "login.errors.verificationTitle",
+    message: "login.errors.verificationMessage",
   },
   default: {
-    title: "Sign-in failed",
-    message: "Something went wrong on the way back from Google. Please try again.",
+    title: "login.errors.defaultTitle",
+    message: "login.errors.defaultMessage",
   },
 };
 
@@ -97,8 +96,12 @@ export default async function LoginPage({
   const safeTarget = getSafeRedirectTarget(searchParams.callbackUrl);
   if (await auth()) redirect(safeTarget);
 
-  const error = searchParams.error
-    ? (ERROR_COPY[searchParams.error] ?? ERROR_COPY.default)
+  const t = getServerT();
+  const errorKeys = searchParams.error
+    ? (ERROR_KEYS[searchParams.error] ?? ERROR_KEYS.default)
+    : null;
+  const error = errorKeys
+    ? { title: t(errorKeys.title), message: t(errorKeys.message) }
     : null;
 
   return (
@@ -114,29 +117,29 @@ export default async function LoginPage({
               alt="School of Health Science"
               priority
             />
-            <p className={styles.schoolName}>Mae Fah Luang University · School of Health Science</p>
+            <p className={styles.schoolName}>{t("login.schoolName")}</p>
           </div>
 
           <div className={styles.brandCopy}>
-            <p className={styles.systemLabel}>Health Science Analytics</p>
-            <h1 id="login-title" className={styles.title}>KPI System</h1>
+            <p className={styles.systemLabel}>{t("login.systemLabel")}</p>
+            <h1 id="login-title" className={styles.title}>{t("login.title")}</h1>
             <p className={styles.description}>
-              A focused workspace for KPI planning, performance, and reporting.
+              {t("login.description")}
             </p>
           </div>
 
           <p className={styles.brandNote}>
-            Faculty access is governed by the current SHS roster.
+            {t("login.brandNote")}
           </p>
         </section>
 
         <section className={styles.accessSection} aria-labelledby="access-title">
           <div className={styles.loginPanel}>
             <div className={styles.panelHeading}>
-              <p className={styles.panelLabel}>Secure faculty access</p>
-              <h2 id="access-title" className={styles.panelTitle}>Continue to your workspace</h2>
+              <p className={styles.panelLabel}>{t("login.panelLabel")}</p>
+              <h2 id="access-title" className={styles.panelTitle}>{t("login.panelTitle")}</h2>
               <p className={styles.panelDescription}>
-                Sign in with your university Google account to continue.
+                {t("login.panelDescription")}
               </p>
             </div>
 
@@ -165,20 +168,20 @@ export default async function LoginPage({
                 aria-describedby={error ? "sign-in-error" : undefined}
               >
                 <span aria-hidden="true" className={styles.googleGlyph}>G</span>
-                Continue with Google
+                {t("login.googleButton")}
               </button>
             </form>
 
             <p className={styles.accessNote}>
-              Use your @mfu.ac.th account. Your role and committee positions follow the faculty roster.
+              {t("login.accessNote")}
             </p>
           </div>
         </section>
       </div>
 
       <footer className={styles.footer}>
-        <p>© 2026 School of Health Science, Mae Fah Luang University</p>
-        <p>Designed by Saharat Arreeras</p>
+        <p>{t("login.copyright")}</p>
+        <p>{t("login.designedBy")}</p>
       </footer>
     </main>
   );

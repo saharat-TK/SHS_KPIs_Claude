@@ -1,7 +1,9 @@
 import type { Action } from "@/lib/auth/can";
+import type { TranslationKey } from "@/lib/i18n/dictionaries";
 
 export interface NavItem {
-  label: string;
+  /** i18n key resolved with t() at render time in Sidebar.tsx. */
+  label: TranslationKey;
   href: string;
   icon: string;
   /** Action required to see this item; omit = visible to all roles. */
@@ -13,33 +15,34 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  label: string;
+  /** i18n key resolved with t() at render time in Sidebar.tsx. */
+  label: TranslationKey;
   items: NavItem[];
 }
 
 export const NAV: NavGroup[] = [
   {
-    label: "Overview",
+    label: "nav.groups.overview",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+      { label: "nav.items.dashboard", href: "/dashboard", icon: "dashboard" },
       {
-        label: "Student Success",
+        label: "nav.items.studentSuccess",
         href: "/analytics/student-success",
         icon: "insights",
       },
     ],
   },
   {
-    label: "Workflow",
+    label: "nav.groups.workflow",
     items: [
       {
-        label: "Validation Queue",
+        label: "nav.items.validationQueue",
         href: "/validation",
         icon: "fact_check",
         requires: "review_submissions",
       },
       {
-        label: "Performance Approvals",
+        label: "nav.items.performanceApprovals",
         href: "/performance-approvals",
         icon: "approval",
         requires: "record_performance",
@@ -47,25 +50,25 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "KPI Management",
+    label: "nav.groups.kpiManagement",
     items: [
       {
-        label: "KPI Management",
+        label: "nav.items.kpiManagement",
         href: "/kpi-management",
         icon: "stacked_bar_chart",
         children: [
           {
-            label: "Performance Records",
+            label: "nav.items.performanceRecords",
             href: "/kpi-management/performance",
             icon: "assessment",
           },
           {
-            label: "Data Sources",
+            label: "nav.items.dataSources",
             href: "/kpi-management/data-sources",
             icon: "database",
           },
           {
-            label: "KPIs Library",
+            label: "nav.items.kpisLibrary",
             href: "/kpi-management/library",
             icon: "library_books",
             requires: "configure_kpis",
@@ -75,26 +78,26 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Faculty Data",
+    label: "nav.groups.facultyData",
     items: [
       {
-        label: "Faculty Data",
+        label: "nav.items.facultyData",
         href: "/faculty",
         icon: "groups",
         children: [
           {
-            label: "Faculty Roster",
+            label: "nav.items.facultyRoster",
             href: "/faculty",
             icon: "badge",
             exact: true,
           },
           {
-            label: "Committees",
+            label: "nav.items.committees",
             href: "/committee",
             icon: "account_tree",
           },
           {
-            label: "Faculty Management",
+            label: "nav.items.facultyManagement",
             href: "/faculty/management",
             icon: "manage_accounts",
             requires: "manage_faculty",
@@ -104,10 +107,10 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Administration",
+    label: "nav.groups.administration",
     items: [
       {
-        label: "Units",
+        label: "nav.items.units",
         href: "/admin/units",
         icon: "square_foot",
         requires: "configure_kpis",
@@ -115,28 +118,28 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Administration (prototype)",
+    label: "nav.groups.administrationPrototype",
     items: [
       {
-        label: "KPIs (prototype)",
+        label: "nav.items.kpisPrototype",
         href: "/kpis",
         icon: "tune",
         requires: "configure_kpis",
       },
       {
-        label: "Metrics",
+        label: "nav.items.metrics",
         href: "/metrics",
         icon: "straighten",
         requires: "configure_kpis",
       },
       {
-        label: "Formula Builder",
+        label: "nav.items.formulaBuilder",
         href: "/formulas/builder",
         icon: "function",
         requires: "configure_kpis",
       },
       {
-        label: "Version History",
+        label: "nav.items.versionHistory",
         href: "/formulas/history",
         icon: "history",
         requires: "configure_kpis",

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { Icon } from "@/components/ui/Icon";
 import { NAV, type NavItem } from "./nav";
+import { useT } from "@/lib/i18n/useT";
 
 type Can = (action: NonNullable<NavItem["requires"]>) => boolean;
 
@@ -28,6 +29,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const { can } = useAuth();
+  const t = useT();
 
   const isVisible = (item: NavItem): boolean => {
     if (item.children) return item.children.some(isVisible);
@@ -59,8 +61,8 @@ export function Sidebar({
           <Link
             href="/dashboard"
             onClick={onClose}
-            aria-label="Dashboard"
-            title={collapsed ? "Health Sciences Analytics Platform" : undefined}
+            aria-label={t("nav.items.dashboard")}
+            title={collapsed ? t("sidebar.brandFull") : undefined}
             className={cn(
               "flex min-w-0 items-center gap-xs",
               collapsed && "lg:justify-center",
@@ -75,15 +77,15 @@ export function Sidebar({
               className="h-8 w-auto shrink-0"
             />
             <div className={cn("min-w-0 leading-tight", collapsed && "lg:hidden")}>
-              <p className="truncate text-body-strong text-white">Health Sciences</p>
-              <p className="truncate text-caption-sm text-[#8a8a8a]">Analytics Platform</p>
+              <p className="truncate text-body-strong text-white">{t("sidebar.brandTitle")}</p>
+              <p className="truncate text-caption-sm text-[#8a8a8a]">{t("sidebar.brandSubtitle")}</p>
             </div>
           </Link>
           <button
             type="button"
             onClick={onToggleCollapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
+            title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
             className={cn(
               "ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT text-[#8a8a8a] transition-colors hover:bg-[#151515] hover:text-white lg:flex",
               collapsed && "lg:absolute lg:left-[52px] lg:ml-0 lg:border lg:border-[#272727] lg:bg-black",
@@ -116,7 +118,7 @@ export function Sidebar({
                     collapsed && "lg:hidden",
                   )}
                 >
-                  {group.label}
+                  {t(group.label)}
                 </p>
                 {items.map((item) =>
                   item.children ? (
@@ -148,12 +150,14 @@ export function Sidebar({
             "truncate border-t border-[#151515] px-md py-sm text-caption-sm text-[#8a8a8a]",
             collapsed && "lg:px-sm lg:text-center",
           )}
-          title="MFU · School of Health Sciences"
+          title={t("sidebar.footer")}
         >
           <span className={cn(collapsed && "lg:hidden")}>
-            MFU · School of Health Sciences
+            {t("sidebar.footer")}
           </span>
-          <span className={cn("hidden", collapsed && "lg:inline")}>MFU</span>
+          <span className={cn("hidden", collapsed && "lg:inline")}>
+            {t("sidebar.footerShort")}
+          </span>
         </div>
       </aside>
     </>
@@ -173,11 +177,12 @@ function NavLeaf({
   onClose: () => void;
   indented?: boolean;
 }) {
+  const t = useT();
   return (
     <Link
       href={item.href}
       onClick={onClose}
-      title={collapsed ? item.label : undefined}
+      title={collapsed ? t(item.label) : undefined}
       className={cn(
         "flex items-center gap-xs rounded-DEFAULT border-y border-r border-l-4 px-sm py-xs text-label-sm transition-colors",
         collapsed && "lg:h-10 lg:w-10 lg:justify-center lg:p-0",
@@ -191,7 +196,7 @@ function NavLeaf({
         <Icon name={item.icon} size={indented ? 17 : 19} />
       </span>
       <span className={cn("min-w-0 truncate", collapsed && "lg:hidden")}>
-        {item.label}
+        {t(item.label)}
       </span>
     </Link>
   );
@@ -210,6 +215,7 @@ function NavParent({
   collapsed: boolean;
   onClose: () => void;
 }) {
+  const t = useT();
   const children = (item.children ?? []).filter(
     (c) => !c.requires || can(c.requires),
   );
@@ -261,7 +267,7 @@ function NavParent({
         >
           <Icon name={item.icon} size={19} />
         </span>
-        <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+        <span className="min-w-0 flex-1 truncate text-left">{t(item.label)}</span>
         <Icon
           name={open ? "expand_less" : "expand_more"}
           size={18}
