@@ -4,6 +4,7 @@ import { auth, signIn } from "@/lib/auth/auth";
 import { BASE_PATH } from "@/lib/basePath";
 import { getServerT } from "@/lib/i18n/server";
 import type { TranslationKey } from "@/lib/i18n/dictionaries";
+import { LanguageToggle } from "@/components/shell/LanguageToggle";
 import styles from "./login.module.css";
 import shsLogo from "@/public/shs-logo.png";
 
@@ -106,6 +107,9 @@ export default async function LoginPage({
 
   return (
     <main className={styles.page}>
+      <div className="fixed right-4 top-4 z-20">
+        <LanguageToggle />
+      </div>
       <SignalField />
 
       <div className={styles.layout}>

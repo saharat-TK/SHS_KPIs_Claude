@@ -1,15 +1,26 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useLanguage, useT } from "@/lib/i18n/useT";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 
 const SHORT: Record<Locale, string> = { th: "ไทย", en: "EN" };
 
-/** Compact TH/EN segmented toggle for the Topbar. */
+/** Compact TH/EN segmented toggle for the Topbar (and the login page). */
 export function LanguageToggle() {
   const { locale, setLocale } = useLanguage();
   const t = useT();
+  const router = useRouter();
+
+  const pick = (code: Locale) => {
+    if (code === locale) return;
+    setLocale(code);
+    // Server components (the login page, <html lang>, breadcrumb overrides)
+    // render from the cookie, so re-run them to reflect the new locale.
+    // Client text updates reactively from context regardless.
+    router.refresh();
+  };
 
   return (
     <div
@@ -23,7 +34,7 @@ export function LanguageToggle() {
           <button
             key={code}
             type="button"
-            onClick={() => setLocale(code)}
+            onClick={() => pick(code)}
             aria-pressed={active}
             className={cn(
               "rounded-full px-sm py-tiny text-caption-sm font-medium transition-colors",
