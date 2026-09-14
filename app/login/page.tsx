@@ -2,9 +2,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/lib/auth/auth";
 import { BASE_PATH } from "@/lib/basePath";
-import { getServerT } from "@/lib/i18n/server";
-import type { TranslationKey } from "@/lib/i18n/dictionaries";
-import { LanguageToggle } from "@/components/shell/LanguageToggle";
+import { translate, type TranslationKey } from "@/lib/i18n/dictionaries";
 import styles from "./login.module.css";
 import shsLogo from "@/public/shs-logo.png";
 
@@ -97,7 +95,10 @@ export default async function LoginPage({
   const safeTarget = getSafeRedirectTarget(searchParams.callbackUrl);
   if (await auth()) redirect(safeTarget);
 
-  const t = getServerT();
+  // The login page is intentionally English-only (no switcher), regardless of
+  // the saved locale — the app switches to Thai after sign-in.
+  const t = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate("en", key, vars);
   const errorKeys = searchParams.error
     ? (ERROR_KEYS[searchParams.error] ?? ERROR_KEYS.default)
     : null;
@@ -107,9 +108,6 @@ export default async function LoginPage({
 
   return (
     <main className={styles.page}>
-      <div className="fixed right-4 top-4 z-20">
-        <LanguageToggle />
-      </div>
       <SignalField />
 
       <div className={styles.layout}>
