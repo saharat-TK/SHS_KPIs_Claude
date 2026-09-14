@@ -5,31 +5,36 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
 import { useBreadcrumbLabels } from "./BreadcrumbLabels";
+import { useT } from "@/lib/i18n/useT";
+import type { TranslationKey } from "@/lib/i18n/dictionaries";
 
-const LABELS: Record<string, string> = {
-  dashboard: "Dashboard",
-  committee: "Committees",
-  faculty: "Faculty Roster",
-  export: "Roster Export",
-  kpis: "KPI Management",
-  "kpi-management": "KPI Management",
-  library: "KPIs Library",
-  performance: "Performance Records",
-  "data-sources": "Data Sources",
-  metrics: "Metrics",
-  formulas: "Formulas",
-  builder: "Formula Builder",
-  history: "Version History",
-  analytics: "Analytics",
-  "student-success": "Student Success",
-  validation: "Validation Queue",
-  admin: "Administration",
-  units: "Units",
+// Path segment -> i18n key. Resolved with t() at render time; unknown segments
+// fall back to the raw segment, and per-page overrides (dynamic DB names) win.
+const LABELS: Record<string, TranslationKey> = {
+  dashboard: "breadcrumb.dashboard",
+  committee: "breadcrumb.committee",
+  faculty: "breadcrumb.faculty",
+  export: "breadcrumb.export",
+  kpis: "breadcrumb.kpis",
+  "kpi-management": "breadcrumb.kpi-management",
+  library: "breadcrumb.library",
+  performance: "breadcrumb.performance",
+  "data-sources": "breadcrumb.data-sources",
+  metrics: "breadcrumb.metrics",
+  formulas: "breadcrumb.formulas",
+  builder: "breadcrumb.builder",
+  history: "breadcrumb.history",
+  analytics: "breadcrumb.analytics",
+  "student-success": "breadcrumb.student-success",
+  validation: "breadcrumb.validation",
+  admin: "breadcrumb.admin",
+  units: "breadcrumb.units",
 };
 
 export function Breadcrumb() {
   const pathname = usePathname();
   const overrides = useBreadcrumbLabels();
+  const t = useT();
   const segments = pathname.split("/").filter(Boolean);
 
   // The dashboard is the app's root view, so it doubles as the leading crumb.
@@ -37,10 +42,11 @@ export function Breadcrumb() {
   const rest = segments[0] === "dashboard" ? [] : segments;
 
   const crumbs = [
-    { href: "/dashboard", label: LABELS.dashboard },
+    { href: "/dashboard", label: t(LABELS.dashboard) },
     ...rest.map((seg, i) => {
       const href = "/" + rest.slice(0, i + 1).join("/");
-      return { href, label: overrides[href] ?? LABELS[seg] ?? seg };
+      const key = LABELS[seg];
+      return { href, label: overrides[href] ?? (key ? t(key) : seg) };
     }),
   ];
 

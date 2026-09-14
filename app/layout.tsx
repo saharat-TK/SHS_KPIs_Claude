@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 import { BASE_PATH } from "@/lib/basePath";
+import { getServerLocale } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
   title: "Health Sciences Analytics — KPI System",
@@ -19,10 +20,11 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const locale = getServerLocale();
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body className="font-sans text-body-md text-on-surface antialiased bg-background min-h-screen">
-        <Providers>{children}</Providers>
+        <Providers initialLocale={locale}>{children}</Providers>
       </body>
     </html>
   );

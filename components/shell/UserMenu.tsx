@@ -9,13 +9,15 @@ import { signOutAction } from "@/app/(app)/actions";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
 import { BASE_PATH } from "@/lib/basePath";
+import { useT } from "@/lib/i18n/useT";
 
 /** The committee position line under the name — the one genuinely useful
  *  detail the old persona switcher showed, kept as-is. */
 function useMembershipDetail(facultyId: string | undefined) {
+  const t = useT();
   const memberships = useCommitteeMemberships();
   const rows = memberships.data?.filter((m) => m.facultyId === facultyId) ?? [];
-  if (memberships.isLoading && facultyId) return "Loading membership…";
+  if (memberships.isLoading && facultyId) return t("userMenu.loadingMembership");
   if (rows.length === 0) return null;
   return rows.map((m) => `${m.position} · ${m.committeeName}`).join(" / ");
 }
@@ -23,6 +25,7 @@ function useMembershipDetail(facultyId: string | undefined) {
 export function UserMenu() {
   const { user, role, impersonating, realName, isRealAdmin } = useAuth();
   const router = useRouter();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
@@ -77,7 +80,11 @@ export function UserMenu() {
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex h-[36px] items-center gap-sm rounded-DEFAULT px-sm hover:bg-surface-soft transition-colors"
-        title={impersonating ? `Viewing as ${user.name}` : user.email}
+        title={
+          impersonating
+            ? t("userMenu.viewingAs", { name: user.name })
+            : user.email
+        }
       >
         <span
           className={cn(
@@ -119,13 +126,13 @@ export function UserMenu() {
             <>
               <div className="my-xs border-t border-hairline" />
               <p className="px-md py-xs text-utility-xs uppercase tracking-wider text-stone">
-                View as
+                {t("userMenu.viewAs")}
               </p>
               <div className="px-md pb-xs">
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search faculty…"
+                  placeholder={t("userMenu.searchFaculty")}
                   className="h-[32px] w-full rounded-DEFAULT border border-hairline bg-surface-soft px-sm text-caption-sm text-on-surface outline-none focus:border-primary-dark"
                 />
               </div>
@@ -145,7 +152,7 @@ export function UserMenu() {
               ))}
               {candidates.length === 0 && (
                 <p className="px-md py-xs text-caption-sm text-mute">
-                  {faculty.isLoading ? "Loading…" : "No matches"}
+                  {faculty.isLoading ? t("common.loading") : t("userMenu.noMatches")}
                 </p>
               )}
             </>
@@ -158,7 +165,7 @@ export function UserMenu() {
               className="flex w-full items-center gap-sm px-md py-sm text-left text-label-md text-on-surface hover:bg-surface-soft transition-colors"
             >
               <Icon name="logout" size={18} />
-              Sign out
+              {t("userMenu.signOut")}
               {impersonating && (
                 <span className="text-caption-sm text-mute">({realName})</span>
               )}

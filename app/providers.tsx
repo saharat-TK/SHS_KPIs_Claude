@@ -7,17 +7,27 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { ToastProvider, ConfirmProvider, useToast } from "@/components/ui";
+import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
+import type { Locale } from "@/lib/i18n/config";
 
 // AuthProvider is deliberately *not* here: it needs a signed-in user, and this
 // wraps /login too. It lives in app/(app)/layout.tsx, which resolves the
 // session server-side before rendering anything that needs it.
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  initialLocale,
+}: {
+  children: React.ReactNode;
+  initialLocale: Locale;
+}) {
   return (
-    <ToastProvider>
-      <ConfirmProvider>
-        <QueryProvider>{children}</QueryProvider>
-      </ConfirmProvider>
-    </ToastProvider>
+    <LanguageProvider initialLocale={initialLocale}>
+      <ToastProvider>
+        <ConfirmProvider>
+          <QueryProvider>{children}</QueryProvider>
+        </ConfirmProvider>
+      </ToastProvider>
+    </LanguageProvider>
   );
 }
 
