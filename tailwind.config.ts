@@ -63,6 +63,7 @@ const config: Config = {
 
         // Semantic
         success: "#3f8500",
+        "on-success": "#ffffff",
         warning: "#df6500",
         error: "#e52020",
         "on-error": "#ffffff",
