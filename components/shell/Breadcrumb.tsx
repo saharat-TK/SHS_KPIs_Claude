@@ -26,7 +26,6 @@ const LABELS: Record<string, TranslationKey> = {
   history: "breadcrumb.history",
   analytics: "breadcrumb.analytics",
   "student-success": "breadcrumb.student-success",
-  validation: "breadcrumb.validation",
   admin: "breadcrumb.admin",
   units: "breadcrumb.units",
 };

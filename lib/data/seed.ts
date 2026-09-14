@@ -6,7 +6,6 @@ import type {
   Kpi,
   Measurement,
   Metric,
-  ValidationSubmission,
 } from "@/lib/types";
 
 export const PERIODS = ["2024-Q1", "2024-Q2", "2024-Q3", "2024-Q4"] as const;
@@ -177,14 +176,3 @@ function buildMeasurements(): Measurement[] {
 }
 
 export const measurements: Measurement[] = buildMeasurements();
-
-export const validationSubmissions: ValidationSubmission[] = [
-  { id: "val-001", metricId: "metric-cohort-completion", committeeId: "cmt-curriculum", submittedById: "u-committee", submittedDate: "2025-01-08T08:30:00Z", period: "2024-Q4", value: 89.2, status: "pending", comments: [] },
-  { id: "val-002", metricId: "metric-first-attempt", committeeId: "cmt-student-alumni", submittedById: "fac-004", submittedDate: "2025-01-07T11:15:00Z", period: "2024-Q4", value: 90.5, status: "pending", comments: [] },
-  { id: "val-003", metricId: "metric-publications", committeeId: "cmt-research-ethics", submittedById: "fac-010", submittedDate: "2025-01-06T14:40:00Z", period: "2024-Q4", value: 71, status: "clarification", reviewerId: "u-reviewer", comments: [{ authorId: "u-reviewer", authorName: "Dr. Krit Saetang", timestamp: "2025-01-07T09:00:00Z", text: "Please confirm whether conference proceedings are included in this count." }] },
-  { id: "val-004", metricId: "metric-field-employ", committeeId: "cmt-graduate", submittedById: "fac-013", submittedDate: "2025-01-05T10:00:00Z", period: "2024-Q4", value: 79.0, status: "approved", reviewerId: "u-reviewer", comments: [{ authorId: "u-reviewer", authorName: "Dr. Krit Saetang", timestamp: "2025-01-06T10:00:00Z", text: "Matches graduate survey export. Approved." }] },
-  { id: "val-005", metricId: "metric-grant-thb", committeeId: "cmt-edpex", submittedById: "fac-007", submittedDate: "2025-01-04T16:20:00Z", period: "2024-Q4", value: 12.1, status: "rejected", reviewerId: "u-reviewer", comments: [{ authorId: "u-reviewer", authorName: "Dr. Krit Saetang", timestamp: "2025-01-05T08:30:00Z", text: "Figure includes pending (unawarded) proposals. Resubmit awarded-only." }] },
-  { id: "val-006", metricId: "metric-retention-y1", committeeId: "cmt-policy-planning", submittedById: "fac-016", submittedDate: "2025-01-09T09:05:00Z", period: "2024-Q4", value: 91.8, status: "pending", comments: [] },
-  { id: "val-007", metricId: "metric-ultimate-pass", committeeId: "cmt-academic-service", submittedById: "fac-019", submittedDate: "2025-01-09T13:25:00Z", period: "2024-Q4", value: 98.2, status: "pending", comments: [] },
-  { id: "val-008", metricId: "metric-cohort-completion", committeeId: "cmt-finance", submittedById: "fac-021", submittedDate: "2025-01-03T12:00:00Z", period: "2024-Q4", value: 95.4, status: "approved", reviewerId: "u-reviewer", comments: [] },
-];

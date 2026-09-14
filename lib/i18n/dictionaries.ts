@@ -27,7 +27,6 @@ const en = {
     items: {
       dashboard: "Dashboard",
       studentSuccess: "Student Success",
-      validationQueue: "Validation Queue",
       performanceApprovals: "Performance Approvals",
       kpiManagement: "KPI Management",
       performanceRecords: "Performance Records",
@@ -81,7 +80,6 @@ const en = {
     history: "Version History",
     analytics: "Analytics",
     "student-success": "Student Success",
-    validation: "Validation Queue",
     admin: "Administration",
     units: "Units",
   },
@@ -288,7 +286,6 @@ const th: Dictionary = {
     items: {
       dashboard: "แดชบอร์ด",
       studentSuccess: "ความสำเร็จของนักศึกษา",
-      validationQueue: "คิวตรวจสอบข้อมูล",
       performanceApprovals: "การอนุมัติผลการดำเนินงาน",
       kpiManagement: "การจัดการ KPI",
       performanceRecords: "บันทึกผลการดำเนินงาน",
@@ -342,7 +339,6 @@ const th: Dictionary = {
     history: "ประวัติเวอร์ชัน",
     analytics: "การวิเคราะห์",
     "student-success": "ความสำเร็จของนักศึกษา",
-    validation: "คิวตรวจสอบข้อมูล",
     admin: "การดูแลระบบ",
     units: "หน่วยนับ",
   },

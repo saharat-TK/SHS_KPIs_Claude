@@ -258,32 +258,6 @@ export interface Measurement {
   value: number;
 }
 
-export type ValidationStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "clarification";
-
-export interface ValidationComment {
-  authorId: string;
-  authorName: string;
-  timestamp: string;
-  text: string;
-}
-
-export interface ValidationSubmission {
-  id: string;
-  metricId: string;
-  committeeId: string;
-  submittedById: string;
-  submittedDate: string; // ISO
-  period: string;
-  value: number;
-  status: ValidationStatus;
-  reviewerId?: string;
-  comments: ValidationComment[];
-}
-
 export interface User {
   id: string;
   name: string;
