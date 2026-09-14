@@ -20,12 +20,15 @@ import {
   Field,
   Input,
   Select,
+  useConfirm,
+  type ConfirmTone,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { RequirePermission } from "@/components/shell/Guard";
 import { ApprovalDetailPanel, ApprovalPanelStatus } from "./ApprovalDetailPanel";
 import {
   usePerformanceRecords,
+  usePerformancePeriods,
   useCommitteeMemberships,
   useRecordApprovals,
   useApprovalTransition,
@@ -38,6 +41,11 @@ import {
   actionRequiresComment,
   ACTION_LABELS,
 } from "@/lib/kpi/approvalWorkflow";
+import {
+  openQuartersForYear,
+  firstOpenQuarter,
+  isPeriodOpen,
+} from "@/lib/kpi/performancePeriods";
 import { healthOf, percentOfTarget, HEALTH_TONE } from "@/lib/kpi/progress";
 import type {
   ApprovalAction,
@@ -73,10 +81,25 @@ const ACTION_ICONS: Record<ApprovalAction, string> = {
   reverse: "lock_open",
 };
 
-const ACTION_TONE: Partial<Record<ApprovalAction, string>> = {
-  approve: "text-success",
-  reject: "text-error",
-  return: "text-error",
+// Shared by the drawer footer and the table's row actions: forward-moving
+// actions render solid green (grouped right in the drawer, after the danger
+// group in the table), pull-back actions render solid red (grouped left /
+// first).
+const ACTION_VARIANT: Partial<Record<ApprovalAction, "success" | "danger">> = {
+  submit: "success",
+  forward: "success",
+  approve: "success",
+  return: "danger",
+  reject: "danger",
+  reverse: "danger",
+};
+
+// Confirm-dialog emphasis per action: undo/unlock actions read as danger,
+// forward-moving ones (still recoverable via return/reject) stay default.
+const CONFIRM_TONE: Partial<Record<ApprovalAction, ConfirmTone>> = {
+  reject: "danger",
+  return: "danger",
+  reverse: "danger",
 };
 
 // Workflow order, not alphabetical — matches the tab order in STATE_TABS, so
@@ -134,6 +157,7 @@ function ApprovalQueue() {
   const { user } = useAuth();
   const records = usePerformanceRecords();
   const memberships = useCommitteeMemberships();
+  const confirm = useConfirm();
 
   const [recordId, setRecordId] = useState(0);
   const [yearNo, setYearNo] = useState(1);
@@ -146,14 +170,45 @@ function ApprovalQueue() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const [sort, setSort] = useState<SortState | null>(null);
 
-  // Default to the first record once loaded.
-  const activeRecord = records.data?.find((r) => r.id === recordId) ?? records.data?.[0];
+  // Only active records reach the picker — inactive/completed records would
+  // otherwise offer an approval queue nobody can act on.
+  const activeRecords = useMemo(
+    () => (records.data ?? []).filter((r) => r.status === "active"),
+    [records.data],
+  );
+
+  // Default to the first active record once loaded.
+  const activeRecord = activeRecords.find((r) => r.id === recordId) ?? activeRecords[0];
   useEffect(() => {
-    if (!recordId && records.data?.length) setRecordId(records.data[0].id);
-  }, [recordId, records.data]);
+    if (!recordId && activeRecords.length) setRecordId(activeRecords[0].id);
+  }, [recordId, activeRecords]);
 
   const approvals = useRecordApprovals(activeRecord?.id ?? 0, yearNo, quarterNo);
   const transition = useApprovalTransition(activeRecord?.id ?? 0);
+  const performancePeriods = usePerformancePeriods(activeRecord?.id ?? 0);
+  const periods = performancePeriods.data ?? [];
+  const openYears = useMemo(
+    () =>
+      Array.from(new Set(periods.filter((p) => p.isOpen).map((p) => p.yearNo))).sort(
+        (a, b) => a - b,
+      ),
+    [periods],
+  );
+  const openQuarters = useMemo(() => openQuartersForYear(periods, yearNo), [periods, yearNo]);
+
+  // Keep the selection pinned to an open period: on first load, and whenever
+  // the active record changes to one with a different open-period set, jump
+  // to the earliest open Year/Quarter instead of showing a closed period.
+  useEffect(() => {
+    if (!activeRecord || performancePeriods.isLoading) return;
+    if (isPeriodOpen(periods, yearNo, quarterNo)) return;
+    if (openYears.length === 0) return;
+    const targetYear = openYears[0];
+    const targetQuarter = firstOpenQuarter(periods, targetYear);
+    if (targetQuarter == null) return;
+    setYearNo(targetYear);
+    setQuarterNo(targetQuarter);
+  }, [activeRecord, performancePeriods.isLoading, periods, yearNo, quarterNo, openYears]);
 
   // user.role *is* faculty.system_role now — resolved server-side per request
   // by getSessionActor, so it matches what the API will actually authorize.
@@ -260,24 +315,40 @@ function ApprovalQueue() {
         </p>
       );
     }
+    const leftActions = actions.filter((a) => ACTION_VARIANT[a] === "danger");
+    const rightActions = actions.filter((a) => ACTION_VARIANT[a] === "success");
     return (
-      <div className="flex flex-wrap items-center justify-end gap-sm">
-        {actions.map((action) => (
-          <Button
-            key={action}
-            size="sm"
-            icon={ACTION_ICONS[action]}
-            className={ACTION_TONE[action]}
-            disabled={transition.isPending}
-            onClick={() =>
-              actionRequiresComment(action)
-                ? setActOn({ perfKpiId: row.perfKpiId, action })
-                : runAction(row, action)
-            }
-          >
-            {ACTION_LABELS[action]}
-          </Button>
-        ))}
+      <div className="flex items-center justify-between gap-sm">
+        <div className="flex flex-wrap items-center gap-sm">
+          {leftActions.map((action) => (
+            <Button
+              key={action}
+              size="sm"
+              variant="ghost"
+              className="rounded-lg text-error"
+              icon={ACTION_ICONS[action]}
+              disabled={transition.isPending}
+              onClick={() => confirmAndRun(row, action)}
+            >
+              {ACTION_LABELS[action]}
+            </Button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-sm">
+          {rightActions.map((action) => (
+            <Button
+              key={action}
+              size="sm"
+              variant="ghost"
+              className="rounded-lg text-success"
+              icon={ACTION_ICONS[action]}
+              disabled={transition.isPending}
+              onClick={() => confirmAndRun(row, action)}
+            >
+              {ACTION_LABELS[action]}
+            </Button>
+          ))}
+        </div>
       </div>
     );
   };
@@ -293,6 +364,24 @@ function ApprovalQueue() {
       },
     });
 
+  // Every action is confirmed before it does anything. return/reject still
+  // need a note afterward — the confirm popup is an extra gate in front of
+  // that existing modal, not a replacement for it.
+  const confirmAndRun = async (row: PerfKpiApproval, action: ApprovalAction) => {
+    const ok = await confirm({
+      title: ACTION_LABELS[action],
+      message: `${ACTION_LABELS[action]} "${row.kpiName}"?`,
+      confirmLabel: ACTION_LABELS[action],
+      tone: CONFIRM_TONE[action] ?? "default",
+    });
+    if (!ok) return;
+    if (actionRequiresComment(action)) {
+      setActOn({ perfKpiId: row.perfKpiId, action });
+    } else {
+      runAction(row, action);
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -306,33 +395,60 @@ function ApprovalQueue() {
           <div className="min-w-[280px]">
             <Field label="Performance record">
               <Select
+                className="rounded-lg"
                 value={String(activeRecord?.id ?? "")}
                 onChange={(e) => setRecordId(Number(e.target.value))}
               >
-                {(records.data ?? []).map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
+                {activeRecords.length === 0 ? (
+                  <option value="" disabled>
+                    No active performance records
                   </option>
-                ))}
+                ) : (
+                  activeRecords.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))
+                )}
               </Select>
             </Field>
           </div>
           <Field label="Year">
-            <Select value={String(yearNo)} onChange={(e) => setYearNo(Number(e.target.value))}>
-              {[1, 2, 3, 4, 5].map((yn) => (
-                <option key={yn} value={yn}>
-                  {yearLabel(yn)}
+            <Select
+              className="rounded-lg"
+              value={String(yearNo)}
+              onChange={(e) => setYearNo(Number(e.target.value))}
+            >
+              {openYears.length === 0 ? (
+                <option value={yearNo} disabled>
+                  No open years
                 </option>
-              ))}
+              ) : (
+                openYears.map((yn) => (
+                  <option key={yn} value={yn}>
+                    {yearLabel(yn)}
+                  </option>
+                ))
+              )}
             </Select>
           </Field>
           <Field label="Quarter">
-            <Select value={String(quarterNo)} onChange={(e) => setQuarterNo(Number(e.target.value))}>
-              {[1, 2, 3, 4].map((qn) => (
-                <option key={qn} value={qn}>
-                  Q{qn}
+            <Select
+              className="rounded-lg"
+              value={String(quarterNo)}
+              onChange={(e) => setQuarterNo(Number(e.target.value))}
+            >
+              {openQuarters.length === 0 ? (
+                <option value={quarterNo} disabled>
+                  No open quarters
                 </option>
-              ))}
+              ) : (
+                openQuarters.map((qn) => (
+                  <option key={qn} value={qn}>
+                    Q{qn}
+                  </option>
+                ))
+              )}
             </Select>
           </Field>
         </div>
@@ -422,6 +538,8 @@ function ApprovalQueue() {
                     stageRolesFor(row.committeeId),
                     row.state as ApprovalState,
                   );
+                  const leftActions = actions.filter((a) => ACTION_VARIANT[a] === "danger");
+                  const rightActions = actions.filter((a) => ACTION_VARIANT[a] === "success");
                   return (
                     <Tr key={row.perfKpiId} onClick={() => setDetailId(row.perfKpiId)}>
                       <Td className="font-medium">{row.kpiName}</Td>
@@ -457,19 +575,19 @@ function ApprovalQueue() {
                           </span>
                         ) : (
                           <div className="flex items-center justify-end gap-xs">
-                            {actions.map((action) => (
+                            {[...leftActions, ...rightActions].map((action) => (
                               <Button
                                 key={action}
                                 size="sm"
                                 variant="ghost"
-                                icon={ACTION_ICONS[action]}
-                                className={ACTION_TONE[action]}
-                                disabled={transition.isPending}
-                                onClick={() =>
-                                  actionRequiresComment(action)
-                                    ? setActOn({ perfKpiId: row.perfKpiId, action })
-                                    : runAction(row, action)
+                                className={
+                                  ACTION_VARIANT[action] === "danger"
+                                    ? "rounded-lg text-error"
+                                    : "rounded-lg text-success"
                                 }
+                                icon={ACTION_ICONS[action]}
+                                disabled={transition.isPending}
+                                onClick={() => confirmAndRun(row, action)}
                               >
                                 {ACTION_LABELS[action]}
                               </Button>

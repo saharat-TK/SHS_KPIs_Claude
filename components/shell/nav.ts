@@ -36,12 +36,6 @@ export const NAV: NavGroup[] = [
     label: "nav.groups.workflow",
     items: [
       {
-        label: "nav.items.validationQueue",
-        href: "/validation",
-        icon: "fact_check",
-        requires: "review_submissions",
-      },
-      {
         label: "nav.items.performanceApprovals",
         href: "/performance-approvals",
         icon: "approval",

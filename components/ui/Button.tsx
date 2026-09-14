@@ -2,7 +2,7 @@ import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import { Icon } from "./Icon";
 
-type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "success";
 type Size = "sm" | "md";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -21,6 +21,7 @@ const VARIANTS: Record<Variant, string> = {
     "border border-hairline-strong hover:border-on-surface bg-transparent text-on-surface",
   ghost: "hover:bg-surface-soft text-on-surface",
   danger: "bg-error hover:bg-on-error-container text-on-error shadow-sm",
+  success: "bg-success hover:bg-success/90 text-on-success shadow-sm",
 };
 
 const SIZES: Record<Size, string> = {
