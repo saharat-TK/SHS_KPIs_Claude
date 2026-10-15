@@ -40,6 +40,7 @@ import type {
   UnitRecord,
 } from "@/lib/types";
 import type { CommitteeUsage } from "@/lib/kpi/committee";
+import type { KpiBatchRow } from "@/lib/kpi/kpiBatch";
 import { delay, getDB, uid } from "./store";
 import { BASE_PATH } from "@/lib/basePath";
 
@@ -486,6 +487,15 @@ export const libraryKpisRepo = {
         body: JSON.stringify(input),
       }),
       "Failed to create KPI",
+    ),
+  bulkCreate: async (setId: number, rows: KpiBatchRow[]): Promise<{ inserted: number }> =>
+    jsonOrThrow(
+      await fetch("/api/library-kpis/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setId, rows }),
+      }),
+      "Failed to create KPIs",
     ),
   update: async (id: number, patch: Partial<LibraryKpi>): Promise<LibraryKpi> =>
     jsonOrThrow(

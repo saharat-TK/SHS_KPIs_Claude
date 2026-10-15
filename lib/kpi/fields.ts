@@ -16,8 +16,14 @@ export const LIBRARY_KPI_FIELDS = `
   k.quarterly_target_mode AS quarterlyTargetMode,
   k.variable1_name AS variable1Name, k.variable1_unit AS variable1Unit,
   k.variable2_name AS variable2Name, k.variable2_unit AS variable2Unit,
-  k.sort_order AS sortOrder
+  k.sort_order AS sortOrder, k.is_draft AS isDraft
 `;
+
+/** MySQL returns TINYINT(1) as 0/1; LibraryKpi.isDraft is a boolean. Apply to
+ *  every row selected with LIBRARY_KPI_FIELDS before it leaves a route. */
+export function toLibraryKpiRow<T extends object>(row: T): T & { isDraft: boolean } {
+  return { ...row, isDraft: Boolean((row as { isDraft?: unknown }).isDraft) };
+}
 
 export const LIBRARY_METRIC_FIELDS = `
   m.id, m.kpi_id AS kpiId, m.name, m.description, m.category_id AS categoryId,

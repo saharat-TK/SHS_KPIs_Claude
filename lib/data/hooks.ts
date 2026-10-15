@@ -28,6 +28,7 @@ import type {
   StrategicSetStatus,
   UnitRecord,
 } from "@/lib/types";
+import type { KpiBatchRow } from "@/lib/kpi/kpiBatch";
 import {
   academicCatalogRepo,
   approvalsRepo,
@@ -589,6 +590,26 @@ export function useCreateLibraryKpi() {
     onSuccess: (d) => {
       qc.invalidateQueries({ queryKey: qk.libraryKpis((d as LibraryKpi).setId) });
       qc.invalidateQueries({ queryKey: qk.strategicSets });
+    },
+  });
+}
+
+// One request for the whole Batch Add grid: the API inserts every row and syncs
+// active performance records once, so the batch lands entirely or not at all.
+export function useBulkCreateLibraryKpis(setId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rows: KpiBatchRow[]) => libraryKpisRepo.bulkCreate(setId, rows),
+    meta: {
+      toast: (d: unknown) => {
+        const n = (d as { inserted: number }).inserted;
+        return `${n} ${n === 1 ? "KPI" : "KPIs"} created`;
+      },
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.libraryKpis(setId) });
+      qc.invalidateQueries({ queryKey: qk.strategicSets });
+      invalidatePerformanceValues(qc);
     },
   });
 }

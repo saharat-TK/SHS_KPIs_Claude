@@ -19,7 +19,7 @@ export function Modal({
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: "md" | "mdWide" | "lg";
+  size?: "md" | "mdWide" | "lg" | "xl";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -41,6 +41,7 @@ export function Modal({
       <div
         className={cn(
           "bg-surface-lowest rounded-lg border border-hairline shadow-chrome w-full my-auto",
+          size === "xl" && "max-w-[1120px]",
           size === "lg" && "max-w-[860px]",
           size === "mdWide" && "max-w-[616px]",
           size === "md" && "max-w-[560px]",

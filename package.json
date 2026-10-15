@@ -20,6 +20,7 @@
     "migrate:academic-catalog": "node --env-file=.env.local scripts/migrate-academic-catalog.mjs",
     "migrate:recompute-parent-rollups": "node --env-file=.env.local scripts/recompute-parent-rollups.mjs",
     "migrate:kpi-value-source": "node --env-file=.env.local scripts/migrate-kpi-value-source.mjs",
+    "migrate:kpi-draft-flag": "node --env-file=.env.local scripts/migrate-kpi-draft-flag.mjs",
     "migrate:backfill-kpi-variables": "node --env-file=.env.local scripts/backfill-kpi-quarter-variables.mjs",
     "migrate:metric-quarter-variables": "node --env-file=.env.local scripts/migrate-metric-quarter-variables.mjs",
     "migrate:link-value-slots": "node --env-file=.env.local scripts/migrate-link-value-slots.mjs",

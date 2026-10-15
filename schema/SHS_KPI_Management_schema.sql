@@ -161,6 +161,7 @@ CREATE TABLE library_kpi (
   variable2_name      VARCHAR(255) NULL,                    -- Variable 2 (Divisor); required when unit is Percent/Ratio
   variable2_unit      VARCHAR(50)  NULL,                    -- Variable 2 unit
   sort_order          INT NOT NULL DEFAULT 0,
+  is_draft            TINYINT(1) NOT NULL DEFAULT 0,        -- 1 until first saved in the KPI editor; drafts are not synced to performance records
   created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_lkpi_set       FOREIGN KEY (set_id)              REFERENCES strategic_set(id)  ON DELETE CASCADE,
