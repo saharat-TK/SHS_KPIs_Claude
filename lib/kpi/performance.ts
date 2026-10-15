@@ -319,7 +319,9 @@ export async function copySetIntoRecord(
   recordId: number,
 ) {
   const [kpis] = await conn.query<RowDataPacket[]>(
-    "SELECT * FROM library_kpi WHERE set_id = ? ORDER BY sort_order, id",
+    // Drafts (is_draft = 1) stay out of performance records until their first
+    // save in the KPI editor; their sub-KPIs are skipped with them.
+    "SELECT * FROM library_kpi WHERE set_id = ? AND is_draft = 0 ORDER BY sort_order, id",
     [setId],
   );
   for (const k of kpis) {
@@ -364,7 +366,9 @@ export async function syncRecordFromLibrary(conn: PoolConnection, recordId: numb
   const keptKpiIds = new Set<number>();
 
   const [libKpis] = await conn.query<RowDataPacket[]>(
-    "SELECT * FROM library_kpi WHERE set_id = ? ORDER BY sort_order, id",
+    // Drafts (is_draft = 1) stay out of performance records until their first
+    // save in the KPI editor; their sub-KPIs are skipped with them.
+    "SELECT * FROM library_kpi WHERE set_id = ? AND is_draft = 0 ORDER BY sort_order, id",
     [setId],
   );
 

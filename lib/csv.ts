@@ -21,8 +21,11 @@ export function toCsv(headers: string[], rows: (string | number)[][]): string {
  *  Deliberately dumb — it does not know about headers, comments, or types. The
  *  caller decides what a row means, which keeps this testable against the
  *  spreadsheet quirks that actually break imports: a UTF-8 BOM from Excel, CRLF
- *  line endings, and the trailing newline every editor adds. */
-export function parseCsv(text: string): string[][] {
+ *  line endings, and the trailing newline every editor adds.
+ *
+ *  `delimiter` is "\t" for clipboard text copied out of Excel, which quotes its
+ *  cells by the same rules. */
+export function parseCsv(text: string, delimiter = ","): string[][] {
   const src = text.startsWith(UTF8_BOM) ? text.slice(UTF8_BOM.length) : text;
 
   const rows: string[][] = [];
@@ -47,7 +50,7 @@ export function parseCsv(text: string): string[][] {
 
     if (ch === '"') {
       quoted = true;
-    } else if (ch === ",") {
+    } else if (ch === delimiter) {
       row.push(field);
       field = "";
     } else if (ch === "\n" || ch === "\r") {

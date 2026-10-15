@@ -123,6 +123,8 @@ const en = {
     backToSet: "Back to Set",
     saveChanges: "Save Changes",
     saving: "Saving…",
+    draftBadgeTitle:
+      "Draft: not in performance records until it is first saved. Save once to publish it.",
     deleteKpi: "Delete KPI",
     deleteConfirmTitle: "Delete KPI",
     deleteConfirmLabel: "Delete",
@@ -383,6 +385,8 @@ const th: Dictionary = {
     backToSet: "กลับไปยังชุด",
     saveChanges: "บันทึกการเปลี่ยนแปลง",
     saving: "กำลังบันทึก…",
+    draftBadgeTitle:
+      "ฉบับร่าง: ยังไม่อยู่ในบันทึกผลการดำเนินงานจนกว่าจะบันทึกครั้งแรก บันทึกหนึ่งครั้งเพื่อเผยแพร่",
     deleteKpi: "ลบ KPI",
     deleteConfirmTitle: "ลบ KPI",
     deleteConfirmLabel: "ลบ",

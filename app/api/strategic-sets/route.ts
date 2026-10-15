@@ -109,8 +109,8 @@ async function cloneSetContents(
           data_collect_method,
           collection_period, data_source_url, committee_id, person_in_charge_id,
           weight, unit, five_year_target, calculation_type, calculation_logic,
-          formula_id, threshold_green, threshold_amber, sort_order)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          formula_id, threshold_green, threshold_amber, sort_order, is_draft)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         newSetId, k.name, k.description, mapCat(k.category_id),
         mapCat(k.routine_category_id), k.kpi_type,
@@ -118,6 +118,7 @@ async function cloneSetContents(
         k.committee_id, k.person_in_charge_id, k.weight, k.unit,
         k.five_year_target, k.calculation_type, k.calculation_logic,
         k.formula_id, k.threshold_green, k.threshold_amber, k.sort_order,
+        k.is_draft, // a draft stays a draft in the clone
       ],
     );
     const newKpiId = ins.insertId;

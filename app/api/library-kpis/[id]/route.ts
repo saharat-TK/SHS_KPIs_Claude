@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
-import { LIBRARY_KPI_FIELDS } from "@/lib/kpi/fields";
+import { LIBRARY_KPI_FIELDS, toLibraryKpiRow } from "@/lib/kpi/fields";
 import {
   syncActiveRecordsForSet,
   setIdForKpi,
@@ -73,7 +73,7 @@ export async function GET(
       "SELECT year_no AS yearNo, target_value AS targetValue FROM library_kpi_annual_target WHERE kpi_id = ? ORDER BY year_no",
       [params.id],
     );
-    return NextResponse.json({ ...rows[0], annualTargets: targets });
+    return NextResponse.json({ ...toLibraryKpiRow(rows[0]), annualTargets: targets });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load KPI" },
@@ -110,6 +110,10 @@ export async function PATCH(
     if (setClauses.length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
+    // The editor's Save is the only caller, and its first save is what
+    // publishes a draft: clear the flag so the sync below copies the KPI into
+    // active performance records.
+    setClauses.push("is_draft = 0");
     values.push(params.id);
 
     const conn = await pool.getConnection();
@@ -140,7 +144,7 @@ export async function PATCH(
       `SELECT ${LIBRARY_KPI_FIELDS} FROM library_kpi k WHERE k.id = ?`,
       [params.id],
     );
-    return NextResponse.json(rows[0]);
+    return NextResponse.json(toLibraryKpiRow(rows[0]));
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update KPI" },

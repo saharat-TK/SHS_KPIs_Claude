@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
-import { LIBRARY_KPI_FIELDS } from "@/lib/kpi/fields";
-import { syncActiveRecordsForSet } from "@/lib/kpi/performance";
-import { DEFAULT_THRESHOLDS } from "@/lib/kpi/progress";
+import { LIBRARY_KPI_FIELDS, toLibraryKpiRow } from "@/lib/kpi/fields";
+import {
+  LIBRARY_KPI_INSERT_COLUMNS,
+  libraryKpiInsertValues,
+} from "@/lib/kpi/libraryKpiInsert";
 import { isCalculationType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
        FROM library_kpi k WHERE k.set_id = ? ORDER BY k.sort_order, k.id`,
       [setId],
     );
-    return NextResponse.json(rows);
+    return NextResponse.json(rows.map(toLibraryKpiRow));
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load KPIs" },
@@ -55,48 +57,19 @@ export async function POST(req: NextRequest) {
       const sortOrder = b.sortOrder ?? maxRow[0]?.next ?? 1;
 
       const [ins] = await conn.query<ResultSetHeader>(
-        `INSERT INTO library_kpi
-           (set_id, name, description, category_id, routine_category_id, kpi_type,
-            data_collect_method,
-            collection_period, data_source_url, committee_id, person_in_charge_id,
-            weight, unit, five_year_target, calculation_type, calculation_logic,
-            formula_id, threshold_green, threshold_amber, sort_order)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [
-          b.setId,
-          b.name.trim(),
-          b.description?.trim() || null,
-          b.categoryId || null,
-          b.routineCategoryId || null,
-          b.kpiType || "operational",
-          b.dataCollectMethod?.trim() || null,
-          b.collectionPeriod || "every_quarter",
-          b.dataSourceUrl?.trim() || null,
-          b.committeeId || null,
-          b.personInChargeId || null,
-          b.weight ?? 0,
-          b.unit?.trim() || null,
-          b.fiveYearTarget ?? null,
-          b.calculationType || "weighted_sum",
-          b.calculationLogic?.trim() || null,
-          b.formulaId ?? null,
-          // `in` rather than `??`: the editor always sends both keys, so an
-          // explicit null means "the user cleared this" and must survive. Only
-          // an absent key falls back to the standard band.
-          "thresholdGreen" in b ? b.thresholdGreen : DEFAULT_THRESHOLDS.green,
-          "thresholdAmber" in b ? b.thresholdAmber : DEFAULT_THRESHOLDS.amber,
-          sortOrder,
-        ],
+        `INSERT INTO library_kpi (${LIBRARY_KPI_INSERT_COLUMNS})
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        libraryKpiInsertValues(Number(b.setId), b, sortOrder),
       );
-      // Propagate the new KPI to every active performance record for this set.
-      await syncActiveRecordsForSet(conn, Number(b.setId));
+      // No sync to active performance records: a new KPI is a draft, and drafts
+      // join them on their first save in the KPI editor.
       await conn.commit();
 
       const [created] = await conn.query<RowDataPacket[]>(
         `SELECT ${LIBRARY_KPI_FIELDS} FROM library_kpi k WHERE k.id = ?`,
         [ins.insertId],
       );
-      return NextResponse.json(created[0], { status: 201 });
+      return NextResponse.json(toLibraryKpiRow(created[0]), { status: 201 });
     } catch (err) {
       await conn.rollback();
       throw err;

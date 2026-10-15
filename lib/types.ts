@@ -364,6 +364,9 @@ export interface LibraryKpi {
   variable2Name: string | null;
   variable2Unit: string | null;
   sortOrder: number;
+  /** New KPIs start as drafts: shown with a "D" badge and kept out of
+   *  performance records until their first save in the KPI editor. */
+  isDraft: boolean;
   annualTargets?: AnnualTarget[];
   metricCount?: number; // populated in list views
 }

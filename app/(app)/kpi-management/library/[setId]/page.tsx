@@ -36,6 +36,7 @@ import {
 } from "@/lib/data/hooks";
 import {
   KPI_TYPES,
+  type KpiCategoryRecord,
   type KpiType,
   type LibraryKpi,
 } from "@/lib/types";
@@ -45,7 +46,10 @@ import {
   categoryTaxonomyForKpiType,
 } from "@/lib/kpi/categories";
 import { describeKpiDeletion } from "@/lib/kpi/deletion";
+import { categoriesForKpiType } from "@/lib/kpi/kpiBatch";
 import { ManageCategoriesModal } from "./ManageCategoriesModal";
+import { BatchAddKpisModal } from "./BatchAddKpisModal";
+import { DraftBadge } from "../DraftBadge";
 
 // Keyed on the seeded ids; kpi_type is user-extensible now, so unknown ids fall
 // back to a neutral tone rather than rendering undefined.
@@ -90,12 +94,13 @@ function SetDetail() {
   const [committeeFilter, setCommitteeFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortState | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showBatch, setShowBatch] = useState(false);
   const [showManageCats, setShowManageCats] = useState(false);
 
   const categories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
   const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
   const kpiTypes = useMemo(() => kpiTypesQ.data ?? [], [kpiTypesQ.data]);
-  const committees = committeesQ.data ?? [];
+  const committees = useMemo(() => committeesQ.data ?? [], [committeesQ.data]);
   const kpiTypeById = useMemo(
     () => new Map(kpiTypes.map((type) => [type.id, type])),
     [kpiTypes],
@@ -113,10 +118,7 @@ function SetDetail() {
     ? selectedKpiType
     : "strategic";
 
-  const strategicCategories = useMemo(
-    () => categoriesOfType(categories, "strategic"),
-    [categories],
-  );
+  const existingNames = useMemo(() => kpis.map((k) => k.name), [kpis]);
   const activeCategories = useMemo(
     () =>
       categoriesOfType(categories, categoryTaxonomyForKpiType(activeKpiType)),
@@ -241,6 +243,13 @@ function SetDetail() {
               Add KPI
             </Button>
             <Button
+              variant="outline"
+              icon="playlist_add"
+              onClick={() => setShowBatch(true)}
+            >
+              Batch Add
+            </Button>
+            <Button
               variant="ghost"
               icon="category"
               onClick={() => setShowManageCats(true)}
@@ -299,9 +308,18 @@ function SetDetail() {
                   : "Try a different committee or category, or add a KPI to this strategic set."
               }
               action={
-                <Button icon="add" onClick={() => setShowCreate(true)}>
-                  Add KPI
-                </Button>
+                <div className="flex flex-wrap justify-center gap-sm">
+                  <Button icon="add" onClick={() => setShowCreate(true)}>
+                    Add KPI
+                  </Button>
+                  <Button
+                    variant="outline"
+                    icon="playlist_add"
+                    onClick={() => setShowBatch(true)}
+                  >
+                    Batch Add
+                  </Button>
+                </div>
               }
             />
           ) : (
@@ -336,7 +354,12 @@ function SetDetail() {
                       router.push(`/kpi-management/library/${setId}/kpis/${k.id}`)
                     }
                   >
-                    <Td className="font-medium">{k.name}</Td>
+                    <Td className="font-medium">
+                      <span className="inline-flex items-center gap-xs">
+                        {k.name}
+                        {k.isDraft && <DraftBadge />}
+                      </span>
+                    </Td>
                     <Td align="center">
                       <Badge tone={TYPE_TONE[k.kpiType] ?? "neutral"}>
                         {typeLabel(k.kpiType)}
@@ -376,7 +399,7 @@ function SetDetail() {
       <CreateKpiModal
         open={showCreate}
         submitting={create.isPending}
-        categories={strategicCategories}
+        categories={categories}
         kpiTypes={kpiTypes.map((t) => ({ id: t.id, label: t.kpiTypeName }))}
         onClose={() => setShowCreate(false)}
         onCreate={(input) =>
@@ -392,6 +415,18 @@ function SetDetail() {
             },
           )
         }
+      />
+
+      <BatchAddKpisModal
+        open={showBatch}
+        onClose={() => setShowBatch(false)}
+        setId={setId}
+        kpiTypes={kpiTypeOptions}
+        categories={categories}
+        committees={committees}
+        existingNames={existingNames}
+        defaultKpiType={activeKpiType}
+        defaultCommitteeId={committeeFilter === "all" ? "" : committeeFilter}
       />
 
       <ManageCategoriesModal
@@ -422,11 +457,12 @@ function CreateKpiModal({
   onCreate: (input: {
     name: string;
     categoryId: string | null;
+    routineCategoryId: string | null;
     kpiType: KpiType;
     weight: number;
     unit: string;
   }) => void;
-  categories: { id: string; label: string }[];
+  categories: KpiCategoryRecord[];
   kpiTypes: { id: string; label: string }[];
   submitting: boolean;
 }) {
@@ -447,6 +483,10 @@ function CreateKpiModal({
   }, [open]);
 
   const valid = name.trim().length > 1;
+  // Routine KPIs group by the ด้านที่ taxonomy (routine_category_id); every
+  // other type by the Strategic one (category_id).
+  const typeCategories = categoriesForKpiType(categories, kpiType);
+  const routine = categoryTaxonomyForKpiType(kpiType) === "routine";
 
   return (
     <Modal
@@ -464,7 +504,8 @@ function CreateKpiModal({
             onClick={() =>
               onCreate({
                 name: name.trim(),
-                categoryId: categoryId || null,
+                categoryId: routine ? null : categoryId || null,
+                routineCategoryId: routine ? categoryId || null : null,
                 kpiType,
                 weight,
                 unit,
@@ -488,7 +529,7 @@ function CreateKpiModal({
           <Field label="Category">
             <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">Uncategorised</option>
-              {categories.map((c) => (
+              {typeCategories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.label}
                 </option>
@@ -496,7 +537,16 @@ function CreateKpiModal({
             </Select>
           </Field>
           <Field label="KPI Type">
-            <Select value={kpiType} onChange={(e) => setKpiType(e.target.value as KpiType)}>
+            <Select
+              value={kpiType}
+              onChange={(e) => {
+                const next = e.target.value as KpiType;
+                setKpiType(next);
+                if (!categoriesForKpiType(categories, next).some((c) => c.id === categoryId)) {
+                  setCategoryId("");
+                }
+              }}
+            >
               {(kpiTypes.length > 0 ? kpiTypes : KPI_TYPES).map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.label}

@@ -56,6 +56,7 @@ import { personsForCommittee } from "@/lib/kpi/committee";
 import { useT, type TFunction } from "@/lib/i18n/useT";
 import type { TranslationKey } from "@/lib/i18n/dictionaries";
 import { MetricEditor } from "./MetricEditor";
+import { DraftBadge } from "../../../DraftBadge";
 
 // Display label/hint keys, indexed by the calculation-type id (the id stays the
 // logic/DB value — only the copy is translated at render). Mirrors the ids in
@@ -413,6 +414,9 @@ function KpiDetail() {
     <>
       <PageHeader
         title={kpiQ.data?.name ?? t("kpiDetail.titleFallback")}
+        titleAdornment={
+          kpiQ.data?.isDraft && <DraftBadge title={t("kpiDetail.draftBadgeTitle")} />
+        }
         description={t("kpiDetail.headerDescription")}
         actions={
           <>
@@ -425,7 +429,11 @@ function KpiDetail() {
             </Button>
             <Button
               icon="save"
-              disabled={!dirty || !!capError || !!varError || saving}
+              // A draft can be saved untouched: that first save is what
+              // publishes it, even when the defaults are already right.
+              disabled={
+                (!dirty && !kpiQ.data?.isDraft) || !!capError || !!varError || saving
+              }
               onClick={save}
             >
               {saving ? t("kpiDetail.saving") : t("kpiDetail.saveChanges")}
