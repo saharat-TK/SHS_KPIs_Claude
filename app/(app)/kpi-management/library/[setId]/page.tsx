@@ -36,6 +36,7 @@ import {
   useEdpexCatalog,
 } from "@/lib/data/hooks";
 import { EdpexSelects, type EdpexValue } from "../../EdpexSelects";
+import { edpexIndicatorCodeError } from "@/lib/kpi/edpex";
 import {
   KPI_TYPES,
   type KpiCategoryRecord,
@@ -446,6 +447,8 @@ function SetDetail() {
   );
 }
 
+const EMPTY_EDPEX: EdpexValue = { edpexTopicId: "", edpexAreaId: "", edpexIndicatorCode: "" };
+
 function CreateKpiModal({
   open,
   onClose,
@@ -465,6 +468,7 @@ function CreateKpiModal({
     unit: string;
     edpexTopicId: string | null;
     edpexAreaId: string | null;
+    edpexIndicatorCode: string | null;
   }) => void;
   categories: KpiCategoryRecord[];
   kpiTypes: { id: string; label: string }[];
@@ -472,7 +476,7 @@ function CreateKpiModal({
 }) {
   const edpexCatalog = useEdpexCatalog();
   const [name, setName] = useState("");
-  const [edpex, setEdpex] = useState<EdpexValue>({ edpexTopicId: "", edpexAreaId: "" });
+  const [edpex, setEdpex] = useState<EdpexValue>(EMPTY_EDPEX);
   const [categoryId, setCategoryId] = useState("");
   const [kpiType, setKpiType] = useState<KpiType>("operational");
   const [weight, setWeight] = useState(10);
@@ -485,11 +489,13 @@ function CreateKpiModal({
       setKpiType("operational");
       setWeight(10);
       setUnit("Item");
-      setEdpex({ edpexTopicId: "", edpexAreaId: "" });
+      setEdpex(EMPTY_EDPEX);
     }
   }, [open]);
 
-  const valid = name.trim().length > 1;
+  const valid =
+    name.trim().length > 1 &&
+    !edpexIndicatorCodeError(edpex.edpexIndicatorCode, edpex.edpexAreaId);
   // Routine KPIs group by the ด้านที่ taxonomy (routine_category_id); every
   // other type by the Strategic one (category_id).
   const typeCategories = categoriesForKpiType(categories, kpiType);
@@ -518,6 +524,7 @@ function CreateKpiModal({
                 unit,
                 edpexTopicId: edpex.edpexTopicId || null,
                 edpexAreaId: edpex.edpexAreaId || null,
+                edpexIndicatorCode: edpex.edpexIndicatorCode.trim() || null,
               })
             }
           >

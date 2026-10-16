@@ -135,6 +135,7 @@ test("pasted Excel rows resolve labels and fall back to defaults", () => {
     description: "Within 1 year",
     edpexTopicId: "",
     edpexAreaId: "",
+    edpexIndicatorCode: "",
   });
   // Same label in both taxonomies → the Routine one, matching the row's type.
   assert.equal(rows[1].categoryId, "routine_research");
@@ -167,6 +168,7 @@ test("the CSV template round-trips, with columns matched by header", () => {
       description: "Counts, by year",
       edpexTopicId: "",
       edpexAreaId: "",
+      edpexIndicatorCode: "",
     },
   ]);
 
@@ -188,6 +190,7 @@ test("normalizeKpiBatchRow coerces a JSON body to strings", () => {
     description: "",
     edpexTopicId: "",
     edpexAreaId: "",
+    edpexIndicatorCode: "",
   });
   assert.deepEqual(normalizeKpiBatchRow(null), emptyKpiBatchRow());
 });
@@ -256,6 +259,8 @@ test("the template explains every column and lists the allowed values", () => {
     "7.1 = ผลลัพธ์ด้านการเรียนรู้ของผู้เรียนและด้านกระบวนการ",
     "Topic 7.2:",
     "7.2ก = ผลลัพธ์ด้านการมุ่งเน้นผู้เรียนและลูกค้ากลุ่มอื่น",
+    "EdPEx Indicator — optional",
+    "Example row: My KPI name,strategic,,C01,Short description,7.1,7.1ก,7.1ก-1",
   ]) {
     assert.ok(template.includes(expected), `template should mention ${expected}`);
   }
@@ -263,7 +268,7 @@ test("the template explains every column and lists the allowed values", () => {
   const lines = template.replace(/^\uFEFF/, "").trimEnd().split("\n");
   assert.equal(
     lines.at(-1),
-    "Name,Type,Category,Committee,Description,EdPEx Topic,EdPEx Area",
+    "Name,Type,Category,Committee,Description,EdPEx Topic,EdPEx Area,EdPEx Indicator",
   );
   assert.ok(lines.slice(0, -1).every((l) => l.startsWith("#") || l.startsWith('"#')));
   assert.deepEqual(readKpiTemplateCsv(template, LOOKUPS), []);
@@ -279,6 +284,7 @@ test("the template explains every column and lists the allowed values", () => {
       description: "",
       edpexTopicId: "7.1",
       edpexAreaId: "7.1ข",
+      edpexIndicatorCode: "",
     },
   ]);
 });
@@ -293,4 +299,53 @@ test("template headers match loosely, and a pre-EdPEx file still imports", () =>
   const [imported] = readKpiTemplateCsv(old, LOOKUPS);
   assert.equal(imported.description, "notes");
   assert.equal(imported.edpexTopicId, "");
+});
+
+// ── EdPEx indicator code ────────────────────────────────────────────────────
+
+test("the EdPEx indicator code must start with the row's area", () => {
+  assert.equal(
+    kpiBatchRowError(row({ edpexAreaId: "7.1ข", edpexIndicatorCode: "7.1ข-4" }), LOOKUPS),
+    null,
+  );
+  // No area: any code is accepted.
+  assert.equal(kpiBatchRowError(row({ edpexIndicatorCode: "7.5ก-2-3" }), LOOKUPS), null);
+  assert.match(
+    kpiBatchRowError(row({ edpexAreaId: "7.1ข", edpexIndicatorCode: "7.2ก-1" }), LOOKUPS),
+    /must start with its EdPEx area 7\.1ข/,
+  );
+});
+
+test("the indicator code is written trimmed, and blank becomes null", () => {
+  const input = toKpiCreateInput(row({ edpexAreaId: "7.1ข", edpexIndicatorCode: " 7.1ข-4 " }), LOOKUPS);
+  assert.equal(input.edpexIndicatorCode, "7.1ข-4");
+  assert.equal(toKpiCreateInput(row(), LOOKUPS).edpexIndicatorCode, null);
+});
+
+test("typing an indicator code makes a row touched", () => {
+  assert.equal(
+    checkKpiBatch([emptyKpiBatchRow({ edpexIndicatorCode: "7.1ข-4" })], LOOKUPS).rows[0].blank,
+    false,
+  );
+});
+
+test("the indicator code is the last pasted / CSV column, and older files still import", () => {
+  const [pasted] = parseKpiPaste("A KPI\tstrategic\t\t\t\t7.1\tข\t 7.1ข-4 ", LOOKUPS);
+  assert.equal(pasted.edpexIndicatorCode, "7.1ข-4");
+
+  const template = buildKpiTemplateCsv(LOOKUPS);
+  const [filled] = readKpiTemplateCsv(template + "Graduate count,strategic,,,,,7.1ข,7.1ข-4\n", LOOKUPS);
+  assert.deepEqual(
+    [filled.edpexTopicId, filled.edpexAreaId, filled.edpexIndicatorCode],
+    ["7.1", "7.1ข", "7.1ข-4"],
+  );
+
+  const aliased = "Name,edpex_indicator_code,EdPEx Code\nX KPI,7.1ก-2,\n";
+  assert.equal(readKpiTemplateCsv(aliased, LOOKUPS)[0].edpexIndicatorCode, "7.1ก-2");
+
+  const preIndicator =
+    "Name,Type,Category,Committee,Description,EdPEx Topic,EdPEx Area\nOld KPI,strategic,,,,7.1,ก\n";
+  const [old] = readKpiTemplateCsv(preIndicator, LOOKUPS);
+  assert.equal(old.edpexAreaId, "7.1ก");
+  assert.equal(old.edpexIndicatorCode, "");
 });

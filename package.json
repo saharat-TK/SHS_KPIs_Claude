@@ -26,6 +26,7 @@
     "migrate:metric-quarter-variables": "node --env-file=.env.local scripts/migrate-metric-quarter-variables.mjs",
     "migrate:link-value-slots": "node --env-file=.env.local scripts/migrate-link-value-slots.mjs",
     "migrate:edpex": "node --env-file=.env.local scripts/migrate-edpex.mjs",
+    "migrate:edpex-indicator": "node --env-file=.env.local scripts/migrate-edpex-indicator.mjs",
     "clear:stale-closed-periods": "node --env-file=.env.local scripts/clear-stale-closed-period-values.mjs",
     "seed:ip": "node --env-file=.env.local scripts/seed-intellectual-property.mjs",
     "seed:ip-usage-count": "node --env-file=.env.local scripts/seed-ip-usage-count.mjs",

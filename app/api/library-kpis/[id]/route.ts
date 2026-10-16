@@ -22,6 +22,7 @@ const COLUMN_MAP: Record<string, string> = {
   routineCategoryId: "routine_category_id",
   edpexTopicId: "edpex_topic_id",
   edpexAreaId: "edpex_area_id",
+  edpexIndicatorCode: "edpex_indicator_code",
   kpiType: "kpi_type",
   dataCollectMethod: "data_collect_method",
   collectionPeriod: "collection_period",
@@ -55,6 +56,7 @@ const NULLABLE_TEXT = new Set([
   "routineCategoryId",
   "edpexTopicId",
   "edpexAreaId",
+  "edpexIndicatorCode",
   "committeeId",
   "personInChargeId",
   "variable1Name",
@@ -100,12 +102,15 @@ export async function PATCH(
         { status: 400 },
       );
     }
-    // The pair is validated as a pair: a patch carrying only one half is
-    // completed from the stored row, then both halves are written together.
-    // A topic-only patch drops a stored area that no longer fits it.
-    if ("edpexTopicId" in body || "edpexAreaId" in body) {
+    // The EdPEx fields are validated together: a patch carrying only some of
+    // topic / area / indicator code is completed from the stored row, then all
+    // three are written. A topic-only patch drops a stored area that no longer
+    // fits it; an area change re-checks the stored indicator code.
+    if ("edpexTopicId" in body || "edpexAreaId" in body || "edpexIndicatorCode" in body) {
       const [current] = await pool.query<RowDataPacket[]>(
-        "SELECT edpex_topic_id AS edpexTopicId, edpex_area_id AS edpexAreaId FROM library_kpi WHERE id = ?",
+        `SELECT edpex_topic_id AS edpexTopicId, edpex_area_id AS edpexAreaId,
+                edpex_indicator_code AS edpexIndicatorCode
+           FROM library_kpi WHERE id = ?`,
         [params.id],
       );
       const catalog = await loadEdpexCatalog(pool);
@@ -117,7 +122,14 @@ export async function PATCH(
           : edpexAreaFitsTopic(catalog, storedArea, topicId)
             ? storedArea
             : null;
-      const edpex = normaliseEdpex({ edpexTopicId: topicId, edpexAreaId: areaId }, catalog);
+      const indicatorCode =
+        "edpexIndicatorCode" in body
+          ? body.edpexIndicatorCode
+          : current[0]?.edpexIndicatorCode ?? null;
+      const edpex = normaliseEdpex(
+        { edpexTopicId: topicId, edpexAreaId: areaId, edpexIndicatorCode: indicatorCode },
+        catalog,
+      );
       if (!edpex.ok) {
         return NextResponse.json({ error: edpex.error }, { status: 400 });
       }

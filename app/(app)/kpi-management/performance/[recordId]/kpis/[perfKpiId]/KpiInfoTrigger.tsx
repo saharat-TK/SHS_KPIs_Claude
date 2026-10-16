@@ -34,6 +34,7 @@ export function KpiInfoTrigger({ kpi }: { kpi: PerfKpi }) {
   const rows: { label: string; value: ReactNode }[] = [
     { label: "Description", value: kpi.description },
     { label: "EdPEx", value: edpexLabel(edpexQ.data ?? [], kpi.edpexTopicId, kpi.edpexAreaId) },
+    { label: "EdPEx Indicator", value: kpi.edpexIndicatorCode },
     { label: "Data Collecting Method", value: kpi.dataCollectMethod },
     {
       label: "Data Source",

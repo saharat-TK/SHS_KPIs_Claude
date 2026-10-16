@@ -17,7 +17,12 @@ import {
   type KpiBatchLookups,
   type KpiBatchRow,
 } from "@/lib/kpi/kpiBatch";
-import { areaAfterTopicChange, areasForTopic, findEdpexArea } from "@/lib/kpi/edpex";
+import {
+  areaAfterTopicChange,
+  areasForTopic,
+  EDPEX_INDICATOR_CODE_MAX,
+  findEdpexArea,
+} from "@/lib/kpi/edpex";
 import type { KpiCategoryRecord } from "@/lib/types";
 
 const INITIAL_ROWS = 5;
@@ -26,7 +31,7 @@ type GridRow = KpiBatchRow & { key: number };
 type FillColumn = "kpiType" | "categoryId" | "committeeId" | "edpexTopicId" | "edpexAreaId";
 
 /** Quick-create many skeleton KPIs — name, type, category, committee, a
- *  description and an optional EdPEx topic / area — to configure one by one in
+ *  description and an optional EdPEx topic / area / indicator code — to configure one by one in
  *  the KPI editor afterwards.
  *
  *  Rows come from typing, from a paste out of Excel (into any Name cell), or
@@ -313,7 +318,7 @@ export function BatchAddKpisModal({
           <span className="ml-auto inline-flex items-center gap-xs text-caption-sm text-mute">
             <Icon name="content_paste" size={16} />
             Paste rows from Excel into any Name cell — columns: Name, Type, Category,
-            Committee, Description, EdPEx Topic, EdPEx Area.
+            Committee, Description, EdPEx Topic, EdPEx Area, EdPEx Indicator.
           </span>
         </div>
 
@@ -334,6 +339,7 @@ export function BatchAddKpisModal({
                 <Th className="px-md">Description</Th>
                 <FillTh label="EdPEx Topic" onFill={() => fillDown("edpexTopicId")} />
                 <FillTh label="EdPEx Area" onFill={() => fillDown("edpexAreaId")} />
+                <Th className="px-md">EdPEx Indicator</Th>
                 <Th className="px-md">Status</Th>
                 <Th className="px-md">
                   <span className="sr-only">Remove</span>
@@ -456,6 +462,16 @@ export function BatchAddKpisModal({
                       </Select>
                     </Td>
                     <Td className="px-md py-xs">
+                      <Input
+                        aria-label={`EdPEx indicator code, row ${i + 1}`}
+                        className="w-[8rem]"
+                        maxLength={EDPEX_INDICATOR_CODE_MAX}
+                        placeholder={row.edpexAreaId ? `${row.edpexAreaId}-1` : "7.1ข-4"}
+                        value={row.edpexIndicatorCode}
+                        onChange={(e) => update(row.key, { edpexIndicatorCode: e.target.value })}
+                      />
+                    </Td>
+                    <Td className="px-md py-xs">
                       <div className="flex min-h-[36px] w-[12rem] items-center">
                         <RowStatus
                           blank={rowCheck?.blank ?? true}
@@ -487,7 +503,8 @@ export function BatchAddKpisModal({
           New KPIs start as drafts (marked D) with weight 0% and unit Item, and stay
           out of performance records until first saved in the KPI editor. Routine
           KPIs use the ด้านที่ categories; every other type uses the Strategic
-          categories. EdPEx Area lists only the areas of the row&apos;s EdPEx Topic. The
+          categories. EdPEx Area lists only the areas of the row&apos;s EdPEx Topic, and an
+          EdPEx Indicator (the SAR row, e.g. 7.1ข-4) must start with the row&apos;s area. The
           CSV template lists every allowed value in its # instruction lines; Type,
           Category, Committee and the EdPEx columns accept either the name shown
           here or its code.
