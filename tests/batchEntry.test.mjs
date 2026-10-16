@@ -6,10 +6,13 @@ import {
   batchColumnKey,
   batchDuplicateKey,
   buildBatchRows,
+  degreeLevelColumn,
+  degreeLevelFor,
   entryRowsFromPaste,
   isBlankEntryRow,
   recordedBatchKeys,
   resolveChoiceText,
+  withDegreeLevel,
 } from "../lib/kpi/batchEntry.ts";
 
 // A trimmed catalog with the real cascade shape: PH owns three curricula, BM one.
@@ -188,4 +191,80 @@ test("pasted Excel rows map onto the columns, skipping a header and blank lines"
     { values: { program: "", who: "", count: "5" }, note: "late" },
     { values: { program: "", who: "", count: "6" }, note: "" },
   ]);
+});
+
+// ── Degree level ────────────────────────────────────────────────────────────
+
+const LEVELS = ["Bachelor's", "Master's", "Doctoral"];
+const leveled = {
+  ...catalog,
+  curricula: [
+    { code: "PHB", programCode: "PH", label: "สาธารณสุขศาสตร์", degreeLevel: "Bachelor's", sortOrder: 1 },
+    { code: "PHM", programCode: "PH", label: "การจัดการสุขภาพชายแดน", degreeLevel: "Master’s", sortOrder: 2 },
+    { code: "PHD", programCode: "PH", label: "ระบาดและวัคซีนวิทยา", degreeLevel: "Doctoral", sortOrder: 3 },
+    { code: "BMM", programCode: "BM", label: "เทคโนโลยีชีวการแพทย์", degreeLevel: null, sortOrder: 9 },
+  ],
+};
+const levelCol = col("degree_level", "select", { label: "Degree level", options: LEVELS });
+const LEVEL_SOURCE = [col("curriculum", "curriculum"), levelCol, col("program", "program"), col("n", "number")];
+
+test("the Degree level column is found by key or by label, only as a select", () => {
+  assert.equal(degreeLevelColumn(LEVEL_SOURCE)?.colKey, "degree_level");
+  assert.equal(
+    degreeLevelColumn([col("lvl", "select", { label: "  Degree  LEVEL ", options: LEVELS })])?.colKey,
+    "lvl",
+  );
+  assert.equal(degreeLevelColumn([col("degree_level", "text")]), null);
+  assert.equal(degreeLevelColumn([col("curriculum", "curriculum")]), null);
+});
+
+test("a curriculum's level is filled only as one of the column's options", () => {
+  assert.equal(degreeLevelFor("PHD", leveled, levelCol), "Doctoral");
+  // A curly apostrophe in the catalog still matches the column's spelling.
+  assert.equal(degreeLevelFor("PHM", leveled, levelCol), "Master's");
+  assert.equal(degreeLevelFor("BMM", leveled, levelCol), null); // no level known
+  assert.equal(degreeLevelFor("XXX", leveled, levelCol), null); // unknown curriculum
+  assert.equal(
+    degreeLevelFor("PHD", leveled, { ...levelCol, options: ["Bachelor's", "Master's"] }),
+    null,
+  );
+  assert.equal(degreeLevelFor("PHD", leveled, null), null);
+});
+
+test("the curriculum batch locks each row's level, leaving unknown ones editable", () => {
+  const rows = buildBatchRows("curricula", leveled, LEVEL_SOURCE);
+  assert.deepEqual(
+    rows.map((r) => r.locked),
+    [
+      { curriculum: "PHB", program: "PH", degree_level: "Bachelor's" },
+      { curriculum: "PHM", program: "PH", degree_level: "Master's" },
+      { curriculum: "PHD", program: "PH", degree_level: "Doctoral" },
+      { curriculum: "BMM", program: "BM" },
+    ],
+  );
+  // No Degree level column: the batch is exactly as before.
+  assert.deepEqual(buildBatchRows("curricula", leveled, BOTH)[2].locked, {
+    curriculum: "PHD",
+    program: "PH",
+  });
+});
+
+test("picking a curriculum fills the level; a pasted level is kept", () => {
+  const picked = withDegreeLevel({ curriculum: "PHD", degree_level: "Master's" }, LEVEL_SOURCE, leveled, {
+    overwrite: true,
+  });
+  assert.equal(picked.degree_level, "Doctoral");
+
+  const pasted = { curriculum: "PHD", degree_level: "Master's" };
+  assert.equal(withDegreeLevel(pasted, LEVEL_SOURCE, leveled, { overwrite: false }), pasted);
+  assert.equal(
+    withDegreeLevel({ curriculum: "PHB", degree_level: "" }, LEVEL_SOURCE, leveled, { overwrite: false })
+      .degree_level,
+    "Bachelor's",
+  );
+  // Unknown level or no level column: values come back untouched.
+  const unknown = { curriculum: "BMM", degree_level: "" };
+  assert.equal(withDegreeLevel(unknown, LEVEL_SOURCE, leveled, { overwrite: true }), unknown);
+  const noColumn = { curriculum: "PHB" };
+  assert.equal(withDegreeLevel(noColumn, BOTH, leveled, { overwrite: true }), noColumn);
 });

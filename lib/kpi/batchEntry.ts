@@ -67,7 +67,10 @@ export function batchColumnKey(
  *  without their programs would leave a source that collects both half blank,
  *  and any link filtering on program would miss every row. The reverse does not
  *  hold — a program has several curricula and none of them is the right guess —
- *  so batching by program leaves a curriculum column empty and editable. */
+ *  so batching by program leaves a curriculum column empty and editable.
+ *
+ *  The same reasoning fills a Degree level column from the curriculum: each
+ *  curriculum has exactly one level (see degreeLevelFor). */
 export function buildBatchRows(
   mode: CatalogBatchMode,
   catalog: AcademicCatalog,
@@ -86,11 +89,70 @@ export function buildBatchRows(
   }
 
   if (!curriculumKey) return [];
+  const levelColumn = degreeLevelColumn(columns);
   return catalog.curricula.map((c) => {
     const locked: Record<string, string> = { [curriculumKey]: c.code };
     if (programKey) locked[programKey] = c.programCode;
+    // A curriculum without a known level leaves the column for the person.
+    const level = degreeLevelFor(c.code, catalog, levelColumn);
+    if (levelColumn && level) locked[levelColumn.colKey] = level;
     return { code: c.code, label: c.label, locked };
   });
+}
+
+// ── Degree level ────────────────────────────────────────────────────────────
+// Sources that record per curriculum often carry a "Degree level" select
+// (Bachelor's / Master's / Doctoral). The catalog knows each curriculum's level
+// (curriculum.degree_level), so entry fills it in rather than asking each time.
+
+/** "Bachelor’s" and "Bachelor's", "Degree  Level" and "degree level" are the
+ *  same thing to a person typing them. */
+const looseText = (s: string) =>
+  s.trim().replace(/\s+/g, " ").replace(/[\u2018\u2019`]/g, "'").toLowerCase();
+
+/** The source's Degree level column: a select keyed `degree_level` or labelled
+ *  "Degree level". Null when the source has none. */
+export function degreeLevelColumn(columns: ColumnSpec[]): ColumnSpec | null {
+  return (
+    columns.find(
+      (c) =>
+        c.dataType === "select" &&
+        (looseText(c.colKey) === "degree_level" || looseText(c.label) === "degree level"),
+    ) ?? null
+  );
+}
+
+/** The curriculum's level, spelled exactly as one of the column's options, or
+ *  null — when the curriculum has no level, or the column does not offer it. A
+ *  value the column would reject is never filled in. */
+export function degreeLevelFor(
+  curriculumCode: string,
+  catalog: AcademicCatalog,
+  column: ColumnSpec | null,
+): string | null {
+  if (!column) return null;
+  const level = catalog.curricula.find((c) => c.code === curriculumCode)?.degreeLevel;
+  if (!level) return null;
+  return (column.options ?? []).find((o) => looseText(o) === looseText(level)) ?? null;
+}
+
+/** Fill a row's Degree level from its curriculum. `overwrite: false` keeps a
+ *  level already typed (pasted rows); a curriculum picked by hand overwrites
+ *  it, and the person can still change it afterwards. Returns `values` itself
+ *  when nothing changes. */
+export function withDegreeLevel(
+  values: Record<string, string>,
+  columns: ColumnSpec[],
+  catalog: AcademicCatalog,
+  { overwrite }: { overwrite: boolean },
+): Record<string, string> {
+  const levelColumn = degreeLevelColumn(columns);
+  const curriculumKey = firstKeyOfType(columns, "curriculum");
+  if (!levelColumn || !curriculumKey) return values;
+  if (!overwrite && (values[levelColumn.colKey] ?? "").trim()) return values;
+  const level = degreeLevelFor((values[curriculumKey] ?? "").trim(), catalog, levelColumn);
+  if (!level || values[levelColumn.colKey] === level) return values;
+  return { ...values, [levelColumn.colKey]: level };
 }
 
 /** Identity of a batch row against what is already stored: the period plus the

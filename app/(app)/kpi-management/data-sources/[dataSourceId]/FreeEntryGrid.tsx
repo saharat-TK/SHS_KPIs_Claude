@@ -13,6 +13,7 @@ import {
 import {
   entryRowsFromPaste,
   isBlankEntryRow,
+  withDegreeLevel,
   type FreeEntryRow,
 } from "@/lib/kpi/batchEntry";
 import type {
@@ -134,7 +135,15 @@ export function useFreeRows({
     tooMany,
     canSubmit: year != null && included.length > 0 && errorCount === 0 && !tooMany,
     setValue: (key, colKey, value) =>
-      update(key, (r) => ({ ...r, values: { ...r.values, [colKey]: value } })),
+      update(key, (r) => {
+        const values = { ...r.values, [colKey]: value };
+        // Picking a curriculum fills its Degree level; it stays editable.
+        const picked = columns.find((c) => c.colKey === colKey)?.dataType === "curriculum";
+        return {
+          ...r,
+          values: picked ? withDegreeLevel(values, columns, catalog, { overwrite: true }) : values,
+        };
+      }),
     setNote: (key, note) => update(key, (r) => ({ ...r, note })),
     addRow: () => setRows((rs) => [...rs, blankRow()]),
     removeRow: (key) =>
@@ -158,7 +167,11 @@ export function useFreeRows({
      *  input should handle itself. */
     paste: (key, startAt, text) => {
       if (!text.includes("\t") && !text.trim().includes("\n")) return false;
-      const pasted = entryRowsFromPaste(text, columns, choices, startAt);
+      // A pasted level is kept; an empty one is filled from the curriculum.
+      const pasted = entryRowsFromPaste(text, columns, choices, startAt).map((p) => ({
+        ...p,
+        values: withDegreeLevel(p.values, columns, catalog, { overwrite: false }),
+      }));
       if (pasted.length === 0) return true;
       setRows((rs) => {
         const at = rs.findIndex((r) => r.key === key);

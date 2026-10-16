@@ -344,9 +344,13 @@ export function BatchEntryGrid({
                           <div className="whitespace-nowrap font-medium">
                             {lockedCode}
                           </div>
-                          <div className="text-caption-sm text-mute">
-                            {labels[lockedCode] ?? "—"}
-                          </div>
+                          {/* Catalog codes carry a Thai name; a filled-in value
+                              such as a degree level is its own label. */}
+                          {labels[lockedCode] && (
+                            <div className="text-caption-sm text-mute">
+                              {labels[lockedCode]}
+                            </div>
+                          )}
                         </Td>
                       );
                     }

@@ -13,6 +13,8 @@ import { COLUMN_TYPE_LABELS } from "@/lib/kpi/dataSources";
 import {
   BATCH_MODE_LABELS,
   availableBatchModes,
+  degreeLevelColumn,
+  withDegreeLevel,
   type BatchMode,
 } from "@/lib/kpi/batchEntry";
 import { EMPTY_ACADEMIC_CATALOG, buildCellLabels } from "@/lib/kpi/academicCatalog";
@@ -33,12 +35,17 @@ const BATCH_MODE_HINTS: Record<BatchMode, string> = {
   curricula: "One row per curriculum, with the curriculum already chosen.",
 };
 
-/** The curriculum batch only fills a program in when the source has somewhere to
- *  put one, so the hint must not promise it otherwise. */
-const hintFor = (mode: BatchMode, hasProgramColumn: boolean) =>
-  mode === "curricula" && hasProgramColumn
-    ? "One row per curriculum, with the curriculum and its program already chosen."
-    : BATCH_MODE_HINTS[mode];
+/** The curriculum batch only fills a program (or degree level) in when the
+ *  source has somewhere to put one, so the hint must not promise it otherwise. */
+const hintFor = (mode: BatchMode, hasProgramColumn: boolean, hasLevelColumn = false) => {
+  if (mode !== "curricula" || (!hasProgramColumn && !hasLevelColumn)) {
+    return BATCH_MODE_HINTS[mode];
+  }
+  const filled = [hasProgramColumn && "its program", hasLevelColumn && "degree level"]
+    .filter(Boolean)
+    .join(" and ");
+  return `One row per curriculum, with the curriculum and ${filled} already chosen.`;
+};
 
 /** Add or edit one row of raw data — or a batch at once: free-form rows typed or
  *  pasted from Excel, or, when the source records per program or per
@@ -117,6 +124,7 @@ export function EntryModal({
   // program we narrow the curriculum picker to that program's curricula. With no
   // program column — the common case — every curriculum stays on offer.
   const programColumn = columns.find((c) => c.dataType === "program");
+  const hasLevelColumn = degreeLevelColumn(columns) != null;
   const selectedProgramCode = programColumn
     ? (values[programColumn.colKey] ?? "").trim() || null
     : null;
@@ -216,10 +224,13 @@ export function EntryModal({
         entry
           ? "One row of raw data for this source."
           : isBatch
-            ? `${hintFor(mode, !!programColumn)} All rows share the period below.`
+            ? `${hintFor(mode, !!programColumn, hasLevelColumn)} All rows share the period below.`
             : "One row of raw data for this source."
       }
-      size={isFree ? "xl" : isBatch ? "lg" : "md"}
+      // All three batch modes share one width, so switching between them does
+      // not resize the dialog; it never outgrows the screen in any mode.
+      size={isBatch ? "batch" : "md"}
+      fitViewport
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -245,7 +256,7 @@ export function EntryModal({
               options={modes.map((m) => ({
                 value: m,
                 label: BATCH_MODE_LABELS[m],
-                hint: hintFor(m, !!programColumn),
+                hint: hintFor(m, !!programColumn, hasLevelColumn),
               }))}
             />
           </div>
@@ -297,7 +308,15 @@ export function EntryModal({
                   faculty={faculty}
                   catalog={catalog}
                   selectedProgramCode={selectedProgramCode}
-                  onChange={(v) => setValues((prev) => ({ ...prev, [c.colKey]: v }))}
+                  onChange={(v) =>
+                    setValues((prev) => {
+                      const next = { ...prev, [c.colKey]: v };
+                      // Picking a curriculum fills its Degree level; it stays editable.
+                      return c.dataType === "curriculum"
+                        ? withDegreeLevel(next, columns, catalog, { overwrite: true })
+                        : next;
+                    })
+                  }
                 />
               </Field>
             ))}

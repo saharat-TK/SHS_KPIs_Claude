@@ -56,6 +56,7 @@ CREATE TABLE curriculum (
   code         VARCHAR(20)  PRIMARY KEY,               -- e.g. "PHB"
   program_code VARCHAR(20)  NOT NULL,
   label_th     VARCHAR(255) NOT NULL,
+  degree_level VARCHAR(20)  NULL,                       -- "Bachelor's" | "Master's" | "Doctoral"; fills a source's Degree level column
   sort_order   INT NOT NULL,
   created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
