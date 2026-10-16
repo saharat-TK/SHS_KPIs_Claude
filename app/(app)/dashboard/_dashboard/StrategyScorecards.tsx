@@ -47,7 +47,7 @@ function ScorecardTile({
   const muted = tint?.muted ?? "text-mute";
 
   return (
-    <Card className={cn("flex flex-col gap-md p-md !border-0", tint?.card)}>
+    <Card className={cn("flex flex-col gap-md p-md shadow-chrome !border-0", tint?.card)}>
       <div className="flex items-center justify-between gap-md">
         <h3 className={cn("text-heading-md uppercase", muted)}>{row.label}</h3>
         <Button

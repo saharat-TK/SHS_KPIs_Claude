@@ -265,6 +265,12 @@ export function Dashboard() {
 
             <HeadlineStats targets={targets} summary={summary} recording={recording} />
 
+            <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_1fr_340px]">
+              {achievementByQuarterCard}
+              {fiveYearTrajectoryCard}
+              {recordingStatusCard}
+            </div>
+
             {/* Scorecards are the way into a strategy on "All Groups"; inside one,
                 the KPI Detail table below already covers that group's KPIs, so
                 nothing else renders here. */}
@@ -275,12 +281,6 @@ export function Dashboard() {
                 onOpenKpi={openKpi}
               />
             )}
-
-            <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_1fr_340px]">
-              {achievementByQuarterCard}
-              {fiveYearTrajectoryCard}
-              {recordingStatusCard}
-            </div>
 
             <Card className="overflow-hidden animate-fade-up shadow-chrome !border-0">
               <CardHeader

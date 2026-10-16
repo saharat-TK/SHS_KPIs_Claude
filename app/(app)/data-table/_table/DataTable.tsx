@@ -11,17 +11,20 @@ import {
   PageHeader,
   QueryBoundary,
 } from "@/components/ui";
-import { usePerfMetricsByRecord } from "@/lib/data/hooks";
+import { useEdpexCatalog, usePerfMetricsByRecord } from "@/lib/data/hooks";
 import { downloadCsv } from "@/lib/csv";
 import { HEALTH_TONE } from "@/lib/kpi/progress";
 import {
   DATA_TABLE_YEARS,
   allExpandableKeys,
+  areaKey,
   buildDataTable,
   buildDataTableCsv,
   groupKey,
+  indicatorKey,
   kpiKey,
   metricsByKpi,
+  type DataTableKpi,
   type DataTableRow,
   type GroupYearCell,
   type YearCell,
@@ -34,8 +37,24 @@ import { DashboardKpiDrawer } from "../../dashboard/_dashboard/DashboardKpiDrawe
 import { GroupTabs, RecordPicker } from "../../dashboard/_dashboard/RecordPicker";
 import { useDashboardScope } from "../../dashboard/_dashboard/useDashboardScope";
 
+// KPI and sub-KPI row tints: pale navy, then white, below the grey summary
+// rows (see SUMMARY_TONE). The sticky
+// name cell carries its own opaque copy (it would otherwise let scrolled cells
+// show through), so it follows the row's hover through `group-hover`.
+const ROW_TONE = {
+  kpi: {
+    row: "group bg-[#e8eef7] hover:bg-[#dce5f2]",
+    sticky: "bg-[#e8eef7] group-hover:bg-[#dce5f2]",
+  },
+  sub: {
+    row: "group text-on-surface-variant hover:bg-surface-soft/60",
+    sticky: "bg-surface-lowest group-hover:bg-surface-soft",
+  },
+} as const;
+
 /**
- * The dashboard's filtered KPIs as one table: Group → KPI → sub-KPI rows, a
+ * The dashboard's filtered KPIs as one table: Group → KPI → sub-KPI rows
+ * (Topic → Area → Indicator code → KPI → sub-KPI under "Group by: EdPEx"), a
  * column per year of the record (each read as of the selected quarter) and the
  * 5-year target. Filters are the dashboard's own, held in the same URL keys,
  * so a filtered dashboard link opens the same slice here.
@@ -63,6 +82,9 @@ export function DataTable() {
   } = scope;
 
   const metricsQ = usePerfMetricsByRecord(record?.id ?? 0);
+  const edpexQ = useEdpexCatalog();
+  // Only the EdPEx view splits its groups (topics) by area and indicator code.
+  const edpexCatalog = groupBy === "edpex" ? edpexQ.data : undefined;
   const table = useMemo(
     () =>
       buildDataTable({
@@ -71,33 +93,37 @@ export function DataTable() {
         categories,
         metrics: metricsByKpi(metricsQ.data ?? []),
         quarter,
+        edpexCatalog,
       }),
-    [scoped, groups, categories, metricsQ.data, quarter],
+    [scoped, groups, categories, metricsQ.data, quarter, edpexCatalog],
   );
 
-  // Groups open, KPIs closed: the first view is every KPI, without the
-  // sub-KPI detail. Keys absent from the set are collapsed.
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // Groups, areas and indicators open, KPIs closed: the first view is every
+  // KPI, without the sub-KPI detail. `collapsed` holds the summary-row keys the
+  // user shut; `openKpis` the KPI keys they opened.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [openKpis, setOpenKpis] = useState<Set<string>>(new Set());
   const expanded = useMemo(() => {
     const keys = new Set(openKpis);
-    for (const g of table) if (!collapsedGroups.has(groupKey(g.id))) keys.add(groupKey(g.id));
+    for (const key of allExpandableKeys(table)) {
+      if (!key.startsWith("k:") && !collapsed.has(key)) keys.add(key);
+    }
     return keys;
-  }, [table, collapsedGroups, openKpis]);
+  }, [table, collapsed, openKpis]);
 
   const toggle = (key: string) => {
-    if (key.startsWith("g:")) {
-      setCollapsedGroups((s) => flip(s, key));
-    } else {
+    if (key.startsWith("k:")) {
       setOpenKpis((s) => flip(s, key));
+    } else {
+      setCollapsed((s) => flip(s, key));
     }
   };
   const expandAll = () => {
-    setCollapsedGroups(new Set());
+    setCollapsed(new Set());
     setOpenKpis(new Set(allExpandableKeys(table).filter((k) => k.startsWith("k:"))));
   };
   const collapseAll = () => {
-    setCollapsedGroups(new Set(table.map((g) => groupKey(g.id))));
+    setCollapsed(new Set(allExpandableKeys(table).filter((k) => !k.startsWith("k:"))));
     setOpenKpis(new Set());
   };
 
@@ -204,84 +230,64 @@ export function DataTable() {
                     )}
                     {table.map((g) => {
                       const gOpen = expanded.has(groupKey(g.id));
+                      const kpiRows = (kpis: DataTableKpi[], under: KpiParent) => (
+                        <KpiRows
+                          kpis={kpis}
+                          under={under}
+                          year={year}
+                          expanded={expanded}
+                          onToggle={toggle}
+                          onOpenKpi={setSelectedKpiId}
+                        />
+                      );
                       return (
                         <Fragment key={g.id}>
-                          <tr className="bg-surface-soft">
-                            <td className="sticky left-0 z-[1] border-b border-hairline bg-surface-soft px-md py-xs">
-                              <ToggleName
-                                open={gOpen}
-                                onToggle={() => toggle(groupKey(g.id))}
-                                label={g.label}
-                                className="font-bold uppercase text-label-md"
-                                suffix={`· ${g.kpis.length} KPI${g.kpis.length === 1 ? "" : "s"}`}
-                              />
-                            </td>
-                            <td className="border-b border-hairline" />
-                            {g.years.map((c) => (
-                              <td
-                                key={c.yearNo}
-                                className={cn(
-                                  "border-b border-hairline px-md py-xs text-right",
-                                  c.yearNo === year && "bg-primary/10",
-                                )}
-                              >
-                                <GroupPct cell={c} />
-                              </td>
-                            ))}
-                            <td className="border-b border-hairline" />
-                          </tr>
+                          <SummaryRow
+                            level="group"
+                            label={g.label}
+                            kpiCount={g.kpis.length}
+                            years={g.years}
+                            year={year}
+                            open={gOpen}
+                            onToggle={() => toggle(groupKey(g.id))}
+                          />
                           {gOpen &&
-                            g.kpis.map((k) => {
-                              const hasSubs = k.subKpis.length > 0;
-                              const kOpen = expanded.has(kpiKey(k.id));
-                              return (
-                                <Fragment key={k.id}>
-                                  <DataRow
-                                    row={k}
-                                    year={year}
-                                    name={
-                                      <span className="flex items-center gap-xs pl-md">
-                                        {hasSubs ? (
-                                          <ChevronButton
-                                            open={kOpen}
-                                            onClick={() => toggle(kpiKey(k.id))}
-                                            label={k.name}
-                                          />
-                                        ) : (
-                                          <span className="w-6 shrink-0" />
-                                        )}
-                                        <button
-                                          type="button"
-                                          className="text-left font-medium text-on-surface hover:underline"
-                                          onClick={() => setSelectedKpiId(k.id)}
-                                        >
-                                          {k.name}
-                                        </button>
-                                        {hasSubs && (
-                                          <span className="shrink-0 text-caption-sm text-mute">
-                                            ({k.subKpis.length})
-                                          </span>
-                                        )}
-                                      </span>
-                                    }
-                                  />
-                                  {kOpen &&
-                                    k.subKpis.map((m) => (
-                                      <DataRow
-                                        key={`m${m.id}`}
-                                        row={m}
+                            (g.areas
+                              ? g.areas.map((a) => {
+                                  const aOpen = expanded.has(areaKey(a.id));
+                                  return (
+                                    <Fragment key={a.id}>
+                                      <SummaryRow
+                                        level="area"
+                                        label={a.label}
+                                        kpiCount={a.kpis.length}
+                                        years={a.years}
                                         year={year}
-                                        muted
-                                        name={
-                                          <span className="block pl-[64px] text-on-surface-variant">
-                                            {m.name}
-                                          </span>
-                                        }
+                                        open={aOpen}
+                                        onToggle={() => toggle(areaKey(a.id))}
                                       />
-                                    ))}
-                                </Fragment>
-                              );
-                            })}
+                                      {aOpen &&
+                                        a.indicators.map((i) => {
+                                          const iOpen = expanded.has(indicatorKey(i.id));
+                                          return (
+                                            <Fragment key={i.id}>
+                                              <SummaryRow
+                                                level="indicator"
+                                                label={i.label}
+                                                kpiCount={i.kpis.length}
+                                                years={i.years}
+                                                year={year}
+                                                open={iOpen}
+                                                onToggle={() => toggle(indicatorKey(i.id))}
+                                              />
+                                              {iOpen && kpiRows(i.kpis, "indicator")}
+                                            </Fragment>
+                                          );
+                                        })}
+                                    </Fragment>
+                                  );
+                                })
+                              : kpiRows(g.kpis, "group"))}
                         </Fragment>
                       );
                     })}
@@ -300,6 +306,141 @@ export function DataTable() {
           </>
         )}
       </QueryBoundary>
+    </>
+  );
+}
+
+// Name-column indent by the row a KPI sits under: a group (category view) or
+// an EdPEx indicator code. Each summary level sits one chevron-width (24px) in
+// from the one above; a KPI 12px past its parent row, a sub-KPI 52px past it.
+const KPI_INDENT = { group: "pl-md", indicator: "pl-[60px]" } as const;
+const SUB_INDENT = { group: "pl-[64px]", indicator: "pl-[112px]" } as const;
+type KpiParent = keyof typeof KPI_INDENT;
+
+const SUMMARY_TONE = {
+  group: { bg: "bg-surface-container-highest", indent: "", label: "font-bold uppercase text-label-md" },
+  area: { bg: "bg-surface-container", indent: "pl-[24px]", label: "font-semibold" },
+  indicator: { bg: "bg-surface-container-low", indent: "pl-[48px]", label: "font-medium" },
+} as const;
+
+/** A group, EdPEx-area or indicator-code row: toggle, KPI count and the
+ *  yearly average %. */
+function SummaryRow({
+  level,
+  label,
+  kpiCount,
+  years,
+  year,
+  open,
+  onToggle,
+}: {
+  level: keyof typeof SUMMARY_TONE;
+  label: string;
+  kpiCount: number;
+  years: GroupYearCell[];
+  year: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const tone = SUMMARY_TONE[level];
+  return (
+    <tr className={tone.bg}>
+      <td className={cn("sticky left-0 z-[1] border-b border-hairline px-md py-xs", tone.bg)}>
+        <span className={cn("block", tone.indent)}>
+          <ToggleName
+            open={open}
+            onToggle={onToggle}
+            label={label}
+            className={tone.label}
+            suffix={`· ${kpiCount} KPI${kpiCount === 1 ? "" : "s"}`}
+          />
+        </span>
+      </td>
+      <td className="border-b border-hairline" />
+      {years.map((c) => (
+        <td
+          key={c.yearNo}
+          className={cn(
+            "border-b border-hairline px-md py-xs text-right",
+            c.yearNo === year && "bg-primary/10",
+          )}
+        >
+          <GroupPct cell={c} />
+        </td>
+      ))}
+      <td className="border-b border-hairline" />
+    </tr>
+  );
+}
+
+/** KPI rows, each followed by its sub-KPIs while it is expanded. */
+function KpiRows({
+  kpis,
+  under,
+  year,
+  expanded,
+  onToggle,
+  onOpenKpi,
+}: {
+  kpis: DataTableKpi[];
+  under: KpiParent;
+  year: number;
+  expanded: ReadonlySet<string>;
+  onToggle: (key: string) => void;
+  onOpenKpi: (kpiId: number) => void;
+}) {
+  return (
+    <>
+      {kpis.map((k) => {
+        const hasSubs = k.subKpis.length > 0;
+        const kOpen = expanded.has(kpiKey(k.id));
+        return (
+          <Fragment key={k.id}>
+            <DataRow
+              row={k}
+              year={year}
+              tone="kpi"
+              name={
+                <span className={cn("flex items-center gap-xs", KPI_INDENT[under])}>
+                  {hasSubs ? (
+                    <ChevronButton
+                      open={kOpen}
+                      onClick={() => onToggle(kpiKey(k.id))}
+                      label={k.name}
+                    />
+                  ) : (
+                    <span className="w-6 shrink-0" />
+                  )}
+                  <button
+                    type="button"
+                    className="text-left font-medium text-on-surface hover:underline"
+                    onClick={() => onOpenKpi(k.id)}
+                  >
+                    {k.name}
+                  </button>
+                  {hasSubs && (
+                    <span className="shrink-0 text-caption-sm text-mute">({k.subKpis.length})</span>
+                  )}
+                </span>
+              }
+            />
+            {kOpen &&
+              k.subKpis.map((m) => (
+                <DataRow
+                  key={`m${m.id}`}
+                  row={m}
+                  year={year}
+                  tone="sub"
+                  name={
+                    <span className={cn("block text-on-surface-variant", SUB_INDENT[under])}>
+                      {m.name}
+                    </span>
+                  }
+                />
+              ))}
+          </Fragment>
+        );
+      })}
     </>
   );
 }
@@ -339,7 +480,7 @@ function ChevronButton({
       aria-expanded={open}
       aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
       onClick={onClick}
-      className="grid h-6 w-6 shrink-0 place-items-center rounded text-mute hover:bg-surface-container-high hover:text-on-surface"
+      className="grid h-6 w-6 shrink-0 place-items-center rounded text-mute hover:bg-ink/10 hover:text-on-surface"
     >
       <Icon name={open ? "expand_more" : "chevron_right"} size={18} />
     </button>
@@ -374,16 +515,16 @@ function DataRow({
   row,
   year,
   name,
-  muted,
+  tone,
 }: {
   row: DataTableRow;
   year: number;
   name: React.ReactNode;
-  muted?: boolean;
+  tone: keyof typeof ROW_TONE;
 }) {
   return (
-    <tr className={cn("hover:bg-surface-soft/60", muted && "text-on-surface-variant")}>
-      <td className="sticky left-0 z-[1] border-b border-hairline bg-surface-lowest px-md py-xs">
+    <tr className={ROW_TONE[tone].row}>
+      <td className={cn("sticky left-0 z-[1] border-b border-hairline px-md py-xs", ROW_TONE[tone].sticky)}>
         {name}
       </td>
       <td className="whitespace-nowrap border-b border-hairline px-md py-xs text-mute">

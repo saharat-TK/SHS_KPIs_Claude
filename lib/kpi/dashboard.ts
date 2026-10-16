@@ -60,6 +60,10 @@ export interface DashboardKpi {
   kpiType?: string | null;
   /** EdPEx results item ("7.1") — the key of the "Group by: EdPEx" view. */
   edpexTopicId?: string | null;
+  /** EdPEx area within that topic ("7.1ข") — the Data Table's second level. */
+  edpexAreaId?: string | null;
+  /** Free-text SAR indicator code ("7.1ข-4") — the Data Table's third level. */
+  edpexIndicatorCode?: string | null;
   /** Per-year cap on the annual targets; shown by the Data Table page. */
   fiveYearTarget?: number | null;
 }
