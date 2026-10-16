@@ -6,6 +6,7 @@ import {
   buildEdpexCatalog,
   edpexAreaFitsTopic,
   edpexCode,
+  edpexIndicatorCodeError,
   edpexLabel,
   normaliseEdpex,
   resolveEdpexAreaText,
@@ -61,15 +62,15 @@ test("the area cascade follows the topic", () => {
 test("normaliseEdpex completes, clears and refuses pairs", () => {
   assert.deepEqual(normaliseEdpex({ edpexAreaId: "7.5ข" }, CATALOG), {
     ok: true,
-    value: { edpexTopicId: "7.5", edpexAreaId: "7.5ข" },
+    value: { edpexTopicId: "7.5", edpexAreaId: "7.5ข", edpexIndicatorCode: null },
   });
   assert.deepEqual(normaliseEdpex({ edpexTopicId: " ", edpexAreaId: "" }, CATALOG), {
     ok: true,
-    value: { edpexTopicId: null, edpexAreaId: null },
+    value: { edpexTopicId: null, edpexAreaId: null, edpexIndicatorCode: null },
   });
   assert.deepEqual(normaliseEdpex({ edpexTopicId: "7.1" }, CATALOG), {
     ok: true,
-    value: { edpexTopicId: "7.1", edpexAreaId: null },
+    value: { edpexTopicId: "7.1", edpexAreaId: null, edpexIndicatorCode: null },
   });
   assert.equal(normaliseEdpex({ edpexTopicId: "7.1", edpexAreaId: "7.5ก" }, CATALOG).ok, false);
   assert.equal(normaliseEdpex({ edpexTopicId: "9.9" }, CATALOG).ok, false);
@@ -122,4 +123,29 @@ test("admin inputs are checked before they reach the database", () => {
   });
   assert.match(readEdpexPatch({ sortOrder: "x" }).error, /whole number/);
   assert.match(readEdpexPatch({}).error, /No fields/);
+});
+
+test("an indicator code must start with its area, when one is set", () => {
+  assert.equal(edpexIndicatorCodeError("7.1ข-4", "7.1ข"), null);
+  assert.equal(edpexIndicatorCodeError("7.1 ข-4", "7.1ข"), null); // spaces ignored
+  assert.equal(edpexIndicatorCodeError("7.5ก-2-3", null), null); // no area: free text
+  assert.equal(edpexIndicatorCodeError("  ", "7.1ข"), null);
+  assert.match(edpexIndicatorCodeError("7.1ก-4", "7.1ข"), /must start with its EdPEx area 7\.1ข/);
+  assert.match(edpexIndicatorCodeError("x".repeat(31), null), /30 characters or fewer/);
+});
+
+test("normaliseEdpex checks and trims the indicator code with the pair", () => {
+  // An area given alone still fills in its topic, and the code is checked
+  // against that area.
+  assert.deepEqual(
+    normaliseEdpex({ edpexAreaId: "7.1ข", edpexIndicatorCode: " 7.1ข-4 " }, CATALOG),
+    { ok: true, value: { edpexTopicId: "7.1", edpexAreaId: "7.1ข", edpexIndicatorCode: "7.1ข-4" } },
+  );
+  assert.deepEqual(normaliseEdpex({ edpexTopicId: "7.5", edpexIndicatorCode: "7.5ก-2-3" }, CATALOG), {
+    ok: true,
+    value: { edpexTopicId: "7.5", edpexAreaId: null, edpexIndicatorCode: "7.5ก-2-3" },
+  });
+  const wrong = normaliseEdpex({ edpexAreaId: "7.5ก", edpexIndicatorCode: "7.1ข-4" }, CATALOG);
+  assert.equal(wrong.ok, false);
+  assert.match(wrong.error, /"7\.1ข-4" must start with its EdPEx area 7\.5ก/);
 });

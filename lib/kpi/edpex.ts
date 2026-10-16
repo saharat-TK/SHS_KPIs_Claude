@@ -6,6 +6,10 @@
 // The one rule a KPI must keep is that its area belongs to its topic; an area
 // given without a topic implies that topic.
 //
+// A KPI may also carry an indicator code: its numbered row in the School's
+// EdPEx SAR ("7.1ข-4", "7.5ก-2-3"). It is free text — the SAR's numbering is
+// not a managed list — but when an area is set the code must start with it.
+//
 // No runtime imports: tests load this file directly under node's type-stripping.
 import type { EdpexArea, EdpexTopic } from "@/lib/types";
 
@@ -15,6 +19,8 @@ export type EdpexCatalog = Pick<EdpexTopic, "id" | "name" | "areas">[];
 export const EDPEX_TOPIC_ID_MAX = 10;
 export const EDPEX_AREA_CODE_MAX = 10;
 export const EDPEX_NAME_MAX = 500;
+/** Column size of library_kpi.edpex_indicator_code. */
+export const EDPEX_INDICATOR_CODE_MAX = 30;
 
 /** An area's id is its topic's id followed by its own code: "7.1" + "ข". */
 export const edpexAreaId = (topicId: string, code: string) => `${topicId}${code}`;
@@ -63,35 +69,70 @@ export function edpexAreaFitsTopic(
   return areasForTopic(catalog, topicId).some((a) => a.id === areaId);
 }
 
-export interface EdpexPair {
+export interface EdpexFields {
   edpexTopicId: string | null;
   edpexAreaId: string | null;
+  edpexIndicatorCode: string | null;
+}
+
+/** Why an indicator code cannot sit with an area, or null when it can. A blank
+ *  code always fits; with no area only the length is checked. Spaces and case
+ *  are ignored, so "7.1 ข-4" fits area 7.1ข. */
+export function edpexIndicatorCodeError(
+  code: string | null | undefined,
+  areaId: string | null | undefined,
+): string | null {
+  const c = code?.trim();
+  if (!c) return null;
+  if (c.length > EDPEX_INDICATOR_CODE_MAX) {
+    return `EdPEx indicator code must be ${EDPEX_INDICATOR_CODE_MAX} characters or fewer`;
+  }
+  const area = areaId?.trim();
+  if (area && !squash(c).startsWith(squash(area))) {
+    return `EdPEx indicator code "${c}" must start with its EdPEx area ${area} (e.g. ${area}-1)`;
+  }
+  return null;
 }
 
 /**
- * Validate and complete a topic/area pair before it is written: blanks become
- * null, an area alone fills in its topic, and an unknown id or an area from
- * another topic is refused. Shared by the single create/edit routes and the
- * batch grid so all three apply one rule.
+ * Validate and complete a KPI's EdPEx fields before they are written: blanks
+ * become null, an area alone fills in its topic, and an unknown id, an area
+ * from another topic or an indicator code outside its area is refused. Shared
+ * by the single create/edit routes and the batch grid so all three apply one
+ * rule.
  */
 export function normaliseEdpex(
-  input: { edpexTopicId?: string | null; edpexAreaId?: string | null },
+  input: {
+    edpexTopicId?: string | null;
+    edpexAreaId?: string | null;
+    edpexIndicatorCode?: string | null;
+  },
   catalog: EdpexCatalog,
-): { ok: true; value: EdpexPair } | { ok: false; error: string } {
+): { ok: true; value: EdpexFields } | { ok: false; error: string } {
   const topicId = input.edpexTopicId?.trim() || null;
   const areaId = input.edpexAreaId?.trim() || null;
+  const edpexIndicatorCode = input.edpexIndicatorCode?.trim() || null;
 
   if (topicId && !findEdpexTopic(catalog, topicId)) {
     return { ok: false, error: `Unknown EdPEx topic "${topicId}"` };
   }
-  if (!areaId) return { ok: true, value: { edpexTopicId: topicId, edpexAreaId: null } };
+  if (!areaId) {
+    const error = edpexIndicatorCodeError(edpexIndicatorCode, null);
+    if (error) return { ok: false, error };
+    return { ok: true, value: { edpexTopicId: topicId, edpexAreaId: null, edpexIndicatorCode } };
+  }
 
   const area = findEdpexArea(catalog, areaId);
   if (!area) return { ok: false, error: `Unknown EdPEx area "${areaId}"` };
   if (topicId && area.topicId !== topicId) {
     return { ok: false, error: `EdPEx area ${area.id} is not part of topic ${topicId}` };
   }
-  return { ok: true, value: { edpexTopicId: area.topicId, edpexAreaId: area.id } };
+  const error = edpexIndicatorCodeError(edpexIndicatorCode, area.id);
+  if (error) return { ok: false, error };
+  return {
+    ok: true,
+    value: { edpexTopicId: area.topicId, edpexAreaId: area.id, edpexIndicatorCode },
+  };
 }
 
 /** The area to keep after the topic changes: unchanged when it still fits,

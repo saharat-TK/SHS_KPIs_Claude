@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
       const [ins] = await conn.query<ResultSetHeader>(
         `INSERT INTO library_kpi (${LIBRARY_KPI_INSERT_COLUMNS})
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         libraryKpiInsertValues(Number(b.setId), { ...b, ...edpex.value }, sortOrder),
       );
       // No sync to active performance records: a new KPI is a draft, and drafts

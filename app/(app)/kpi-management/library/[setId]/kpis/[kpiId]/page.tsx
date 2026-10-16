@@ -148,6 +148,7 @@ type Draft = {
   routineCategoryId: string;
   edpexTopicId: string;
   edpexAreaId: string;
+  edpexIndicatorCode: string;
   kpiType: KpiType;
   dataCollectMethod: string;
   collectionPeriod: CollectionPeriod;
@@ -177,6 +178,7 @@ function draftOf(k: LibraryKpi): Draft {
     routineCategoryId: k.routineCategoryId ?? "",
     edpexTopicId: k.edpexTopicId ?? "",
     edpexAreaId: k.edpexAreaId ?? "",
+    edpexIndicatorCode: k.edpexIndicatorCode ?? "",
     kpiType: k.kpiType,
     dataCollectMethod: k.dataCollectMethod ?? "",
     collectionPeriod: k.collectionPeriod,
@@ -313,6 +315,7 @@ function KpiDetail() {
           routineCategoryId: draft.routineCategoryId || null,
           edpexTopicId: draft.edpexTopicId || null,
           edpexAreaId: draft.edpexAreaId || null,
+          edpexIndicatorCode: draft.edpexIndicatorCode.trim() || null,
           kpiType: draft.kpiType,
           dataCollectMethod: draft.dataCollectMethod,
           collectionPeriod: draft.collectionPeriod,
@@ -596,6 +599,8 @@ function KpiDetail() {
                     areaLabel={t("kpiDetail.edpexArea")}
                     noneLabel={t("kpiDetail.edpexNone")}
                     chooseTopicFirst={t("kpiDetail.edpexChooseTopicFirst")}
+                    indicatorLabel={t("kpiDetail.edpexIndicatorCode")}
+                    indicatorHint={t("kpiDetail.edpexIndicatorHint")}
                   />
                   <div className="sm:col-span-2">
                     <Field label={t("kpiDetail.description")}>
