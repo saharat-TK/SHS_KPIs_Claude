@@ -192,7 +192,7 @@ test("program columns validate against the five program codes", () => {
   assert.equal(coerceCellValue(c, "EnvH"), "EnvH");
   assert.throws(
     () => coerceCellValue(c, "BioMed"),
-    /"Program": "BioMed" is not a valid choice\. Options are the five academic programs/,
+    /"Program": "BioMed" is not a valid choice\. Options are the academic programs in the catalog/,
   );
 });
 

@@ -41,6 +41,11 @@ import {
   type MetricTargetMode,
 } from "@/lib/types";
 import { personsForCommittee } from "@/lib/kpi/committee";
+import {
+  planBatchRows,
+  type BatchEntry,
+  type ExistingMetric,
+} from "@/lib/kpi/metricBatch";
 
 function toYearSlots(targets: AnnualTarget[] | undefined): (number | null)[] {
   const slots: (number | null)[] = [null, null, null, null, null];
@@ -65,11 +70,10 @@ type ParentDefaults = {
 
 const ZERO_YEARS: (number | null)[] = [0, 0, 0, 0, 0];
 
-// Batch presets — each entry prefixes `${abbr}-` onto the parent KPI's name.
-// `label` is the Thai program/curriculum name, shown for reference in the dialog.
-// Both lists come from the academic catalog tables, the same source the
-// program/curriculum data-source columns use, so they cannot drift apart.
-type BatchEntry = { abbr: string; label: string };
+// Batch presets — each entry becomes a sub-KPI named by its Thai
+// program/curriculum label (label_th); see planBatchRows. Both lists come from
+// the academic catalog tables, the same source the program/curriculum
+// data-source columns use, so they cannot drift apart.
 
 const TARGET_MODE_OPTIONS: {
   value: MetricTargetMode;
@@ -126,11 +130,14 @@ export function MetricEditor({
   const metrics = metricsQ.data ?? [];
   const catalogQ = useAcademicCatalog();
   const toBatchEntry = (e: { code: string; label: string }): BatchEntry => ({
-    abbr: e.code,
+    code: e.code,
     label: e.label,
   });
   const programBatch = (catalogQ.data?.programs ?? []).map(toBatchEntry);
   const curriculumBatch = (catalogQ.data?.curricula ?? []).map(toBatchEntry);
+  // Counted from the catalog tables, so the labels follow what is in the DB.
+  const programTitle = `Batch: ${programBatch.length} Programs`;
+  const curriculumTitle = `Batch: ${curriculumBatch.length} Curriculums`;
   // The presets are useless until the catalog arrives, so gate on it too.
   const canStartBatch = canAddMetric && !!catalogQ.data;
   const batchTooltip = !canAddMetric
@@ -154,9 +161,9 @@ export function MetricEditor({
               icon="groups"
               disabled={!canStartBatch}
               title={batchTooltip}
-              onClick={() => setBatch({ title: "Batch: 5 Programs", entries: programBatch })}
+              onClick={() => setBatch({ title: programTitle, entries: programBatch })}
             >
-              Batch: 5 Programs
+              {catalogQ.data ? programTitle : "Batch: Programs"}
             </Button>
             <Button
               size="sm"
@@ -164,11 +171,9 @@ export function MetricEditor({
               icon="school"
               disabled={!canStartBatch}
               title={batchTooltip}
-              onClick={() =>
-                setBatch({ title: "Batch: 9 Curriculums", entries: curriculumBatch })
-              }
+              onClick={() => setBatch({ title: curriculumTitle, entries: curriculumBatch })}
             >
-              Batch: 9 Curriculums
+              {catalogQ.data ? curriculumTitle : "Batch: Curriculums"}
             </Button>
             <Button
               size="sm"
@@ -274,7 +279,11 @@ export function MetricEditor({
           parentName={parentName}
           parentUnit={parentUnit}
           parentDefaults={parentDefaults}
-          existingNames={metrics.map((m) => m.name)}
+          existing={metrics.map((m) => ({
+            id: m.id,
+            name: m.name,
+            catalogCode: m.catalogCode ?? null,
+          }))}
           onClose={() => setBatch(null)}
         />
       )}
@@ -289,7 +298,7 @@ function BatchConfirmModal({
   parentName,
   parentUnit,
   parentDefaults,
-  existingNames,
+  existing,
   onClose,
 }: {
   kpiId: number;
@@ -298,23 +307,32 @@ function BatchConfirmModal({
   parentName: string;
   parentUnit: string;
   parentDefaults: ParentDefaults;
-  existingNames: string[];
+  existing: ExistingMetric[];
   onClose: () => void;
 }) {
   const create = useCreateLibraryMetric();
-  const existing = new Set(existingNames);
+  const update = useUpdateLibraryMetric();
+  const pending = create.isPending || update.isPending;
 
-  const rows = entries.map((e) => {
-    const name = `${e.abbr}-${parentName}`;
-    return { ...e, name, duplicate: existing.has(name) };
-  });
-  const toCreate = rows.filter((r) => !r.duplicate);
+  const rows = planBatchRows(entries, parentName, existing);
+  const toCreate = rows.filter((r) => r.status === "create");
+  const toRename = rows.flatMap((r) => (r.status === "rename" ? [r] : []));
+  const toLink = rows.flatMap((r) => (r.status === "link" ? [r] : []));
+  const applyLabel = [
+    toCreate.length > 0 &&
+      `Create ${toCreate.length} Sub-KPI${toCreate.length === 1 ? "" : "s"}`,
+    toRename.length > 0 && `Rename ${toRename.length}`,
+    toLink.length > 0 && `Link ${toLink.length}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-  const onCreate = async () => {
+  const onApply = async () => {
     for (const row of toCreate) {
       await create.mutateAsync({
         kpiId,
         name: row.name,
+        catalogCode: row.code,
         categoryId: parentDefaults.categoryId || null,
         weight: 100,
         unit: parentUnit,
@@ -330,6 +348,15 @@ function BatchConfirmModal({
         thresholdAmber: null,
       });
     }
+    for (const row of toRename) {
+      await update.mutateAsync({
+        id: row.metricId,
+        patch: { name: row.name, catalogCode: row.code },
+      });
+    }
+    for (const row of toLink) {
+      await update.mutateAsync({ id: row.metricId, patch: { catalogCode: row.code } });
+    }
     onClose();
   };
 
@@ -338,20 +365,15 @@ function BatchConfirmModal({
       open
       onClose={onClose}
       title={title}
-      subtitle={`Each sub-KPI is named “${parentName}” prefixed with its abbreviation. Inherits the parent's category, committee, collection period, data method, source and unit; weight 100, blank targets.`}
+      subtitle={`Each sub-KPI is named after its program/curriculum (Thai name). Existing ones are renamed when their program/curriculum name has changed (or they still use the old “CODE-…” name). Inherits the parent's category, committee, collection period, data method, source and unit; weight 100, blank targets.`}
       size="mdWide"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose} disabled={create.isPending}>
+          <Button variant="ghost" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
-          <Button
-            disabled={toCreate.length === 0 || create.isPending}
-            onClick={onCreate}
-          >
-            {create.isPending
-              ? "Creating…"
-              : `Create ${toCreate.length} Sub-KPI${toCreate.length === 1 ? "" : "s"}`}
+          <Button disabled={!applyLabel || pending} onClick={onApply}>
+            {pending ? "Saving…" : applyLabel || "Nothing to add"}
           </Button>
         </>
       }
@@ -360,20 +382,31 @@ function BatchConfirmModal({
         <thead>
           <tr>
             <Th>Sub-KPI name</Th>
-            <Th>Program / Curriculum</Th>
+            <Th>Code</Th>
             <Th align="right">Status</Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <Tr key={r.abbr}>
-              <Td className={r.duplicate ? "text-mute" : "font-medium"}>{r.name}</Td>
-              <Td className="text-mute">{r.label}</Td>
+            <Tr key={r.code}>
+              <Td className={r.status === "exists" ? "text-mute" : "font-medium"}>
+                {r.name}
+                {r.status === "rename" && (
+                  <span className="block text-caption-sm font-normal text-mute line-through">
+                    {r.oldName}
+                  </span>
+                )}
+              </Td>
+              <Td className="text-mute">{r.code}</Td>
               <Td align="right">
-                {r.duplicate ? (
-                  <span className="text-caption-sm text-mute">already exists — skipped</span>
+                {r.status === "exists" ? (
+                  <span className="whitespace-nowrap text-caption-sm text-mute">already exists — skipped</span>
+                ) : r.status === "link" ? (
+                  <span className="whitespace-nowrap text-caption-sm text-mute">already exists — will be linked</span>
+                ) : r.status === "rename" ? (
+                  <span className="whitespace-nowrap text-caption-sm text-warning">will be renamed</span>
                 ) : (
-                  <span className="text-caption-sm text-success">will be created</span>
+                  <span className="whitespace-nowrap text-caption-sm text-success">will be created</span>
                 )}
               </Td>
             </Tr>

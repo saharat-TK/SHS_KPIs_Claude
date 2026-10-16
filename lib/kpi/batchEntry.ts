@@ -1,6 +1,6 @@
 // Batch data entry — pre-building one entry row per academic program or per
 // curriculum, so a source that collects the same measure across the faculty is
-// filled in once rather than five or nine times.
+// filled in once rather than once per program or curriculum.
 //
 // Like dataSources.ts and dataSourceFilters.ts this file takes its data as
 // arguments and imports only types, so the tests can load it under node's type
@@ -17,12 +17,20 @@ export type BatchMode = "single" | "rows" | "programs" | "curricula";
 /** The modes whose rows are pre-built from the academic catalog. */
 export type CatalogBatchMode = "programs" | "curricula";
 
-export const BATCH_MODE_LABELS: Record<BatchMode, string> = {
-  single: "Single entry",
-  rows: "Multiple rows",
-  programs: "5 Departments",
-  curricula: "9 Curriculums",
-};
+/** The "What to add" option label. The catalog modes carry a live count from
+ *  the catalog tables, so adding a curriculum updates the label with it. */
+export function batchModeLabel(mode: BatchMode, catalog: AcademicCatalog): string {
+  switch (mode) {
+    case "single":
+      return "Single entry";
+    case "rows":
+      return "Multiple rows";
+    case "programs":
+      return `${catalog.programs.length} Programs`;
+    case "curricula":
+      return `${catalog.curricula.length} Curriculums`;
+  }
+}
 
 /** One pre-built row of a batch. */
 export interface BatchRow {
@@ -63,7 +71,7 @@ export function batchColumnKey(
 /** One row per program (or per curriculum), in the catalog's own order.
  *
  *  A curriculum belongs to exactly one program, so batching by curriculum also
- *  fills the program column when the source has one: recording nine curricula
+ *  fills the program column when the source has one: recording the curricula
  *  without their programs would leave a source that collects both half blank,
  *  and any link filtering on program would miss every row. The reverse does not
  *  hold — a program has several curricula and none of them is the right guess —

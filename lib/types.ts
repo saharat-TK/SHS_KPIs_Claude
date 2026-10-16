@@ -402,6 +402,9 @@ export interface LibraryMetric {
   id: number;
   kpiId: number;
   name: string;
+  /** Program/curriculum code this sub-KPI was batch-created for ("PH", "PHB"),
+   *  or null for a hand-made one. Links it to the catalog across label edits. */
+  catalogCode: string | null;
   description: string | null;
   categoryId: string | null;
   dataCollectMethod: string | null;

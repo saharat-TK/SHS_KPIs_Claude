@@ -229,6 +229,7 @@ CREATE TABLE library_metric (
   id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   kpi_id              BIGINT UNSIGNED NOT NULL,
   name                VARCHAR(500) NOT NULL,
+  catalog_code        VARCHAR(20)  NULL,                    -- program/curriculum code a batch created it for (no FK)
   description         TEXT NULL,
   category_id         VARCHAR(40)  NULL,                    -- FK -> kpi_categories.id
   data_collect_method VARCHAR(500) NULL,

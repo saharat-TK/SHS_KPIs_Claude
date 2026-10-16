@@ -11,7 +11,7 @@ import {
 } from "@/lib/data/hooks";
 import { COLUMN_TYPE_LABELS } from "@/lib/kpi/dataSources";
 import {
-  BATCH_MODE_LABELS,
+  batchModeLabel,
   availableBatchModes,
   degreeLevelColumn,
   withDegreeLevel,
@@ -255,7 +255,7 @@ export function EntryModal({
               onChange={setMode}
               options={modes.map((m) => ({
                 value: m,
-                label: BATCH_MODE_LABELS[m],
+                label: batchModeLabel(m, catalog),
                 hint: hintFor(m, !!programColumn, hasLevelColumn),
               }))}
             />

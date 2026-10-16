@@ -119,7 +119,7 @@ test("buildEntryTemplateCsv lists derived codes with their labels", () => {
   const csv = template();
   assert.match(csv, /^#\s+PH = สาธารณสุขศาสตร์$/m);
   assert.match(csv, /^#\s+SHS = วิทยาศาสตร์การกีฬา$/m);
-  assert.match(csv, /Program \[program\] — 5 Programs\. Enter one of these codes:/);
+  assert.match(csv, /Program \[program\] — Programs\. Enter one of these codes:/);
 });
 
 test("buildEntryTemplateCsv prints a Choice option once, not as code = code", () => {
@@ -329,7 +329,7 @@ test("an annual source tolerates an empty Quarter column", () => {
 test("readEntryTemplateCsv skips the legend and numbers lines against the file", () => {
   const csv = [
     "# SHS data entry template — S",
-    "#   Program [program] — 5 Programs.",
+    "#   Program [program] — Programs.",
     "#",
     "Year,Quarter,Program,Count,Note",
     "2568,1,PH,4,",
