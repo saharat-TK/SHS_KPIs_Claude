@@ -139,12 +139,12 @@ async function cloneSetContents(
     for (const m of srcMetrics) {
       const [minsert] = await conn.query<ResultSetHeader>(
         `INSERT INTO library_metric
-           (kpi_id, name, description, category_id, data_collect_method,
+           (kpi_id, name, catalog_code, description, category_id, data_collect_method,
             collection_period, data_source_url, committee_id, person_in_charge_id,
             weight, unit, five_year_target, threshold_green, threshold_amber, sort_order)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
-          newKpiId, m.name, m.description, mapCat(m.category_id), m.data_collect_method,
+          newKpiId, m.name, m.catalog_code ?? null, m.description, mapCat(m.category_id), m.data_collect_method,
           m.collection_period, m.data_source_url, m.committee_id,
           m.person_in_charge_id, m.weight, m.unit, m.five_year_target,
           m.threshold_green, m.threshold_amber, m.sort_order,

@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 const COLUMN_MAP: Record<string, string> = {
   name: "name",
+  catalogCode: "catalog_code",
   description: "description",
   categoryId: "category_id",
   dataCollectMethod: "data_collect_method",
@@ -30,6 +31,7 @@ const COLUMN_MAP: Record<string, string> = {
 };
 
 const NULLABLE_TEXT = new Set([
+  "catalogCode",
   "description",
   "dataCollectMethod",
   "dataSourceUrl",

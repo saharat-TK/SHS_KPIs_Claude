@@ -26,8 +26,8 @@ export const COLUMN_TYPE_LABELS: Record<DataSourceColumnType, string> = {
   select: "Choice",
   boolean: "Yes / No",
   faculty: "Faculties",
-  program: "5 Programs",
-  curriculum: "9 Curriculums",
+  program: "Programs",
+  curriculum: "Curriculums",
 };
 
 /** Types whose allowed values come from elsewhere (the faculty roster, the program
@@ -47,8 +47,8 @@ export const isDerivedOptionType = (t: DataSourceColumnType) =>
  *  of the options input. */
 export const DERIVED_OPTION_SOURCE: Partial<Record<DataSourceColumnType, string>> = {
   faculty: "Options come from the faculty roster (active staff).",
-  program: "Options are the five academic programs.",
-  curriculum: "Options are the nine curricula.",
+  program: "Options are the academic programs in the catalog.",
+  curriculum: "Options are the curricula in the catalog.",
 };
 
 /** Column definition as far as validation cares — lets callers pass either a

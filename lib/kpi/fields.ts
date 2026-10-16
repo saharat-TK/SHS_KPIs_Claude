@@ -28,7 +28,8 @@ export function toLibraryKpiRow<T extends object>(row: T): T & { isDraft: boolea
 }
 
 export const LIBRARY_METRIC_FIELDS = `
-  m.id, m.kpi_id AS kpiId, m.name, m.description, m.category_id AS categoryId,
+  m.id, m.kpi_id AS kpiId, m.name, m.catalog_code AS catalogCode,
+  m.description, m.category_id AS categoryId,
   m.data_collect_method AS dataCollectMethod, m.collection_period AS collectionPeriod,
   m.data_source_url AS dataSourceUrl, m.committee_id AS committeeId,
   m.person_in_charge_id AS personInChargeId, m.weight, m.unit,

@@ -55,13 +55,14 @@ export async function POST(req: NextRequest) {
 
       const [ins] = await conn.query<ResultSetHeader>(
         `INSERT INTO library_metric
-           (kpi_id, name, description, category_id, data_collect_method,
+           (kpi_id, name, catalog_code, description, category_id, data_collect_method,
             collection_period, data_source_url, committee_id, person_in_charge_id,
             weight, unit, five_year_target, target_mode, threshold_green, threshold_amber, sort_order)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           b.kpiId,
           b.name.trim(),
+          b.catalogCode?.trim() || null,
           b.description?.trim() || null,
           b.categoryId || null,
           b.dataCollectMethod?.trim() || null,
