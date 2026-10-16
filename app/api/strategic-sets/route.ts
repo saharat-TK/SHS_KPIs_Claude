@@ -105,15 +105,18 @@ async function cloneSetContents(
   for (const k of srcKpis) {
     const [ins] = await conn.query<ResultSetHeader>(
       `INSERT INTO library_kpi
-         (set_id, name, description, category_id, routine_category_id, kpi_type,
+         (set_id, name, description, category_id, routine_category_id,
+          edpex_topic_id, edpex_area_id, kpi_type,
           data_collect_method,
           collection_period, data_source_url, committee_id, person_in_charge_id,
           weight, unit, five_year_target, calculation_type, calculation_logic,
           formula_id, threshold_green, threshold_amber, sort_order, is_draft)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         newSetId, k.name, k.description, mapCat(k.category_id),
-        mapCat(k.routine_category_id), k.kpi_type,
+        mapCat(k.routine_category_id),
+        // EdPEx topics/areas are global, not per set — copied without a remap.
+        k.edpex_topic_id, k.edpex_area_id, k.kpi_type,
         k.data_collect_method, k.collection_period, k.data_source_url,
         k.committee_id, k.person_in_charge_id, k.weight, k.unit,
         k.five_year_target, k.calculation_type, k.calculation_logic,

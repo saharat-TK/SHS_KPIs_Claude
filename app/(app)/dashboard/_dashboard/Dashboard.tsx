@@ -26,11 +26,13 @@ import {
   useKpiCategories,
   useKpiTypes,
   usePerformancePeriods,
+  useEdpexCatalog,
 } from "@/lib/data/hooks";
 import { KPI_TYPES } from "@/lib/types";
 import {
   categoryDetail,
   countByType,
+  groupByEdpexTopic,
   groupsInUse,
   kpisOfType,
   issuesAsOf,
@@ -68,7 +70,7 @@ export function Dashboard() {
   const { user } = useAuth();
   const recordsQ = usePerformanceRecords();
 
-  const { recordId, year, quarter, group, type, setFilters } = useDashboardFilters();
+  const { recordId, year, quarter, group, type, groupBy, setFilters } = useDashboardFilters();
   const kpiTypesQ = useKpiTypes();
 
   const activeRecords = useMemo(
@@ -87,7 +89,8 @@ export function Dashboard() {
   const periodsQ = usePerformancePeriods(record?.id ?? 0);
 
   const kpis = useMemo<DashboardKpi[]>(() => kpisQ.data ?? [], [kpisQ.data]);
-  const categories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
+  const setCategories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
+  const edpexQ = useEdpexCatalog();
   const periods = periodsQ.data ?? [];
 
   // The three toggle options come from the kpi_type table rather than a constant
@@ -119,7 +122,15 @@ export function Dashboard() {
 
   // Everything below this line is scoped to one type. `typed` also carries the
   // routine-taxonomy swap, so `categoryId` already means the right column.
-  const typed = useMemo(() => kpisOfType(kpis, activeType), [kpis, activeType]);
+  // With "Group by: EdPEx", the EdPEx projection then re-keys `categoryId` to
+  // the KPI's EdPEx topic and swaps the group list to match, so every grouping
+  // helper below works unchanged on either view.
+  const { kpis: typed, categories } = useMemo(() => {
+    const ofType = kpisOfType(kpis, activeType);
+    return groupBy === "edpex"
+      ? groupByEdpexTopic(ofType, edpexQ.data ?? [])
+      : { kpis: ofType, categories: setCategories };
+  }, [kpis, activeType, groupBy, edpexQ.data, setCategories]);
 
   const groups = useMemo(() => groupsInUse(typed, categories), [typed, categories]);
   // A group the record no longer has (after switching records or types) would
@@ -319,6 +330,9 @@ export function Dashboard() {
         // change. The stale-group guard above would catch the render either
         // way; clearing it here stops a dead ?g= lingering in the URL.
         onTypeChange={(t) => setFilters({ type: t, group: "all" })}
+        groupBy={groupBy}
+        // Same reason: a category id means nothing as an EdPEx group.
+        onGroupByChange={(gb) => setFilters({ groupBy: gb, group: "all" })}
       />
 
       <QueryBoundary isLoading={loading} isError={recordsQ.isError || kpisQ.isError}>

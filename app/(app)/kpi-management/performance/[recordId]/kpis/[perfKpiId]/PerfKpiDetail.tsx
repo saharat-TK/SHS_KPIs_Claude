@@ -37,6 +37,7 @@ import {
   useApprovalTransition,
   useKpiTypes,
 } from "@/lib/data/hooks";
+import { edpexCode } from "@/lib/kpi/edpex";
 import {
   targetForYear,
   percentOfTarget,
@@ -265,7 +266,7 @@ export function PerfKpiDetailBody({
                   kpiTypesQ.data?.find((t) => t.id === kpi.kpiType)?.kpiTypeName ??
                   KPI_TYPES.find((t) => t.id === kpi.kpiType)?.label ??
                   kpi.kpiType
-                } · weight ${kpi.weight}%`
+                } · weight ${kpi.weight}%${edpexSuffix(kpi)}`
               : "Loading…"
           }
           actions={
@@ -601,7 +602,7 @@ export function PerfKpiDetailDrawer({
       width="xl"
       title={kpi?.name ?? "KPI Details"}
       titleAdornment={kpi && <KpiInfoTrigger kpi={kpi} />}
-      subtitle={kpi ? `${typeName} · weight ${kpi.weight}%` : undefined}
+      subtitle={kpi ? `${typeName} · weight ${kpi.weight}%${edpexSuffix(kpi)}` : undefined}
       headerActions={
         <Link
           href={recordUrl}
@@ -724,4 +725,11 @@ function ApproveConfirmModal({
       </p>
     </Modal>
   );
+}
+
+/** " · EdPEx 7.1ข" for a header subtitle, or "" when the KPI has no EdPEx
+ *  placement. The full names are in the KpiInfoTrigger card beside the title. */
+function edpexSuffix(kpi: { edpexTopicId?: string | null; edpexAreaId?: string | null }) {
+  const code = edpexCode(kpi.edpexTopicId, kpi.edpexAreaId);
+  return code ? ` · EdPEx ${code}` : "";
 }

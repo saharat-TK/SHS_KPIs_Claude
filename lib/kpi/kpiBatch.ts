@@ -2,7 +2,8 @@
 // grid on the set page and the bulk POST that persists it.
 //
 // A batch row carries just enough to place a KPI in the set: its name, type,
-// one category, owning committee and a description. Everything else (targets,
+// one category, owning committee, a description and its optional EdPEx topic /
+// area. Everything else (targets,
 // calculation, thresholds, variables) is configured afterwards in the KPI
 // editor, so rows land with the same defaults as the single-create POST plus
 // the weight/unit below.
@@ -11,6 +12,13 @@
 // under node's type-stripping.
 import type { KpiCategoryRecord } from "@/lib/types";
 import { categoryTaxonomyForKpiType } from "./categories.ts";
+import {
+  findEdpexArea,
+  normaliseEdpex,
+  resolveEdpexAreaText,
+  resolveEdpexTopicText,
+  type EdpexCatalog,
+} from "./edpex.ts";
 import { parseCsv, toCsv, UTF8_BOM } from "../csv.ts";
 
 /** Ceiling on one batch: the bulk POST builds a single multi-row INSERT. */
@@ -29,12 +37,17 @@ export interface KpiBatchRow {
   categoryId: string;
   committeeId: string;
   description: string;
+  /** EdPEx topic id ("7.1") and area id ("7.1ข"); optional, and the area must
+   *  be one of the topic's. */
+  edpexTopicId: string;
+  edpexAreaId: string;
 }
 
 export interface KpiBatchLookups {
   kpiTypes: { id: string; label: string }[];
   categories: Pick<KpiCategoryRecord, "id" | "kpiType" | "label">[];
   committees: { id: string; name: string }[];
+  edpex: EdpexCatalog;
 }
 
 export interface KpiBatchRowCheck {
@@ -52,14 +65,22 @@ export interface KpiBatchCheck {
   duplicateCount: number;
 }
 
-/** The columns in grid, paste and CSV order. */
+/** The columns in grid, paste and CSV order. The EdPEx pair comes last so a
+ *  five-column paste or file from before it existed still lines up.
+ *  `aliases` are other headers a template upload accepts for the column. */
 export const KPI_BATCH_COLUMNS = [
-  { key: "name", label: "Name" },
-  { key: "kpiType", label: "Type" },
-  { key: "categoryId", label: "Category" },
-  { key: "committeeId", label: "Committee" },
-  { key: "description", label: "Description" },
-] as const satisfies readonly { key: keyof KpiBatchRow; label: string }[];
+  { key: "name", label: "Name", aliases: ["KPI Name"] },
+  { key: "kpiType", label: "Type", aliases: ["KPI Type"] },
+  { key: "categoryId", label: "Category", aliases: [] },
+  { key: "committeeId", label: "Committee", aliases: [] },
+  { key: "description", label: "Description", aliases: [] },
+  { key: "edpexTopicId", label: "EdPEx Topic", aliases: ["EdPEx-topic", "EdPEx"] },
+  { key: "edpexAreaId", label: "EdPEx Area", aliases: ["EdPEx-area"] },
+] as const satisfies readonly {
+  key: keyof KpiBatchRow;
+  label: string;
+  aliases: readonly string[];
+}[];
 
 export function emptyKpiBatchRow(defaults: Partial<KpiBatchRow> = {}): KpiBatchRow {
   return {
@@ -68,6 +89,8 @@ export function emptyKpiBatchRow(defaults: Partial<KpiBatchRow> = {}): KpiBatchR
     categoryId: "",
     committeeId: "",
     description: "",
+    edpexTopicId: "",
+    edpexAreaId: "",
     ...defaults,
   };
 }
@@ -82,11 +105,14 @@ export function normalizeKpiBatchRow(raw: unknown): KpiBatchRow {
     categoryId: str(r.categoryId),
     committeeId: str(r.committeeId),
     description: str(r.description),
+    edpexTopicId: str(r.edpexTopicId),
+    edpexAreaId: str(r.edpexAreaId),
   };
 }
 
-/** Type and committee are pre-filled on new rows, so they do not make a row
- *  "touched" — only the fields a person actually types do. */
+/** Type and committee are pre-filled on new rows, and the EdPEx pair can be
+ *  filled down a whole column, so none of them make a row "touched" — only the
+ *  fields a person actually types do. */
 export function isBlankKpiBatchRow(row: KpiBatchRow): boolean {
   return !row.name.trim() && !row.description.trim() && !row.categoryId.trim();
 }
@@ -131,6 +157,9 @@ export function kpiBatchRowError(
   if (row.committeeId && !lookups.committees.some((c) => c.id === row.committeeId)) {
     return `Unknown committee "${row.committeeId}"`;
   }
+
+  const edpex = normaliseEdpex(row, lookups.edpex);
+  if (!edpex.ok) return edpex.error;
   return null;
 }
 
@@ -169,11 +198,18 @@ export function checkKpiBatch(
 }
 
 /** The library_kpi fields a batch row writes. The row's single category goes
- *  to the column its type groups by; the other taxonomy stays empty. */
-export function toKpiCreateInput(row: KpiBatchRow) {
+ *  to the column its type groups by; the other taxonomy stays empty. With the
+ *  lookups, an EdPEx area given alone also fills in its topic. */
+export function toKpiCreateInput(row: KpiBatchRow, lookups?: Pick<KpiBatchLookups, "edpex">) {
   const categoryId = row.categoryId.trim() || null;
   const routine = categoryTaxonomyForKpiType(row.kpiType) === "routine";
+  const raw = {
+    edpexTopicId: row.edpexTopicId.trim() || null,
+    edpexAreaId: row.edpexAreaId.trim() || null,
+  };
+  const edpex = lookups ? normaliseEdpex(raw, lookups.edpex) : null;
   return {
+    ...(edpex?.ok ? edpex.value : raw),
     name: row.name.trim(),
     description: row.description.trim() || null,
     kpiType: row.kpiType,
@@ -226,57 +262,150 @@ export function resolveCommitteeText(text: string, lookups: KpiBatchLookups): st
 }
 
 /** Build a row from cells in KPI_BATCH_COLUMNS order. Empty type/committee
- *  cells take the defaults (the page's current type and committee filter). */
+ *  cells take the defaults (the page's current type and committee filter).
+ *  An EdPEx area typed without a topic fills the topic in from the area. */
 export function kpiBatchRowFromCells(
   cells: string[],
   lookups: KpiBatchLookups,
   defaults: Partial<KpiBatchRow> = {},
 ): KpiBatchRow {
-  const [name = "", type = "", category = "", committee = "", description = ""] = cells;
+  const [
+    name = "",
+    type = "",
+    category = "",
+    committee = "",
+    description = "",
+    topic = "",
+    area = "",
+  ] = cells;
   const kpiType = resolveKpiTypeText(type, lookups) || defaults.kpiType || "";
+  let edpexTopicId = resolveEdpexTopicText(topic, lookups.edpex);
+  const edpexAreaId = resolveEdpexAreaText(area, edpexTopicId, lookups.edpex);
+  if (!edpexTopicId) edpexTopicId = findEdpexArea(lookups.edpex, edpexAreaId)?.topicId ?? "";
   return {
     name: name.trim(),
     kpiType,
     categoryId: resolveCategoryText(category, kpiType, lookups),
     committeeId: resolveCommitteeText(committee, lookups) || defaults.committeeId || "",
     description: description.trim(),
+    edpexTopicId,
+    edpexAreaId,
   };
 }
 
+/** Template lines starting with this are instructions, skipped on read. */
+export const KPI_TEMPLATE_COMMENT = "#";
+
+const isCommentLine = (cells: string[]) =>
+  (cells[0] ?? "").trimStart().startsWith(KPI_TEMPLATE_COMMENT);
+
+/** Header matching ignores case, spaces, hyphens and underscores, and accepts
+ *  a column's label, key or any alias — "EdPEx-topic", "edpex_topic_id"… */
+const headerKey = (s: string) => norm(s).replace(/[\s_-]+/g, "");
+const columnHeaders = (c: (typeof KPI_BATCH_COLUMNS)[number]) =>
+  [c.label, c.key, ...c.aliases].map(headerKey);
+
 const isHeaderCell = (cell: string | undefined) =>
-  ["name", "kpi name"].includes(norm(cell ?? ""));
+  columnHeaders(KPI_BATCH_COLUMNS[0]).includes(headerKey(cell ?? ""));
 
 /** Rows copied out of Excel (tab-separated). A header row, if one was copied
- *  along, is skipped; fully empty lines are dropped. */
+ *  along, is skipped, as are template instruction lines and empty lines. */
 export function parseKpiPaste(
   text: string,
   lookups: KpiBatchLookups,
   defaults: Partial<KpiBatchRow> = {},
 ): KpiBatchRow[] {
-  const lines = parseCsv(text, "\t").filter((cells) => cells.some((c) => c.trim()));
+  const lines = parseCsv(text, "\t").filter(
+    (cells) => cells.some((c) => c.trim()) && !isCommentLine(cells),
+  );
   if (lines.length > 0 && isHeaderCell(lines[0][0])) lines.shift();
   return lines.map((cells) => kpiBatchRowFromCells(cells, lookups, defaults));
 }
 
-export function buildKpiTemplateCsv(): string {
-  return UTF8_BOM + toCsv(KPI_BATCH_COLUMNS.map((c) => c.label), []) + "\n";
+/**
+ * The downloadable template: an instruction block — every column, whether it
+ * is required, and the values it accepts, listed from the live lookups — then
+ * the header row. Instruction lines start with "#" and are skipped on upload,
+ * so the file goes back in exactly as downloaded. Each instruction line is one
+ * quoted cell, so commas in a name never spill it across columns in Excel.
+ */
+export function buildKpiTemplateCsv(lookups: KpiBatchLookups, setName?: string): string {
+  const lines: string[] = [];
+  const note = (text = "") => lines.push(toCsv([`${KPI_TEMPLATE_COMMENT} ${text}`.trimEnd()], []));
+
+  note(`SHS Batch Add KPIs template${setName ? ` — ${setName}` : ""}`);
+  note("Lines starting with # are instructions and are ignored on upload. Keep the header row.");
+  note("One KPI per row. Each value may be typed as its code or its full name.");
+  note("Every KPI is created as a draft; configure targets and calculation afterwards in the KPI editor.");
+  note();
+  note("Columns:");
+
+  note("  Name — required. Free text, 2–500 characters.");
+
+  note("  Type — required. One of:");
+  for (const t of lookups.kpiTypes) note(`      ${t.id} = ${t.label}`);
+
+  note("  Category — optional. Must belong to the taxonomy of the row's Type:");
+  const taxonomies = [...new Set(lookups.kpiTypes.map((t) => categoryTaxonomyForKpiType(t.id)))];
+  for (const taxonomy of taxonomies) {
+    const types = lookups.kpiTypes
+      .filter((t) => categoryTaxonomyForKpiType(t.id) === taxonomy)
+      .map((t) => t.label)
+      .join(" / ");
+    note(`    For ${types} KPIs:`);
+    const mine = lookups.categories.filter((c) => c.kpiType === taxonomy);
+    if (mine.length === 0) note("      (none defined in this set)");
+    for (const c of mine) note(`      ${c.id} = ${c.label}`);
+  }
+
+  note("  Committee — optional. One of:");
+  for (const c of lookups.committees) note(`      ${c.id} = ${c.name}`);
+
+  note("  Description — optional. Free text.");
+
+  note("  EdPEx Topic — optional. The EdPEx Category 7 results item. One of:");
+  for (const t of lookups.edpex) note(`      ${t.id} = ${t.name}`);
+
+  note("  EdPEx Area — optional. Must be an area of the row's EdPEx Topic.");
+  note("    Type the full code (7.1ข), or just the letter (ข) when EdPEx Topic is filled.");
+  note("    An area given without a topic fills the topic in automatically.");
+  for (const t of lookups.edpex) {
+    if (t.areas.length === 0) continue;
+    note(`    Topic ${t.id}:`);
+    for (const a of t.areas) note(`      ${a.id} = ${a.name}`);
+  }
+
+  note();
+  const example = lookups.edpex[0]?.areas[0];
+  note(
+    `Example row: My KPI name,${lookups.kpiTypes[0]?.id ?? "strategic"},,` +
+      `${lookups.committees[0]?.id ?? ""},Short description,` +
+      `${example?.topicId ?? ""},${example?.id ?? ""}`,
+  );
+  note();
+
+  lines.push(toCsv(KPI_BATCH_COLUMNS.map((c) => c.label), []));
+  return UTF8_BOM + lines.join("\n") + "\n";
 }
 
-/** Read a filled-in template. Columns are matched by header, so they may be
- *  reordered or omitted — only Name is required. */
+/** Read a filled-in template. Instruction (#) lines are skipped and columns are
+ *  matched by header, so they may be reordered or omitted — only Name is
+ *  required, and a file from before the EdPEx columns still imports. */
 export function readKpiTemplateCsv(
   text: string,
   lookups: KpiBatchLookups,
   defaults: Partial<KpiBatchRow> = {},
 ): KpiBatchRow[] {
-  const lines = parseCsv(text).filter((cells) => cells.some((c) => c.trim()));
+  const lines = parseCsv(text).filter(
+    (cells) => cells.some((c) => c.trim()) && !isCommentLine(cells),
+  );
   if (lines.length === 0) throw new Error("The file is empty");
 
-  const header = lines[0].map(norm);
-  const indexOf = (label: string) => header.indexOf(norm(label));
-  const positions = KPI_BATCH_COLUMNS.map((c) =>
-    c.key === "name" ? Math.max(indexOf("Name"), indexOf("KPI Name")) : indexOf(c.label),
-  );
+  const header = lines[0].map(headerKey);
+  const positions = KPI_BATCH_COLUMNS.map((c) => {
+    const names = columnHeaders(c);
+    return header.findIndex((h) => names.includes(h));
+  });
   if (positions[0] < 0) {
     throw new Error('The file needs a "Name" column — start from the downloaded template');
   }

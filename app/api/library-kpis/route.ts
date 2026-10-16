@@ -7,6 +7,8 @@ import {
   libraryKpiInsertValues,
 } from "@/lib/kpi/libraryKpiInsert";
 import { isCalculationType } from "@/lib/types";
+import { normaliseEdpex } from "@/lib/kpi/edpex";
+import { loadEdpexCatalog } from "@/lib/kpi/edpexServer";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +49,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const edpex = normaliseEdpex(b, await loadEdpexCatalog(pool));
+    if (!edpex.ok) {
+      return NextResponse.json({ error: edpex.error }, { status: 400 });
+    }
+
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -58,8 +65,8 @@ export async function POST(req: NextRequest) {
 
       const [ins] = await conn.query<ResultSetHeader>(
         `INSERT INTO library_kpi (${LIBRARY_KPI_INSERT_COLUMNS})
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        libraryKpiInsertValues(Number(b.setId), b, sortOrder),
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        libraryKpiInsertValues(Number(b.setId), { ...b, ...edpex.value }, sortOrder),
       );
       // No sync to active performance records: a new KPI is a draft, and drafts
       // join them on their first save in the KPI editor.

@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PERFORMANCE_YEAR_COUNT } from "@/lib/kpi/performancePeriods";
+import type { DashboardGroupBy } from "@/lib/kpi/dashboard";
 
 export interface DashboardFilters {
   /** Null means "follow whatever record is active" — the URL pins one only
@@ -15,6 +16,8 @@ export interface DashboardFilters {
   /** A kpi_type slug. Not validated here — kpi_type is a DB table, so the live
    *  list decides what is real. Dashboard falls back when it isn't. */
   type: string;
+  /** What the group tabs and scorecards split by. */
+  groupBy: DashboardGroupBy;
 }
 
 /** Defaults applied when the key is absent. A key whose value equals its default
@@ -23,6 +26,7 @@ const DEFAULT_YEAR = 1;
 const DEFAULT_QUARTER = 4;
 const DEFAULT_GROUP = "all";
 export const DEFAULT_KPI_TYPE = "strategic";
+const DEFAULT_GROUP_BY: DashboardGroupBy = "category";
 
 /** Parse to an integer inside [min, max], or fall back. A hand-edited ?q=9 must
  *  degrade to a usable view, never blank the page. */
@@ -34,7 +38,7 @@ function clampParam(raw: string | null, min: number, max: number, fallback: numb
 
 /**
  * Dashboard filter state, held in the URL so a view can be linked and pasted.
- * Keys are kept short (`record`, `y`, `q`, `g`) because these addresses get
+ * Keys are kept short (`record`, `y`, `q`, `g`, `gb`) because these addresses get
  * shared in chat.
  *
  * Writes use router.replace, not push: stepping the quarter should not fill the
@@ -55,6 +59,7 @@ export function useDashboardFilters(): DashboardFilters & {
       quarter: clampParam(searchParams.get("q"), 1, 4, DEFAULT_QUARTER),
       group: searchParams.get("g") || DEFAULT_GROUP,
       type: searchParams.get("t") || DEFAULT_KPI_TYPE,
+      groupBy: searchParams.get("gb") === "edpex" ? "edpex" : DEFAULT_GROUP_BY,
     };
   }, [searchParams]);
 
@@ -73,6 +78,7 @@ export function useDashboardFilters(): DashboardFilters & {
       if (patch.quarter != null) put("q", String(patch.quarter), String(DEFAULT_QUARTER));
       if (patch.group != null) put("g", patch.group, DEFAULT_GROUP);
       if (patch.type != null) put("t", patch.type, DEFAULT_KPI_TYPE);
+      if (patch.groupBy != null) put("gb", patch.groupBy, DEFAULT_GROUP_BY);
       const qs = next.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },

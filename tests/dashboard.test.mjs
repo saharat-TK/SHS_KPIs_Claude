@@ -21,6 +21,8 @@ import {
   recordingSlices,
   issuesAsOf,
   yearSeries,
+  groupByEdpexTopic,
+  NO_EDPEX_TOPIC,
   UNCATEGORISED,
 } from "../lib/kpi/dashboard.ts";
 import { valueAsOfQuarter } from "../lib/kpi/progress.ts";
@@ -718,4 +720,43 @@ test("countByType counts every type and sums to the whole record", () => {
     kpis.length,
   );
   assert.deepEqual(countByType([]), {});
+});
+
+test("Group by EdPEx re-keys KPIs to their topic, with a no-topic bucket", () => {
+  const topics = [
+    { id: "7.1", name: "Learning" },
+    { id: "7.2", name: "Customers" },
+    { id: "7.3", name: "Workforce" },
+  ];
+  const kpis = [
+    kpi({ id: 1, edpexTopicId: "7.2" }),
+    kpi({ id: 2, edpexTopicId: "7.1" }),
+    kpi({ id: 3, edpexTopicId: null }),
+    kpi({ id: 4, edpexTopicId: "7.9" }), // topic since deleted
+    kpi({ id: 5, edpexTopicId: "7.2" }),
+  ];
+  const grouped = groupByEdpexTopic(kpis, topics);
+
+  // The record's own category is replaced, not mutated.
+  assert.equal(kpis[0].categoryId, "research_output");
+  assert.deepEqual(
+    groupsInUse(grouped.kpis, grouped.categories).map((g) => [g.id, g.label]),
+    [
+      ["7.1", "7.1 Learning"],
+      ["7.2", "7.2 Customers"],
+      [NO_EDPEX_TOPIC, "No EdPEx topic"],
+    ],
+  );
+  assert.deepEqual(
+    kpisInGroup(grouped.kpis, "7.2", grouped.categories).map((k) => k.id),
+    [1, 5],
+  );
+  assert.deepEqual(
+    kpisInGroup(grouped.kpis, NO_EDPEX_TOPIC, grouped.categories).map((k) => k.id),
+    [3, 4],
+  );
+  assert.equal(
+    categoryDetail(grouped.kpis, grouped.categories, 1, 4).reduce((n, r) => n + r.statuses.length, 0),
+    5,
+  );
 });

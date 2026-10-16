@@ -109,6 +109,12 @@ export const NAV: NavGroup[] = [
         icon: "square_foot",
         requires: "configure_kpis",
       },
+      {
+        label: "nav.items.edpex",
+        href: "/admin/edpex",
+        icon: "workspace_premium",
+        requires: "configure_kpis",
+      },
     ],
   },
   {

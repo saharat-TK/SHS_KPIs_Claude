@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
 import { HoverInfoCard } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { KPI_CALCULATION_TYPES, type PerfKpi } from "@/lib/types";
+import { useEdpexCatalog } from "@/lib/data/hooks";
+import { edpexLabel } from "@/lib/kpi/edpex";
 
 /**
  * Icon-only trigger next to a KPI's name showing its core configuration —
- * Description, Data Collecting Method, Data Source, Calculation Type,
+ * Description, EdPEx topic / area, Data Collecting Method, Data Source, Calculation Type,
  * Calculation Logic, and Variables — in the same dark-cyan hover card the
  * Dashboard uses for its sub-KPI performance preview (see
  * SubKpiHoverPreview), via the shared HoverInfoCard shell. Most fields are
@@ -15,6 +17,7 @@ import { KPI_CALCULATION_TYPES, type PerfKpi } from "@/lib/types";
  * Type is a required enum and always appears.
  */
 export function KpiInfoTrigger({ kpi }: { kpi: PerfKpi }) {
+  const edpexQ = useEdpexCatalog();
   const variables = [
     kpi.variable1Name
       ? `${kpi.variable1Name}${kpi.variable1Unit ? ` (${kpi.variable1Unit})` : ""}`
@@ -30,6 +33,7 @@ export function KpiInfoTrigger({ kpi }: { kpi: PerfKpi }) {
 
   const rows: { label: string; value: ReactNode }[] = [
     { label: "Description", value: kpi.description },
+    { label: "EdPEx", value: edpexLabel(edpexQ.data ?? [], kpi.edpexTopicId, kpi.edpexAreaId) },
     { label: "Data Collecting Method", value: kpi.dataCollectMethod },
     {
       label: "Data Source",

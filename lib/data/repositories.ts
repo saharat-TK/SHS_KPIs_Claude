@@ -1,5 +1,6 @@
 import type {
   AcademicCatalog,
+  EdpexTopic,
   Committee,
   CommitteeMembership,
   DataSource,
@@ -322,6 +323,53 @@ export const unitsRepo = {
     ),
   remove: async (id: number): Promise<{ id: number }> =>
     jsonOrThrow(await fetch(`/api/units/${id}`, { method: "DELETE" }), "Failed to remove unit"),
+};
+
+// EdPEx topics / areas (admin-managed, /admin/edpex) ---------------------------
+// Ids carry "." and Thai ("7.1ข"), so they are always URL-encoded in paths.
+const jsonPost = (body: unknown) => ({
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+export const edpexRepo = {
+  list: async (): Promise<EdpexTopic[]> =>
+    jsonOrThrow(await fetch("/api/edpex"), "Failed to load EdPEx topics"),
+  createTopic: async (input: { id: string; name: string }) =>
+    jsonOrThrow(
+      await fetch("/api/edpex/topics", { method: "POST", ...jsonPost(input) }),
+      "Failed to add EdPEx topic",
+    ),
+  updateTopic: async (id: string, patch: { name?: string; sortOrder?: number }) =>
+    jsonOrThrow(
+      await fetch(`/api/edpex/topics/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        ...jsonPost(patch),
+      }),
+      "Failed to update EdPEx topic",
+    ),
+  removeTopic: async (id: string) =>
+    jsonOrThrow(
+      await fetch(`/api/edpex/topics/${encodeURIComponent(id)}`, { method: "DELETE" }),
+      "Failed to delete EdPEx topic",
+    ),
+  createArea: async (input: { topicId: string; code: string; name: string }) =>
+    jsonOrThrow(
+      await fetch("/api/edpex/areas", { method: "POST", ...jsonPost(input) }),
+      "Failed to add EdPEx area",
+    ),
+  updateArea: async (id: string, patch: { name?: string; sortOrder?: number }) =>
+    jsonOrThrow(
+      await fetch(`/api/edpex/areas/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        ...jsonPost(patch),
+      }),
+      "Failed to update EdPEx area",
+    ),
+  removeArea: async (id: string) =>
+    jsonOrThrow(
+      await fetch(`/api/edpex/areas/${encodeURIComponent(id)}`, { method: "DELETE" }),
+      "Failed to delete EdPEx area",
+    ),
 };
 
 // KPIs -----------------------------------------------------------------------

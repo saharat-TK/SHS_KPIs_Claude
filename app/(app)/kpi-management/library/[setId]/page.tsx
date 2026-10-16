@@ -33,7 +33,9 @@ import {
   useKpiCategories,
   useKpiTypes,
   useCommittees,
+  useEdpexCatalog,
 } from "@/lib/data/hooks";
+import { EdpexSelects, type EdpexValue } from "../../EdpexSelects";
 import {
   KPI_TYPES,
   type KpiCategoryRecord,
@@ -461,12 +463,16 @@ function CreateKpiModal({
     kpiType: KpiType;
     weight: number;
     unit: string;
+    edpexTopicId: string | null;
+    edpexAreaId: string | null;
   }) => void;
   categories: KpiCategoryRecord[];
   kpiTypes: { id: string; label: string }[];
   submitting: boolean;
 }) {
+  const edpexCatalog = useEdpexCatalog();
   const [name, setName] = useState("");
+  const [edpex, setEdpex] = useState<EdpexValue>({ edpexTopicId: "", edpexAreaId: "" });
   const [categoryId, setCategoryId] = useState("");
   const [kpiType, setKpiType] = useState<KpiType>("operational");
   const [weight, setWeight] = useState(10);
@@ -479,6 +485,7 @@ function CreateKpiModal({
       setKpiType("operational");
       setWeight(10);
       setUnit("Item");
+      setEdpex({ edpexTopicId: "", edpexAreaId: "" });
     }
   }, [open]);
 
@@ -509,6 +516,8 @@ function CreateKpiModal({
                 kpiType,
                 weight,
                 unit,
+                edpexTopicId: edpex.edpexTopicId || null,
+                edpexAreaId: edpex.edpexAreaId || null,
               })
             }
           >
@@ -566,6 +575,11 @@ function CreateKpiModal({
           <Field label="Unit">
             <UnitSelect value={unit} onChange={setUnit} />
           </Field>
+          <EdpexSelects
+            catalog={edpexCatalog.data ?? []}
+            value={edpex}
+            onChange={setEdpex}
+          />
         </div>
       </div>
     </Modal>
