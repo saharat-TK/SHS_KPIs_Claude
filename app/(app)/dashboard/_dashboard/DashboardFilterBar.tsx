@@ -3,6 +3,12 @@
 import { Field, Select, SegmentedControl, type SegmentItem } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { PERFORMANCE_YEAR_COUNT, yearForYearNo } from "@/lib/kpi/performancePeriods";
+import type { DashboardGroupBy } from "@/lib/kpi/dashboard";
+
+const GROUP_BY_ITEMS: SegmentItem[] = [
+  { id: "category", label: "Category" },
+  { id: "edpex", label: "EdPEx" },
+];
 
 /** The KPI type toggle plus the Year/Quarter controls the record page also uses.
  *  Everything below them on the dashboard reads from these three. */
@@ -13,8 +19,10 @@ export function DashboardFilterBar({
   openQuarters,
   kpiType,
   kpiTypeItems,
+  groupBy,
   onChange,
   onTypeChange,
+  onGroupByChange,
 }: {
   year: number;
   quarter: number;
@@ -26,8 +34,10 @@ export function DashboardFilterBar({
   /** Built by the caller from the live kpi_type table, with per-type counts and
    *  the empty ones already marked disabled. */
   kpiTypeItems: SegmentItem[];
+  groupBy: DashboardGroupBy;
   onChange: (patch: { year?: number; quarter?: number }) => void;
   onTypeChange: (typeId: string) => void;
+  onGroupByChange: (groupBy: DashboardGroupBy) => void;
 }) {
   return (
     <div className="flex flex-col gap-md rounded-lg border border-hairline bg-surface-lowest px-md py-sm lg:flex-row lg:items-end lg:justify-between">
@@ -42,6 +52,17 @@ export function DashboardFilterBar({
             active={kpiType}
             onChange={onTypeChange}
             ariaLabel="KPI type"
+            selectionStyle="sliding"
+            className="h-[28px]"
+          />
+        </div>
+        <div className="flex flex-col gap-xs">
+          <span className="text-label-md text-on-surface">Group by</span>
+          <SegmentedControl
+            items={GROUP_BY_ITEMS}
+            active={groupBy}
+            onChange={(id) => onGroupByChange(id as DashboardGroupBy)}
+            ariaLabel="Group by"
             selectionStyle="sliding"
             className="h-[28px]"
           />

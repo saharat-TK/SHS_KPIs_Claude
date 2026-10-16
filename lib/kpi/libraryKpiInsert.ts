@@ -8,7 +8,8 @@
 import { DEFAULT_THRESHOLDS } from "@/lib/kpi/progress";
 
 export const LIBRARY_KPI_INSERT_COLUMNS = `
-  set_id, name, description, category_id, routine_category_id, kpi_type,
+  set_id, name, description, category_id, routine_category_id,
+  edpex_topic_id, edpex_area_id, kpi_type,
   data_collect_method,
   collection_period, data_source_url, committee_id, person_in_charge_id,
   weight, unit, five_year_target, calculation_type, calculation_logic,
@@ -20,6 +21,10 @@ export interface LibraryKpiInsertInput {
   description?: string | null;
   categoryId?: string | null;
   routineCategoryId?: string | null;
+  /** Already normalised by normaliseEdpex (lib/kpi/edpex.ts) — this layer
+   *  writes what it is given. */
+  edpexTopicId?: string | null;
+  edpexAreaId?: string | null;
   kpiType?: string | null;
   dataCollectMethod?: string | null;
   collectionPeriod?: string | null;
@@ -48,6 +53,8 @@ export function libraryKpiInsertValues(
     b.description?.trim() || null,
     b.categoryId || null,
     b.routineCategoryId || null,
+    b.edpexTopicId || null,
+    b.edpexAreaId || null,
     b.kpiType || "operational",
     b.dataCollectMethod?.trim() || null,
     b.collectionPeriod || "every_quarter",

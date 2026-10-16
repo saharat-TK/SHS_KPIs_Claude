@@ -19,6 +19,7 @@ import {
   toKpiCreateInput,
   type KpiBatchLookups,
 } from "@/lib/kpi/kpiBatch";
+import { loadEdpexCatalog } from "@/lib/kpi/edpexServer";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,12 @@ export async function POST(req: NextRequest) {
       ),
       pool.query<RowDataPacket[]>("SELECT id, name FROM committees"),
     ]);
-    const lookups = { kpiTypes, categories, committees } as unknown as KpiBatchLookups;
+    const lookups = {
+      kpiTypes,
+      categories,
+      committees,
+      edpex: await loadEdpexCatalog(pool),
+    } as unknown as KpiBatchLookups;
 
     const rows = raw.map(normalizeKpiBatchRow);
     const errors = rows
@@ -86,7 +92,7 @@ export async function POST(req: NextRequest) {
       );
       const firstSort = Number(maxRow[0]?.next ?? 1);
       const values = rows.map((row, i) =>
-        libraryKpiInsertValues(setId, toKpiCreateInput(row), firstSort + i),
+        libraryKpiInsertValues(setId, toKpiCreateInput(row, lookups), firstSort + i),
       );
 
       const [ins] = await conn.query<ResultSetHeader>(

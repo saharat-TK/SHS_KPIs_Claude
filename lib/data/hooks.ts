@@ -36,6 +36,7 @@ import {
   committeesRepo,
   committeeMembershipsRepo,
   dataSourcesRepo,
+  edpexRepo,
   type DataSourceColumnInput,
   type DataSourceBulkEntryInput,
   type DataSourceEntryInput,
@@ -77,6 +78,7 @@ export const qk = {
   kpiCategoriesFor: (setId?: number) => ["kpiCategories", setId ?? null] as const,
   kpiTypesFor: (forCategories?: boolean) => ["kpiTypes", !!forCategories] as const,
   units: ["units"] as const,
+  edpex: ["edpex"] as const,
   metrics: ["metrics"] as const,
   metricsByKpi: (id: string) => ["metrics", "byKpi", id] as const,
   formulas: ["formulas"] as const,
@@ -387,6 +389,45 @@ export function useUpdateUnit() {
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.units }),
   });
 }
+
+// ── EdPEx topics / areas (admin-managed, /admin/edpex) ───────────────────────
+// KPIs store only the ids; every label is looked up in this catalog, so
+// refreshing it is enough for a rename to show everywhere.
+export const useEdpexCatalog = () =>
+  useQuery({ queryKey: qk.edpex, queryFn: edpexRepo.list, staleTime: 5 * 60_000 });
+
+function useEdpexMutation<V>(fn: (v: V) => Promise<unknown>, toast: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    meta: { toast },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.edpex }),
+  });
+}
+
+export const useCreateEdpexTopic = () =>
+  useEdpexMutation((v: { id: string; name: string }) => edpexRepo.createTopic(v), "EdPEx topic added");
+export const useUpdateEdpexTopic = () =>
+  useEdpexMutation(
+    ({ id, patch }: { id: string; patch: { name?: string; sortOrder?: number } }) =>
+      edpexRepo.updateTopic(id, patch),
+    "EdPEx topic updated",
+  );
+export const useDeleteEdpexTopic = () =>
+  useEdpexMutation((id: string) => edpexRepo.removeTopic(id), "EdPEx topic deleted");
+export const useCreateEdpexArea = () =>
+  useEdpexMutation(
+    (v: { topicId: string; code: string; name: string }) => edpexRepo.createArea(v),
+    "EdPEx area added",
+  );
+export const useUpdateEdpexArea = () =>
+  useEdpexMutation(
+    ({ id, patch }: { id: string; patch: { name?: string; sortOrder?: number } }) =>
+      edpexRepo.updateArea(id, patch),
+    "EdPEx area updated",
+  );
+export const useDeleteEdpexArea = () =>
+  useEdpexMutation((id: string) => edpexRepo.removeArea(id), "EdPEx area deleted");
 
 export function useDeleteUnit() {
   const qc = useQueryClient();

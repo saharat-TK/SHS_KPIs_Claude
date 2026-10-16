@@ -34,6 +34,7 @@ import {
   useDeleteLibraryKpi,
   useSaveLibraryKpiTargets,
   useLibraryMetrics,
+  useEdpexCatalog,
 } from "@/lib/data/hooks";
 import {
   KPI_CALCULATION_TYPES,
@@ -57,6 +58,7 @@ import { useT, type TFunction } from "@/lib/i18n/useT";
 import type { TranslationKey } from "@/lib/i18n/dictionaries";
 import { MetricEditor } from "./MetricEditor";
 import { DraftBadge } from "../../../DraftBadge";
+import { EdpexSelects } from "../../../../EdpexSelects";
 
 // Display label/hint keys, indexed by the calculation-type id (the id stays the
 // logic/DB value — only the copy is translated at render). Mirrors the ids in
@@ -144,6 +146,8 @@ type Draft = {
   description: string;
   categoryId: string;
   routineCategoryId: string;
+  edpexTopicId: string;
+  edpexAreaId: string;
   kpiType: KpiType;
   dataCollectMethod: string;
   collectionPeriod: CollectionPeriod;
@@ -171,6 +175,8 @@ function draftOf(k: LibraryKpi): Draft {
     description: k.description ?? "",
     categoryId: k.categoryId ?? "",
     routineCategoryId: k.routineCategoryId ?? "",
+    edpexTopicId: k.edpexTopicId ?? "",
+    edpexAreaId: k.edpexAreaId ?? "",
     kpiType: k.kpiType,
     dataCollectMethod: k.dataCollectMethod ?? "",
     collectionPeriod: k.collectionPeriod,
@@ -220,6 +226,7 @@ function KpiDetail() {
   const membershipsQ = useCommitteeMemberships();
   const facultyQ = useFacultyRecords();
   const formulasQ = useFormulas();
+  const edpexQ = useEdpexCatalog();
   const metricsQ = useLibraryMetrics(kpiId);
   const update = useUpdateLibraryKpi();
   const saveTargets = useSaveLibraryKpiTargets();
@@ -304,6 +311,8 @@ function KpiDetail() {
           description: draft.description,
           categoryId: draft.categoryId || null,
           routineCategoryId: draft.routineCategoryId || null,
+          edpexTopicId: draft.edpexTopicId || null,
+          edpexAreaId: draft.edpexAreaId || null,
           kpiType: draft.kpiType,
           dataCollectMethod: draft.dataCollectMethod,
           collectionPeriod: draft.collectionPeriod,
@@ -579,6 +588,15 @@ function KpiDetail() {
                       ))}
                     </Select>
                   </Field>
+                  <EdpexSelects
+                    catalog={edpexQ.data ?? []}
+                    value={draft}
+                    onChange={(v) => setDraft((d) => (d ? { ...d, ...v } : d))}
+                    topicLabel={t("kpiDetail.edpexTopic")}
+                    areaLabel={t("kpiDetail.edpexArea")}
+                    noneLabel={t("kpiDetail.edpexNone")}
+                    chooseTopicFirst={t("kpiDetail.edpexChooseTopicFirst")}
+                  />
                   <div className="sm:col-span-2">
                     <Field label={t("kpiDetail.description")}>
                       <Input

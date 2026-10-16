@@ -9,6 +9,8 @@ import {
 } from "@/lib/kpi/performance";
 import { syncInheritedMetricTargetsForKpi } from "@/lib/kpi/targetInheritance";
 import { isCalculationType } from "@/lib/types";
+import { edpexAreaFitsTopic, normaliseEdpex } from "@/lib/kpi/edpex";
+import { loadEdpexCatalog } from "@/lib/kpi/edpexServer";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,8 @@ const COLUMN_MAP: Record<string, string> = {
   description: "description",
   categoryId: "category_id",
   routineCategoryId: "routine_category_id",
+  edpexTopicId: "edpex_topic_id",
+  edpexAreaId: "edpex_area_id",
   kpiType: "kpi_type",
   dataCollectMethod: "data_collect_method",
   collectionPeriod: "collection_period",
@@ -49,6 +53,8 @@ const NULLABLE_TEXT = new Set([
   "calculationLogic",
   "categoryId",
   "routineCategoryId",
+  "edpexTopicId",
+  "edpexAreaId",
   "committeeId",
   "personInChargeId",
   "variable1Name",
@@ -93,6 +99,29 @@ export async function PATCH(
         { error: `Unknown calculationType: ${body.calculationType}` },
         { status: 400 },
       );
+    }
+    // The pair is validated as a pair: a patch carrying only one half is
+    // completed from the stored row, then both halves are written together.
+    // A topic-only patch drops a stored area that no longer fits it.
+    if ("edpexTopicId" in body || "edpexAreaId" in body) {
+      const [current] = await pool.query<RowDataPacket[]>(
+        "SELECT edpex_topic_id AS edpexTopicId, edpex_area_id AS edpexAreaId FROM library_kpi WHERE id = ?",
+        [params.id],
+      );
+      const catalog = await loadEdpexCatalog(pool);
+      const topicId = "edpexTopicId" in body ? body.edpexTopicId : current[0]?.edpexTopicId;
+      const storedArea = current[0]?.edpexAreaId ?? null;
+      const areaId =
+        "edpexAreaId" in body
+          ? body.edpexAreaId
+          : edpexAreaFitsTopic(catalog, storedArea, topicId)
+            ? storedArea
+            : null;
+      const edpex = normaliseEdpex({ edpexTopicId: topicId, edpexAreaId: areaId }, catalog);
+      if (!edpex.ok) {
+        return NextResponse.json({ error: edpex.error }, { status: 400 });
+      }
+      Object.assign(body, edpex.value);
     }
     const setClauses: string[] = [];
     const values: unknown[] = [];

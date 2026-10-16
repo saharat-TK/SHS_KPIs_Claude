@@ -1,0 +1,125 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  areaAfterTopicChange,
+  areasForTopic,
+  buildEdpexCatalog,
+  edpexAreaFitsTopic,
+  edpexCode,
+  edpexLabel,
+  normaliseEdpex,
+  resolveEdpexAreaText,
+  resolveEdpexTopicText,
+} from "../lib/kpi/edpex.ts";
+import { readEdpexAreaInput, readEdpexPatch, readEdpexTopicInput } from "../lib/kpi/edpexAdmin.ts";
+
+const area = (topicId, code, name, sortOrder) => ({
+  id: `${topicId}${code}`,
+  topicId,
+  code,
+  name,
+  sortOrder,
+});
+
+// Deliberately out of order: the catalog sorts.
+const CATALOG = buildEdpexCatalog(
+  [
+    { id: "7.5", name: "ผลลัพธ์ด้านงบประมาณ การเงิน ตลาด และกลยุทธ์", sortOrder: 5 },
+    { id: "7.1", name: "ผลลัพธ์ด้านการเรียนรู้ของผู้เรียนและด้านกระบวนการ", sortOrder: 1 },
+  ],
+  [
+    area("7.1", "ข", "ผลลัพธ์ด้านประสิทธิผลของกระบวนการทำงาน", 2),
+    area("7.5", "ก", "ผลลัพธ์ด้านงบประมาณ การเงิน และตลาด", 7),
+    area("7.1", "ก", "ผลลัพธ์ด้านการเรียนรู้ของผู้เรียนและด้านบริการที่มุ่งเน้นลูกค้า", 1),
+    area("7.5", "ข", "ผลลัพธ์ด้านการนำกลยุทธ์ไปปฏิบัติและด้านนวัตกรรม", 8),
+  ],
+);
+
+test("buildEdpexCatalog nests areas under their topic, in order", () => {
+  assert.deepEqual(
+    CATALOG.map((t) => [t.id, t.areas.map((a) => a.id)]),
+    [
+      ["7.1", ["7.1ก", "7.1ข"]],
+      ["7.5", ["7.5ก", "7.5ข"]],
+    ],
+  );
+});
+
+test("the area cascade follows the topic", () => {
+  assert.deepEqual(
+    areasForTopic(CATALOG, "7.5").map((a) => a.id),
+    ["7.5ก", "7.5ข"],
+  );
+  assert.deepEqual(areasForTopic(CATALOG, ""), []);
+  assert.equal(edpexAreaFitsTopic(CATALOG, "7.1ข", "7.1"), true);
+  assert.equal(edpexAreaFitsTopic(CATALOG, "7.1ข", "7.5"), false);
+  assert.equal(edpexAreaFitsTopic(CATALOG, "", "7.5"), true);
+  assert.equal(areaAfterTopicChange(CATALOG, "7.1ข", "7.5"), "");
+  assert.equal(areaAfterTopicChange(CATALOG, "7.1ข", "7.1"), "7.1ข");
+});
+
+test("normaliseEdpex completes, clears and refuses pairs", () => {
+  assert.deepEqual(normaliseEdpex({ edpexAreaId: "7.5ข" }, CATALOG), {
+    ok: true,
+    value: { edpexTopicId: "7.5", edpexAreaId: "7.5ข" },
+  });
+  assert.deepEqual(normaliseEdpex({ edpexTopicId: " ", edpexAreaId: "" }, CATALOG), {
+    ok: true,
+    value: { edpexTopicId: null, edpexAreaId: null },
+  });
+  assert.deepEqual(normaliseEdpex({ edpexTopicId: "7.1" }, CATALOG), {
+    ok: true,
+    value: { edpexTopicId: "7.1", edpexAreaId: null },
+  });
+  assert.equal(normaliseEdpex({ edpexTopicId: "7.1", edpexAreaId: "7.5ก" }, CATALOG).ok, false);
+  assert.equal(normaliseEdpex({ edpexTopicId: "9.9" }, CATALOG).ok, false);
+  assert.equal(normaliseEdpex({ edpexAreaId: "7.1ค" }, CATALOG).ok, false);
+});
+
+test("typed text resolves by code, bare letter or name", () => {
+  assert.equal(resolveEdpexTopicText(" 7.1 ", CATALOG), "7.1");
+  assert.equal(resolveEdpexTopicText("ผลลัพธ์ด้านงบประมาณ การเงิน ตลาด และกลยุทธ์", CATALOG), "7.5");
+  assert.equal(resolveEdpexTopicText("8.0", CATALOG), "8.0");
+  assert.equal(resolveEdpexAreaText("ข", "7.5", CATALOG), "7.5ข");
+  assert.equal(resolveEdpexAreaText("ข.", "7.1", CATALOG), "7.1ข");
+  assert.equal(resolveEdpexAreaText("7.1 ก", "", CATALOG), "7.1ก");
+  assert.equal(resolveEdpexAreaText("ผลลัพธ์ด้านงบประมาณ การเงิน และตลาด", "", CATALOG), "7.5ก");
+  assert.equal(resolveEdpexAreaText("ข", "", CATALOG), "ข");
+});
+
+test("labels show names, and fall back to the bare id", () => {
+  assert.equal(edpexLabel(CATALOG, "7.1", "7.1ข"), "7.1ข · ผลลัพธ์ด้านประสิทธิผลของกระบวนการทำงาน");
+  assert.equal(edpexLabel(CATALOG, "7.5", null), "7.5 · ผลลัพธ์ด้านงบประมาณ การเงิน ตลาด และกลยุทธ์");
+  assert.equal(edpexLabel(CATALOG, "7.4", null), "7.4");
+  assert.equal(edpexLabel(CATALOG, null, null), null);
+  assert.equal(edpexCode("7.1", "7.1ข"), "7.1ข");
+  assert.equal(edpexCode("7.1", null), "7.1");
+});
+
+test("admin inputs are checked before they reach the database", () => {
+  assert.deepEqual(readEdpexTopicInput({ id: " 7.6 ", name: " New " }), {
+    ok: true,
+    id: "7.6",
+    name: "New",
+  });
+  assert.match(readEdpexTopicInput({ id: "7 .1", name: "x" }).error, /spaces/);
+  assert.match(readEdpexTopicInput({ id: "7.1", name: "" }).error, /Name is required/);
+  assert.match(readEdpexTopicInput({ id: "12345678901", name: "x" }).error, /longer than 10/);
+
+  assert.deepEqual(readEdpexAreaInput({ topicId: "7.2", code: "ข", name: "Area" }), {
+    ok: true,
+    id: "7.2ข",
+    topicId: "7.2",
+    code: "ข",
+    name: "Area",
+  });
+  assert.match(readEdpexAreaInput({ code: "ก", name: "x" }).error, /Topic is required/);
+
+  assert.deepEqual(readEdpexPatch({ name: "Renamed", sortOrder: "3" }), {
+    ok: true,
+    name: "Renamed",
+    sortOrder: 3,
+  });
+  assert.match(readEdpexPatch({ sortOrder: "x" }).error, /whole number/);
+  assert.match(readEdpexPatch({}).error, /No fields/);
+});

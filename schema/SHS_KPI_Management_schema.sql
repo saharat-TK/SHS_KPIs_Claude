@@ -126,6 +126,30 @@ CREATE TABLE formula_version (
   CONSTRAINT fk_fver_formula FOREIGN KEY (formula_id) REFERENCES formula(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── edpex_topic / edpex_area ─────────────────────────────────────────────────
+-- EdPEx Category 7 results items (7.1–7.5) and the ก/ข/ค areas within each.
+-- Global (not per set) and admin-editable at /admin/edpex. The id is the code
+-- and never changes once created; seeded by scripts/migrate-edpex.mjs.
+CREATE TABLE edpex_topic (
+  id          VARCHAR(10)  PRIMARY KEY,                     -- "7.1"
+  name        VARCHAR(500) NOT NULL,
+  sort_order  INT          NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE edpex_area (
+  id          VARCHAR(20)  PRIMARY KEY,                     -- topic id + code: "7.1ข"
+  topic_id    VARCHAR(10)  NOT NULL,
+  code        VARCHAR(10)  NOT NULL,                        -- "ข"
+  name        VARCHAR(500) NOT NULL,
+  sort_order  INT          NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_edpex_area_code (topic_id, code),
+  CONSTRAINT fk_edpex_area_topic FOREIGN KEY (topic_id) REFERENCES edpex_topic(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── library_kpi ──────────────────────────────────────────────────────────────
 -- A KPI definition inside a set. Core config + 5-year target + calc logic.
 CREATE TABLE library_kpi (
@@ -136,6 +160,8 @@ CREATE TABLE library_kpi (
   description         TEXT NULL,
   category_id         VARCHAR(40)  NULL,                    -- FK -> kpi_categories.id (Strategic taxonomy)
   routine_category_id VARCHAR(40)  NULL,                    -- FK -> kpi_categories.id (Routine taxonomy, ด้านที่ 1–7)
+  edpex_topic_id      VARCHAR(10)  NULL,                    -- FK -> edpex_topic.id (EdPEx results item, e.g. "7.1")
+  edpex_area_id       VARCHAR(20)  NULL,                    -- FK -> edpex_area.id  (area within it, e.g. "7.1ข"); must belong to edpex_topic_id
   kpi_type            VARCHAR(20)  NOT NULL,                -- FK -> kpi_type.id
   data_collect_method VARCHAR(500) NULL,                    -- "Data collecting method"
   collection_period   ENUM('Q1','Q2','Q3','Q4','every_quarter') NOT NULL,
@@ -169,6 +195,10 @@ CREATE TABLE library_kpi (
   CONSTRAINT fk_lkpi_category  FOREIGN KEY (category_id)         REFERENCES kpi_categories(id) ON DELETE SET NULL,
   CONSTRAINT fk_lkpi_routine_category
                                FOREIGN KEY (routine_category_id) REFERENCES kpi_categories(id) ON DELETE SET NULL,
+  CONSTRAINT fk_lkpi_edpex_topic
+                               FOREIGN KEY (edpex_topic_id)      REFERENCES edpex_topic(id)    ON DELETE SET NULL,
+  CONSTRAINT fk_lkpi_edpex_area
+                               FOREIGN KEY (edpex_area_id)       REFERENCES edpex_area(id)     ON DELETE SET NULL,
   CONSTRAINT fk_lkpi_type      FOREIGN KEY (kpi_type)            REFERENCES kpi_type(id)       ON DELETE RESTRICT,
   CONSTRAINT fk_lkpi_committee FOREIGN KEY (committee_id)        REFERENCES committees(id)     ON DELETE SET NULL,
   CONSTRAINT fk_lkpi_person    FOREIGN KEY (person_in_charge_id) REFERENCES faculty(id)        ON DELETE SET NULL,
@@ -178,6 +208,8 @@ CREATE TABLE library_kpi (
 CREATE INDEX idx_lkpi_set      ON library_kpi(set_id);
 CREATE INDEX idx_lkpi_category ON library_kpi(category_id);
 CREATE INDEX idx_lkpi_routine_category ON library_kpi(routine_category_id);
+CREATE INDEX idx_lkpi_edpex_topic ON library_kpi(edpex_topic_id);
+CREATE INDEX idx_lkpi_edpex_area ON library_kpi(edpex_area_id);
 
 -- ── library_kpi_annual_target ────────────────────────────────────────────────
 -- Per-year target for a KPI. year_no 1..5 maps to start_year..start_year+4.
@@ -278,6 +310,8 @@ CREATE TABLE perf_kpi (
   description         TEXT NULL,
   category_id         VARCHAR(40)  NULL,                   -- no FK: a snapshot must survive its source category being deleted
   routine_category_id VARCHAR(40)  NULL,                   -- ditto, Routine taxonomy
+  edpex_topic_id      VARCHAR(10)  NULL,                   -- mirrors edpex_topic.id; no FK, same reason
+  edpex_area_id       VARCHAR(20)  NULL,                   -- mirrors edpex_area.id; no FK, same reason
   kpi_type            VARCHAR(20)  NOT NULL,               -- mirrors kpi_type.id; no FK, same reason
   data_collect_method VARCHAR(500) NULL,
   collection_period   ENUM('Q1','Q2','Q3','Q4','every_quarter') NOT NULL,

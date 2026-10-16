@@ -304,6 +304,25 @@ export const COLLECTION_PERIODS: { id: CollectionPeriod; label: string }[] = [
   { id: "every_quarter", label: "Every quarter" },
 ];
 
+/** An EdPEx Category 7 results item (table `edpex_topic`, /api/edpex). The id
+ *  is its code ("7.1") and never changes once created. */
+export interface EdpexTopic {
+  id: string;
+  name: string;
+  sortOrder: number;
+  /** The topic's areas, in sort order. */
+  areas: EdpexArea[];
+}
+
+/** An area within an EdPEx topic (table `edpex_area`). id = topicId + code. */
+export interface EdpexArea {
+  id: string; // "7.1ข"
+  topicId: string; // "7.1"
+  code: string; // "ข"
+  name: string;
+  sortOrder: number;
+}
+
 /** One per-year target row. yearNo 1..5 maps to startYear..startYear+4. */
 export interface AnnualTarget {
   yearNo: number; // 1..5
@@ -339,6 +358,11 @@ export interface LibraryKpi {
   /** Routine-taxonomy category — the ด้านที่ 1–7 operating areas. Independent
    *  of categoryId; a KPI may carry one of each. */
   routineCategoryId: string | null;
+  /** EdPEx results item this KPI reports under (edpex_topic.id, e.g. "7.1"). */
+  edpexTopicId?: string | null;
+  /** Area within that item (edpex_area.id, e.g. "7.1ข"); always one of the
+   *  topic's own areas. */
+  edpexAreaId?: string | null;
   kpiType: KpiType;
   dataCollectMethod: string | null;
   collectionPeriod: CollectionPeriod;

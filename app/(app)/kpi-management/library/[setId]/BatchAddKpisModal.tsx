@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Input, Modal, Select, Table, Td, Th } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
-import { useBulkCreateLibraryKpis } from "@/lib/data/hooks";
+import { useBulkCreateLibraryKpis, useEdpexCatalog } from "@/lib/data/hooks";
 import { downloadCsv } from "@/lib/csv";
 import {
   KPI_BATCH_MAX_ROWS,
@@ -17,15 +17,17 @@ import {
   type KpiBatchLookups,
   type KpiBatchRow,
 } from "@/lib/kpi/kpiBatch";
+import { areaAfterTopicChange, areasForTopic, findEdpexArea } from "@/lib/kpi/edpex";
 import type { KpiCategoryRecord } from "@/lib/types";
 
 const INITIAL_ROWS = 5;
 
 type GridRow = KpiBatchRow & { key: number };
-type FillColumn = "kpiType" | "categoryId" | "committeeId";
+type FillColumn = "kpiType" | "categoryId" | "committeeId" | "edpexTopicId" | "edpexAreaId";
 
-/** Quick-create many skeleton KPIs — name, type, category, committee and a
- *  description — to configure one by one in the KPI editor afterwards.
+/** Quick-create many skeleton KPIs — name, type, category, committee, a
+ *  description and an optional EdPEx topic / area — to configure one by one in
+ *  the KPI editor afterwards.
  *
  *  Rows come from typing, from a paste out of Excel (into any Name cell), or
  *  from an uploaded CSV template; all three land in the same grid so they are
@@ -60,6 +62,8 @@ export function BatchAddKpisModal({
   defaultCommitteeId: string;
 }) {
   const create = useBulkCreateLibraryKpis(setId);
+  const edpexQ = useEdpexCatalog();
+  const edpex = useMemo(() => edpexQ.data ?? [], [edpexQ.data]);
   const nextKey = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   // Seeded on mount so the first open never paints an empty grid.
@@ -76,8 +80,8 @@ export function BatchAddKpisModal({
     [defaultKpiType, defaultCommitteeId],
   );
   const lookups: KpiBatchLookups = useMemo(
-    () => ({ kpiTypes, categories, committees }),
-    [kpiTypes, categories, committees],
+    () => ({ kpiTypes, categories, committees, edpex }),
+    [kpiTypes, categories, committees, edpex],
   );
 
   const keyed = (row: KpiBatchRow): GridRow => ({ ...row, key: nextKey.current++ });
@@ -121,6 +125,10 @@ export function BatchAddKpisModal({
         ) {
           next.categoryId = "";
         }
+        // Likewise a topic change drops an area that is not one of its own.
+        if (patch.edpexTopicId !== undefined) {
+          next.edpexAreaId = areaAfterTopicChange(edpex, next.edpexAreaId, next.edpexTopicId);
+        }
         return next;
       }),
     );
@@ -149,6 +157,21 @@ export function BatchAddKpisModal({
           const next = { ...r, kpiType: value };
           const fits = categoriesForKpiType(categories, value).some((c) => c.id === r.categoryId);
           return fits ? next : { ...next, categoryId: "" };
+        }
+        if (col === "edpexTopicId") {
+          return {
+            ...r,
+            edpexTopicId: value,
+            edpexAreaId: areaAfterTopicChange(edpex, r.edpexAreaId, value),
+          };
+        }
+        if (col === "edpexAreaId") {
+          // An area carries its topic with it, but never overrides a row that
+          // already sits under a different topic.
+          if (!value) return { ...r, edpexAreaId: "" };
+          const area = findEdpexArea(edpex, value);
+          if (!area || (r.edpexTopicId && r.edpexTopicId !== area.topicId)) return r;
+          return { ...r, edpexTopicId: area.topicId, edpexAreaId: area.id };
         }
         return { ...r, [col]: value };
       });
@@ -261,7 +284,7 @@ export function BatchAddKpisModal({
             size="sm"
             variant="ghost"
             icon="download"
-            onClick={() => downloadCsv("kpi-batch-template.csv", buildKpiTemplateCsv())}
+            onClick={() => downloadCsv("kpi-batch-template.csv", buildKpiTemplateCsv(lookups))}
           >
             Template
           </Button>
@@ -290,7 +313,7 @@ export function BatchAddKpisModal({
           <span className="ml-auto inline-flex items-center gap-xs text-caption-sm text-mute">
             <Icon name="content_paste" size={16} />
             Paste rows from Excel into any Name cell — columns: Name, Type, Category,
-            Committee, Description.
+            Committee, Description, EdPEx Topic, EdPEx Area.
           </span>
         </div>
 
@@ -309,6 +332,8 @@ export function BatchAddKpisModal({
                 <FillTh label="Category" onFill={() => fillDown("categoryId")} />
                 <FillTh label="Committee" onFill={() => fillDown("committeeId")} />
                 <Th className="px-md">Description</Th>
+                <FillTh label="EdPEx Topic" onFill={() => fillDown("edpexTopicId")} />
+                <FillTh label="EdPEx Area" onFill={() => fillDown("edpexAreaId")} />
                 <Th className="px-md">Status</Th>
                 <Th className="px-md">
                   <span className="sr-only">Remove</span>
@@ -319,6 +344,7 @@ export function BatchAddKpisModal({
               {rows.map((row, i) => {
                 const rowCheck = check.rows[i];
                 const rowCategories = categoriesForKpiType(categories, row.kpiType);
+                const rowAreas = areasForTopic(edpex, row.edpexTopicId);
                 return (
                   <tr key={row.key} className="border-t border-hairline align-top">
                     <Td className="px-md py-xs">
@@ -392,6 +418,44 @@ export function BatchAddKpisModal({
                       />
                     </Td>
                     <Td className="px-md py-xs">
+                      <Select
+                        aria-label={`EdPEx topic, row ${i + 1}`}
+                        className="w-[9rem]"
+                        value={row.edpexTopicId}
+                        onChange={(e) => update(row.key, { edpexTopicId: e.target.value })}
+                      >
+                        <option value="">None</option>
+                        {edpex.map((t) => (
+                          <option key={t.id} value={t.id} title={t.name}>
+                            {t.id} · {t.name}
+                          </option>
+                        ))}
+                        <UnknownOption value={row.edpexTopicId} known={edpex} />
+                      </Select>
+                    </Td>
+                    <Td className="px-md py-xs">
+                      <Select
+                        aria-label={`EdPEx area, row ${i + 1}`}
+                        className="w-[9rem]"
+                        value={row.edpexAreaId}
+                        disabled={!row.edpexTopicId && !row.edpexAreaId}
+                        onChange={(e) => update(row.key, { edpexAreaId: e.target.value })}
+                      >
+                        <option value="">{row.edpexTopicId ? "None" : "Topic first"}</option>
+                        {rowAreas.map((a) => (
+                          <option key={a.id} value={a.id} title={a.name}>
+                            {a.id} · {a.name}
+                          </option>
+                        ))}
+                        <UnknownOption
+                          value={row.edpexAreaId}
+                          known={rowAreas}
+                          label={findEdpexArea(edpex, row.edpexAreaId)?.id}
+                          wrongLabel="other topic"
+                        />
+                      </Select>
+                    </Td>
+                    <Td className="px-md py-xs">
                       <div className="flex min-h-[36px] w-[12rem] items-center">
                         <RowStatus
                           blank={rowCheck?.blank ?? true}
@@ -423,9 +487,10 @@ export function BatchAddKpisModal({
           New KPIs start as drafts (marked D) with weight 0% and unit Item, and stay
           out of performance records until first saved in the KPI editor. Routine
           KPIs use the ด้านที่ categories; every other type uses the Strategic
-          categories. In the CSV
-          template, Type, Category and Committee accept either the name shown here
-          or its id.
+          categories. EdPEx Area lists only the areas of the row&apos;s EdPEx Topic. The
+          CSV template lists every allowed value in its # instruction lines; Type,
+          Category, Committee and the EdPEx columns accept either the name shown
+          here or its code.
         </p>
       </div>
     </Modal>
@@ -457,17 +522,20 @@ function UnknownOption({
   value,
   known,
   label,
+  wrongLabel,
 }: {
   value: string;
   known: { id: string }[];
   /** Set when the value exists but is not valid here (a category from the
    *  other taxonomy); omitted when it matched nothing at all. */
   label?: string;
+  /** What "exists but not valid here" means for this column. */
+  wrongLabel?: string;
 }) {
   if (!value || known.some((k) => k.id === value)) return null;
   return (
     <option value={value}>
-      {label ? `${label} (wrong type)` : `${value} (not found)`}
+      {label ? `${label} (${wrongLabel ?? "wrong type"})` : `${value} (not found)`}
     </option>
   );
 }

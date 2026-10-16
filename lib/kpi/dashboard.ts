@@ -58,6 +58,8 @@ export interface DashboardKpi {
   /** 'strategic' | 'operational' | 'routine'. Left as a string, not a closed
    *  union, because kpi_type is a DB table rather than a constant. */
   kpiType?: string | null;
+  /** EdPEx results item ("7.1") — the key of the "Group by: EdPEx" view. */
+  edpexTopicId?: string | null;
 }
 
 /** A category as the dashboard groups by it. KpiCategoryRecord satisfies this. */
@@ -223,6 +225,41 @@ export function kpisOfType(kpis: DashboardKpi[], type: string): DashboardKpi[] {
   // Copy rather than mutate — the caller still holds the unprojected list to
   // count types from.
   return mine.map((k) => ({ ...k, categoryId: categoryIdForKpiType(k, type) }));
+}
+
+// ── EdPEx grouping ───────────────────────────────────────────────────────────
+
+/** What the dashboard's groups are: the type's own category taxonomy, or the
+ *  EdPEx Category 7 topics (7.1–7.5). */
+export type DashboardGroupBy = "category" | "edpex";
+
+/** The group for KPIs with no EdPEx topic (or one since deleted). A real id
+ *  rather than UNCATEGORISED, so it can carry its own label and kpisInGroup
+ *  finds its KPIs by plain equality. */
+export const NO_EDPEX_TOPIC = "__no_edpex";
+
+/**
+ * Re-key KPIs by EdPEx topic, the same projection trick as kpisOfType: once
+ * `categoryId` carries the topic, groupsInUse, kpisInGroup, categoryDetail and
+ * quarterSeries group by EdPEx with no change. Returns the matching group list
+ * — the topics in catalog order, then the no-topic bucket — so callers swap
+ * both halves together.
+ */
+export function groupByEdpexTopic(
+  kpis: DashboardKpi[],
+  topics: { id: string; name: string }[],
+): { kpis: DashboardKpi[]; categories: DashboardCategory[] } {
+  const known = new Set(topics.map((t) => t.id));
+  return {
+    kpis: kpis.map((k) => ({
+      ...k,
+      categoryId: k.edpexTopicId && known.has(k.edpexTopicId) ? k.edpexTopicId : NO_EDPEX_TOPIC,
+    })),
+    categories: [
+      ...topics.map((t) => ({ id: t.id, label: `${t.id} ${t.name}` })),
+      { id: NO_EDPEX_TOPIC, label: "No EdPEx topic" },
+    ],
+  };
 }
 
 /** How many KPIs of each type the record holds, over EVERY KPI regardless of

@@ -250,12 +250,13 @@ export async function recomputeKpiQuarter(
 }
 
 const PERF_KPI_INSERT_COLS = `record_id, source_kpi_id, name, description, category_id,
-  routine_category_id,
+  routine_category_id, edpex_topic_id, edpex_area_id,
   kpi_type, data_collect_method, collection_period, data_source_url, committee_id,
   person_in_charge_id, weight, unit, five_year_target, calculation_type,
   calculation_logic, formula_id, threshold_green, threshold_amber, quarterly_target_mode,
   variable1_name, variable1_unit, variable2_name, variable2_unit,
   sort_order, has_children`;
+const PERF_KPI_INSERT_PLACEHOLDERS = PERF_KPI_INSERT_COLS.split(",").map(() => "?").join(",");
 
 const PERF_METRIC_INSERT_COLS = `perf_kpi_id, source_metric_id, name, description, category_id,
   data_collect_method, collection_period, data_source_url, committee_id,
@@ -264,7 +265,7 @@ const PERF_METRIC_INSERT_COLS = `perf_kpi_id, source_metric_id, name, descriptio
 
 // Columns updated on re-sync (definition + config, NOT identity or progress).
 const PERF_KPI_UPDATE = `name=?, description=?, category_id=?, routine_category_id=?,
-  kpi_type=?, data_collect_method=?,
+  edpex_topic_id=?, edpex_area_id=?, kpi_type=?, data_collect_method=?,
   collection_period=?, data_source_url=?, committee_id=?, person_in_charge_id=?, weight=?,
   unit=?, five_year_target=?, calculation_type=?, calculation_logic=?, formula_id=?,
   threshold_green=?, threshold_amber=?, quarterly_target_mode=?,
@@ -277,7 +278,7 @@ const PERF_METRIC_UPDATE = `name=?, description=?, category_id=?, data_collect_m
 
 const kpiValues = (recordId: number, k: RowDataPacket, hasChildren: number) => [
   recordId, k.id, k.name, k.description, k.category_id, k.routine_category_id,
-  k.kpi_type, k.data_collect_method,
+  k.edpex_topic_id, k.edpex_area_id, k.kpi_type, k.data_collect_method,
   k.collection_period, k.data_source_url, k.committee_id, k.person_in_charge_id, k.weight,
   k.unit, k.five_year_target, k.calculation_type, k.calculation_logic, k.formula_id,
   k.threshold_green, k.threshold_amber, k.quarterly_target_mode,
@@ -327,7 +328,7 @@ export async function copySetIntoRecord(
   for (const k of kpis) {
     const hasChildren = await kpiHasChildren(conn, k.id);
     const [ins] = await conn.query<ResultSetHeader>(
-      `INSERT INTO perf_kpi (${PERF_KPI_INSERT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO perf_kpi (${PERF_KPI_INSERT_COLS}) VALUES (${PERF_KPI_INSERT_PLACEHOLDERS})`,
       kpiValues(recordId, k, hasChildren),
     );
     const perfKpiId = ins.insertId;
@@ -379,7 +380,7 @@ export async function syncRecordFromLibrary(conn: PoolConnection, recordId: numb
     if (perfKpiId) {
       await conn.query(`UPDATE perf_kpi SET ${PERF_KPI_UPDATE} WHERE id = ?`, [
         k.name, k.description, k.category_id, k.routine_category_id,
-        k.kpi_type, k.data_collect_method,
+        k.edpex_topic_id, k.edpex_area_id, k.kpi_type, k.data_collect_method,
         k.collection_period, k.data_source_url, k.committee_id, k.person_in_charge_id,
         k.weight, k.unit, k.five_year_target, k.calculation_type, k.calculation_logic,
         k.formula_id, k.threshold_green, k.threshold_amber, k.quarterly_target_mode,
@@ -395,7 +396,7 @@ export async function syncRecordFromLibrary(conn: PoolConnection, recordId: numb
       );
     } else {
       const [ins] = await conn.query<ResultSetHeader>(
-        `INSERT INTO perf_kpi (${PERF_KPI_INSERT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO perf_kpi (${PERF_KPI_INSERT_COLS}) VALUES (${PERF_KPI_INSERT_PLACEHOLDERS})`,
         kpiValues(recordId, k, hasChildren),
       );
       perfKpiId = ins.insertId;
