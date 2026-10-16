@@ -729,7 +729,12 @@ function ApproveConfirmModal({
 
 /** " · EdPEx 7.1ข" for a header subtitle, or "" when the KPI has no EdPEx
  *  placement. The full names are in the KpiInfoTrigger card beside the title. */
-function edpexSuffix(kpi: { edpexTopicId?: string | null; edpexAreaId?: string | null }) {
-  const code = edpexCode(kpi.edpexTopicId, kpi.edpexAreaId);
+function edpexSuffix(kpi: {
+  edpexTopicId?: string | null;
+  edpexAreaId?: string | null;
+  edpexIndicatorCode?: string | null;
+}) {
+  // The indicator code starts with the area, so it replaces it when set.
+  const code = kpi.edpexIndicatorCode || edpexCode(kpi.edpexTopicId, kpi.edpexAreaId);
   return code ? ` · EdPEx ${code}` : "";
 }

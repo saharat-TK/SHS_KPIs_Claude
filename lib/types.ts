@@ -363,6 +363,9 @@ export interface LibraryKpi {
   /** Area within that item (edpex_area.id, e.g. "7.1ข"); always one of the
    *  topic's own areas. */
   edpexAreaId?: string | null;
+  /** The KPI's numbered row in the EdPEx SAR ("7.1ข-4"); free text that starts
+   *  with edpexAreaId when both are set. */
+  edpexIndicatorCode?: string | null;
   kpiType: KpiType;
   dataCollectMethod: string | null;
   collectionPeriod: CollectionPeriod;

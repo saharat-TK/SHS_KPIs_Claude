@@ -162,6 +162,7 @@ CREATE TABLE library_kpi (
   routine_category_id VARCHAR(40)  NULL,                    -- FK -> kpi_categories.id (Routine taxonomy, ด้านที่ 1–7)
   edpex_topic_id      VARCHAR(10)  NULL,                    -- FK -> edpex_topic.id (EdPEx results item, e.g. "7.1")
   edpex_area_id       VARCHAR(20)  NULL,                    -- FK -> edpex_area.id  (area within it, e.g. "7.1ข"); must belong to edpex_topic_id
+  edpex_indicator_code VARCHAR(30) NULL,                    -- the KPI's row in the EdPEx SAR ("7.1ข-4"); free text, starts with edpex_area_id when both are set
   kpi_type            VARCHAR(20)  NOT NULL,                -- FK -> kpi_type.id
   data_collect_method VARCHAR(500) NULL,                    -- "Data collecting method"
   collection_period   ENUM('Q1','Q2','Q3','Q4','every_quarter') NOT NULL,
@@ -312,6 +313,7 @@ CREATE TABLE perf_kpi (
   routine_category_id VARCHAR(40)  NULL,                   -- ditto, Routine taxonomy
   edpex_topic_id      VARCHAR(10)  NULL,                   -- mirrors edpex_topic.id; no FK, same reason
   edpex_area_id       VARCHAR(20)  NULL,                   -- mirrors edpex_area.id; no FK, same reason
+  edpex_indicator_code VARCHAR(30) NULL,                   -- mirrors library_kpi.edpex_indicator_code
   kpi_type            VARCHAR(20)  NOT NULL,               -- mirrors kpi_type.id; no FK, same reason
   data_collect_method VARCHAR(500) NULL,
   collection_period   ENUM('Q1','Q2','Q3','Q4','every_quarter') NOT NULL,

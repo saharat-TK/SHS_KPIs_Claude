@@ -3,7 +3,7 @@
 //
 // A batch row carries just enough to place a KPI in the set: its name, type,
 // one category, owning committee, a description and its optional EdPEx topic /
-// area. Everything else (targets,
+// area / indicator code. Everything else (targets,
 // calculation, thresholds, variables) is configured afterwards in the KPI
 // editor, so rows land with the same defaults as the single-create POST plus
 // the weight/unit below.
@@ -13,6 +13,7 @@
 import type { KpiCategoryRecord } from "@/lib/types";
 import { categoryTaxonomyForKpiType } from "./categories.ts";
 import {
+  EDPEX_INDICATOR_CODE_MAX,
   findEdpexArea,
   normaliseEdpex,
   resolveEdpexAreaText,
@@ -41,6 +42,9 @@ export interface KpiBatchRow {
    *  be one of the topic's. */
   edpexTopicId: string;
   edpexAreaId: string;
+  /** The KPI's row in the EdPEx SAR ("7.1ข-4"); optional free text that must
+   *  start with the area when one is set. */
+  edpexIndicatorCode: string;
 }
 
 export interface KpiBatchLookups {
@@ -65,8 +69,9 @@ export interface KpiBatchCheck {
   duplicateCount: number;
 }
 
-/** The columns in grid, paste and CSV order. The EdPEx pair comes last so a
- *  five-column paste or file from before it existed still lines up.
+/** The columns in grid, paste and CSV order. Later additions go last — the
+ *  EdPEx pair, then the indicator code — so a shorter paste or file from before
+ *  they existed still lines up.
  *  `aliases` are other headers a template upload accepts for the column. */
 export const KPI_BATCH_COLUMNS = [
   { key: "name", label: "Name", aliases: ["KPI Name"] },
@@ -76,6 +81,11 @@ export const KPI_BATCH_COLUMNS = [
   { key: "description", label: "Description", aliases: [] },
   { key: "edpexTopicId", label: "EdPEx Topic", aliases: ["EdPEx-topic", "EdPEx"] },
   { key: "edpexAreaId", label: "EdPEx Area", aliases: ["EdPEx-area"] },
+  {
+    key: "edpexIndicatorCode",
+    label: "EdPEx Indicator",
+    aliases: ["EdPEx Indicator Code", "EdPEx Code", "Indicator Code"],
+  },
 ] as const satisfies readonly {
   key: keyof KpiBatchRow;
   label: string;
@@ -91,6 +101,7 @@ export function emptyKpiBatchRow(defaults: Partial<KpiBatchRow> = {}): KpiBatchR
     description: "",
     edpexTopicId: "",
     edpexAreaId: "",
+    edpexIndicatorCode: "",
     ...defaults,
   };
 }
@@ -107,14 +118,20 @@ export function normalizeKpiBatchRow(raw: unknown): KpiBatchRow {
     description: str(r.description),
     edpexTopicId: str(r.edpexTopicId),
     edpexAreaId: str(r.edpexAreaId),
+    edpexIndicatorCode: str(r.edpexIndicatorCode),
   };
 }
 
 /** Type and committee are pre-filled on new rows, and the EdPEx pair can be
  *  filled down a whole column, so none of them make a row "touched" — only the
- *  fields a person actually types do. */
+ *  fields a person actually types do (the indicator code is one of those). */
 export function isBlankKpiBatchRow(row: KpiBatchRow): boolean {
-  return !row.name.trim() && !row.description.trim() && !row.categoryId.trim();
+  return (
+    !row.name.trim() &&
+    !row.description.trim() &&
+    !row.categoryId.trim() &&
+    !row.edpexIndicatorCode.trim()
+  );
 }
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLocaleLowerCase();
@@ -206,6 +223,7 @@ export function toKpiCreateInput(row: KpiBatchRow, lookups?: Pick<KpiBatchLookup
   const raw = {
     edpexTopicId: row.edpexTopicId.trim() || null,
     edpexAreaId: row.edpexAreaId.trim() || null,
+    edpexIndicatorCode: row.edpexIndicatorCode.trim() || null,
   };
   const edpex = lookups ? normaliseEdpex(raw, lookups.edpex) : null;
   return {
@@ -277,6 +295,7 @@ export function kpiBatchRowFromCells(
     description = "",
     topic = "",
     area = "",
+    indicatorCode = "",
   ] = cells;
   const kpiType = resolveKpiTypeText(type, lookups) || defaults.kpiType || "";
   let edpexTopicId = resolveEdpexTopicText(topic, lookups.edpex);
@@ -290,6 +309,7 @@ export function kpiBatchRowFromCells(
     description: description.trim(),
     edpexTopicId,
     edpexAreaId,
+    edpexIndicatorCode: indicatorCode.trim(),
   };
 }
 
@@ -375,12 +395,15 @@ export function buildKpiTemplateCsv(lookups: KpiBatchLookups, setName?: string):
     for (const a of t.areas) note(`      ${a.id} = ${a.name}`);
   }
 
+  note("  EdPEx Indicator — optional. The KPI's numbered row in the EdPEx SAR, e.g. 7.1ข-4.");
+  note(`    Free text, up to ${EDPEX_INDICATOR_CODE_MAX} characters. When EdPEx Area is filled it must start with that area (7.1ข-…).`);
+
   note();
   const example = lookups.edpex[0]?.areas[0];
   note(
     `Example row: My KPI name,${lookups.kpiTypes[0]?.id ?? "strategic"},,` +
       `${lookups.committees[0]?.id ?? ""},Short description,` +
-      `${example?.topicId ?? ""},${example?.id ?? ""}`,
+      `${example?.topicId ?? ""},${example?.id ?? ""},${example ? `${example.id}-1` : ""}`,
   );
   note();
 
