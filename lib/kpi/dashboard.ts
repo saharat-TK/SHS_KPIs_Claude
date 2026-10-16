@@ -60,6 +60,12 @@ export interface DashboardKpi {
   kpiType?: string | null;
   /** EdPEx results item ("7.1") — the key of the "Group by: EdPEx" view. */
   edpexTopicId?: string | null;
+  /** EdPEx area within that topic ("7.1ข") — the Data Table's second level. */
+  edpexAreaId?: string | null;
+  /** Free-text SAR indicator code ("7.1ข-4") — the Data Table's third level. */
+  edpexIndicatorCode?: string | null;
+  /** Per-year cap on the annual targets; shown by the Data Table page. */
+  fiveYearTarget?: number | null;
 }
 
 /** A category as the dashboard groups by it. KpiCategoryRecord satisfies this. */
@@ -203,6 +209,21 @@ export function healthMix(
 
 // ── KPI type ─────────────────────────────────────────────────────────────────
 
+/** The KPI type toggle's "All" option: every type at once. Not a kpi_type id. */
+export const ALL_KPI_TYPES = "all";
+
+/** The group list for the "All" view: every category of the set, Strategic
+ *  taxonomy first, then Routine (the ด้านที่ areas), each in its own order. */
+export function categoriesForAllTypes<T extends DashboardCategory & { kpiType?: string }>(
+  categories: T[],
+): T[] {
+  const rank = (c: T) => (c.kpiType === "routine" ? 1 : 0);
+  return categories
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => rank(a.c) - rank(b.c) || a.i - b.i)
+    .map(({ c }) => c);
+}
+
 /**
  * The KPIs of one type, projected so `categoryId` carries the taxonomy that type
  * is actually grouped by: routine KPIs group by their ด้านที่ area, every other
@@ -220,6 +241,12 @@ export function healthMix(
  * disappearing into someone else's.
  */
 export function kpisOfType(kpis: DashboardKpi[], type: string): DashboardKpi[] {
+  // "All" keeps every KPI, each grouped by its OWN type's taxonomy — a routine
+  // KPI under its ด้านที่ area, the rest under their strategic category — so a
+  // KPI sits in the same group here as in its own type's view.
+  if (type === ALL_KPI_TYPES) {
+    return kpis.map((k) => ({ ...k, categoryId: categoryIdForKpiType(k, k.kpiType ?? "") }));
+  }
   const mine = kpis.filter((k) => k.kpiType === type);
   if (categoryTaxonomyForKpiType(type) !== "routine") return mine;
   // Copy rather than mutate — the caller still holds the unprojected list to

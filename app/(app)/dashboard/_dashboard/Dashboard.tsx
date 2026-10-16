@@ -7,10 +7,7 @@ import {
   Card,
   CardHeader,
   CardBody,
-  Badge,
   Button,
-  Tabs,
-  Select,
   QueryBoundary,
   EmptyState,
   CountUp,
@@ -21,23 +18,8 @@ import {
 } from "@/components/ui";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
-  usePerformanceRecords,
-  usePerfKpis,
-  useKpiCategories,
-  useKpiTypes,
-  usePerformancePeriods,
-  useEdpexCatalog,
-} from "@/lib/data/hooks";
-import { KPI_TYPES } from "@/lib/types";
-import {
   categoryDetail,
-  countByType,
-  groupByEdpexTopic,
-  groupsInUse,
-  kpisOfType,
   issuesAsOf,
-  kpisInGroup,
-  pickActiveRecord,
   quarterOverQuarterDelta,
   quarterSeries,
   recordingMix,
@@ -46,100 +28,40 @@ import {
   summarize,
   targetsMet,
   yearSeries,
-  type DashboardKpi,
 } from "@/lib/kpi/dashboard";
-import { openQuartersForYear } from "@/lib/kpi/performancePeriods";
 import { formatDate } from "@/lib/utils";
-import type { PerformanceRecord, PerformanceStatus } from "@/lib/types";
 import { DashboardFilterBar } from "./DashboardFilterBar";
-import { DEFAULT_KPI_TYPE, useDashboardFilters } from "./useDashboardFilters";
+import { useDashboardScope } from "./useDashboardScope";
+import { GroupTabs, RecordPicker } from "./RecordPicker";
 import { HeadlineStats } from "./HeadlineStats";
 import { KpiDetailTable } from "./KpiDetailTable";
 import { IssuesTable } from "./IssuesTable";
 import { StrategyScorecards } from "./StrategyScorecards";
 import { DashboardKpiDrawer } from "./DashboardKpiDrawer";
 
-const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> = {
-  active: "success",
-  inactive: "neutral",
-  completed: "warning",
-};
-
 export function Dashboard() {
   const router = useRouter();
   const { user } = useAuth();
-  const recordsQ = usePerformanceRecords();
-
-  const { recordId, year, quarter, group, type, groupBy, setFilters } = useDashboardFilters();
-  const kpiTypesQ = useKpiTypes();
-
-  const activeRecords = useMemo(
-    () => (recordsQ.data ?? []).filter((r) => r.status === "active"),
-    [recordsQ.data],
-  );
-  // Which record is on screen: the one the URL pins, else the active one that is
-  // actually being recorded into. The id is never written back on mount, so a
-  // link without ?record= keeps following whatever is active today.
-  const autoRecord = useMemo(() => pickActiveRecord(recordsQ.data ?? []), [recordsQ.data]);
-  const record: PerformanceRecord | null =
-    (recordsQ.data ?? []).find((r) => r.id === recordId) ?? autoRecord;
-
-  const kpisQ = usePerfKpis(record?.id ?? 0);
-  const categoriesQ = useKpiCategories(record?.sourceSetId, { enabled: !!record });
-  const periodsQ = usePerformancePeriods(record?.id ?? 0);
-
-  const kpis = useMemo<DashboardKpi[]>(() => kpisQ.data ?? [], [kpisQ.data]);
-  const setCategories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
-  const edpexQ = useEdpexCatalog();
-  const periods = periodsQ.data ?? [];
-
-  // The three toggle options come from the kpi_type table rather than a constant
-  // so a type added there gets an option instead of vanishing from every view.
-  // KPI_TYPES is the loading fallback, the same idiom the library editor uses.
-  const kpiTypeOptions = useMemo(
-    () =>
-      kpiTypesQ.data
-        ?.slice()
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((t) => ({ id: t.id, label: t.kpiTypeName })) ?? KPI_TYPES,
-    [kpiTypesQ.data],
-  );
-  // Counts read the WHOLE record — they are what tells you a type is empty.
-  const typeCounts = useMemo(() => countByType(kpis), [kpis]);
-  const kpiTypeItems = useMemo(
-    () =>
-      kpiTypeOptions.map((t) => ({
-        id: t.id,
-        label: t.label,
-        count: typeCounts[t.id] ?? 0,
-        disabled: (typeCounts[t.id] ?? 0) === 0,
-      })),
-    [kpiTypeOptions, typeCounts],
-  );
-  // A ?t= naming a type this deployment does not have would scope the page to
-  // nothing, so fall back rather than render an empty dashboard.
-  const activeType = kpiTypeOptions.some((t) => t.id === type) ? type : DEFAULT_KPI_TYPE;
-
-  // Everything below this line is scoped to one type. `typed` also carries the
-  // routine-taxonomy swap, so `categoryId` already means the right column.
-  // With "Group by: EdPEx", the EdPEx projection then re-keys `categoryId` to
-  // the KPI's EdPEx topic and swaps the group list to match, so every grouping
-  // helper below works unchanged on either view.
-  const { kpis: typed, categories } = useMemo(() => {
-    const ofType = kpisOfType(kpis, activeType);
-    return groupBy === "edpex"
-      ? groupByEdpexTopic(ofType, edpexQ.data ?? [])
-      : { kpis: ofType, categories: setCategories };
-  }, [kpis, activeType, groupBy, edpexQ.data, setCategories]);
-
-  const groups = useMemo(() => groupsInUse(typed, categories), [typed, categories]);
-  // A group the record no longer has (after switching records or types) would
-  // silently filter everything away, so fall back to All.
-  const activeGroup = group !== "all" && !groups.some((g) => g.id === group) ? "all" : group;
-  const scoped = useMemo(
-    () => (activeGroup === "all" ? typed : kpisInGroup(typed, activeGroup, categories)),
-    [typed, activeGroup, categories],
-  );
+  const scope = useDashboardScope();
+  const {
+    year,
+    quarter,
+    groupBy,
+    setFilters,
+    recordsQ,
+    record,
+    kpis,
+    kpiTypeItems,
+    activeType,
+    typed,
+    categories,
+    groups,
+    activeGroup,
+    scoped,
+    openQuarters,
+    loading,
+    isError,
+  } = scope;
 
   const statuses = useMemo(() => statusesAsOf(scoped, year, quarter), [scoped, year, quarter]);
   const summary = useMemo(() => summarize(statuses), [statuses]);
@@ -166,9 +88,6 @@ export function Dashboard() {
 
   const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null);
   const openKpi = (kpiId: number) => setSelectedKpiId(kpiId);
-
-  const openQuarters = openQuartersForYear(periods, year);
-  const loading = recordsQ.isLoading || kpisQ.isLoading;
 
   if (!recordsQ.isLoading && !recordsQ.isError && !record) {
     return (
@@ -291,21 +210,7 @@ export function Dashboard() {
         }
         actions={
           <div className="flex items-center gap-sm">
-            {record && <Badge tone={STATUS_TONE[record.status]}>{record.status}</Badge>}
-            {activeRecords.length > 1 && (
-              <Select
-                aria-label="Performance record"
-                value={String(record?.id ?? "")}
-                onChange={(e) => setFilters({ recordId: Number(e.target.value) })}
-                className="w-auto min-w-[220px] max-w-[320px]"
-              >
-                {activeRecords.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </Select>
-            )}
+            <RecordPicker scope={scope} />
             <Button
               variant="outline"
               iconRight="chevron_right"
@@ -335,7 +240,7 @@ export function Dashboard() {
         onGroupByChange={(gb) => setFilters({ groupBy: gb, group: "all" })}
       />
 
-      <QueryBoundary isLoading={loading} isError={recordsQ.isError || kpisQ.isError}>
+      <QueryBoundary isLoading={loading} isError={isError}>
         {kpis.length === 0 ? (
           <Card>
             <EmptyState
@@ -356,21 +261,15 @@ export function Dashboard() {
           </Card>
         ) : (
           <>
-            <Tabs
-              items={[
-                { id: "all", label: "All Groups", count: typed.length },
-                ...groups.map((g) => ({
-                  id: g.id,
-                  label: g.label,
-                  count: kpisInGroup(typed, g.id, categories).length,
-                })),
-              ]}
-              active={activeGroup}
-              onChange={(g) => setFilters({ group: g })}
-              className="rounded-lg !border-b-0 bg-surface-lowest px-sm shadow-chrome"
-            />
+            <GroupTabs scope={scope} />
 
             <HeadlineStats targets={targets} summary={summary} recording={recording} />
+
+            <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_1fr_340px]">
+              {achievementByQuarterCard}
+              {fiveYearTrajectoryCard}
+              {recordingStatusCard}
+            </div>
 
             {/* Scorecards are the way into a strategy on "All Groups"; inside one,
                 the KPI Detail table below already covers that group's KPIs, so
@@ -382,12 +281,6 @@ export function Dashboard() {
                 onOpenKpi={openKpi}
               />
             )}
-
-            <div className="grid grid-cols-1 gap-md lg:grid-cols-[1fr_1fr_340px]">
-              {achievementByQuarterCard}
-              {fiveYearTrajectoryCard}
-              {recordingStatusCard}
-            </div>
 
             <Card className="overflow-hidden animate-fade-up shadow-chrome !border-0">
               <CardHeader

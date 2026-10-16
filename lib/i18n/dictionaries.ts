@@ -26,6 +26,7 @@ const en = {
     },
     items: {
       dashboard: "Dashboard",
+      dataTable: "Data Table",
       studentSuccess: "Student Success",
       performanceApprovals: "Performance Approvals",
       kpiManagement: "KPI Management",
@@ -67,6 +68,7 @@ const en = {
   },
   breadcrumb: {
     dashboard: "Dashboard",
+    "data-table": "Data Table",
     committee: "Committees",
     faculty: "Faculty Roster",
     export: "Roster Export",
@@ -116,6 +118,22 @@ const en = {
   },
   dashboard: {
     loading: "Loading dashboard…",
+  },
+  dataTable: {
+    title: "Data Table",
+    loading: "Loading data table…",
+    subtitle: "{count} KPI(s) · each year read as of Q{quarter}",
+    year: "Year {n}",
+    name: "Group / KPI / Sub-KPI",
+    unit: "Unit",
+    fiveYearTarget: "5-Year Target",
+    expandAll: "Expand all",
+    collapseAll: "Collapse all",
+    exportCsv: "Export CSV",
+    emptyTitle: "No KPIs to show",
+    emptyMessage:
+      "There is no active performance record, or it has no KPIs of the selected type.",
+    noKpisInGroup: "No KPIs in this group.",
   },
   kpiDetail: {
     titleFallback: "KPI",
@@ -296,6 +314,7 @@ const th: Dictionary = {
     },
     items: {
       dashboard: "แดชบอร์ด",
+      dataTable: "ตารางข้อมูล",
       studentSuccess: "ความสำเร็จของนักศึกษา",
       performanceApprovals: "การอนุมัติผลการดำเนินงาน",
       kpiManagement: "การจัดการ KPI",
@@ -337,6 +356,7 @@ const th: Dictionary = {
   },
   breadcrumb: {
     dashboard: "แดชบอร์ด",
+    "data-table": "ตารางข้อมูล",
     committee: "คณะกรรมการ",
     faculty: "ทำเนียบบุคลากร",
     export: "ส่งออกทำเนียบ",
@@ -387,6 +407,21 @@ const th: Dictionary = {
   },
   dashboard: {
     loading: "กำลังโหลดแดชบอร์ด…",
+  },
+  dataTable: {
+    title: "ตารางข้อมูล",
+    loading: "กำลังโหลดตารางข้อมูล…",
+    subtitle: "{count} ตัวชี้วัด · แต่ละปีแสดงค่า ณ ไตรมาส {quarter}",
+    year: "ปีที่ {n}",
+    name: "กลุ่ม / ตัวชี้วัด / ตัวชี้วัดย่อย",
+    unit: "หน่วย",
+    fiveYearTarget: "เป้าหมาย 5 ปี",
+    expandAll: "ขยายทั้งหมด",
+    collapseAll: "ยุบทั้งหมด",
+    exportCsv: "ส่งออก CSV",
+    emptyTitle: "ไม่มีตัวชี้วัดที่จะแสดง",
+    emptyMessage: "ยังไม่มีรอบการรายงานผลที่ใช้งานอยู่ หรือไม่มีตัวชี้วัดประเภทที่เลือก",
+    noKpisInGroup: "ไม่มีตัวชี้วัดในกลุ่มนี้",
   },
   kpiDetail: {
     titleFallback: "KPI",

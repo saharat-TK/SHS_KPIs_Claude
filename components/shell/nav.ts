@@ -26,6 +26,12 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "nav.items.dashboard", href: "/dashboard", icon: "dashboard" },
       {
+        label: "nav.items.dataTable",
+        href: "/data-table",
+        icon: "table_chart",
+        requires: "view_dashboards",
+      },
+      {
         label: "nav.items.studentSuccess",
         href: "/analytics/student-success",
         icon: "insights",
