@@ -12,6 +12,7 @@ export function Modal({
   children,
   footer,
   size = "md",
+  fitViewport = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -19,7 +20,11 @@ export function Modal({
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: "md" | "mdWide" | "lg" | "xl";
+  size?: "md" | "mdWide" | "lg" | "xl" | "batch";
+  /** Never grow taller than the screen: the header and footer stay put and the
+   *  body scrolls instead. Opt-in, because a scrolling body clips dropdowns that
+   *  are not portaled (Combobox) — only use it where none sit in the body. */
+  fitViewport?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -41,6 +46,11 @@ export function Modal({
       <div
         className={cn(
           "bg-surface-lowest rounded-lg border border-hairline shadow-chrome w-full my-auto",
+          // The overlay pads 14px (28px from sm) on each side; stay inside it.
+          fitViewport &&
+            "flex max-h-[calc(100dvh-28px)] flex-col sm:max-h-[calc(100dvh-56px)]",
+          // The data-entry batch modes: Multiple rows' former 1120px plus 10%.
+          size === "batch" && "max-w-[1232px]",
           size === "xl" && "max-w-[1120px]",
           size === "lg" && "max-w-[860px]",
           size === "mdWide" && "max-w-[616px]",
@@ -48,7 +58,7 @@ export function Modal({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-md border-b border-hairline px-lg py-md">
+        <div className="flex shrink-0 items-start justify-between gap-md border-b border-hairline px-lg py-md">
           <div>
             <h2 className="text-heading-md text-on-surface">{title}</h2>
             {subtitle && <p className="text-caption-sm text-mute mt-tiny">{subtitle}</p>}
@@ -61,9 +71,11 @@ export function Modal({
             <Icon name="close" size={20} />
           </button>
         </div>
-        <div className="px-lg py-md">{children}</div>
+        <div className={cn("px-lg py-md", fitViewport && "min-h-0 overflow-y-auto")}>
+          {children}
+        </div>
         {footer && (
-          <div className="flex items-center justify-end gap-sm border-t border-hairline px-lg py-md">
+          <div className="flex shrink-0 items-center justify-end gap-sm border-t border-hairline px-lg py-md">
             {footer}
           </div>
         )}

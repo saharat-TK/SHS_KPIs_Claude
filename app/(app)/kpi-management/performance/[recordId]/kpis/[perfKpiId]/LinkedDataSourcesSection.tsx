@@ -22,7 +22,11 @@ import {
   useFacultyRecords,
   useAcademicCatalog,
 } from "@/lib/data/hooks";
-import { formatCellValue, formatEntryPeriod } from "@/lib/kpi/dataSources";
+import {
+  buildColumnChoices,
+  formatCellValue,
+  formatEntryPeriod,
+} from "@/lib/kpi/dataSources";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import type {
@@ -38,6 +42,8 @@ import {
   formatEntryCreatedAt,
 } from "@/app/(app)/kpi-management/data-sources/[dataSourceId]/EntriesTable";
 import { EntryModal } from "@/app/(app)/kpi-management/data-sources/[dataSourceId]/EntryModal";
+import { ImportEntriesModal } from "@/app/(app)/kpi-management/data-sources/[dataSourceId]/ImportEntriesModal";
+import { downloadEntryTemplate } from "@/app/(app)/kpi-management/data-sources/[dataSourceId]/entryTemplate";
 
 /** Roughly ten rows plus the sticky header — a literal class, because Tailwind
  *  only emits arbitrary values it can see in the source. */
@@ -188,6 +194,7 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
 
   const [editing, setEditing] = useState<DataSourceEntry | null>(null);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [findData, setFindData] = useState("");
 
   const columns = useMemo(() => columnsQ.data ?? [], [columnsQ.data]);
@@ -195,6 +202,12 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
   const cellLabels = useMemo(
     () => buildCellLabels(facultyQ.data ?? [], catalogQ.data),
     [facultyQ.data, catalogQ.data],
+  );
+  // The allowed values behind the derived-option columns: the template's legend
+  // and the upload preview's check, built exactly as on the data source page.
+  const templateChoices = useMemo(
+    () => buildColumnChoices(columns, catalogQ.data, facultyQ.data ?? []),
+    [columns, catalogQ.data, facultyQ.data],
   );
 
   // Scoped to the DATA SOURCE's committee, not the performance record's.
@@ -205,6 +218,16 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
   // nothing, so disable it rather than swallowing the click.
   const detailReady = !!detailQ.data;
   const addEntryTitle = detailReady ? undefined : "Loading this data source…";
+
+  const downloadTemplate = () => {
+    if (!detailQ.data) return;
+    downloadEntryTemplate({
+      sourceName: source.name,
+      grain: detailQ.data.periodGrain,
+      columns,
+      choices: templateChoices,
+    });
+  };
 
   const exportCsv = () => {
     const headers = ["Period", ...columns.map((c) => c.label), "Note", "Created at"];
@@ -245,14 +268,34 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
             </Button>
           )}
           {canRecord && columns.length > 0 && (
-            <Button
-              icon="add"
-              disabled={!detailReady}
-              title={addEntryTitle}
-              onClick={() => setAdding(true)}
-            >
-              Add Entry
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                icon="description"
+                disabled={!detailReady}
+                title={addEntryTitle ?? "Download a CSV template to fill in offline"}
+                onClick={downloadTemplate}
+              >
+                Template
+              </Button>
+              <Button
+                variant="ghost"
+                icon="upload_file"
+                disabled={!detailReady}
+                title={addEntryTitle ?? "Upload a filled-in template"}
+                onClick={() => setImporting(true)}
+              >
+                Upload CSV
+              </Button>
+              <Button
+                icon="add"
+                disabled={!detailReady}
+                title={addEntryTitle}
+                onClick={() => setAdding(true)}
+              >
+                Add Entry
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -292,14 +335,25 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
             }
             action={
               canRecord ? (
-                <Button
-                  icon="add"
-                  disabled={!detailReady}
-                  title={addEntryTitle}
-                  onClick={() => setAdding(true)}
-                >
-                  Add Entry
-                </Button>
+                <div className="flex flex-wrap justify-center gap-sm">
+                  <Button
+                    icon="add"
+                    disabled={!detailReady}
+                    title={addEntryTitle}
+                    onClick={() => setAdding(true)}
+                  >
+                    Add Entry
+                  </Button>
+                  <Button
+                    variant="outline"
+                    icon="upload_file"
+                    disabled={!detailReady}
+                    title={addEntryTitle}
+                    onClick={() => setImporting(true)}
+                  >
+                    Upload CSV
+                  </Button>
+                </div>
               ) : undefined
             }
           />
@@ -316,6 +370,20 @@ function SourcePanel({ source }: { source: PerfKpiSource }) {
           />
         )}
       </QueryBoundary>
+
+      {detailQ.data && (
+        <ImportEntriesModal
+          open={importing}
+          onClose={() => setImporting(false)}
+          dataSourceId={source.id}
+          periodGrain={detailQ.data.periodGrain}
+          columns={columns}
+          choices={templateChoices}
+          entries={entries}
+          cellLabels={cellLabels}
+          onDownloadTemplate={downloadTemplate}
+        />
+      )}
 
       {(adding || editing) && detailQ.data && (
         <EntryModal

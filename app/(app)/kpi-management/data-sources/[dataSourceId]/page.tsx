@@ -33,18 +33,18 @@ import {
 } from "@/lib/data/hooks";
 import {
   buildColumnChoices,
-  buildEntryTemplateCsv,
   formatCellValue,
   formatEntryPeriod,
 } from "@/lib/kpi/dataSources";
 import { describeMapping } from "@/lib/kpi/dataSourceFilters";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
-import { UTF8_BOM, downloadCsv, toCsv } from "@/lib/csv";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { Icon } from "@/components/ui/Icon";
 import type { DataSourceColumn, DataSourceEntry, DataSourceLink } from "@/lib/types";
 import { DataSourceModal } from "../DataSourceModal";
 import { EntryModal } from "./EntryModal";
 import { ImportEntriesModal } from "./ImportEntriesModal";
+import { downloadEntryTemplate } from "./entryTemplate";
 import { LinkKpiModal } from "./LinkKpiModal";
 import { ManageColumnsModal } from "./ManageColumnsModal";
 import { EntriesTable, formatEntryCreatedAt } from "./EntriesTable";
@@ -132,14 +132,12 @@ function DataSourceDetail({ id }: { id: number }) {
 
   const downloadTemplate = () => {
     if (!source) return;
-    // The BOM is what makes Excel read the Thai labels in the legend as UTF-8.
-    const csv = buildEntryTemplateCsv({
+    downloadEntryTemplate({
       sourceName: source.name,
       grain: source.periodGrain,
       columns,
       choices: templateChoices,
     });
-    downloadCsv(`${fileSlug}-template.csv`, `${UTF8_BOM}${csv}`);
   };
 
   return (

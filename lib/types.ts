@@ -573,6 +573,9 @@ export interface Curriculum {
   programCode: string;
   /** Thai display name (curriculum.label_th). */
   label: string;
+  /** "Bachelor's" | "Master's" | "Doctoral" (curriculum.degree_level), or null
+   *  when unset. Fills a data source's Degree level column on entry. */
+  degreeLevel: string | null;
   sortOrder: number;
 }
 

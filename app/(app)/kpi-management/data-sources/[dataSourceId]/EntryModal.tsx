@@ -13,6 +13,8 @@ import { COLUMN_TYPE_LABELS } from "@/lib/kpi/dataSources";
 import {
   BATCH_MODE_LABELS,
   availableBatchModes,
+  degreeLevelColumn,
+  withDegreeLevel,
   type BatchMode,
 } from "@/lib/kpi/batchEntry";
 import { EMPTY_ACADEMIC_CATALOG, buildCellLabels } from "@/lib/kpi/academicCatalog";
@@ -24,22 +26,30 @@ import type {
 } from "@/lib/types";
 import { CellInput } from "./CellInput";
 import { BatchEntryGrid, toPayload, useBatchRows } from "./BatchEntryGrid";
+import { FreeEntryGrid, useFreeRows } from "./FreeEntryGrid";
 
 const BATCH_MODE_HINTS: Record<BatchMode, string> = {
   single: "Add one row and fill it in yourself.",
+  rows: "Several rows of your own; paste from Excel or add rows one by one.",
   programs: "One row per academic program, with the program already chosen.",
   curricula: "One row per curriculum, with the curriculum already chosen.",
 };
 
-/** The curriculum batch only fills a program in when the source has somewhere to
- *  put one, so the hint must not promise it otherwise. */
-const hintFor = (mode: BatchMode, hasProgramColumn: boolean) =>
-  mode === "curricula" && hasProgramColumn
-    ? "One row per curriculum, with the curriculum and its program already chosen."
-    : BATCH_MODE_HINTS[mode];
+/** The curriculum batch only fills a program (or degree level) in when the
+ *  source has somewhere to put one, so the hint must not promise it otherwise. */
+const hintFor = (mode: BatchMode, hasProgramColumn: boolean, hasLevelColumn = false) => {
+  if (mode !== "curricula" || (!hasProgramColumn && !hasLevelColumn)) {
+    return BATCH_MODE_HINTS[mode];
+  }
+  const filled = [hasProgramColumn && "its program", hasLevelColumn && "degree level"]
+    .filter(Boolean)
+    .join(" and ");
+  return `One row per curriculum, with the curriculum and ${filled} already chosen.`;
+};
 
-/** Add or edit one row of raw data — or, when the source records per program or
- *  per curriculum, a whole batch at once.
+/** Add or edit one row of raw data — or a batch at once: free-form rows typed or
+ *  pasted from Excel, or, when the source records per program or per
+ *  curriculum, one pre-built row for each.
  *
  *  Values are held as strings while editing and coerced server-side by
  *  validateEntryValues, which is the authority. */
@@ -89,8 +99,8 @@ export function EntryModal({
   const [values, setValues] = useState<Record<string, string>>({});
   const [mode, setMode] = useState<BatchMode>("single");
 
-  // A batch preset is useless until the catalog arrives, and editing an existing
-  // row is always a single row, so the chooser only appears when creating.
+  // The batch grids need the catalog for their pickers and checks, and editing an
+  // existing row is always a single row, so the chooser only appears when creating.
   const modes = useMemo(() => availableBatchModes(columns), [columns]);
   const showModes = !entry && modes.length > 1 && !!catalogQ.data;
 
@@ -114,6 +124,7 @@ export function EntryModal({
   // program we narrow the curriculum picker to that program's curricula. With no
   // program column — the common case — every curriculum stays on offer.
   const programColumn = columns.find((c) => c.dataType === "program");
+  const hasLevelColumn = degreeLevelColumn(columns) != null;
   const selectedProgramCode = programColumn
     ? (values[programColumn.colKey] ?? "").trim() || null
     : null;
@@ -121,7 +132,16 @@ export function EntryModal({
   const yearValid = /^\d{4}$/.test(year.trim());
   const batchQuarter = periodGrain === "annual" ? null : Number(quarter);
   const batch = useBatchRows({
-    mode: mode === "single" ? "programs" : mode,
+    mode: mode === "curricula" ? "curricula" : "programs",
+    columns,
+    catalog,
+    faculty,
+    entries,
+    year: yearValid ? Number(year) : null,
+    quarter: batchQuarter,
+  });
+
+  const freeRows = useFreeRows({
     columns,
     catalog,
     faculty,
@@ -135,18 +155,24 @@ export function EntryModal({
   const requiredFilled = columns.every(
     (c) => !c.isRequired || (values[c.colKey] ?? "").trim() !== "",
   );
+  const isFree = mode === "rows";
   const isBatch = mode !== "single";
-  const valid = isBatch
-    ? yearValid && batch.canSubmit
-    : yearValid && requiredFilled;
+  const valid = isFree
+    ? yearValid && freeRows.canSubmit
+    : isBatch
+      ? yearValid && batch.canSubmit
+      : yearValid && requiredFilled;
   const submitting = create.isPending || update.isPending || bulk.isPending;
 
   const submitBatch = () => {
+    const rows = isFree
+      ? freeRows.included.map((row) => ({ locked: {}, values: row.values, note: row.note }))
+      : batch.included;
     bulk.mutate(
       {
         id: dataSourceId,
         input: {
-          rows: batch.included.map((row) => ({
+          rows: rows.map((row) => ({
             year: Number(year),
             quarter: batchQuarter,
             values: toPayload(row.locked, row.values, columns),
@@ -182,8 +208,9 @@ export function EntryModal({
     }
   };
 
+  const batchCount = isFree ? freeRows.included.length : batch.included.length;
   const submitLabel = isBatch
-    ? `Add ${batch.included.length} ${batch.included.length === 1 ? "Entry" : "Entries"}`
+    ? `Add ${batchCount} ${batchCount === 1 ? "Entry" : "Entries"}`
     : entry
       ? "Save"
       : "Add Entry";
@@ -197,10 +224,13 @@ export function EntryModal({
         entry
           ? "One row of raw data for this source."
           : isBatch
-            ? `${hintFor(mode, !!programColumn)} All rows share the period below.`
+            ? `${hintFor(mode, !!programColumn, hasLevelColumn)} All rows share the period below.`
             : "One row of raw data for this source."
       }
-      size={isBatch ? "lg" : "md"}
+      // All three batch modes share one width, so switching between them does
+      // not resize the dialog; it never outgrows the screen in any mode.
+      size={isBatch ? "batch" : "md"}
+      fitViewport
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -226,7 +256,7 @@ export function EntryModal({
               options={modes.map((m) => ({
                 value: m,
                 label: BATCH_MODE_LABELS[m],
-                hint: hintFor(m, !!programColumn),
+                hint: hintFor(m, !!programColumn, hasLevelColumn),
               }))}
             />
           </div>
@@ -254,7 +284,9 @@ export function EntryModal({
           )}
         </div>
 
-        {isBatch ? (
+        {isFree ? (
+          <FreeEntryGrid state={freeRows} columns={columns} catalog={catalog} faculty={faculty} />
+        ) : isBatch ? (
           <BatchEntryGrid
             state={batch}
             columns={columns}
@@ -276,7 +308,15 @@ export function EntryModal({
                   faculty={faculty}
                   catalog={catalog}
                   selectedProgramCode={selectedProgramCode}
-                  onChange={(v) => setValues((prev) => ({ ...prev, [c.colKey]: v }))}
+                  onChange={(v) =>
+                    setValues((prev) => {
+                      const next = { ...prev, [c.colKey]: v };
+                      // Picking a curriculum fills its Degree level; it stays editable.
+                      return c.dataType === "curriculum"
+                        ? withDegreeLevel(next, columns, catalog, { overwrite: true })
+                        : next;
+                    })
+                  }
                 />
               </Field>
             ))}
