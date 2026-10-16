@@ -23,6 +23,8 @@ import {
   yearSeries,
   groupByEdpexTopic,
   NO_EDPEX_TOPIC,
+  ALL_KPI_TYPES,
+  categoriesForAllTypes,
   UNCATEGORISED,
 } from "../lib/kpi/dashboard.ts";
 import { valueAsOfQuarter } from "../lib/kpi/progress.ts";
@@ -758,5 +760,37 @@ test("Group by EdPEx re-keys KPIs to their topic, with a no-topic bucket", () =>
   assert.equal(
     categoryDetail(grouped.kpis, grouped.categories, 1, 4).reduce((n, r) => n + r.statuses.length, 0),
     5,
+  );
+});
+
+test("the All type keeps every KPI, each grouped by its own type's taxonomy", () => {
+  const all = kpisOfType(TYPED(), ALL_KPI_TYPES);
+  assert.deepEqual(
+    all.map((k) => [k.id, k.categoryId]),
+    [
+      [1, "student_success"],
+      [2, "research_output"],
+      [3, "routine_area_2"], // routine → its ด้านที่ area, as in the Routine view
+    ],
+  );
+  // Not mutated.
+  assert.equal(TYPED()[2].categoryId, "research_output");
+});
+
+test("the All view lists Strategic groups before Routine ones, each in order", () => {
+  const categories = [
+    { id: "routine_area_1", label: "ด้านที่ 1", kpiType: "routine" },
+    { id: "student_success", label: "Student Success", kpiType: "strategic" },
+    { id: "routine_area_2", label: "ด้านที่ 2", kpiType: "routine" },
+    { id: "research_output", label: "Research Output", kpiType: "strategic" },
+  ];
+  assert.deepEqual(
+    categoriesForAllTypes(categories).map((c) => c.id),
+    ["student_success", "research_output", "routine_area_1", "routine_area_2"],
+  );
+  const all = kpisOfType(TYPED(), ALL_KPI_TYPES);
+  assert.deepEqual(
+    groupsInUse(all, categoriesForAllTypes(categories)).map((g) => g.id),
+    ["student_success", "research_output", "routine_area_2"],
   );
 });

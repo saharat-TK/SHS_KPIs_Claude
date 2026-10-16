@@ -98,6 +98,9 @@ export const qk = {
   perfKpis: (recordId: number) => ["perfKpis", recordId] as const,
   perfKpi: (id: number) => ["perfKpi", id] as const,
   perfMetrics: (perfKpiId: number) => ["perfMetrics", perfKpiId] as const,
+  // Under the same "perfMetrics" prefix, so the broad ["perfMetrics"]
+  // invalidations refresh it too.
+  perfMetricsByRecord: (recordId: number) => ["perfMetrics", "record", recordId] as const,
   perfKpiSources: (perfKpiId: number) => ["perfKpiSources", perfKpiId] as const,
   academicCatalog: ["academicCatalog"] as const,
   approvals: (recordId: number, yearNo: number, quarterNo: number) =>
@@ -864,6 +867,14 @@ export const usePerfMetricsByKpi = (perfKpiId: number) =>
     enabled: Number.isFinite(perfKpiId) && perfKpiId > 0,
   });
 
+/** Every sub-KPI in a performance record (the Data Table page). */
+export const usePerfMetricsByRecord = (recordId: number) =>
+  useQuery({
+    queryKey: qk.perfMetricsByRecord(recordId),
+    queryFn: () => performanceRecordsRepo.metricsByRecord(recordId),
+    enabled: Number.isFinite(recordId) && recordId > 0,
+  });
+
 /** Data sources linked to this KPI or any of its metrics. */
 export const usePerfKpiSources = (perfKpiId: number) =>
   useQuery({
@@ -904,6 +915,7 @@ export function useSaveMetricProgress(perfMetricId: number, perfKpiId: number) {
       // The Sub-KPIs table (usePerfMetricsByKpi) reads this list query — refresh
       // it too so saving in the pop-up updates the table live, in place.
       qc.invalidateQueries({ queryKey: qk.perfMetrics(perfKpiId) });
+      qc.invalidateQueries({ queryKey: ["perfMetrics", "record"] });
     },
   });
 }
@@ -966,6 +978,7 @@ export function useApprovalTransition(recordId: number) {
       });
       qc.invalidateQueries({ queryKey: qk.perfKpi(perfKpiId) });
       qc.invalidateQueries({ queryKey: qk.perfMetrics(perfKpiId) });
+      qc.invalidateQueries({ queryKey: ["perfMetrics", "record"] });
     },
   });
 }

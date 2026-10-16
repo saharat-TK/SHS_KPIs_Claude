@@ -12,6 +12,7 @@ import type { TranslationKey } from "@/lib/i18n/dictionaries";
 // fall back to the raw segment, and per-page overrides (dynamic DB names) win.
 const LABELS: Record<string, TranslationKey> = {
   dashboard: "breadcrumb.dashboard",
+  "data-table": "breadcrumb.data-table",
   committee: "breadcrumb.committee",
   faculty: "breadcrumb.faculty",
   export: "breadcrumb.export",
@@ -28,6 +29,7 @@ const LABELS: Record<string, TranslationKey> = {
   "student-success": "breadcrumb.student-success",
   admin: "breadcrumb.admin",
   units: "breadcrumb.units",
+  edpex: "breadcrumb.edpex",
 };
 
 export function Breadcrumb() {
