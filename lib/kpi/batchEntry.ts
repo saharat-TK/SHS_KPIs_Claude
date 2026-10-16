@@ -7,14 +7,19 @@
 // stripping. Nothing here hardcodes a program or a curriculum: the rows come
 // from the academic catalog, the same tables the pickers read.
 import type { AcademicCatalog, DataSourceCellValue } from "@/lib/types";
-import type { ColumnSpec } from "./dataSources";
+import type { ColumnSpec, TemplateChoice } from "./dataSources";
+import { parseCsv } from "../csv.ts";
 
-/** How Add Entry is filling the dialog: one row typed by hand, or one row per
- *  catalog entry with its code already chosen. */
-export type BatchMode = "single" | "programs" | "curricula";
+/** How Add Entry is filling the dialog: one row typed by hand, any number of
+ *  free-form rows, or one row per catalog entry with its code already chosen. */
+export type BatchMode = "single" | "rows" | "programs" | "curricula";
+
+/** The modes whose rows are pre-built from the academic catalog. */
+export type CatalogBatchMode = "programs" | "curricula";
 
 export const BATCH_MODE_LABELS: Record<BatchMode, string> = {
   single: "Single entry",
+  rows: "Multiple rows",
   programs: "5 Departments",
   curricula: "9 Curriculums",
 };
@@ -35,11 +40,12 @@ export interface BatchRow {
 const firstKeyOfType = (columns: ColumnSpec[], type: ColumnSpec["dataType"]) =>
   columns.find((c) => c.dataType === type)?.colKey ?? null;
 
-/** Which modes this source's columns can support. A batch is only meaningful
- *  when there is a column to put the code in — without one every row would be
- *  an indistinguishable copy of the last. "single" is always available. */
+/** Which modes this source's columns can support. A catalog batch is only
+ *  meaningful when there is a column to put the code in — without one every row
+ *  would be an indistinguishable copy of the last. "single" and the free-form
+ *  "rows" are always available. */
 export function availableBatchModes(columns: ColumnSpec[]): BatchMode[] {
-  const modes: BatchMode[] = ["single"];
+  const modes: BatchMode[] = ["single", "rows"];
   if (firstKeyOfType(columns, "program")) modes.push("programs");
   if (firstKeyOfType(columns, "curriculum")) modes.push("curricula");
   return modes;
@@ -48,7 +54,7 @@ export function availableBatchModes(columns: ColumnSpec[]): BatchMode[] {
 /** The column whose value identifies a row within a batch — what a repeat of the
  *  same batch would collide on. */
 export function batchColumnKey(
-  mode: Exclude<BatchMode, "single">,
+  mode: CatalogBatchMode,
   columns: ColumnSpec[],
 ): string | null {
   return firstKeyOfType(columns, mode === "programs" ? "program" : "curriculum");
@@ -63,7 +69,7 @@ export function batchColumnKey(
  *  hold — a program has several curricula and none of them is the right guess —
  *  so batching by program leaves a curriculum column empty and editable. */
 export function buildBatchRows(
-  mode: Exclude<BatchMode, "single">,
+  mode: CatalogBatchMode,
   catalog: AcademicCatalog,
   columns: ColumnSpec[],
 ): BatchRow[] {
@@ -119,4 +125,62 @@ export function recordedBatchKeys(
     keys.add(batchDuplicateKey(entry.year, entry.quarter, colKey, String(cell)));
   }
   return keys;
+}
+
+// ── Free-form rows ("Multiple rows") ────────────────────────────────────────
+// Typed or pasted rows with no catalog code chosen up front. Each row is
+// validated by validateEntryValues like every other entry path; these helpers
+// only shape what was typed.
+
+/** One free-form row while editing: strings, "" = empty. */
+export interface FreeEntryRow {
+  values: Record<string, string>;
+  note: string;
+}
+
+/** Nothing typed in the row — skipped rather than submitted. */
+export function isBlankEntryRow(row: FreeEntryRow): boolean {
+  return !row.note.trim() && Object.values(row.values).every((v) => !v.trim());
+}
+
+const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+
+/** A typed program, curriculum, faculty or select cell, resolved to the code
+ *  the picker stores: either the code itself or the label the picker shows.
+ *  Anything else is kept as typed so validation can name it. */
+export function resolveChoiceText(text: string, choices: TemplateChoice[] | undefined): string {
+  const t = norm(text);
+  if (!t || !choices?.length) return text.trim();
+  return choices.find((c) => norm(c.code) === t || norm(c.label) === t)?.code ?? text.trim();
+}
+
+/** Rows copied out of Excel (tab-separated): one cell per column in the
+ *  source's column order, then an optional Note. Pasting into a later column
+ *  (`startAt`) fills from that column on and leaves the earlier ones empty. A
+ *  header row copied along (its first cell is that column's label or key) is
+ *  skipped, and fully empty lines are dropped. */
+export function entryRowsFromPaste(
+  text: string,
+  columns: ColumnSpec[],
+  choices: Record<string, TemplateChoice[]>,
+  startAt = 0,
+): FreeEntryRow[] {
+  const lines = parseCsv(text, "\t").filter((cells) => cells.some((c) => c.trim()));
+  const first = columns[startAt];
+  if (
+    first &&
+    lines.length > 0 &&
+    [norm(first.label), norm(first.colKey)].includes(norm(lines[0][0] ?? ""))
+  ) {
+    lines.shift();
+  }
+  return lines.map((cells) => ({
+    values: Object.fromEntries(
+      columns.map((c, i) => {
+        const cell = i < startAt ? "" : cells[i - startAt] ?? "";
+        return [c.colKey, resolveChoiceText(cell, choices[c.colKey])];
+      }),
+    ),
+    note: (cells[columns.length - startAt] ?? "").trim(),
+  }));
 }

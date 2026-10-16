@@ -14,7 +14,7 @@ import {
   batchDuplicateKey,
   buildBatchRows,
   recordedBatchKeys,
-  type BatchMode,
+  type CatalogBatchMode,
 } from "@/lib/kpi/batchEntry";
 import type {
   AcademicCatalog,
@@ -25,7 +25,7 @@ import type {
 } from "@/lib/types";
 import { CellInput } from "./CellInput";
 
-type BatchModeNonSingle = Exclude<BatchMode, "single">;
+type BatchModeNonSingle = CatalogBatchMode;
 
 /** One row as the grid holds it: the pre-built code plus what has been typed
  *  into it. Values are strings while editing, exactly as in the single-entry

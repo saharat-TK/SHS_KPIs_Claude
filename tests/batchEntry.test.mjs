@@ -6,7 +6,10 @@ import {
   batchColumnKey,
   batchDuplicateKey,
   buildBatchRows,
+  entryRowsFromPaste,
+  isBlankEntryRow,
   recordedBatchKeys,
+  resolveChoiceText,
 } from "../lib/kpi/batchEntry.ts";
 
 // A trimmed catalog with the real cascade shape: PH owns three curricula, BM one.
@@ -34,21 +37,22 @@ const col = (colKey, dataType, extra = {}) => ({
 const BOTH = [col("program", "program"), col("curriculum", "curriculum"), col("headcount", "number")];
 
 test("both batch modes are offered when both columns exist", () => {
-  assert.deepEqual(availableBatchModes(BOTH), ["single", "programs", "curricula"]);
+  assert.deepEqual(availableBatchModes(BOTH), ["single", "rows", "programs", "curricula"]);
 });
 
 test("a mode is withheld when its column is missing", () => {
   assert.deepEqual(
     availableBatchModes([col("program", "program"), col("n", "number")]),
-    ["single", "programs"],
+    ["single", "rows", "programs"],
   );
   assert.deepEqual(
     availableBatchModes([col("curriculum", "curriculum")]),
-    ["single", "curricula"],
+    ["single", "rows", "curricula"],
   );
-  // Nothing to distinguish the rows by, so no batch at all.
+  // Nothing to distinguish catalog rows by, so only the free-form batch.
   assert.deepEqual(availableBatchModes([col("n", "number"), col("who", "faculty")]), [
     "single",
+    "rows",
   ]);
 });
 
@@ -132,4 +136,56 @@ test("recorded keys ignore blank cells and cover non-string stored values", () =
   assert.equal(keys.has(batchDuplicateKey(2568, 2, "program", "BM")), true);
   // Same code, different quarter, is not a repeat.
   assert.equal(keys.has(batchDuplicateKey(2568, 2, "program", "PH")), false);
+});
+
+// ── Free-form rows ──────────────────────────────────────────────────────────
+
+const PASTE_COLUMNS = [
+  { colKey: "program", label: "Program", dataType: "program", isRequired: true },
+  { colKey: "who", label: "Faculty", dataType: "faculty", isRequired: false },
+  { colKey: "count", label: "Count", dataType: "number", isRequired: false },
+];
+const PASTE_CHOICES = {
+  program: [
+    { code: "PH", label: "สาขาวิชาสาธารณสุขศาสตร์" },
+    { code: "BM", label: "สาขาวิชาเทคโนโลยีชีวการแพทย์" },
+  ],
+  who: [{ code: "F001", label: "Dr. Somchai Jaidee", hint: "PH" }],
+};
+
+test("a free-form row is blank until something is typed", () => {
+  assert.equal(isBlankEntryRow({ values: { program: "", count: "  " }, note: "" }), true);
+  assert.equal(isBlankEntryRow({ values: { program: "", count: "3" }, note: "" }), false);
+  assert.equal(isBlankEntryRow({ values: { program: "" }, note: "see memo" }), false);
+});
+
+test("typed derived cells resolve by code or label, case-insensitively", () => {
+  assert.equal(resolveChoiceText(" ph ", PASTE_CHOICES.program), "PH");
+  assert.equal(resolveChoiceText("สาขาวิชาเทคโนโลยีชีวการแพทย์", PASTE_CHOICES.program), "BM");
+  assert.equal(resolveChoiceText("dr.  somchai jaidee", PASTE_CHOICES.who), "F001");
+  // Unknown text is kept so validation can name it.
+  assert.equal(resolveChoiceText("Nursing", PASTE_CHOICES.program), "Nursing");
+  assert.equal(resolveChoiceText("12", undefined), "12");
+});
+
+test("pasted Excel rows map onto the columns, skipping a header and blank lines", () => {
+  const text =
+    "Program\tFaculty\tCount\tNote\r\n" +
+    "สาขาวิชาสาธารณสุขศาสตร์\tDr. Somchai Jaidee\t12\tfirst batch\r\n" +
+    "\t\t\t\r\n" +
+    "bm\t\t7\r\n" +
+    "Nursing\tF999\t\"1,200\"\r\n";
+  assert.deepEqual(entryRowsFromPaste(text, PASTE_COLUMNS, PASTE_CHOICES), [
+    { values: { program: "PH", who: "F001", count: "12" }, note: "first batch" },
+    { values: { program: "BM", who: "", count: "7" }, note: "" },
+    { values: { program: "Nursing", who: "F999", count: "1,200" }, note: "" },
+  ]);
+  // Without a header, the first line is data; a header matched by key is skipped too.
+  assert.equal(entryRowsFromPaste("PH\t\t1", PASTE_COLUMNS, PASTE_CHOICES).length, 1);
+  assert.equal(entryRowsFromPaste("program\twho\nPH\t\t1", PASTE_COLUMNS, PASTE_CHOICES).length, 1);
+  // Pasting into the Count column fills from there on, then the Note.
+  assert.deepEqual(entryRowsFromPaste("5\tlate\n6", PASTE_COLUMNS, PASTE_CHOICES, 2), [
+    { values: { program: "", who: "", count: "5" }, note: "late" },
+    { values: { program: "", who: "", count: "6" }, note: "" },
+  ]);
 });
