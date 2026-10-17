@@ -78,7 +78,8 @@ export const METRIC_QUARTER_PROGRESS_FIELDS = `
 `;
 
 export const PERF_METRIC_FIELDS = `
-  m.id, m.perf_kpi_id AS perfKpiId, m.source_metric_id AS sourceMetricId, m.name, m.description,
+  m.id, m.perf_kpi_id AS perfKpiId, m.source_metric_id AS sourceMetricId, m.name,
+  m.catalog_code AS catalogCode, m.description,
   m.category_id AS categoryId, m.data_collect_method AS dataCollectMethod,
   m.collection_period AS collectionPeriod, m.data_source_url AS dataSourceUrl,
   m.committee_id AS committeeId, m.person_in_charge_id AS personInChargeId,

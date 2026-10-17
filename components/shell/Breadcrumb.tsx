@@ -32,6 +32,18 @@ const LABELS: Record<string, TranslationKey> = {
   edpex: "breadcrumb.edpex",
 };
 
+function resolveBreadcrumbHref(href: string): string {
+  const libraryKpisMatch = href.match(/^\/kpi-management\/library\/([^/]+)\/kpis$/);
+  if (libraryKpisMatch) {
+    return `/kpi-management/library/${libraryKpisMatch[1]}`;
+  }
+  const perfKpisMatch = href.match(/^\/kpi-management\/performance\/([^/]+)\/kpis$/);
+  if (perfKpisMatch) {
+    return `/kpi-management/performance/${perfKpisMatch[1]}`;
+  }
+  return href;
+}
+
 export function Breadcrumb() {
   const pathname = usePathname();
   const overrides = useBreadcrumbLabels();
@@ -43,11 +55,15 @@ export function Breadcrumb() {
   const rest = segments[0] === "dashboard" ? [] : segments;
 
   const crumbs = [
-    { href: "/dashboard", label: t(LABELS.dashboard) },
+    { href: "/dashboard", label: t(LABELS.dashboard), key: "dashboard" },
     ...rest.map((seg, i) => {
-      const href = "/" + rest.slice(0, i + 1).join("/");
+      const rawHref = "/" + rest.slice(0, i + 1).join("/");
       const key = LABELS[seg];
-      return { href, label: overrides[href] ?? (key ? t(key) : seg) };
+      return {
+        href: resolveBreadcrumbHref(rawHref),
+        label: overrides[rawHref] ?? (key ? t(key) : seg),
+        key: `${rawHref}-${i}`,
+      };
     }),
   ];
 
@@ -60,7 +76,7 @@ export function Breadcrumb() {
         const last = i === crumbs.length - 1;
         return (
           <span
-            key={c.href}
+            key={c.key}
             className={cn("flex items-center gap-xs", last ? "min-w-0" : "shrink-0")}
           >
             {i > 0 && (
