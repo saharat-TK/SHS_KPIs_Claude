@@ -15,6 +15,8 @@ const nextConfig = {
     return [
       { source: "/", destination: "/dashboard", permanent: false },
       { source: "/kpi-management", destination: "/kpi-management/performance", permanent: false },
+      { source: "/kpi-management/library/:setId/kpis", destination: "/kpi-management/library/:setId", permanent: false },
+      { source: "/kpi-management/performance/:recordId/kpis", destination: "/kpi-management/performance/:recordId", permanent: false },
       { source: "/analytics", destination: "/analytics/student-success", permanent: false },
       { source: "/admin", destination: "/admin/units", permanent: false },
       { source: "/formulas", destination: "/formulas/builder", permanent: false },

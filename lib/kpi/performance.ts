@@ -258,7 +258,7 @@ const PERF_KPI_INSERT_COLS = `record_id, source_kpi_id, name, description, categ
   sort_order, has_children`;
 const PERF_KPI_INSERT_PLACEHOLDERS = PERF_KPI_INSERT_COLS.split(",").map(() => "?").join(",");
 
-const PERF_METRIC_INSERT_COLS = `perf_kpi_id, source_metric_id, name, description, category_id,
+const PERF_METRIC_INSERT_COLS = `perf_kpi_id, source_metric_id, name, catalog_code, description, category_id,
   data_collect_method, collection_period, data_source_url, committee_id,
   person_in_charge_id, weight, unit, five_year_target, threshold_green,
   threshold_amber, sort_order`;
@@ -272,7 +272,7 @@ const PERF_KPI_UPDATE = `name=?, description=?, category_id=?, routine_category_
   variable1_name=?, variable1_unit=?, variable2_name=?, variable2_unit=?,
   sort_order=?, has_children=?`;
 
-const PERF_METRIC_UPDATE = `name=?, description=?, category_id=?, data_collect_method=?,
+const PERF_METRIC_UPDATE = `name=?, catalog_code=?, description=?, category_id=?, data_collect_method=?,
   collection_period=?, data_source_url=?, committee_id=?, person_in_charge_id=?, weight=?,
   unit=?, five_year_target=?, threshold_green=?, threshold_amber=?, sort_order=?`;
 
@@ -287,7 +287,7 @@ const kpiValues = (recordId: number, k: RowDataPacket, hasChildren: number) => [
 ];
 
 const metricValues = (perfKpiId: number, m: RowDataPacket) => [
-  perfKpiId, m.id, m.name, m.description, m.category_id, m.data_collect_method,
+  perfKpiId, m.id, m.name, m.catalog_code ?? null, m.description, m.category_id, m.data_collect_method,
   m.collection_period, m.data_source_url, m.committee_id, m.person_in_charge_id, m.weight,
   m.unit, m.five_year_target, m.threshold_green, m.threshold_amber, m.sort_order,
 ];
@@ -302,7 +302,7 @@ async function kpiHasChildren(conn: PoolConnection, libKpiId: number): Promise<n
 
 async function copyMetricInto(conn: PoolConnection, perfKpiId: number, m: RowDataPacket) {
   const [ins] = await conn.query<ResultSetHeader>(
-    `INSERT INTO perf_metric (${PERF_METRIC_INSERT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO perf_metric (${PERF_METRIC_INSERT_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     metricValues(perfKpiId, m),
   );
   await conn.query(
@@ -426,7 +426,7 @@ export async function syncRecordFromLibrary(conn: PoolConnection, recordId: numb
       const pmId = pmBySource.get(m.id);
       if (pmId) {
         await conn.query(`UPDATE perf_metric SET ${PERF_METRIC_UPDATE} WHERE id = ?`, [
-          m.name, m.description, m.category_id, m.data_collect_method, m.collection_period,
+          m.name, m.catalog_code ?? null, m.description, m.category_id, m.data_collect_method, m.collection_period,
           m.data_source_url, m.committee_id, m.person_in_charge_id, m.weight, m.unit,
           m.five_year_target, m.threshold_green, m.threshold_amber, m.sort_order, pmId,
         ]);

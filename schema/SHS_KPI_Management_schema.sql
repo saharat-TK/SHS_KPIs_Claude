@@ -393,6 +393,7 @@ CREATE TABLE perf_metric (
   perf_kpi_id         BIGINT UNSIGNED NOT NULL,
   source_metric_id    BIGINT UNSIGNED NULL,                -- original library_metric.id
   name                VARCHAR(500) NOT NULL,
+  catalog_code        VARCHAR(20)  NULL,                   -- mirrors library_metric.catalog_code (no FK)
   description         TEXT NULL,
   category_id         VARCHAR(40)  NULL,
   data_collect_method VARCHAR(500) NULL,
