@@ -6,7 +6,7 @@ import { PERFORMANCE_YEAR_COUNT, yearForYearNo } from "@/lib/kpi/performancePeri
 import type { DashboardGroupBy } from "@/lib/kpi/dashboard";
 
 const GROUP_BY_ITEMS: SegmentItem[] = [
-  { id: "category", label: "Category" },
+  { id: "category", label: "SHS" },
   { id: "edpex", label: "EdPEx" },
 ];
 

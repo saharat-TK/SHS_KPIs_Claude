@@ -119,9 +119,9 @@ export function AnnualQuarterProgressMatrix({
 
         <div className="overflow-visible">
           <div className="grid w-full grid-cols-[32px_repeat(5,minmax(0,1fr))] gap-tiny">
-            <div className="text-center text-[9px] font-medium text-mute">Ref</div>
+            <div className="text-center text-[11.25px] font-medium text-mute">Ref</div>
             {COLUMNS.map((column) => (
-              <div key={column} className="text-center text-[9px] font-medium text-mute">
+              <div key={column} className="text-center text-[11.25px] font-medium text-mute">
                 {column}
               </div>
             ))}
@@ -162,7 +162,7 @@ function ProgressMatrixRow({ row, cells }: { row: MatrixRow; cells: CellData[] }
         className="flex min-w-0 items-center justify-center py-tiny"
         title={row.name}
       >
-        <Badge tone={row.isParent ? "info" : "neutral"} className="px-tiny text-[9px]">
+        <Badge tone={row.isParent ? "info" : "neutral"} className="px-tiny text-[11.25px]">
           {row.displayLabel}
         </Badge>
       </div>
@@ -173,7 +173,7 @@ function ProgressMatrixRow({ row, cells }: { row: MatrixRow; cells: CellData[] }
           <div
             key={cell.label}
             className={cn(
-              "relative flex h-7 min-w-0 items-center justify-center rounded-[4px] px-tiny text-[9px] font-semibold",
+              "relative flex h-7 min-w-0 items-center justify-center rounded-[4px] px-tiny text-[11.25px] font-semibold",
               colorClassForCell(row, cell),
             )}
             aria-label={tooltip}
@@ -194,7 +194,7 @@ function ProgressMatrixRow({ row, cells }: { row: MatrixRow; cells: CellData[] }
 
       {hoverTooltip && (
         <div
-          className="pointer-events-none fixed z-[300] max-w-[280px] whitespace-pre-line rounded border border-hairline bg-ink px-sm py-xs text-left text-[10px] font-normal leading-snug text-on-primary shadow-chrome"
+          className="pointer-events-none fixed z-[300] max-w-[280px] whitespace-pre-line rounded border border-hairline bg-ink px-sm py-xs text-left text-[12.5px] font-normal leading-snug text-on-primary shadow-chrome"
           style={{ left: hoverTooltip.x, top: hoverTooltip.y }}
         >
           {hoverTooltip.text}

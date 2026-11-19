@@ -73,6 +73,9 @@ const TYPE_TONE: Record<string, "primary" | "info" | "neutral"> = {
 const FALLBACK_TYPE_LABELS = new Map<string, string>(
   KPI_TYPES.map((type) => [type.id, type.label]),
 );
+// Every column but KPI Name reads one step quieter: 90% of the table's
+// body-sm (16.25px). Badges carry their own size and are unaffected.
+const SECONDARY_CELL = "text-[14.625px]";
 type SortKey = "name" | "type" | "annualTarget" | "currentProgress" | "approvalLock";
 type SortState = { key: SortKey; dir: "asc" | "desc" };
 
@@ -611,6 +614,7 @@ function PerformanceRecordDetail() {
                 <col />
                 <col />
                 <col />
+                <col />
               </colgroup>
               <thead>
                 <tr>
@@ -637,6 +641,7 @@ function PerformanceRecordDetail() {
                   >
                     Annual Target
                   </Th>
+                  <Th align="center">Unit</Th>
                   <Th
                     sortable
                     sortDir={sort?.key === "currentProgress" ? sort.dir : null}
@@ -677,22 +682,23 @@ function PerformanceRecordDetail() {
                   return (
                     <Tr key={k.id} onClick={() => setSelectedKpiId(k.id)}>
                       <Td className="font-medium">{k.name}</Td>
-                      <Td align="center">
+                      <Td align="center" className={SECONDARY_CELL}>
                         <Badge tone={TYPE_TONE[k.kpiType] ?? "neutral"}>
                           {typeLabel(k.kpiType)}
                         </Badge>
                       </Td>
-                      <Td align="right">
-                        {annualTarget == null
-                          ? "—"
-                          : `${formatNumber(annualTarget, 2)} ${k.unit ?? ""}`}
+                      <Td align="right" className={SECONDARY_CELL}>
+                        {annualTarget == null ? "—" : formatNumber(annualTarget, 2)}
                       </Td>
-                      <Td align="center">
+                      <Td align="center" className={SECONDARY_CELL}>
+                        {k.unit || "—"}
+                      </Td>
+                      <Td align="center" className={SECONDARY_CELL}>
                         {current == null ? (
                           <span className="text-caption-sm text-mute">—</span>
                         ) : (
                           <div className="flex items-center justify-center gap-sm">
-                            <span>{`${formatNumber(current, 2)} ${k.unit ?? ""}`}</span>
+                            <span>{formatNumber(current, 2)}</span>
                             {pct != null && (
                               // Badge takes no title, so the status label rides
                               // on a wrapper for hover/screen-reader text.
@@ -705,13 +711,13 @@ function PerformanceRecordDetail() {
                           </div>
                         )}
                       </Td>
-                      <Td align="center">{k.metricCount ?? 0}</Td>
-                      <Td align="center">
+                      <Td align="center" className={SECONDARY_CELL}>{k.metricCount ?? 0}</Td>
+                      <Td align="center" className={SECONDARY_CELL}>
                         <Badge tone={k.hasChildren ? "info" : "neutral"}>
                           {k.hasChildren ? "computed" : "direct entry"}
                         </Badge>
                       </Td>
-                      <Td>
+                      <Td className={SECONDARY_CELL}>
                         {approvalsLoading ? (
                           <span className="text-caption-sm text-mute">Loading…</span>
                         ) : approvalLock?.lock?.locked ? (
@@ -723,7 +729,7 @@ function PerformanceRecordDetail() {
                           <span className="text-caption-sm text-mute">—</span>
                         )}
                       </Td>
-                      <Td align="right">
+                      <Td align="right" className={SECONDARY_CELL}>
                         <button
                           aria-label={approvalLock?.lock?.locked ? "View progress" : "Record progress"}
                           title={approvalLock?.lock?.locked ? "View progress" : "Record progress"}
