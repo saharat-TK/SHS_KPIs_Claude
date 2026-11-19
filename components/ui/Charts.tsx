@@ -36,10 +36,10 @@ const ERROR = "#e52020";
 const LINK_BLUE = "#0046a4";
 const SURFACE_DIM = "#dadada";
 
-const AXIS = { fontSize: 11, fill: MUTE };
+const AXIS = { fontSize: 14, fill: MUTE };
 const TOOLTIP = {
   contentStyle: {
-    fontSize: 12,
+    fontSize: 15,
     borderRadius: 2,
     border: `1px solid ${GRID}`,
     boxShadow: "0 0 5px 0 rgba(0,0,0,0.1)",
@@ -144,7 +144,7 @@ export function TrendLineChart({
           />
           <YAxis tick={AXIS} tickLine={false} axisLine={false} />
           <Tooltip {...TOOLTIP} />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Legend wrapperStyle={{ fontSize: 14 }} />
           {lines.map((l, i) => (
             <Line
               key={l.key}
@@ -218,7 +218,7 @@ export function CategoryBarChart({
  *  other chart in this file keeps the shared light TOOLTIP above. */
 const TOOLTIP_DARK = {
   contentStyle: {
-    fontSize: 12,
+    fontSize: 15,
     borderRadius: 8,
     border: "none",
     boxShadow: "0 4px 16px 0 rgba(0,0,0,0.25)",
@@ -254,7 +254,7 @@ function ActiveQuarterTick({
         x={0}
         y={14}
         textAnchor="middle"
-        fontSize={11}
+        fontSize={14}
         fontWeight={active ? 700 : 400}
         fill={active ? PRIMARY : MUTE}
       >
@@ -318,7 +318,7 @@ export function AchievementTrendChart({
             width={46}
           />
           <Tooltip {...TOOLTIP_DARK} formatter={(v: number) => `${v}%`} />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Legend wrapperStyle={{ fontSize: 14 }} />
           <ReferenceLine y={100} stroke={PRIMARY} strokeDasharray="4 4" />
           {lines.map((l, i) =>
             i === 0 ? (
@@ -457,7 +457,7 @@ function DonutChart<K extends string>({
                 <Cell key={s.key} fill={fill[s.key]} />
               ))}
             </Pie>
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Legend wrapperStyle={{ fontSize: 14 }} />
           </PieChart>
         </ResponsiveContainer>
         {centre && (
@@ -539,7 +539,7 @@ export function TargetVsActualChart({
             cursor={{ fill: "#f3f3f4" }}
             formatter={(v: number) => `${v}%`}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Legend wrapperStyle={{ fontSize: 14 }} />
           <Bar
             dataKey="achievement"
             name="Achieved"

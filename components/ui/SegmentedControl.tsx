@@ -45,7 +45,7 @@ export function SegmentedControl({
       aria-label={ariaLabel}
       className={cn(
         sliding
-          ? "relative inline-grid items-center rounded-lg border border-hairline bg-surface-container-high p-tiny shadow-inner"
+          ? "relative inline-grid items-stretch rounded-lg border border-hairline bg-surface-container-high p-tiny shadow-inner"
           : "inline-flex flex-wrap items-center gap-tiny rounded-xl border border-hairline bg-surface-container-high p-tiny",
         className,
       )}
@@ -71,8 +71,11 @@ export function SegmentedControl({
             disabled={item.disabled}
             onClick={() => onChange(item.id)}
             className={cn(
-              "relative z-10 inline-flex items-center gap-xs rounded-lg px-md py-xs text-label-md transition-colors",
-              sliding && "min-w-0 justify-center",
+              "relative z-10 inline-flex items-center gap-xs rounded-lg px-md text-label-md transition-colors",
+              // Sliding mode sits in a fixed-height track (h-[28px] at every call
+              // site): fill the row and centre the label rather than padding it,
+              // which overflowed the track and pushed the text below centre.
+              sliding ? "h-full min-w-0 justify-center py-0 leading-none" : "py-xs",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
               item.disabled
                 ? "cursor-not-allowed text-stone opacity-60"

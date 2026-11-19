@@ -5,6 +5,7 @@ import type { KpiStatus } from "@/lib/kpi/dashboard";
 import type { Health } from "@/lib/kpi/progress";
 import { cn, formatNumber } from "@/lib/utils";
 import { AchievementBar } from "./AchievementBar";
+import { AchievementStatusIcon } from "./AchievementStatusIcon";
 import { SubKpiHoverPreview } from "./SubKpiHoverPreview";
 import { subKpiDensity } from "./subKpiDensity";
 
@@ -36,19 +37,19 @@ function FullTile({
       title={status.name}
       className={cn(
         "animate-fade-up rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-        row && "w-[calc(50%-0.1875rem)] sm:w-[168px] lg:h-[212px]",
+        row && "w-[calc(50%-0.1875rem)] sm:w-[176px] lg:h-[256px]",
       )}
       style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
     >
       <Card className="flex h-full flex-col gap-xs p-md !border-0 shadow-md transition-shadow hover:shadow-lg">
         <span className="text-utility-xs uppercase text-mute">K{index + 1}</span>
-        <span className={cn(row ? "line-clamp-3" : "line-clamp-2", "text-caption-sm text-on-surface")}>
+        <span className={cn(row ? "line-clamp-5 text-[16px] leading-tight" : "line-clamp-2 text-caption-sm", "text-on-surface")}>
           {status.name}
         </span>
         {row ? (
           <>
             <div
-              className="flex flex-col gap-tiny pt-xs text-utility-xs tabular-nums text-mute lg:min-h-0 lg:flex-1 lg:justify-center"
+              className="flex flex-col gap-tiny pt-xs text-utility-xs tabular-nums text-[#424242] lg:min-h-0 lg:flex-1 lg:justify-center"
               title={`Recorded ${fmt(status.value)} against a Q target of ${fmt(status.quarterTarget)}${status.unit ? ` ${status.unit}` : ""}`}
             >
               <span>
@@ -62,17 +63,11 @@ function FullTile({
                 {status.unit ? ` ${status.unit}` : ""}
               </span>
             </div>
-            <div className="flex flex-col gap-tiny">
-              <span className="self-end text-body-sm font-bold tabular-nums text-on-surface lg:text-[25px] lg:leading-none">
+            <div className="flex items-center justify-end gap-xs">
+              <AchievementStatusIcon pct={status.pct} size={26} />
+              <span className="text-body-sm font-bold tabular-nums text-on-surface lg:text-[31.25px] lg:leading-none">
                 {status.pct == null ? "—" : <CountUp value={status.pct} suffix="%" />}
               </span>
-              <AchievementBar
-                pct={status.pct}
-                health={status.health}
-                size="sm"
-                showValue={false}
-                className="w-full"
-              />
             </div>
           </>
         ) : (
@@ -114,15 +109,15 @@ function CompactDetailTile({
       >
         <Card className="flex h-full flex-col gap-tiny p-md !border-0 shadow-md transition-[box-shadow,background-color] hover:shadow-lg hover:!bg-cyan-50">
           <span className="text-utility-xs uppercase text-mute">K{index + 1}</span>
-          <span className="line-clamp-2 text-caption-sm font-normal text-on-surface">{status.name}</span>
+          <span className="line-clamp-2 text-[16px] leading-tight font-normal text-on-surface">{status.name}</span>
           <div className="mt-auto flex flex-col gap-tiny">
-            <div className="flex flex-wrap items-baseline justify-end gap-xs">
-              <span className="text-[8px] font-normal text-on-surface">Achieved by</span>
-              <span className="text-body-sm font-bold tabular-nums text-on-surface lg:text-[18px] lg:leading-none">
+            <div className="flex flex-wrap items-center justify-end gap-xs">
+              <span className="text-[10px] font-normal text-on-surface">Achieved by</span>
+              <AchievementStatusIcon pct={status.pct} size={20} />
+              <span className="text-body-sm font-bold tabular-nums text-on-surface lg:text-[22.5px] lg:leading-none">
                 {status.pct == null ? "—" : <CountUp value={status.pct} suffix="%" />}
               </span>
             </div>
-            <AchievementBar pct={status.pct} health={status.health} size="sm" showValue={false} className="w-full" />
           </div>
         </Card>
       </button>
@@ -148,12 +143,12 @@ function CompactTile({
         style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
       >
         <Card className="flex h-full flex-col gap-tiny p-xs !border-0 shadow-md transition-[box-shadow,background-color] hover:shadow-lg hover:!bg-cyan-50">
-          <span className="line-clamp-3 text-caption-sm text-on-surface">{status.name}</span>
-          <div className="mt-auto flex flex-col gap-tiny">
-            <span className="self-end text-body-sm font-bold tabular-nums text-on-surface lg:text-[25px] lg:leading-none">
+          <span className="line-clamp-3 text-[16px] leading-tight text-on-surface">{status.name}</span>
+          <div className="mt-auto flex items-center justify-end gap-tiny">
+            <AchievementStatusIcon pct={status.pct} size={22} />
+            <span className="text-body-sm font-bold tabular-nums text-on-surface lg:text-[31.25px] lg:leading-none">
               {status.pct == null ? "—" : <CountUp value={status.pct} suffix="%" />}
             </span>
-            <AchievementBar pct={status.pct} health={status.health} size="sm" showValue={false} className="w-full" />
           </div>
         </Card>
       </button>
@@ -210,9 +205,9 @@ export function KpiMiniBars({
     : density === "full"
       ? "flex flex-wrap items-start gap-sm"
       : density === "compact_detail"
-        ? "grid grid-cols-2 gap-tiny sm:grid-cols-5 lg:auto-rows-[104px]"
+        ? "grid grid-cols-2 gap-tiny sm:grid-cols-5 lg:auto-rows-[125px]"
         : density === "compact"
-          ? "grid grid-cols-2 gap-tiny sm:grid-cols-5 lg:grid-cols-10 lg:auto-rows-[104px]"
+          ? "grid grid-cols-2 gap-tiny sm:grid-cols-5 lg:grid-cols-10 lg:auto-rows-[125px]"
           : "grid grid-cols-5 gap-tiny pr-tiny sm:grid-cols-10 lg:max-h-[214px] lg:overflow-y-auto lg:scroll-thin";
 
   return (

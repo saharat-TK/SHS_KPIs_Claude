@@ -176,7 +176,9 @@ export function Dashboard() {
                 <span className="text-display-md leading-none text-on-surface tabular-nums">
                   <CountUp value={recording.pctThisQuarter ?? 0} suffix="%" />
                 </span>
-                <span className="text-caption-sm text-mute">recorded this quarter</span>
+                <span className="max-w-[7rem] text-center text-caption-sm leading-tight text-mute">
+                  recorded this quarter
+                </span>
               </>
             }
           />

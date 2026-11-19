@@ -6,12 +6,12 @@ import { cn } from "@/lib/utils";
 import { KpiMiniBars } from "./KpiMiniBars";
 import { metBand } from "./metBand";
 
-// Category scorecards use pale semantic 50 surfaces with 200-level borders.
-// The 500-level ring sits a shade lighter than the 600-level text.
-const CATEGORY_CARD_SURFACE = {
-  healthy: { card: "!bg-[#f7fee7] !border-[#d9f99d]", muted: "text-[#65a30d]", donut: "#84cc16" },
-  watch: { card: "!bg-[#fff7ed] !border-[#fed7aa]", muted: "text-[#ea580c]", donut: "#f97316" },
-  at_risk: { card: "!bg-[#fef2f2] !border-[#fecaca]", muted: "text-[#dc2626]", donut: "#ef4444" },
+// Scorecards sit on plain white like every other card; the met-target band
+// shows only in the donut ring.
+const CATEGORY_DONUT_FILL = {
+  healthy: "#84cc16",
+  watch: "#f97316",
+  at_risk: "#ef4444",
 } as const;
 
 const CATEGORY_KPI_NAME_ORDER = new Intl.Collator("en", {
@@ -35,21 +35,17 @@ function ScorecardTile({
   onSelect: () => void;
   onOpenKpi: (kpiId: number) => void;
 }) {
-  // Tinted from the MET ratio, not from row.health: the highlighted figure is
-  // the met ratio, and a card that tints green behind a number reading 33%
-  // argues with itself. row.health (worst graded member) still drives the
-  // group bar chart, where achievement is what is being plotted.
-  //
-  // The !important prefixes are load-bearing — cn() is a plain join, so an
-  // un-important tint loses to Card's own bg-surface-lowest.
+  // The ring is coloured from the MET ratio, not from row.health: the figure in
+  // its centre is the met ratio, and a green ring around 33% argues with
+  // itself. row.health (worst graded member) still drives the group bar chart.
   const band = metBand(row.pctMet);
-  const tint = band ? CATEGORY_CARD_SURFACE[band] : null;
-  const muted = tint?.muted ?? "text-mute";
+  const donutFill = band ? CATEGORY_DONUT_FILL[band] : HEALTH_FILL.no_data;
+  const muted = "text-mute";
 
   return (
-    <Card className={cn("flex flex-col gap-md p-md shadow-chrome !border-0", tint?.card)}>
+    <Card className="flex flex-col gap-md p-md shadow-chrome !border-0">
       <div className="flex items-center justify-between gap-md">
-        <h3 className={cn("text-heading-md uppercase", muted)}>{row.label}</h3>
+        <h3 className={cn("text-heading-md uppercase text-on-surface")}>{row.label}</h3>
         <Button
           variant="ghost"
           size="sm"
@@ -71,9 +67,9 @@ function ScorecardTile({
               value={row.onTarget}
               total={row.total}
               size={88}
-              fill={tint?.donut ?? HEALTH_FILL.no_data}
+              fill={donutFill}
               label={`${row.onTarget} of ${row.total} KPIs met target`}
-              centerTextClassName="text-[25px] leading-none"
+              centerTextClassName="text-[31.25px] leading-none"
               animateCenterValue
             />
             <div className="lg:text-center">
@@ -90,7 +86,7 @@ function ScorecardTile({
           />
 
           <div className="lg:text-center">
-            <span className="text-[30px] leading-none font-bold text-on-surface tabular-nums">
+            <span className="text-[37.5px] leading-none font-bold text-on-surface tabular-nums">
               {row.pct == null ? "—" : <CountUp value={row.pct} suffix="%" />}
             </span>
             <p className={cn("text-utility-xs uppercase mt-xs", muted)}>Avg achievement</p>
