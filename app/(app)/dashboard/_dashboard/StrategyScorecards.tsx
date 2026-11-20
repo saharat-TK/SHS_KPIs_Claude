@@ -2,6 +2,7 @@
 
 import { Button, Card, CountUp, RingGauge, HEALTH_FILL } from "@/components/ui";
 import type { CategoryDetailRow } from "@/lib/kpi/dashboard";
+import { kpiLabel } from "@/components/ui/kpiLabel";
 import { cn } from "@/lib/utils";
 import { KpiMiniBars } from "./KpiMiniBars";
 import { metBand } from "./metBand";
@@ -66,14 +67,15 @@ function ScorecardTile({
             <RingGauge
               value={row.onTarget}
               total={row.total}
-              size={88}
+              size={112}
+              stroke={10}
               fill={donutFill}
               label={`${row.onTarget} of ${row.total} KPIs met target`}
               centerTextClassName="text-[31.25px] leading-none"
               animateCenterValue
             />
             <div className="lg:text-center">
-              <p className={cn("text-utility-xs uppercase", muted)}>KPIs met target</p>
+              <p className={cn("text-utility-xs uppercase", muted)}>{kpiLabel("KPIs met target")}</p>
               <p className={cn("text-caption-sm mt-tiny", muted)}>
                 <CountUp value={row.onTarget} /> of <CountUp value={row.total} />
               </p>
