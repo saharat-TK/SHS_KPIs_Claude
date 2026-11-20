@@ -77,7 +77,7 @@ export function Sidebar({
               className="h-8 w-auto shrink-0"
             />
             <div className={cn("min-w-0 leading-tight", collapsed && "lg:hidden")}>
-              <p className="truncate text-body-strong text-white">{t("sidebar.brandTitle")}</p>
+              <p className="truncate text-[16px] font-bold leading-tight text-white">{t("sidebar.brandTitle")}</p>
               <p className="truncate text-caption-sm text-[#8a8a8a]">{t("sidebar.brandSubtitle")}</p>
             </div>
           </Link>
@@ -114,7 +114,7 @@ export function Sidebar({
               >
                 <p
                   className={cn(
-                    "px-sm text-utility-xs uppercase tracking-wider text-[#8a8a8a] mb-xs",
+                    "px-sm text-[11px] font-bold uppercase tracking-wider text-[#8a8a8a] mb-xs",
                     collapsed && "lg:hidden",
                   )}
                 >
@@ -184,7 +184,7 @@ function NavLeaf({
       onClick={onClose}
       title={collapsed ? t(item.label) : undefined}
       className={cn(
-        "flex items-center gap-xs rounded-DEFAULT border-y border-r border-l-4 px-sm py-xs text-label-sm transition-colors",
+        "flex items-center gap-tiny rounded-DEFAULT border-y border-r border-l-4 px-sm py-xs text-[15px] transition-colors",
         collapsed && "lg:h-10 lg:w-10 lg:justify-center lg:p-0",
         indented && !collapsed && "pl-md",
         active
@@ -253,7 +253,7 @@ function NavParent({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={cn(
-          "flex items-center gap-xs rounded-DEFAULT border border-transparent px-sm py-xs text-label-sm transition-colors",
+          "flex items-center gap-tiny rounded-DEFAULT border border-transparent px-sm py-xs text-[15px] transition-colors",
           childActive && !open
             ? "text-primary-container"
             : "text-white hover:bg-[#151515]",
