@@ -4,7 +4,7 @@ export function PageHeader({
   description,
   actions,
 }: {
-  title: string;
+  title: React.ReactNode;
   /** Rendered as a sibling right after the title text — not nested inside the
    *  <h1> — so an interactive control here (e.g. an info-icon trigger) never
    *  pollutes the heading's accessible name. */

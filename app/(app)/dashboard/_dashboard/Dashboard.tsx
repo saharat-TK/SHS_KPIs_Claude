@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -86,6 +86,24 @@ export function Dashboard() {
     [scoped, quarter, record?.startYear],
   );
 
+  // The stored name as written, title included (e.g. "อ.ดร.…"), with stray
+  // double spaces collapsed.
+  const welcomeName = user.name.trim().replace(/\s+/g, " ");
+  // Thai has no spaces inside a name, so the browser may break a surname
+  // mid-word on narrow screens. Keep each word whole; lines break only at
+  // the real spaces between them.
+  const welcomeTitle = (
+    <>
+      Welcome,{" "}
+      {welcomeName.split(" ").map((word, i) => (
+        <Fragment key={i}>
+          {i > 0 && " "}
+          <span className="whitespace-nowrap">{word}</span>
+        </Fragment>
+      ))}
+    </>
+  );
+
   const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null);
   const openKpi = (kpiId: number) => setSelectedKpiId(kpiId);
 
@@ -93,7 +111,7 @@ export function Dashboard() {
     return (
       <>
         <PageHeader
-          title={`Welcome, ${user.name.split(" ").slice(-1)[0]}`}
+          title={welcomeTitle}
           description="School of Health Sciences — performance at a glance."
         />
         <Card>
@@ -202,7 +220,7 @@ export function Dashboard() {
   return (
     <>
       <PageHeader
-        title={`Welcome, ${user.name.split(" ").slice(-1)[0]}`}
+        title={welcomeTitle}
         description={
           record
             ? `${record.name} · ${record.startYear}–${record.endYear}${
