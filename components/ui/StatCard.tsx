@@ -5,6 +5,7 @@ import { HEALTH_SURFACE } from "@/lib/kpi/progress";
 import { Icon } from "./Icon";
 import { Card } from "./Card";
 import { CountUp } from "./CountUp";
+import { kpiLabel } from "./kpiLabel";
 
 // Fill + label/unit colour, kept paired: a tinted card needs its muted text
 // darkened to stay legible (text-mute on any of these fills is only ~3.7:1,
@@ -97,7 +98,7 @@ export function StatCard({
             toneClasses.muted,
           )}
         >
-          {label}
+          {kpiLabel(label)}
         </span>
         {icon && !visual && <Icon name={icon} size={20} className={inverse ? "text-white" : "text-primary"} />}
       </div>
