@@ -24,6 +24,7 @@
     "migrate:data-source-column-links": "node --env-file=.env.local scripts/migrate-data-source-column-links.mjs",
     "migrate:data-source-date-types": "node --env-file=.env.local scripts/migrate-data-source-date-types.mjs",
     "fix:date-cells": "node --env-file=.env.local scripts/fix-date-cells.mjs",
+    "migrate:data-source-year-be": "node --env-file=.env.local scripts/migrate-data-source-year-be.mjs",
     "migrate:curriculum-degree-level": "node --env-file=.env.local scripts/migrate-curriculum-degree-level.mjs",
     "migrate:backfill-kpi-variables": "node --env-file=.env.local scripts/backfill-kpi-quarter-variables.mjs",
     "migrate:metric-quarter-variables": "node --env-file=.env.local scripts/migrate-metric-quarter-variables.mjs",

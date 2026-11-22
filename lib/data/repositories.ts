@@ -663,7 +663,7 @@ export const performanceRecordsRepo = {
     id: number,
     periods: { yearNo: number; quarterNo: number; isOpen: boolean }[],
     updatedBy?: string,
-  ): Promise<PerformancePeriod[]> =>
+  ): Promise<{ periods: PerformancePeriod[]; feedSummary: string | null }> =>
     jsonOrThrow(
       await fetch(`/api/performance-records/${id}/periods`, {
         method: "PUT",

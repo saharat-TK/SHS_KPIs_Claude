@@ -561,13 +561,13 @@ CREATE TABLE data_source_column (
   col_key        VARCHAR(40)  NOT NULL,                -- slug, e.g. "student_count"
   label          VARCHAR(255) NOT NULL,
   data_type      ENUM('text','url','number','date','select','boolean',
-                      'faculty','program','curriculum','year_ce','month') NOT NULL DEFAULT 'text',
+                      'faculty','program','curriculum','year_be','month') NOT NULL DEFAULT 'text',
                                                        -- faculty: stores a faculty.id ("fac-001")
                                                        -- program: stores a PROGRAMS abbr ("PH")
                                                        -- curriculum: stores a CURRICULUMS abbr ("PHB")
-                                                       -- year_ce: a CE year as a number (2026); BE years rejected
+                                                       -- year_be: a Buddhist-era year as a number (2569); CE years rejected
                                                        -- month: 1-12 as a number
-                                                       -- (year_ce/month added by scripts/migrate-data-source-date-types.mjs)
+                                                       -- (month added by migrate-data-source-date-types.mjs; year_ce became year_be in migrate-data-source-year-be.mjs)
   unit          VARCHAR(50)  NULL,                    -- free text, same convention as library_kpi.unit
   options        JSON NULL,                            -- string[] of allowed values; only for data_type='select'.
                                                        -- NULL for faculty/program/curriculum: their options are DERIVED

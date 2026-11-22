@@ -1,4 +1,4 @@
-// Parsing for the formatted cell types: Year (CE), Month and Date.
+// Parsing for the formatted cell types: Year (BE), Month and Date.
 //
 // One source of truth for what these accept, used by cell validation
 // (coerceCellValue), Excel paste and CSV import (normalizeCellInput), link
@@ -8,7 +8,7 @@
 // Pure, no runtime imports, so tests load it directly.
 
 /** Thrown with a message that reads after the column's label, e.g.
- *  `"Publication year (CE)" must be a 4-digit CE year, e.g. 2026`. */
+ *  `"Publication year (BE)" must be a 4-digit BE year, e.g. 2569`. */
 export class CellFormatError extends Error {}
 
 const fail = (message: string): never => {
@@ -20,10 +20,14 @@ const fail = (message: string): never => {
 export const BE_YEAR_FROM = 2400;
 export const BE_OFFSET = 543;
 const MIN_CE_YEAR = 1900;
+const MAX_BE_YEAR = 2999;
+
+/** This year in the Buddhist era — the default for every year field. */
+export const currentBEYear = (now: Date = new Date()) => now.getFullYear() + BE_OFFSET;
 
 /** The example shown with each input, in hints, placeholders and the CSV legend. */
 export const FORMAT_EXAMPLE = {
-  year_ce: "e.g. 2026",
+  year_be: "e.g. 2569",
   month: "1–12, e.g. 3 (March)",
   date: "e.g. 2026-03-15 or 15/03/2026",
 } as const;
@@ -57,16 +61,19 @@ export const monthShortLabel = (value: number) => {
 
 const text = (raw: unknown) => String(raw ?? "").trim();
 
-/** A CE year as a number. A BE year is rejected with its CE equivalent rather
- *  than converted: silently moving a value by 543 years is worse than asking. */
-export function parseYearCE(raw: unknown): number {
+/** A Buddhist-era year as a number — Year (BE) cells and every entry's period
+ *  year. A CE year is rejected with its BE equivalent rather than converted:
+ *  silently moving a value by 543 years is worse than asking. */
+export function parseYearBE(raw: unknown): number {
   const s = text(raw);
-  if (!/^\d{4}$/.test(s)) fail(`must be a 4-digit CE year, ${FORMAT_EXAMPLE.year_ce}`);
+  if (!/^\d{4}$/.test(s)) fail(`must be a 4-digit BE year, ${FORMAT_EXAMPLE.year_be}`);
   const year = Number(s);
-  if (year >= BE_YEAR_FROM) {
-    fail(`is ${year}, which looks like a Buddhist-era year — the CE year is ${year - BE_OFFSET}`);
+  if (year >= MIN_CE_YEAR && year < BE_YEAR_FROM) {
+    fail(`is ${year}, which looks like a CE year — the BE year is ${year + BE_OFFSET}`);
   }
-  if (year < MIN_CE_YEAR) fail(`must be a 4-digit CE year, ${FORMAT_EXAMPLE.year_ce}`);
+  if (year < MIN_CE_YEAR || year > MAX_BE_YEAR) {
+    fail(`must be a 4-digit BE year, ${FORMAT_EXAMPLE.year_be}`);
+  }
   return year;
 }
 
@@ -146,7 +153,7 @@ export const isFormattedType = (t: string): t is FormattedType => t in FORMAT_EX
 export function normalizeCellInput(dataType: string, raw: string): string {
   if (!raw.trim()) return raw;
   try {
-    if (dataType === "year_ce") return String(parseYearCE(raw));
+    if (dataType === "year_be") return String(parseYearBE(raw));
     if (dataType === "month") return String(parseMonth(raw));
     if (dataType === "date") return parseDate(raw);
   } catch {

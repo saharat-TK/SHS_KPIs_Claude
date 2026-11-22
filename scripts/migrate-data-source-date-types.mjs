@@ -1,4 +1,4 @@
-// One-off migration: add the 'year_ce' and 'month' data-source column types.
+// One-off migration: add the 'year_be' and 'month' data-source column types.
 //
 //   node --env-file=.env.local scripts/migrate-data-source-date-types.mjs
 //
@@ -12,8 +12,8 @@
 // Idempotent: guarded on information_schema, safe to re-run.
 import mysql from "mysql2/promise";
 
-const NEW_TYPES = ["year_ce", "month"];
-const COLUMN_TYPE_DDL = `ENUM('text','url','number','date','select','boolean','faculty','program','curriculum','year_ce','month') NOT NULL DEFAULT 'text'`;
+const NEW_TYPES = ["year_be", "month"];
+const COLUMN_TYPE_DDL = `ENUM('text','url','number','date','select','boolean','faculty','program','curriculum','year_be','month') NOT NULL DEFAULT 'text'`;
 
 async function main() {
   const conn = await mysql.createConnection({
@@ -35,9 +35,15 @@ async function main() {
       process.exitCode = 1;
       return;
     }
+    if (current.includes("'year_ce'")) {
+      // This database predates Year (BE): narrowing the ENUM here would break
+      // its year_ce columns. migrate-data-source-year-be.mjs converts them.
+      console.log("data_source_column.data_type has year_ce — run migrate-data-source-year-be.mjs instead.");
+      return;
+    }
     const missing = NEW_TYPES.filter((t) => !current.includes(`'${t}'`));
     if (missing.length === 0) {
-      console.log("data_source_column.data_type already has year_ce and month — nothing to do.");
+      console.log("data_source_column.data_type already has year_be and month — nothing to do.");
       return;
     }
     // DDL auto-commits in MySQL, so there is no transaction to wrap this in.

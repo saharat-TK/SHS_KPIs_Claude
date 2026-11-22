@@ -25,6 +25,7 @@ import {
   useUpdateStrategicSet,
 } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { currentBEYear } from "@/lib/kpi/cellFormats";
 import { Icon } from "@/components/ui/Icon";
 import type { StrategicSet, StrategicSetStatus } from "@/lib/types";
 
@@ -314,17 +315,17 @@ function CreateSetModal({
   submitting: boolean;
 }) {
   const { user } = useAuth();
-  const currentBEYear = new Date().getFullYear() + 543;
+  const thisBEYear = currentBEYear();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [startYear, setStartYear] = useState(currentBEYear);
+  const [startYear, setStartYear] = useState(thisBEYear);
   const [cloneFromSetId, setCloneFromSetId] = useState<string>("");
 
   useEffect(() => {
     if (open) {
       setName("");
       setDescription("");
-      setStartYear(currentBEYear);
+      setStartYear(thisBEYear);
       setCloneFromSetId("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

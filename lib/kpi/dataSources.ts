@@ -12,7 +12,7 @@ import {
   monthShortLabel,
   parseDate,
   parseMonth,
-  parseYearCE,
+  parseYearBE,
 } from "./cellFormats.ts";
 
 export const DATA_SOURCE_COLUMN_TYPES: DataSourceColumnType[] = [
@@ -25,7 +25,7 @@ export const DATA_SOURCE_COLUMN_TYPES: DataSourceColumnType[] = [
   "faculty",
   "program",
   "curriculum",
-  "year_ce",
+  "year_be",
   "month",
 ];
 
@@ -39,7 +39,7 @@ export const COLUMN_TYPE_LABELS: Record<DataSourceColumnType, string> = {
   faculty: "Faculties",
   program: "Programs",
   curriculum: "Curriculums",
-  year_ce: "Year (CE)",
+  year_be: "Year (BE)",
   month: "Month",
 };
 
@@ -145,10 +145,10 @@ export function coerceCellValue(
     // Formatted types share their parsing with paste, CSV and the input hints
     // (cellFormats.ts). A date is stored as YYYY-MM-DD whatever form it came in.
     case "date":
-    case "year_ce":
+    case "year_be":
     case "month": {
       try {
-        if (column.dataType === "year_ce") return parseYearCE(raw);
+        if (column.dataType === "year_be") return parseYearBE(raw);
         if (column.dataType === "month") return parseMonth(raw);
         return parseDate(raw);
       } catch (err) {
@@ -214,15 +214,23 @@ export function validateEntryValues(
 }
 
 /** A source's grain decides whether an entry carries a quarter at all.
- *  Returns the quarter to store, or throws when the pair is inconsistent. */
+ *  Returns the quarter to store, or throws when the pair is inconsistent.
+ *  The year is Buddhist era, like every performance record's years; a CE year
+ *  is rejected with its BE equivalent ("2026 … the BE year is 2569"). */
 export function normalizeEntryPeriod(
   grain: DataSourcePeriodGrain,
   year: unknown,
   quarter: unknown,
 ): { year: number; quarter: number | null } {
-  const y = Number(year);
-  if (!Number.isInteger(y) || y < 1900 || y > 3000) {
+  if (year === null || year === undefined || String(year).trim() === "") {
     throw invalid("A valid year is required");
+  }
+  let y: number;
+  try {
+    y = parseYearBE(year);
+  } catch (err) {
+    if (err instanceof CellFormatError) throw invalid(`Year ${err.message}`);
+    throw err;
   }
 
   if (grain === "annual") {
@@ -344,8 +352,8 @@ function describeColumnInput(column: ColumnSpec): string {
   switch (column.dataType) {
     case "date":
       return `Format: YYYY-MM-DD or DD/MM/YYYY (CE), ${FORMAT_EXAMPLE.date}.`;
-    case "year_ce":
-      return `A 4-digit CE year, ${FORMAT_EXAMPLE.year_ce}. Not a Buddhist-era year.`;
+    case "year_be":
+      return `A 4-digit Buddhist-era (BE) year, ${FORMAT_EXAMPLE.year_be}. Not a CE year.`;
     case "month":
       return "Enter 1–12 (or the month's name):";
     case "url":
@@ -382,8 +390,8 @@ export function buildEntryTemplateCsv(args: {
     comment(`SHS data entry template — ${sourceName}`),
     comment(
       grain === "quarterly"
-        ? `Period grain: quarterly — fill both ${TEMPLATE_YEAR_HEADER} and ${TEMPLATE_QUARTER_HEADER} (1–4).`
-        : `Period grain: annual — fill ${TEMPLATE_YEAR_HEADER} only, and leave no ${TEMPLATE_QUARTER_HEADER} column.`,
+        ? `Period grain: quarterly — fill both ${TEMPLATE_YEAR_HEADER} (BE, ${FORMAT_EXAMPLE.year_be}) and ${TEMPLATE_QUARTER_HEADER} (1–4).`
+        : `Period grain: annual — fill ${TEMPLATE_YEAR_HEADER} only (BE, ${FORMAT_EXAMPLE.year_be}), and leave no ${TEMPLATE_QUARTER_HEADER} column.`,
     ),
     comment("Lines starting with # are ignored on upload. Do not edit the header row."),
     comment(`${TEMPLATE_NOTE_HEADER} is optional and free text.`),

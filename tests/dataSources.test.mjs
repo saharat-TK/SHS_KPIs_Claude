@@ -72,11 +72,11 @@ test("coerceCellValue stores dates as ISO, accepting DD/MM/YYYY and rejecting BE
   assert.throws(() => coerceCellValue(c, "July 18"), /"Recorded on" must be a date like 2026-03-15/);
 });
 
-test("coerceCellValue validates Year (CE) and Month and stores numbers", () => {
-  const y = col({ dataType: "year_ce", label: "Publication year (CE)" });
-  assert.equal(coerceCellValue(y, "2026"), 2026);
-  assert.throws(() => coerceCellValue(y, "2569"), /"Publication year \(CE\)" is 2569, which looks like a Buddhist-era year — the CE year is 2026/);
-  assert.throws(() => coerceCellValue(y, "26"), /4-digit CE year, e\.g\. 2026/);
+test("coerceCellValue validates Year (BE) and Month and stores numbers", () => {
+  const y = col({ dataType: "year_be", label: "Publication year (BE)" });
+  assert.equal(coerceCellValue(y, "2569"), 2569);
+  assert.throws(() => coerceCellValue(y, "2026"), /"Publication year \(BE\)" is 2026, which looks like a CE year — the BE year is 2569/);
+  assert.throws(() => coerceCellValue(y, "69"), /4-digit BE year, e\.g\. 2569/);
   const m = col({ dataType: "month", label: "Month" });
   assert.equal(coerceCellValue(m, "3"), 3);
   assert.equal(coerceCellValue(m, "มี.ค."), 3);
@@ -158,7 +158,16 @@ test("normalizeEntryPeriod forbids a quarter on annual sources", () => {
 
 test("normalizeEntryPeriod rejects implausible years", () => {
   assert.throws(() => normalizeEntryPeriod("annual", "", null), /valid year/);
-  assert.throws(() => normalizeEntryPeriod("annual", 12, null), /valid year/);
+  assert.throws(() => normalizeEntryPeriod("annual", null, null), /valid year/);
+  assert.throws(() => normalizeEntryPeriod("annual", 12, null), /Year must be a 4-digit BE year/);
+});
+
+test("normalizeEntryPeriod takes a Buddhist-era year and rejects a CE one", () => {
+  assert.deepEqual(normalizeEntryPeriod("quarterly", "2569", "1"), { year: 2569, quarter: 1 });
+  assert.throws(
+    () => normalizeEntryPeriod("quarterly", 2026, 1),
+    /Year is 2026, which looks like a CE year — the BE year is 2569/,
+  );
 });
 
 test("formatCellValue renders booleans and blanks readably", () => {

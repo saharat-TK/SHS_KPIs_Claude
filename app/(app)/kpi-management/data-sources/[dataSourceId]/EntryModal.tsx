@@ -10,11 +10,19 @@ import {
   useUpdateDataSourceEntry,
 } from "@/lib/data/hooks";
 import { COLUMN_TYPE_LABELS, coerceCellValue } from "@/lib/kpi/dataSources";
-import { FORMAT_EXAMPLE, isFormattedType } from "@/lib/kpi/cellFormats";
+import {
+  CellFormatError,
+  FORMAT_EXAMPLE,
+  currentBEYear,
+  isFormattedType,
+  parseYearBE,
+} from "@/lib/kpi/cellFormats";
 
 /** Types whose typed text can be malformed, checked live as the user types.
  *  Choice types can't be: their pickers only offer valid values. */
-const FORMAT_CHECKED = new Set(["number", "url", "date", "year_ce", "month"]);
+const FORMAT_CHECKED = new Set(["number", "url", "date", "year_be", "month"]);
+/** Touched-set key for the period Year; no column key can start with "@". */
+const YEAR_FIELD = "@year";
 import {
   batchModeLabel,
   availableBatchModes,
@@ -105,7 +113,8 @@ export function EntryModal({
   const catalogQ = useAcademicCatalog();
   const catalog = catalogQ.data ?? EMPTY_ACADEMIC_CATALOG;
 
-  const thisYear = new Date().getFullYear();
+  // Entry periods are Buddhist era, like the performance records they feed.
+  const thisYear = currentBEYear();
   const [year, setYear] = useState(String(thisYear));
   const [quarter, setQuarter] = useState("1");
   const [note, setNote] = useState("");
@@ -180,7 +189,15 @@ export function EntryModal({
     ? (values[programColumn.colKey] ?? "").trim() || null
     : null;
 
-  const yearValid = /^\d{4}$/.test(year.trim());
+  const yearError = useMemo(() => {
+    try {
+      parseYearBE(year);
+      return null;
+    } catch (err) {
+      return err instanceof CellFormatError ? `Year ${err.message}` : String(err);
+    }
+  }, [year]);
+  const yearValid = yearError === null;
   const batchQuarter = periodGrain === "annual" ? null : Number(quarter);
   const batch = useBatchRows({
     mode: mode === "curricula" ? "curricula" : "programs",
@@ -320,13 +337,24 @@ export function EntryModal({
 
   const periodFields = (
     <div className="flex gap-md">
-      <Field label="Year">
-        <Input
-          value={year}
-          onChange={(e) => setYear(e.target.value)}
-          inputMode="numeric"
-          placeholder="e.g. 2568"
-        />
+      <Field label="Year (BE)" hint={`Buddhist era · ${FORMAT_EXAMPLE.year_be}`}>
+        <span
+          className="contents"
+          onBlur={() => setTouched((prev) => new Set(prev).add(YEAR_FIELD))}
+        >
+          <Input
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            inputMode="numeric"
+            maxLength={4}
+            placeholder={FORMAT_EXAMPLE.year_be}
+          />
+        </span>
+        {yearError && touched.has(YEAR_FIELD) && (
+          <span role="alert" className="text-caption-sm text-error">
+            {yearError}
+          </span>
+        )}
       </Field>
       {periodGrain === "quarterly" && (
         <Field label="Quarter">
