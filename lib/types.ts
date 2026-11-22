@@ -753,6 +753,11 @@ export interface DataSourceLinkMapping {
    *  the same row. percent_of / ratio_of with denominatorSource "rows" only;
    *  absent ⇒ both sides total columnKey, and only the row set differs. */
   numeratorColumnKey?: string | null;
+  /** "Count of rows (distinct)": both sides of a percent_of / ratio_of count the
+   *  distinct non-blank values of this column (any type) instead of rows — e.g.
+   *  papers, not author rows. columnKey and numeratorColumnKey are then unset.
+   *  Under denominatorSource "faculty" only the top is a distinct count. */
+  distinctColumnKey?: string | null;
   /** percent_of / ratio_of only. */
   denominatorSource?: DenominatorSource;
   /** Which ranks count toward the headcount, always further restricted to

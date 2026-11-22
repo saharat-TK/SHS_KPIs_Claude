@@ -63,6 +63,10 @@ export interface DraftMapping {
   /** Totals the numerator on its own column instead of columnKey. Empty = same
    *  column both sides. Proportion kinds, "rows" denominator only. */
   numeratorColumnKey: string;
+  /** "Count of rows (distinct)" picked in the Column field: both sides count
+   *  the distinct values of distinctColumnKey. Proportion kinds only. */
+  distinct: boolean;
+  distinctColumnKey: string;
   /** Proportion kinds only. */
   denominatorSource: DenominatorSource;
   /** Which ranks the headcount counts, when the denominator is the roster. */
@@ -94,9 +98,15 @@ export const newMapping = (): DraftMapping => ({
   filters: [],
   numeratorFilters: [],
   numeratorColumnKey: "",
+  distinct: false,
+  distinctColumnKey: "",
   denominatorSource: "rows",
   facultyRanks: ACADEMIC_RANKS,
 });
+
+/** The Column select's value for "Count of rows (distinct)" — not a column key
+ *  (those are short identifiers; this can't collide with one). */
+const DISTINCT_OPTION = "@distinct";
 
 const filterToDraft = (f: DataSourceFilter): DraftFilter => ({
   key: nextKey(),
@@ -115,6 +125,8 @@ export function toDraft(m: DataSourceLinkMapping): DraftMapping {
     filters: (m.filters ?? []).map(filterToDraft),
     numeratorFilters: (m.numeratorFilters ?? []).map(filterToDraft),
     numeratorColumnKey: m.numeratorColumnKey ?? "",
+    distinct: !!m.distinctColumnKey,
+    distinctColumnKey: m.distinctColumnKey ?? "",
     denominatorSource: m.denominatorSource ?? "rows",
     facultyRanks: m.facultyRanks ?? ACADEMIC_RANKS,
   };
@@ -136,25 +148,33 @@ const filtersToPayload = (fs: DraftFilter[]): DataSourceFilter[] =>
       return f.operator === "between" ? { ...base, valueTo: f.valueTo } : base;
     });
 
-export const toPayload = (d: DraftMapping): DataSourceLinkMapping => ({
-  aggregation: d.aggregation,
-  columnKey: aggregationAllowsColumn(d.aggregation) ? d.columnKey || null : null,
-  filters: filtersToPayload(d.filters),
-  // Only the proportion kinds carry the denominator fields, and each mode
-  // carries only its own — so a leftover from switching can't be stored.
-  ...(isProportionKind(d.aggregation)
-    ? d.denominatorSource === "faculty"
-      ? { denominatorSource: "faculty" as const, facultyRanks: d.facultyRanks }
-      : {
-          numeratorFilters: filtersToPayload(d.numeratorFilters),
-          // The same column on both sides is a no-op the server strips anyway;
-          // dropping it here keeps the live preview in step with what it stores.
-          ...(d.numeratorColumnKey && d.numeratorColumnKey !== d.columnKey
-            ? { numeratorColumnKey: d.numeratorColumnKey }
-            : {}),
-        }
-    : {}),
-});
+export const toPayload = (d: DraftMapping): DataSourceLinkMapping => {
+  // Distinct mode replaces the column total on both sides, so it carries no
+  // columnKey and no numerator column. Sent as "" until a column is picked,
+  // which the server refuses rather than reading as a plain row count.
+  const distinct = isProportionKind(d.aggregation) && d.distinct;
+  return {
+    aggregation: d.aggregation,
+    columnKey:
+      aggregationAllowsColumn(d.aggregation) && !distinct ? d.columnKey || null : null,
+    ...(distinct ? { distinctColumnKey: d.distinctColumnKey } : {}),
+    filters: filtersToPayload(d.filters),
+    // Only the proportion kinds carry the denominator fields, and each mode
+    // carries only its own — so a leftover from switching can't be stored.
+    ...(isProportionKind(d.aggregation)
+      ? d.denominatorSource === "faculty"
+        ? { denominatorSource: "faculty" as const, facultyRanks: d.facultyRanks }
+        : {
+            numeratorFilters: filtersToPayload(d.numeratorFilters),
+            // The same column on both sides is a no-op the server strips anyway;
+            // dropping it here keeps the live preview in step with what it stores.
+            ...(!distinct && d.numeratorColumnKey && d.numeratorColumnKey !== d.columnKey
+              ? { numeratorColumnKey: d.numeratorColumnKey }
+              : {}),
+          }
+      : {}),
+  };
+};
 
 export function MappingCard({
   mapping,
@@ -185,6 +205,10 @@ export function MappingCard({
   // stop being the only thing keeping the answer off 100%.
   const numeratorColumn = numberColumns.find((c) => c.colKey === mapping.numeratorColumnKey);
   const twoColumn = !!numeratorColumn && mapping.numeratorColumnKey !== mapping.columnKey;
+  // "Count of rows (distinct)": both sides count distinct values of one column.
+  const distinctMode = isProportion && mapping.distinct;
+  const distinctLabel =
+    columns.find((c) => c.colKey === mapping.distinctColumnKey)?.label ?? "values";
   // Same helper the server feeds with, so the preview can't disagree with the
   // number that ends up stored.
   const headcount = facultyHeadcount(faculty, mapping.facultyRanks);
@@ -210,14 +234,16 @@ export function MappingCard({
               matchesFilters(e as never, columns, payload.numeratorFilters ?? []),
             )
           : undefined;
+      const distinctKey = payload.distinctColumnKey || null;
       const proportion = byFaculty
-        ? { denominator: headcount }
+        ? { denominator: headcount, distinctKey }
         : numerator
           ? {
               numerator: numerator as never,
               // Already collision-stripped by toPayload, so the preview divides
               // exactly what a save would.
               numeratorColumnKey: payload.numeratorColumnKey ?? null,
+              distinctKey,
             }
           : undefined;
       const parts = aggregateParts(
@@ -234,12 +260,14 @@ export function MappingCard({
         value: parts.value,
         pending:
           ready.length !== mapping.filters.length ||
-          (!byFaculty && readyNum.length !== mapping.numeratorFilters.length),
+          (!byFaculty && readyNum.length !== mapping.numeratorFilters.length) ||
+          // No column yet would preview a plain row count — not what's asked.
+          (distinctMode && !mapping.distinctColumnKey),
       };
     } catch {
       return null;
     }
-  }, [mapping, columns, entries, isProportion, byFaculty, headcount]);
+  }, [mapping, columns, entries, isProportion, byFaculty, headcount, distinctMode]);
 
   return (
     <div className="rounded-md border border-hairline p-md">
@@ -257,7 +285,12 @@ export function MappingCard({
                 const keep =
                   !aggregationNeedsNumberColumn(aggregation) ||
                   numberColumns.some((c) => c.colKey === mapping.columnKey);
-                onChange({ aggregation, ...(keep ? {} : { columnKey: "" }) });
+                onChange({
+                  aggregation,
+                  ...(keep ? {} : { columnKey: "" }),
+                  // Only Ratio of / Percent of offer a distinct row count.
+                  ...(isProportionKind(aggregation) ? {} : { distinct: false }),
+                });
               }}
             >
               {AGGREGATION_KINDS.map((k) => (
@@ -275,22 +308,32 @@ export function MappingCard({
               hint={
                 anyColumn
                   ? "Counts each distinct value once — pick the column that identifies one item."
-                  : numberColumns.length === 0
-                  ? "No number columns on this source."
-                  : isProportion
-                    ? "Optional — leave blank to compare row counts."
-                    : undefined
+                  : distinctMode
+                    ? undefined
+                    : numberColumns.length === 0
+                      ? isProportion
+                        ? "Count rows — this source has no number columns to total."
+                        : "No number columns on this source."
+                      : isProportion
+                        ? "Count rows, count distinct values, or total a number column."
+                        : undefined
               }
             >
               <Select
-                value={mapping.columnKey}
+                value={distinctMode ? DISTINCT_OPTION : mapping.columnKey}
                 onChange={(e) => {
+                  if (e.target.value === DISTINCT_OPTION) {
+                    // A distinct count replaces the column total on both sides.
+                    onChange({ distinct: true, columnKey: "", numeratorColumnKey: "" });
+                    return;
+                  }
                   const columnKey = e.target.value;
                   // Taking over the numerator's column — or dropping to a row
                   // count — leaves nothing for it to mean, and the picker below
                   // would render blank on a value it no longer offers.
                   onChange({
                     columnKey,
+                    distinct: false,
                     ...(!columnKey || columnKey === mapping.numeratorColumnKey
                       ? { numeratorColumnKey: "" }
                       : {}),
@@ -298,9 +341,32 @@ export function MappingCard({
                 }}
               >
                 <option value="">
-                  {isProportion ? "Count rows" : "Select a column…"}
+                  {isProportion ? "Count of rows" : "Select a column…"}
                 </option>
+                {isProportion && (
+                  <option value={DISTINCT_OPTION}>Count of rows (distinct)</option>
+                )}
                 {aggregatable.map((c) => (
+                  <option key={c.id} value={c.colKey}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        )}
+        {distinctMode && (
+          <div className="min-w-[10rem] flex-1">
+            <Field
+              label="Distinct by"
+              hint="Counts each distinct value once — pick the column that identifies one item."
+            >
+              <Select
+                value={mapping.distinctColumnKey}
+                onChange={(e) => onChange({ distinctColumnKey: e.target.value })}
+              >
+                <option value="">Select a column…</option>
+                {columns.map((c) => (
                   <option key={c.id} value={c.colKey}>
                     {c.label}
                   </option>
@@ -347,7 +413,13 @@ export function MappingCard({
 
         <ConditionList
           heading={
-            byFaculty ? "Count rows where…" : isProportion ? "Out of rows where…" : undefined
+            byFaculty
+              ? distinctMode
+                ? `Count distinct ${distinctLabel} where…`
+                : "Count rows where…"
+              : isProportion
+                ? "Out of rows where…"
+                : undefined
           }
           emptyText={
             byFaculty
@@ -364,37 +436,42 @@ export function MappingCard({
 
         {isProportion && !byFaculty && (
           <div className="mt-sm flex flex-col gap-sm border-t border-hairline pt-md">
-            <div className="max-w-xs">
-              <Field
-                label="Numerator column"
-                hint={
-                  !mapping.columnKey
-                    ? "Pick a column above first — a column total has no row count to divide by."
-                    : "For fractions whose top and bottom are two different columns."
-                }
-              >
-                <Select
-                  value={mapping.numeratorColumnKey}
-                  disabled={!mapping.columnKey}
-                  onChange={(e) => onChange({ numeratorColumnKey: e.target.value })}
+            {/* A distinct count has no column totals to split across two columns. */}
+            {!distinctMode && (
+              <div className="max-w-xs">
+                <Field
+                  label="Numerator column"
+                  hint={
+                    !mapping.columnKey
+                      ? "Pick a column above first — a column total has no row count to divide by."
+                      : "For fractions whose top and bottom are two different columns."
+                  }
                 >
-                  <option value="">Same column as the denominator</option>
-                  {numberColumns
-                    .filter((c) => c.colKey !== mapping.columnKey)
-                    .map((c) => (
-                      <option key={c.id} value={c.colKey}>
-                        {c.label}
-                      </option>
-                    ))}
-                </Select>
-              </Field>
-            </div>
+                  <Select
+                    value={mapping.numeratorColumnKey}
+                    disabled={!mapping.columnKey}
+                    onChange={(e) => onChange({ numeratorColumnKey: e.target.value })}
+                  >
+                    <option value="">Same column as the denominator</option>
+                    {numberColumns
+                      .filter((c) => c.colKey !== mapping.columnKey)
+                      .map((c) => (
+                        <option key={c.id} value={c.colKey}>
+                          {c.label}
+                        </option>
+                      ))}
+                  </Select>
+                </Field>
+              </div>
+            )}
 
             <ConditionList
               heading={
-                twoColumn
-                  ? `Of those, total ${numeratorColumn!.label} where…`
-                  : "Of those, count rows where…"
+                distinctMode
+                  ? `Of those, count distinct ${distinctLabel} where…`
+                  : twoColumn
+                    ? `Of those, total ${numeratorColumn!.label} where…`
+                    : "Of those, count rows where…"
               }
               emptyText={
                 twoColumn
@@ -444,7 +521,11 @@ export function MappingCard({
           <div className="flex justify-end">
             <span className="text-caption-sm text-mute">
               <Badge tone={preview.matched > 0 ? "success" : "warning"}>
-                {byFaculty
+                {distinctMode && mapping.distinctColumnKey
+                  ? byFaculty
+                    ? `${preview.parts.numerator ?? 0} distinct ${distinctLabel} ÷ ${headcount} faculty`
+                    : `${preview.parts.numerator ?? 0} of ${preview.parts.denominator ?? 0} distinct ${distinctLabel}`
+                  : byFaculty
                   ? `${preview.matched} rows ÷ ${headcount} faculty`
                   : // Row counts would mislead in two-column mode — the fraction
                     // is two column totals, often over the very same rows.

@@ -769,3 +769,116 @@ test("describeMapping lists every value of an in filter", () => {
     "Count of rows where Author is any of ผศ.ดร.จงกล สายสิงห์, อ.ดร.อ่อน ลายเงิน",
   );
 });
+
+// ── Count of rows (distinct) under percent_of / ratio_of ───────────────────
+
+// Two papers, two author rows each; only paper "A" is Q1. One blank title row.
+const PAPERS = [
+  entry({ id: 1, values: { quartile: "Q1", title: "A", author: "fac-001" } }),
+  entry({ id: 2, values: { quartile: "Q1", title: "A", author: "fac-002" } }),
+  entry({ id: 3, values: { quartile: "Q2", title: "B", author: "fac-001" } }),
+  entry({ id: 4, values: { quartile: "Q2", title: "B", author: "fac-003" } }),
+  entry({ id: 5, values: { quartile: "Q1", title: "", author: "fac-004" } }),
+];
+const Q1_PAPERS = PAPERS.filter((e) => e.values.quartile === "Q1");
+
+test("a distinct proportion counts distinct values on both sides, not rows", () => {
+  // 1 of 2 papers, where rows would say 3 of 5.
+  assert.equal(aggregate("ratio_of", null, PAPERS, { numerator: Q1_PAPERS, distinctKey: "title" }), 0.5);
+  assert.equal(aggregate("percent_of", null, PAPERS, { numerator: Q1_PAPERS, distinctKey: "title" }), 50);
+  assert.equal(aggregate("ratio_of", null, PAPERS, { numerator: Q1_PAPERS }), 0.6);
+});
+
+test("a distinct proportion over the faculty roster divides distinct values by headcount", () => {
+  assert.equal(aggregate("ratio_of", null, PAPERS, { denominator: 4, distinctKey: "title" }), 0.5);
+  assert.equal(aggregate("percent_of", null, Q1_PAPERS, { denominator: 4, distinctKey: "title" }), 25);
+});
+
+test("a distinct proportion ignores blank values and has no answer for an empty population", () => {
+  const blanks = [entry({ values: { title: "" } }), entry({ values: { title: null } })];
+  assert.equal(aggregate("ratio_of", null, blanks, { numerator: blanks, distinctKey: "title" }), null);
+});
+
+test("validateMappings accepts a distinct proportion and rejects each misuse", () => {
+  const numer = { numeratorFilters: [F("quartile", "eq", "Q1")] };
+  const [rows] = validateMappings(COLUMNS, "quarterly", [
+    mapping({ aggregation: "percent_of", distinctColumnKey: "title", ...numer }),
+  ]);
+  assert.equal(rows.distinctColumnKey, "title");
+  assert.equal(rows.columnKey, null);
+
+  const [faculty] = validateMappings(COLUMNS, "quarterly", [
+    mapping({
+      aggregation: "ratio_of",
+      distinctColumnKey: "title",
+      denominatorSource: "faculty",
+      facultyRanks: ["Lecturer"],
+    }),
+  ]);
+  assert.equal(faculty.distinctColumnKey, "title");
+
+  // Plain mappings never carry the field.
+  assert.equal("distinctColumnKey" in validateMappings(COLUMNS, "quarterly", [mapping()])[0], false);
+
+  assert.throws(
+    () => validateMappings(COLUMNS, "quarterly", [mapping({ distinctColumnKey: "title" })]),
+    /has no distinct row count/,
+  );
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "ratio_of", columnKey: "citations", distinctColumnKey: "title", ...numer }),
+      ]),
+    /not both/,
+  );
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "ratio_of", distinctColumnKey: "title", numeratorColumnKey: "reviews", ...numer }),
+      ]),
+    /no separate numerator column/,
+  );
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "ratio_of", distinctColumnKey: "nope", ...numer }),
+      ]),
+    /Unknown column "nope"/,
+  );
+  // Distinct mode with no column picked is an error, not a silent row count.
+  assert.throws(
+    () =>
+      validateMappings(COLUMNS, "quarterly", [
+        mapping({ aggregation: "ratio_of", distinctColumnKey: "", ...numer }),
+      ]),
+    /Pick the column whose distinct values to count/,
+  );
+  // Rows mode still needs a condition, or the answer is always 100%.
+  assert.throws(
+    () => validateMappings(COLUMNS, "quarterly", [mapping({ aggregation: "ratio_of", distinctColumnKey: "title" })]),
+    /at least one condition/,
+  );
+});
+
+test("describeMapping names the distinct column", () => {
+  assert.equal(
+    describeMapping(
+      mapping({
+        aggregation: "ratio_of",
+        distinctColumnKey: "title",
+        denominatorSource: "faculty",
+        facultyRanks: ["Professor", "Associate Professor", "Assistant Professor", "Lecturer"],
+        filters: [IN("quartile", ["Q1", "Q2"])],
+      }),
+      COLUMNS,
+    ),
+    "Ratio of distinct Title where Quartile is any of Q1, Q2 · per current active faculty member (excluding Support Staff)",
+  );
+  assert.equal(
+    describeMapping(
+      mapping({ aggregation: "percent_of", distinctColumnKey: "title", numeratorFilters: [F("quartile", "eq", "Q1")] }),
+      COLUMNS,
+    ),
+    "Percent of distinct Title · counting Quartile is Q1",
+  );
+});

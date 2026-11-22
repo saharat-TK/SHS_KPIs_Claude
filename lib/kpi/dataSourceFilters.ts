@@ -315,21 +315,25 @@ const NO_PARTS: AggregateParts = { value: null, numerator: null, denominator: nu
  *     real data, not something to clamp.
  *   - `denominator` — a fixed divisor (a faculty headcount) that replaces
  *     `entries` on the bottom; then `entries` IS the numerator, because the
- *     mapping's filters selected those rows directly. Wins over `numerator`. */
+ *     mapping's filters selected those rows directly. Wins over `numerator`.
+ *   - `distinctKey` — "Count of rows (distinct)": each side counts the distinct
+ *     non-blank values of this column instead of its rows (one paper, one row
+ *     per author → papers, not authors). Replaces `columnKey` on both sides. */
 export function aggregateParts(
   kind: AggregationKind,
   columnKey: string | null,
   entries: FilterableEntry[],
-  proportion?: {
-    numerator?: FilterableEntry[];
-    numeratorColumnKey?: string | null;
-    denominator?: number | null;
-  },
+  proportion?: ProportionInput,
 ): AggregateParts {
   if (kind === "percent_of" || kind === "ratio_of") {
-    // No column → proportion of rows; with one → proportion of its total.
+    const distinctKey = proportion?.distinctKey ?? null;
+    // Distinct → distinct values; no column → rows; with one → its total.
     const total = (rows: FilterableEntry[], key = columnKey) =>
-      key ? numericCells(rows, key).reduce((s, n) => s + n, 0) : rows.length;
+      distinctKey
+        ? distinctCount(rows, distinctKey)
+        : key
+          ? numericCells(rows, key).reduce((s, n) => s + n, 0)
+          : rows.length;
 
     const fixed = proportion?.denominator;
     if (fixed !== undefined) {
@@ -366,15 +370,8 @@ export function aggregateParts(
   if (!columnKey) return NO_PARTS;
 
   if (kind === "count_distinct") {
-    // Several rows can describe one thing — one paper, one row per author —
-    // so count the distinct non-blank values instead of the rows. String()
-    // makes 1 and "1" (or true and "true") the same value.
-    const seen = new Set<string>();
-    for (const e of entries) {
-      const v = e.values[columnKey];
-      if (v !== null && v !== undefined && v !== "") seen.add(String(v));
-    }
-    return { value: seen.size, numerator: seen.size, denominator: null };
+    const n = distinctCount(entries, columnKey);
+    return { value: n, numerator: n, denominator: null };
   }
 
   if (kind === "latest") {
@@ -402,16 +399,32 @@ export function aggregateParts(
     : { value: total, numerator: total, denominator: null };
 }
 
+/** Several rows can describe one thing — one paper, one row per author — so
+ *  count the distinct non-blank values instead of the rows. String() makes 1
+ *  and "1" (or true and "true") the same value. */
+function distinctCount(entries: FilterableEntry[], columnKey: string): number {
+  const seen = new Set<string>();
+  for (const e of entries) {
+    const v = e.values[columnKey];
+    if (v !== null && v !== undefined && v !== "") seen.add(String(v));
+  }
+  return seen.size;
+}
+
+/** The extra inputs percent_of / ratio_of take — see aggregateParts. */
+export interface ProportionInput {
+  numerator?: FilterableEntry[];
+  numeratorColumnKey?: string | null;
+  denominator?: number | null;
+  distinctKey?: string | null;
+}
+
 /** The aggregated value alone — see aggregateParts for the semantics. */
 export function aggregate(
   kind: AggregationKind,
   columnKey: string | null,
   entries: FilterableEntry[],
-  proportion?: {
-    numerator?: FilterableEntry[];
-    numeratorColumnKey?: string | null;
-    denominator?: number | null;
-  },
+  proportion?: ProportionInput,
 ): number | null {
   return aggregateParts(kind, columnKey, entries, proportion).value;
 }
@@ -455,10 +468,37 @@ export function validateMappings(
       }
     }
 
+    // "Count of rows (distinct)" counts distinct values of a column on both
+    // sides of a proportion. Mixing it with a column total would leave two
+    // conflicting answers to "what is counted", so each conflict is refused.
+    const distinctColumnKey: string | null = m?.distinctColumnKey?.trim() || null;
+    // The editor sends "" for "distinct, column not picked yet"; reading that
+    // as a row count would quietly save a different number than the one asked.
+    if (typeof m?.distinctColumnKey === "string" && !distinctColumnKey) {
+      throw invalid("Pick the column whose distinct values to count");
+    }
+    if (distinctColumnKey) {
+      if (!isProportionKind(aggregation)) {
+        throw invalid(
+          `"${AGGREGATION_LABELS[aggregation]}" has no distinct row count — use "${AGGREGATION_LABELS.count_distinct}"`,
+        );
+      }
+      if (columnKey) {
+        throw invalid("Count distinct values or total a column — not both");
+      }
+      if (m?.numeratorColumnKey) {
+        throw invalid("A distinct count has no separate numerator column");
+      }
+      if (!byKey.has(distinctColumnKey)) {
+        throw invalid(`Unknown column "${distinctColumnKey}"`);
+      }
+    }
+
     const filters = Array.isArray(m?.filters) ? m.filters : [];
     const mapping: DataSourceLinkMapping = {
       aggregation,
       columnKey,
+      ...(distinctColumnKey ? { distinctColumnKey } : {}),
       filters: filters.map((f: DataSourceFilter) =>
         validateFilter(byKey, grain, f),
       ),
@@ -654,7 +694,9 @@ export function describeMapping(
     fs.map((f) => describeFilter(f, columns, labels)).join(" and ");
   // No column to name → the kind is measuring rows themselves. Two columns name
   // both sides, or the fraction would read as one column's share of itself.
-  const head = mapping.numeratorColumnKey
+  const head = mapping.distinctColumnKey
+    ? `${AGGREGATION_LABELS[mapping.aggregation]} distinct ${labelOf(mapping.distinctColumnKey)}`
+    : mapping.numeratorColumnKey
     ? `${AGGREGATION_LABELS[mapping.aggregation]} ${labelOf(mapping.numeratorColumnKey)} out of ${labelOf(mapping.columnKey)}`
     : mapping.columnKey
       ? `${AGGREGATION_LABELS[mapping.aggregation]} ${labelOf(mapping.columnKey)}`
