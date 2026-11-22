@@ -6,21 +6,28 @@ import {
   normalizeCellInput,
   parseDate,
   parseMonth,
-  parseYearCE,
+  currentBEYear,
+  parseYearBE,
 } from "../lib/kpi/cellFormats.ts";
 
-test("a CE year is a 4-digit number between 1900 and 2399", () => {
-  assert.equal(parseYearCE("2026"), 2026);
-  assert.equal(parseYearCE(" 1900 "), 1900);
-  assert.equal(parseYearCE(2399), 2399);
-  for (const bad of ["26", "20266", "2026.5", "abc", "1899", ""]) {
-    assert.throws(() => parseYearCE(bad), /4-digit CE year, e\.g\. 2026/, bad);
+test("a BE year is a 4-digit number between 2400 and 2999", () => {
+  assert.equal(parseYearBE("2569"), 2569);
+  assert.equal(parseYearBE(" 2400 "), 2400);
+  assert.equal(parseYearBE(2999), 2999);
+  for (const bad of ["69", "25690", "2569.5", "abc", "1899", "3000", ""]) {
+    assert.throws(() => parseYearBE(bad), /4-digit BE year, e\.g\. 2569/, bad);
   }
 });
 
-test("a BE year is rejected with its CE year, never converted", () => {
-  assert.throws(() => parseYearCE("2569"), /2569, which looks like a Buddhist-era year — the CE year is 2026/);
-  assert.throws(() => parseYearCE("2400"), /the CE year is 1857/);
+test("a CE year is rejected with its BE year, never converted", () => {
+  assert.throws(() => parseYearBE("2026"), /2026, which looks like a CE year — the BE year is 2569/);
+  assert.throws(() => parseYearBE("2399"), /the BE year is 2942/);
+  assert.throws(() => parseYearBE("1900"), /the BE year is 2443/);
+});
+
+test("currentBEYear is this year plus 543", () => {
+  assert.equal(currentBEYear(new Date(2026, 10, 22)), 2569);
+  assert.equal(currentBEYear(), new Date().getFullYear() + 543);
 });
 
 test("a month accepts numbers and English or Thai names", () => {
@@ -79,9 +86,9 @@ test("an Excel date serial is read; other junk is not", () => {
 test("normalizeCellInput shows what will be saved, and leaves bad input alone", () => {
   assert.equal(normalizeCellInput("date", "15/03/2026"), "2026-03-15");
   assert.equal(normalizeCellInput("month", "มี.ค."), "3");
-  assert.equal(normalizeCellInput("year_ce", " 2026 "), "2026");
+  assert.equal(normalizeCellInput("year_be", " 2569 "), "2569");
   assert.equal(normalizeCellInput("date", "31/02/2026"), "31/02/2026");
-  assert.equal(normalizeCellInput("year_ce", "2569"), "2569");
+  assert.equal(normalizeCellInput("year_be", "2026"), "2026");
   assert.equal(normalizeCellInput("text", "15/03/2026"), "15/03/2026");
   assert.equal(normalizeCellInput("date", ""), "");
 });

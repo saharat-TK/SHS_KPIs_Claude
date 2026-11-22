@@ -844,10 +844,22 @@ export function useSavePerformancePeriods() {
       periods: Pick<PerformancePeriod, "yearNo" | "quarterNo" | "isOpen">[];
       updatedBy?: string;
     }) => performanceRecordsRepo.savePeriods(id, periods, updatedBy),
-    meta: { toast: "Recording periods updated" },
+    // Saving periods also runs the data-source feed for newly opened quarters;
+    // when that changed anything, say so.
+    meta: {
+      toast: (d) => {
+        const summary = (d as { feedSummary: string | null }).feedSummary;
+        return summary
+          ? `Recording periods updated · data sources: ${summary}`
+          : "Recording periods updated";
+      },
+    },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: qk.performancePeriods(id) });
       qc.invalidateQueries({ queryKey: qk.performanceRecords });
+      qc.invalidateQueries({ queryKey: qk.perfKpis(id) });
+      qc.invalidateQueries({ queryKey: ["perfKpi"] });
+      qc.invalidateQueries({ queryKey: ["perfMetrics"] });
     },
   });
 }

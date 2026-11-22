@@ -1,4 +1,4 @@
-// Check every Date / Year (CE) / Month cell against the rules in
+// Check every Date / Year (BE) / Month cell against the rules in
 // lib/kpi/cellFormats.ts, and convert Buddhist-era dates to CE.
 //
 //   node --env-file=.env.local scripts/fix-date-cells.mjs           # report only
@@ -10,7 +10,7 @@
 // rewrites each BE date (year >= 2400) to year - 543, checking the result with
 // the same parseDate the app uses, in one transaction.
 //
-// Only dates are converted. A Year (CE) or Month cell that fails is reported for
+// Only dates are converted. A Year (BE) or Month cell that fails is reported for
 // a person to fix: guessing a number's meaning is not safe.
 //
 // No KPI link filters on a date column today, so no KPI value moves; the report
@@ -22,11 +22,11 @@ import {
   CellFormatError,
   parseDate,
   parseMonth,
-  parseYearCE,
+  parseYearBE,
 } from "../lib/kpi/cellFormats.ts";
 
 const apply = process.argv.includes("--apply");
-const PARSERS = { date: parseDate, year_ce: parseYearCE, month: parseMonth };
+const PARSERS = { date: parseDate, year_be: parseYearBE, month: parseMonth };
 const BE_ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 async function main() {
@@ -41,7 +41,7 @@ async function main() {
     const [columns] = await conn.query(
       `SELECT c.data_source_id AS ds, d.name, c.col_key AS colKey, c.label, c.data_type AS type
          FROM data_source_column c JOIN data_source d ON d.id = c.data_source_id
-        WHERE c.data_type IN ('date','year_ce','month')
+        WHERE c.data_type IN ('date','year_be','month')
         ORDER BY c.data_source_id, c.sort_order`,
     );
 

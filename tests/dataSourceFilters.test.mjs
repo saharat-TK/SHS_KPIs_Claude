@@ -81,14 +81,14 @@ test("date ranges compare chronologically and are inclusive", () => {
 
 test("year and month columns filter numerically and accept month names", () => {
   const cols = [
-    { colKey: "y", label: "Year", dataType: "year_ce" },
+    { colKey: "y", label: "Year", dataType: "year_be" },
     { colKey: "m", label: "Month", dataType: "month" },
   ];
-  const row = { id: 1, year: 2569, quarter: 2, values: { y: 2026, m: 3 } };
-  assert.equal(matchesFilters(row, cols, [F("y", "gte", "2025")]), true);
+  const row = { id: 1, year: 2569, quarter: 2, values: { y: 2569, m: 3 } };
+  assert.equal(matchesFilters(row, cols, [F("y", "gte", "2568")]), true);
   assert.equal(matchesFilters(row, cols, [F("m", "eq", "March")]), true);
   assert.equal(matchesFilters(row, cols, [{ field: "m", operator: "in", values: ["4", "5"] }]), false);
-  assert.throws(() => matchesFilters(row, cols, [F("y", "eq", "2569")]), /Buddhist-era/);
+  assert.throws(() => matchesFilters(row, cols, [F("y", "eq", "2026")]), /the BE year is 2569/);
 });
 
 test("a blank cell never matches", () => {

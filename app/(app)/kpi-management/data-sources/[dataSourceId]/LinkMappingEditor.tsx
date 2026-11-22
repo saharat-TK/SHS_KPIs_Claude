@@ -959,13 +959,13 @@ function ValueInput({
       );
     case "date":
       return <Input type="date" value={value} onChange={(e) => onChange(e.target.value)} />;
-    case "year_ce":
+    case "year_be":
       return (
         <Input
           value={value}
           inputMode="numeric"
           maxLength={4}
-          placeholder={FORMAT_EXAMPLE.year_ce}
+          placeholder={FORMAT_EXAMPLE.year_be}
           onChange={(e) => onChange(e.target.value)}
         />
       );

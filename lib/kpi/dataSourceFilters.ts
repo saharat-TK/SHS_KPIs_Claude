@@ -9,7 +9,7 @@ import type {
   FilterOperator,
   Rank,
 } from "@/lib/types";
-import { CellFormatError, parseDate, parseMonth, parseYearCE } from "./cellFormats.ts";
+import { CellFormatError, parseDate, parseMonth, parseYearBE } from "./cellFormats.ts";
 
 // Which rows of a data source count toward a KPI, and how they become a number.
 //
@@ -120,7 +120,7 @@ export function operatorsFor(dataType: DataSourceColumnType): FilterOperator[] {
   switch (dataType) {
     case "number":
       return ["eq", "gte", "lte", "between"];
-    case "year_ce":
+    case "year_be":
     case "month":
       return ["eq", "in", "gte", "lte", "between"];
     case "date":
@@ -174,10 +174,10 @@ function normalizeOperand(
     }
     // Same parsing as the cells they compare against (cellFormats.ts).
     case "date":
-    case "year_ce":
+    case "year_be":
     case "month": {
       try {
-        if (column.dataType === "year_ce") return parseYearCE(raw);
+        if (column.dataType === "year_be") return parseYearBE(raw);
         if (column.dataType === "month") return parseMonth(raw);
         return parseDate(raw);
       } catch (err) {

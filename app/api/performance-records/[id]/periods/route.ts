@@ -5,6 +5,8 @@ import {
   buildPerformancePeriodMatrix,
   normalizePerformancePeriodInput,
 } from "@/lib/kpi/performancePeriods";
+import { feedRecord } from "@/lib/kpi/dataSourceFeed";
+import { describeOutcome } from "@/lib/kpi/feedOutcome";
 
 export const dynamic = "force-dynamic";
 
@@ -93,9 +95,14 @@ export async function PUT(
     }
 
     const updatedBy = typeof body.updatedBy === "string" ? body.updatedBy : null;
+    let feedSummary: string | null = null;
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      const [recordRows] = await conn.query<RowDataPacket[]>(
+        "SELECT status FROM performance_record WHERE id = ? FOR UPDATE",
+        [params.id],
+      );
       for (const period of periods) {
         await conn.query(
           `INSERT INTO performance_record_period
@@ -118,6 +125,15 @@ export async function PUT(
           ],
         );
       }
+      // The data-source feed skips closed quarters, so data recorded while a
+      // quarter was closed never reached it. Run the feed now that the open set
+      // has changed, so a newly opened quarter fills in without a manual
+      // "Recompute from Data Sources". It still respects approval locks, and is
+      // a no-op for quarters already up to date. Only active records are fed.
+      if (recordRows[0]?.status === "active") {
+        const outcome = await feedRecord(conn, Number(params.id));
+        if (outcome.updated > 0 || outcome.cleared > 0) feedSummary = describeOutcome(outcome);
+      }
       await conn.commit();
     } catch (err) {
       await conn.rollback();
@@ -126,7 +142,7 @@ export async function PUT(
       conn.release();
     }
 
-    return NextResponse.json(await loadPeriods(params.id));
+    return NextResponse.json({ periods: await loadPeriods(params.id), feedSummary });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to save recording periods" },

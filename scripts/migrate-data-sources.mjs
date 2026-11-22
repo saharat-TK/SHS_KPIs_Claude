@@ -30,7 +30,7 @@ async function columnType(conn, table, column) {
 
 // Column-level upgrades for databases created before a given feature landed.
 // Each entry is guarded by its own check, so re-running is a no-op.
-const COLUMN_TYPE_DDL = `ENUM('text','url','number','date','select','boolean','faculty','program','curriculum','year_ce','month') NOT NULL DEFAULT 'text'`;
+const COLUMN_TYPE_DDL = `ENUM('text','url','number','date','select','boolean','faculty','program','curriculum','year_be','month') NOT NULL DEFAULT 'text'`;
 
 async function columnExists(conn, table, column) {
   return (await columnType(conn, table, column)) != null;
@@ -69,12 +69,17 @@ async function ensureMetricIsComputed(conn) {
 async function ensureColumnTypes(conn) {
   const current = await columnType(conn, "data_source_column", "data_type");
   if (current == null) return; // table was just created with the full ENUM
+  if (current.includes("'year_ce'")) {
+    // Narrowing the ENUM here would break columns still typed 'year_ce'.
+    console.log("data_source_column.data_type still has year_ce — run migrate-data-source-year-be.mjs; skipping.");
+    return;
+  }
   if (
     current.includes("'url'") &&
     current.includes("'faculty'") &&
     current.includes("'program'") &&
     current.includes("'curriculum'") &&
-    current.includes("'year_ce'") &&
+    current.includes("'year_be'") &&
     current.includes("'month'")
   ) {
     console.log("data_source_column.data_type already has all column types — skipping.");
@@ -111,7 +116,7 @@ const TABLES = [
        data_source_id BIGINT UNSIGNED NOT NULL,
        col_key        VARCHAR(40)  NOT NULL,
        label          VARCHAR(255) NOT NULL,
-       data_type      ENUM('text','url','number','date','select','boolean','faculty','program','curriculum','year_ce','month') NOT NULL DEFAULT 'text',
+       data_type      ENUM('text','url','number','date','select','boolean','faculty','program','curriculum','year_be','month') NOT NULL DEFAULT 'text',
        unit           VARCHAR(50)  NULL,
        options        JSON NULL,
        is_required    TINYINT(1) NOT NULL DEFAULT 0,

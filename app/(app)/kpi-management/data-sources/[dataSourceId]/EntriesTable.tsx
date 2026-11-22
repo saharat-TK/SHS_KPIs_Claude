@@ -17,7 +17,7 @@ import type { DataSourceColumn, DataSourceEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Stored as numbers: right-aligned and sorted numerically. */
-const NUMERIC_TYPES = new Set<string>(["number", "year_ce", "month"]);
+const NUMERIC_TYPES = new Set<string>(["number", "year_be", "month"]);
 
 const DATA_TABLE_COLUMN_WIDTHS = {
   period: 80,

@@ -631,7 +631,7 @@ export type DataSourceColumnType =
   | "program" // stores an academic_program code ("PH")
   | "curriculum" // stores a curriculum code ("PHB")
   // Validated numbers (lib/kpi/cellFormats.ts):
-  | "year_ce" // a CE year, 1900-2399 (a BE year is rejected with a hint)
+  | "year_be" // a Buddhist-era year, 2400-2999 (a CE year is rejected with a hint)
   | "month"; // 1-12
 
 /** A cell value as stored in data_source_entry.values_json. */

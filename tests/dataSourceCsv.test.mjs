@@ -302,9 +302,17 @@ test("collectEntryRows reports a bad period against the row, not a column", () =
   const [row] = collect([["not-a-year", "1", "PH", "1", ""]]);
   assert.equal(row.year, null);
   assert.deepEqual(row.errors, [
-    { colKey: null, message: "A valid year is required" },
+    { colKey: null, message: "Year must be a 4-digit BE year, e.g. 2569" },
   ]);
   assert.equal(row.rawPeriod, "not-a-year Q1");
+});
+
+test("collectEntryRows rejects a CE period year with its BE year", () => {
+  const [row] = collect([["2026", "1", "PH", "1", ""]]);
+  assert.equal(row.year, null);
+  assert.deepEqual(row.errors, [
+    { colKey: null, message: "Year is 2026, which looks like a CE year — the BE year is 2569" },
+  ]);
 });
 
 test("an annual source rejects a row that fills in a quarter", () => {
