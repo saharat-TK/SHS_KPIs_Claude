@@ -2,7 +2,9 @@
 // component — it pulls in the MySQL pool.
 import { NextResponse } from "next/server";
 import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
+import { buildRefLookups, checkRefConsistency } from "@/lib/kpi/columnLinks";
 import type {
+  DataSourceCellValue,
   DataSourceColumn,
   DataSourceEntry,
   DataSourceLink,
@@ -48,7 +50,8 @@ export const DATA_SOURCE_FROM = `
 
 export const COLUMN_SELECT = `
   id, data_source_id AS dataSourceId, col_key AS colKey, label,
-  data_type AS dataType, unit, options, is_required AS isRequired,
+  data_type AS dataType, unit, options, ref_col_key AS refColKey,
+  is_multiple AS isMultiple, auto_fill AS autoFill, is_required AS isRequired,
   sort_order AS sortOrder
 `;
 
@@ -73,6 +76,9 @@ export function mapColumnRow(row: RowDataPacket): DataSourceColumn {
     dataType: row.dataType,
     unit: row.unit ?? null,
     options: parseJsonColumn<string[] | null>(row.options, null),
+    refColKey: row.refColKey ?? null,
+    isMultiple: !!row.isMultiple,
+    autoFill: row.autoFill === "share" ? "share" : null,
     isRequired: !!row.isRequired,
     sortOrder: Number(row.sortOrder),
   };
@@ -195,6 +201,36 @@ export async function resolveColumnOptions(
     }
     return c;
   });
+}
+
+/** Throw a 400 when a row breaks a "ref by" pair — a faculty member or
+ *  curriculum recorded under a program it doesn't belong to. Loads the roster
+ *  and catalog only when the source actually has a ref pair, and returns a
+ *  checker so a bulk import pays for that once.
+ *
+ *  Stored values stay snapshots: this runs on write only, so a later program
+ *  move does not invalidate rows already recorded. */
+export async function loadRefChecker(
+  db: Db,
+  columns: DataSourceColumn[],
+): Promise<(values: Record<string, unknown>) => void> {
+  if (!columns.some((c) => c.refColKey)) return () => {};
+  const [[rows], catalog] = await Promise.all([
+    db.query<RowDataPacket[]>("SELECT id, program FROM faculty"),
+    loadAcademicCatalog(db),
+  ]);
+  const lookups = buildRefLookups(
+    rows.map((r) => ({ id: String(r.id), program: r.program ?? null })),
+    catalog,
+  );
+  return (values) => {
+    const problems = checkRefConsistency(
+      columns,
+      values as Record<string, DataSourceCellValue>,
+      lookups,
+    );
+    if (problems.length > 0) throw new DataSourceValidationError(problems[0]);
+  };
 }
 
 /** Load a data source's shape (grain + columns), or null when it doesn't exist. */

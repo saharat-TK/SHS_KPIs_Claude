@@ -8,6 +8,7 @@
 // from the academic catalog, the same tables the pickers read.
 import type { AcademicCatalog, DataSourceCellValue } from "@/lib/types";
 import type { ColumnSpec, TemplateChoice } from "./dataSources";
+import { normalizeCellInput } from "./cellFormats.ts";
 import { parseCsv } from "../csv.ts";
 
 /** How Add Entry is filling the dialog: one row typed by hand, any number of
@@ -248,7 +249,9 @@ export function entryRowsFromPaste(
     values: Object.fromEntries(
       columns.map((c, i) => {
         const cell = i < startAt ? "" : cells[i - startAt] ?? "";
-        return [c.colKey, resolveChoiceText(cell, choices[c.colKey])];
+        // Dates, months and years are shown as they will be saved, so a pasted
+        // "15/03/2026" or "มี.ค." fills the picker instead of leaving it blank.
+        return [c.colKey, normalizeCellInput(c.dataType, resolveChoiceText(cell, choices[c.colKey]))];
       }),
     ),
     note: (cells[columns.length - startAt] ?? "").trim(),

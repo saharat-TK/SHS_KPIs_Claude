@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
-import type { DataSourceColumnType } from "@/lib/types";
+import type { ColumnAutoFill, DataSourceColumnType } from "@/lib/types";
 import { COLUMN_SELECT, errorResponse, mapColumnRow } from "@/lib/kpi/dataSourcesServer";
+import { requirePermission } from "@/lib/auth/session";
+import { validateColumnConfig } from "@/lib/kpi/columnLinks";
 import {
   DATA_SOURCE_COLUMN_TYPES,
   DataSourceValidationError,
@@ -39,6 +41,11 @@ interface ColumnInput {
   unit?: string | null;
   options?: string[] | null;
   isRequired?: boolean;
+  /** "Ref by" target, as an index into this same array — a new column's final
+   *  col_key isn't known until it's assigned below, so the client can't name it. */
+  refIndex?: number | null;
+  isMultiple?: boolean;
+  autoFill?: ColumnAutoFill | null;
 }
 
 /** Replace the whole column set in one transaction. Existing columns are matched
@@ -50,6 +57,8 @@ export async function PUT(
   { params }: { params: { id: string } },
 ) {
   try {
+    // The columns editor is admin-only in the UI; this route must say so too.
+    await requirePermission("configure_kpis");
     const body = await req.json();
     const input: ColumnInput[] = Array.isArray(body?.columns) ? body.columns : [];
 
@@ -91,14 +100,40 @@ export async function PUT(
         unit: c.unit?.trim() || null,
         options,
         isRequired: c.isRequired ? 1 : 0,
+        isMultiple: c.isMultiple ? 1 : 0,
+        autoFill: c.autoFill === "share" ? ("share" as const) : null,
+        refIndex: typeof c.refIndex === "number" ? c.refIndex : null,
       };
     });
+
+    // Resolve each "ref by" index to the target's final key, then check the
+    // link settings as a whole (one multiple column, valid pairs, …).
+    const linked = prepared.map((c) => {
+      if (c.refIndex === null) return { ...c, refColKey: null };
+      const target = prepared[c.refIndex];
+      if (!target) {
+        throw new DataSourceValidationError(`"${c.label}" is ref by a column that no longer exists`);
+      }
+      return { ...c, refColKey: target.colKey };
+    });
+    const problems = validateColumnConfig(
+      linked.map((c) => ({
+        colKey: c.colKey,
+        label: c.label,
+        dataType: c.dataType,
+        isRequired: !!c.isRequired,
+        refColKey: c.refColKey,
+        isMultiple: !!c.isMultiple,
+        autoFill: c.autoFill,
+      })),
+    );
+    if (problems.length > 0) throw new DataSourceValidationError(problems[0]);
 
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
 
-      const keptIds = prepared.map((c) => c.id).filter((id): id is number => id != null);
+      const keptIds = linked.map((c) => c.id).filter((id): id is number => id != null);
       if (keptIds.length > 0) {
         await conn.query(
           `DELETE FROM data_source_column
@@ -111,20 +146,34 @@ export async function PUT(
         ]);
       }
 
-      for (const [i, c] of prepared.entries()) {
+      for (const [i, c] of linked.entries()) {
         const optionsJson = c.options ? JSON.stringify(c.options) : null;
         if (c.id != null) {
           await conn.query(
             `UPDATE data_source_column
-                SET label = ?, data_type = ?, unit = ?, options = ?, is_required = ?, sort_order = ?
+                SET label = ?, data_type = ?, unit = ?, options = ?, ref_col_key = ?,
+                    is_multiple = ?, auto_fill = ?, is_required = ?, sort_order = ?
               WHERE id = ? AND data_source_id = ?`,
-            [c.label, c.dataType, c.unit, optionsJson, c.isRequired, i, c.id, params.id],
+            [
+              c.label,
+              c.dataType,
+              c.unit,
+              optionsJson,
+              c.refColKey,
+              c.isMultiple,
+              c.autoFill,
+              c.isRequired,
+              i,
+              c.id,
+              params.id,
+            ],
           );
         } else {
           await conn.query(
             `INSERT INTO data_source_column
-               (data_source_id, col_key, label, data_type, unit, options, is_required, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+               (data_source_id, col_key, label, data_type, unit, options, ref_col_key,
+                is_multiple, auto_fill, is_required, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               params.id,
               c.colKey,
@@ -132,6 +181,9 @@ export async function PUT(
               c.dataType,
               c.unit,
               optionsJson,
+              c.refColKey,
+              c.isMultiple,
+              c.autoFill,
               c.isRequired,
               i,
             ],

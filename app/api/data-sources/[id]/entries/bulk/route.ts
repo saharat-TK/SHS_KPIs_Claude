@@ -13,6 +13,7 @@ import {
   checkEntryWriteAccess,
   errorResponse,
   loadSourceShape,
+  loadRefChecker,
   resolveColumnOptions,
 } from "@/lib/kpi/dataSourcesServer";
 import {
@@ -70,12 +71,14 @@ export async function POST(
     // Resolve the derived options once — the roster and catalog do not change
     // mid-import, and per-row lookups would be the bulk of the request's cost.
     const columns = await resolveColumnOptions(pool, source.columns);
+    const checkRefs = await loadRefChecker(pool, source.columns);
 
     const values: unknown[][] = rows.map(
       (row: { year: unknown; quarter: unknown; values?: Record<string, unknown>; note?: string | null }, i: number) => {
         try {
           const period = normalizeEntryPeriod(source.periodGrain, row.year, row.quarter);
           const cells = validateEntryValues(columns, row.values ?? {});
+          checkRefs(cells);
           return [
             params.id,
             period.year,

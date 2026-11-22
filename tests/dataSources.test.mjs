@@ -63,11 +63,24 @@ test("coerceCellValue accepts the usual boolean spellings", () => {
   assert.throws(() => coerceCellValue(c, "maybe"), /"Passed" must be true or false/);
 });
 
-test("coerceCellValue requires ISO dates", () => {
+test("coerceCellValue stores dates as ISO, accepting DD/MM/YYYY and rejecting BE years", () => {
   const c = col({ dataType: "date", label: "Recorded on" });
   assert.equal(coerceCellValue(c, "2026-07-18"), "2026-07-18");
-  assert.throws(() => coerceCellValue(c, "18/07/2026"), /YYYY-MM-DD/);
-  assert.throws(() => coerceCellValue(c, "2026-13-40"), /YYYY-MM-DD/);
+  assert.equal(coerceCellValue(c, "18/07/2026"), "2026-07-18");
+  assert.throws(() => coerceCellValue(c, "2026-13-40"), /"Recorded on" is 2026-13-40, which is not a real date/);
+  assert.throws(() => coerceCellValue(c, "18/07/2569"), /"Recorded on" .*Buddhist-era year — write 18\/07\/2026/);
+  assert.throws(() => coerceCellValue(c, "July 18"), /"Recorded on" must be a date like 2026-03-15/);
+});
+
+test("coerceCellValue validates Year (CE) and Month and stores numbers", () => {
+  const y = col({ dataType: "year_ce", label: "Publication year (CE)" });
+  assert.equal(coerceCellValue(y, "2026"), 2026);
+  assert.throws(() => coerceCellValue(y, "2569"), /"Publication year \(CE\)" is 2569, which looks like a Buddhist-era year — the CE year is 2026/);
+  assert.throws(() => coerceCellValue(y, "26"), /4-digit CE year, e\.g\. 2026/);
+  const m = col({ dataType: "month", label: "Month" });
+  assert.equal(coerceCellValue(m, "3"), 3);
+  assert.equal(coerceCellValue(m, "มี.ค."), 3);
+  assert.throws(() => coerceCellValue(m, "13"), /"Month" must be a month 1–12/);
 });
 
 test("coerceCellValue accepts HTTP(S) URLs and rejects unsafe or malformed URLs", () => {

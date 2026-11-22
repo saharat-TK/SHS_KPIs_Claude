@@ -9,13 +9,14 @@ import type {
   FilterOperator,
   Rank,
 } from "@/lib/types";
+import { CellFormatError, parseDate, parseMonth, parseYearCE } from "./cellFormats.ts";
 
 // Which rows of a data source count toward a KPI, and how they become a number.
 //
-// This module has NO runtime imports on purpose — tests load it directly under
-// node's type-stripping, which cannot resolve the "@/" alias for value imports
-// (type-only imports are erased, so the block above is fine). Anything it needs
-// from elsewhere arrives as an argument.
+// This module has no "@/" runtime imports on purpose — tests load it directly
+// under node's type-stripping, which cannot resolve the alias for value imports
+// (type-only imports are erased, so the block above is fine). A relative
+// "./x.ts" import of another pure module is fine.
 
 /** Pseudo-field: the entry's own year/quarter rather than one of its columns. */
 export const PERIOD_FIELD = "__period";
@@ -23,11 +24,6 @@ export const PERIOD_FIELD = "__period";
 /** Period filter operands are always "YYYY-Q" — both bounds explicit, so there
  *  is no "does 2568 mean Q1 or Q4" ambiguity. */
 const PERIOD_RE = /^(\d{4})-([1-4])$/;
-
-// Kept in step with ISO_DATE_RE in lib/kpi/dataSources.ts. Duplicated rather than
-// imported because of the no-runtime-imports rule above; both must agree, since a
-// date bound is compared against a cell that coerceCellValue already validated.
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Mirrors RANKS in lib/types.ts, duplicated for the same no-runtime-imports
 // reason. Both must agree with the faculty.rank ENUM in the schema.
@@ -70,6 +66,7 @@ export const AGGREGATION_KINDS: AggregationKind[] = [
   "sum",
   "avg",
   "count",
+  "count_distinct",
   "latest",
   "percent_of",
   "ratio_of",
@@ -79,6 +76,7 @@ export const AGGREGATION_LABELS: Record<AggregationKind, string> = {
   sum: "Sum of",
   avg: "Average of",
   count: "Count of rows",
+  count_distinct: "Count of rows (distinct)",
   latest: "Latest value of",
   percent_of: "Percent of",
   ratio_of: "Ratio of",
@@ -109,6 +107,11 @@ export const aggregationAllowsColumn = (kind: AggregationKind) => kind !== "coun
 export const aggregationNeedsColumn = (kind: AggregationKind) =>
   aggregationAllowsColumn(kind) && !isProportionKind(kind);
 
+/** Whether the kind reads the column's values as numbers. "count_distinct"
+ *  only compares them, so it accepts any column type (a paper's key, a person). */
+export const aggregationNeedsNumberColumn = (kind: AggregationKind) =>
+  kind !== "count_distinct";
+
 /** Operators offered for a column type. Deliberately minimal: a date is always a
  *  range, numbers get comparisons, and only choice-like columns get "is any of"
  *  — free text would invite an exact-match OR where people expect "contains",
@@ -117,6 +120,9 @@ export function operatorsFor(dataType: DataSourceColumnType): FilterOperator[] {
   switch (dataType) {
     case "number":
       return ["eq", "gte", "lte", "between"];
+    case "year_ce":
+    case "month":
+      return ["eq", "in", "gte", "lte", "between"];
     case "date":
       return ["between"];
     case "select":
@@ -166,12 +172,18 @@ function normalizeOperand(
       if (!Number.isFinite(n)) throw invalid(`${what} must be a number`);
       return n;
     }
-    case "date": {
-      const s = String(raw);
-      if (!ISO_DATE_RE.test(s) || Number.isNaN(Date.parse(s))) {
-        throw invalid(`${what} must be a date (YYYY-MM-DD)`);
+    // Same parsing as the cells they compare against (cellFormats.ts).
+    case "date":
+    case "year_ce":
+    case "month": {
+      try {
+        if (column.dataType === "year_ce") return parseYearCE(raw);
+        if (column.dataType === "month") return parseMonth(raw);
+        return parseDate(raw);
+      } catch (err) {
+        if (err instanceof CellFormatError) throw invalid(`${what} ${err.message}`);
+        throw err;
       }
-      return s;
     }
     case "boolean": {
       if (typeof raw === "boolean") return raw;
@@ -353,6 +365,18 @@ export function aggregateParts(
   }
   if (!columnKey) return NO_PARTS;
 
+  if (kind === "count_distinct") {
+    // Several rows can describe one thing — one paper, one row per author —
+    // so count the distinct non-blank values instead of the rows. String()
+    // makes 1 and "1" (or true and "true") the same value.
+    const seen = new Set<string>();
+    for (const e of entries) {
+      const v = e.values[columnKey];
+      if (v !== null && v !== undefined && v !== "") seen.add(String(v));
+    }
+    return { value: seen.size, numerator: seen.size, denominator: null };
+  }
+
   if (kind === "latest") {
     const withValue = entries.filter((e) => {
       const v = e.values[columnKey];
@@ -426,7 +450,7 @@ export function validateMappings(
     } else {
       const col = byKey.get(columnKey);
       if (!col) throw invalid(`Unknown column "${columnKey}"`);
-      if (col.dataType !== "number") {
+      if (aggregationNeedsNumberColumn(aggregation) && col.dataType !== "number") {
         throw invalid(`"${col.label}" is not a number column, so it cannot be aggregated`);
       }
     }

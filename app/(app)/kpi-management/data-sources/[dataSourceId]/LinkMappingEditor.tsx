@@ -14,6 +14,7 @@ import {
   PERIOD_FIELD,
   aggregateParts,
   aggregationAllowsColumn,
+  aggregationNeedsNumberColumn,
   isMultiValueOperator,
   isProportionKind,
   matchesFilters,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/kpi/dataSourceFilters";
 import { useAcademicCatalog } from "@/lib/data/hooks";
 import { EMPTY_ACADEMIC_CATALOG, catalogOptionLabel } from "@/lib/kpi/academicCatalog";
+import { FORMAT_EXAMPLE, MONTHS, monthLabel } from "@/lib/kpi/cellFormats";
 import { formatNumber } from "@/lib/utils";
 import { unitNeedsDivisor } from "@/lib/kpi/progress";
 import { ACADEMIC_RANKS, RANKS } from "@/lib/types";
@@ -172,6 +174,10 @@ export function MappingCard({
   onRemove: () => void;
 }) {
   const numberColumns = columns.filter((c) => c.dataType === "number");
+  // "Count of rows (distinct)" compares values rather than adding them, so any
+  // column can be counted — e.g. a paper key, to count papers not author rows.
+  const anyColumn = !aggregationNeedsNumberColumn(mapping.aggregation);
+  const aggregatable = anyColumn ? columns : numberColumns;
 
   const isProportion = isProportionKind(mapping.aggregation);
   const byFaculty = isProportion && mapping.denominatorSource === "faculty";
@@ -240,13 +246,19 @@ export function MappingCard({
       {/* Top-aligned: the Column field's hint makes it taller than its
           neighbours, and bottom-alignment would push their labels out of line. */}
       <div className="flex flex-wrap items-start gap-sm">
-        <div className="w-44">
+        <div className="w-56">
           <Field label="Aggregate">
             <Select
               value={mapping.aggregation}
-              onChange={(e) =>
-                onChange({ aggregation: e.target.value as AggregationKind })
-              }
+              onChange={(e) => {
+                const aggregation = e.target.value as AggregationKind;
+                // Leaving "distinct" for a numeric kind drops a non-number column
+                // it can no longer aggregate, instead of keeping it hidden.
+                const keep =
+                  !aggregationNeedsNumberColumn(aggregation) ||
+                  numberColumns.some((c) => c.colKey === mapping.columnKey);
+                onChange({ aggregation, ...(keep ? {} : { columnKey: "" }) });
+              }}
             >
               {AGGREGATION_KINDS.map((k) => (
                 <option key={k} value={k}>
@@ -261,7 +273,9 @@ export function MappingCard({
             <Field
               label="Column"
               hint={
-                numberColumns.length === 0
+                anyColumn
+                  ? "Counts each distinct value once — pick the column that identifies one item."
+                  : numberColumns.length === 0
                   ? "No number columns on this source."
                   : isProportion
                     ? "Optional — leave blank to compare row counts."
@@ -286,7 +300,7 @@ export function MappingCard({
                 <option value="">
                   {isProportion ? "Count rows" : "Select a column…"}
                 </option>
-                {numberColumns.map((c) => (
+                {aggregatable.map((c) => (
                   <option key={c.id} value={c.colKey}>
                     {c.label}
                   </option>
@@ -448,7 +462,12 @@ export function MappingCard({
                     preview.value == null
                       ? "—"
                       : // A count is a whole number; everything else may not be.
-                        formatNumber(preview.value, mapping.aggregation === "count" ? 0 : 2)
+                        formatNumber(
+                          preview.value,
+                          mapping.aggregation === "count" || mapping.aggregation === "count_distinct"
+                            ? 0
+                            : 2,
+                        )
                   }`}
             </span>
           </div>
@@ -800,6 +819,8 @@ function choiceOptions(
   switch (column.dataType) {
     case "select":
       return (column.options ?? []).map((o) => ({ value: o, label: o }));
+    case "month":
+      return MONTHS.map((m) => ({ value: String(m.value), label: monthLabel(m.value) }));
     case "program":
       return catalog.programs.map((p) => ({ value: p.code, label: catalogOptionLabel(p) }));
     case "curriculum":
@@ -938,6 +959,16 @@ function ValueInput({
       );
     case "date":
       return <Input type="date" value={value} onChange={(e) => onChange(e.target.value)} />;
+    case "year_ce":
+      return (
+        <Input
+          value={value}
+          inputMode="numeric"
+          maxLength={4}
+          placeholder={FORMAT_EXAMPLE.year_ce}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
     case "number":
       return (
         <Input value={value} inputMode="decimal" onChange={(e) => onChange(e.target.value)} />

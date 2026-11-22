@@ -934,6 +934,10 @@ export interface DataSourceColumnInput {
   unit?: string | null;
   options?: string[] | null;
   isRequired?: boolean;
+  /** "Ref by" target as an index into the same array (see the columns route). */
+  refIndex?: number | null;
+  isMultiple?: boolean;
+  autoFill?: "share" | null;
 }
 
 /** Writing a link immediately recomputes what it feeds; `feed` is that outcome,

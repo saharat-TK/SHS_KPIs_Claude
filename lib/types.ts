@@ -629,7 +629,10 @@ export type DataSourceColumnType =
   // stays NULL in the DB and is resolved at validation/render time instead.
   | "faculty" // stores a faculty.id ("fac-001")
   | "program" // stores an academic_program code ("PH")
-  | "curriculum"; // stores a curriculum code ("PHB")
+  | "curriculum" // stores a curriculum code ("PHB")
+  // Validated numbers (lib/kpi/cellFormats.ts):
+  | "year_ce" // a CE year, 1900-2399 (a BE year is rejected with a hint)
+  | "month"; // 1-12
 
 /** A cell value as stored in data_source_entry.values_json. */
 export type DataSourceCellValue = string | number | boolean | null;
@@ -663,9 +666,19 @@ export interface DataSourceColumn {
   unit: string | null;
   /** Allowed values; only meaningful when dataType is "select". */
   options: string[] | null;
+  /** "Ref by": col_key of the program column this faculty or curriculum column
+   *  is linked to. Picking a program narrows this column's choices; picking a
+   *  value here fills in its program. See lib/kpi/columnLinks.ts. */
+  refColKey?: string | null;
+  /** The entry form takes several values and saves one row per value. */
+  isMultiple?: boolean;
+  /** "share" fills this number column with 1/n of a multiple entry's rows. */
+  autoFill?: ColumnAutoFill | null;
   isRequired: boolean;
   sortOrder: number;
 }
+
+export type ColumnAutoFill = "share";
 
 /** One recorded row. `quarter` is null when the source's grain is "annual". */
 export interface DataSourceEntry {
@@ -704,6 +717,7 @@ export type AggregationKind =
   | "sum"
   | "avg"
   | "count"
+  | "count_distinct"
   | "latest"
   | "percent_of"
   | "ratio_of";
@@ -722,6 +736,8 @@ export type DenominatorSource = "rows" | "faculty";
 export interface DataSourceLinkMapping {
   aggregation: AggregationKind;
   /** The column being aggregated. Null (and unused) when aggregation is "count".
+   *  For "count_distinct" it may be any column type: the value is the number of
+   *  distinct non-blank values in it (e.g. papers, not author rows).
    *  Optional for percent_of / ratio_of, which fall back to counting rows. */
   columnKey: string | null;
   /** Which rows count. Under percent_of / ratio_of with denominatorSource

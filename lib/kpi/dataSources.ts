@@ -5,6 +5,15 @@ import type {
   DataSourceColumnType,
   DataSourcePeriodGrain,
 } from "@/lib/types";
+import {
+  CellFormatError,
+  FORMAT_EXAMPLE,
+  MONTHS,
+  monthShortLabel,
+  parseDate,
+  parseMonth,
+  parseYearCE,
+} from "./cellFormats.ts";
 
 export const DATA_SOURCE_COLUMN_TYPES: DataSourceColumnType[] = [
   "text",
@@ -16,6 +25,8 @@ export const DATA_SOURCE_COLUMN_TYPES: DataSourceColumnType[] = [
   "faculty",
   "program",
   "curriculum",
+  "year_ce",
+  "month",
 ];
 
 export const COLUMN_TYPE_LABELS: Record<DataSourceColumnType, string> = {
@@ -28,6 +39,8 @@ export const COLUMN_TYPE_LABELS: Record<DataSourceColumnType, string> = {
   faculty: "Faculties",
   program: "Programs",
   curriculum: "Curriculums",
+  year_ce: "Year (CE)",
+  month: "Month",
 };
 
 /** Types whose allowed values come from elsewhere (the faculty roster, the program
@@ -59,7 +72,6 @@ export type ColumnSpec = Pick<
 > & { options?: string[] | null };
 
 const COL_KEY_RE = /^[a-z][a-z0-9_]*$/;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Only web URLs may be opened from the data table. Keeping this check shared
  * between the write path and renderer prevents unsafe protocols from reaching
@@ -130,12 +142,19 @@ export function coerceCellValue(
       if (raw === "true" || raw === 1 || raw === "1") return true;
       if (raw === "false" || raw === 0 || raw === "0") return false;
       throw invalid(`"${column.label}" must be true or false`);
-    case "date": {
-      const s = String(raw);
-      if (!ISO_DATE_RE.test(s) || Number.isNaN(Date.parse(s))) {
-        throw invalid(`"${column.label}" must be a date (YYYY-MM-DD)`);
+    // Formatted types share their parsing with paste, CSV and the input hints
+    // (cellFormats.ts). A date is stored as YYYY-MM-DD whatever form it came in.
+    case "date":
+    case "year_ce":
+    case "month": {
+      try {
+        if (column.dataType === "year_ce") return parseYearCE(raw);
+        if (column.dataType === "month") return parseMonth(raw);
+        return parseDate(raw);
+      } catch (err) {
+        if (err instanceof CellFormatError) throw invalid(`"${column.label}" ${err.message}`);
+        throw err;
       }
-      return s;
     }
     case "url": {
       const s = String(raw).trim();
@@ -237,6 +256,7 @@ export function formatCellValue(
 ): string {
   if (value === null || value === undefined) return "—";
   if (column.dataType === "boolean") return value ? "Yes" : "No";
+  if (column.dataType === "month" && typeof value === "number") return monthShortLabel(value);
 
   const raw = String(value);
   return isDerivedOptionType(column.dataType) ? (labels?.[raw] ?? raw) : raw;
@@ -323,7 +343,11 @@ function escapeCsvCell(value: string): string {
 function describeColumnInput(column: ColumnSpec): string {
   switch (column.dataType) {
     case "date":
-      return "Format: YYYY-MM-DD.";
+      return `Format: YYYY-MM-DD or DD/MM/YYYY (CE), ${FORMAT_EXAMPLE.date}.`;
+    case "year_ce":
+      return `A 4-digit CE year, ${FORMAT_EXAMPLE.year_ce}. Not a Buddhist-era year.`;
+    case "month":
+      return "Enter 1–12 (or the month's name):";
     case "url":
       return "Must start with http:// or https://.";
     case "boolean":
@@ -440,6 +464,12 @@ export function buildColumnChoices(
   for (const c of columns) {
     if (c.dataType === "select") {
       out[c.colKey] = (c.options ?? []).map((o) => ({ code: o, label: o }));
+    } else if (c.dataType === "month") {
+      out[c.colKey] = MONTHS.map((m) => ({
+        code: String(m.value),
+        label: m.en,
+        hint: m.thShort,
+      }));
     } else if (c.dataType === "program") {
       out[c.colKey] = (catalog?.programs ?? []).map((p) => ({
         code: p.code,

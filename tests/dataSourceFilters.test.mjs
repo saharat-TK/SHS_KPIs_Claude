@@ -23,7 +23,7 @@ const entry = (over = {}) => ({
   id: 1,
   year: 2568,
   quarter: 1,
-  values: { quartile: "Q1", citations: 10, pub_date: "2568-03-15", author: "fac-002", title: "A" },
+  values: { quartile: "Q1", citations: 10, pub_date: "2025-03-15", author: "fac-002", title: "A" },
   ...over,
 });
 
@@ -69,11 +69,26 @@ test("between is inclusive at both bounds", () => {
 
 test("date ranges compare chronologically and are inclusive", () => {
   const on = (d) => entry({ values: { ...entry().values, pub_date: d } });
-  const range = F("pub_date", "between", "2568-01-01", "2568-12-31");
-  assert.equal(matchesFilters(on("2568-01-01"), COLUMNS, [range]), true);
-  assert.equal(matchesFilters(on("2568-12-31"), COLUMNS, [range]), true);
-  assert.equal(matchesFilters(on("2569-01-01"), COLUMNS, [range]), false);
-  assert.equal(matchesFilters(on("2567-12-31"), COLUMNS, [range]), false);
+  const range = F("pub_date", "between", "2025-01-01", "2025-12-31");
+  assert.equal(matchesFilters(on("2025-01-01"), COLUMNS, [range]), true);
+  assert.equal(matchesFilters(on("2025-12-31"), COLUMNS, [range]), true);
+  assert.equal(matchesFilters(on("2026-01-01"), COLUMNS, [range]), false);
+  assert.equal(matchesFilters(on("2024-12-31"), COLUMNS, [range]), false);
+  // A bound may be typed day-first; a BE bound is refused, like a BE cell.
+  assert.equal(matchesFilters(on("2025-06-30"), COLUMNS, [F("pub_date", "between", "01/06/2025", "30/06/2025")]), true);
+  assert.throws(() => matchesFilters(on("2025-06-30"), COLUMNS, [F("pub_date", "between", "2568-01-01", "2568-12-31")]), /Buddhist-era/);
+});
+
+test("year and month columns filter numerically and accept month names", () => {
+  const cols = [
+    { colKey: "y", label: "Year", dataType: "year_ce" },
+    { colKey: "m", label: "Month", dataType: "month" },
+  ];
+  const row = { id: 1, year: 2569, quarter: 2, values: { y: 2026, m: 3 } };
+  assert.equal(matchesFilters(row, cols, [F("y", "gte", "2025")]), true);
+  assert.equal(matchesFilters(row, cols, [F("m", "eq", "March")]), true);
+  assert.equal(matchesFilters(row, cols, [{ field: "m", operator: "in", values: ["4", "5"] }]), false);
+  assert.throws(() => matchesFilters(row, cols, [F("y", "eq", "2569")]), /Buddhist-era/);
 });
 
 test("a blank cell never matches", () => {
@@ -153,6 +168,45 @@ test("period filters bound the entry's own year/quarter", () => {
 test("count ignores the column and treats zero rows as a real zero", () => {
   assert.equal(aggregate("count", null, [entry(), entry()]), 2);
   assert.equal(aggregate("count", null, []), 0);
+});
+
+test("count_distinct counts distinct non-blank values, not rows", () => {
+  // One paper, three author rows; a second paper; a row with no title.
+  const rows = [
+    entry({ id: 1, values: { title: "A", author: "fac-001" } }),
+    entry({ id: 2, values: { title: "A", author: "fac-002" } }),
+    entry({ id: 3, values: { title: "A", author: "fac-003" } }),
+    entry({ id: 4, values: { title: "B", author: "fac-001" } }),
+    entry({ id: 5, values: { title: "", author: "fac-004" } }),
+    entry({ id: 6, values: { title: null, author: "fac-004" } }),
+  ];
+  assert.equal(aggregate("count_distinct", "title", rows), 2);
+  assert.equal(aggregate("count_distinct", "author", rows), 4);
+  assert.equal(aggregate("count", null, rows), 6);
+  // Zero rows is a real zero, like count.
+  assert.equal(aggregate("count_distinct", "title", []), 0);
+  // 1 and "1" are the same value.
+  assert.equal(
+    aggregate("count_distinct", "citations", [
+      entry({ values: { citations: 1 } }),
+      entry({ values: { citations: "1" } }),
+    ]),
+    1,
+  );
+});
+
+test("validateMappings lets count_distinct use any column but requires one", () => {
+  for (const columnKey of ["title", "author", "quartile", "citations"]) {
+    assert.equal(
+      validateMappings(COLUMNS, "quarterly", [mapping({ aggregation: "count_distinct", columnKey })])[0]
+        .columnKey,
+      columnKey,
+    );
+  }
+  assert.throws(
+    () => validateMappings(COLUMNS, "quarterly", [mapping({ aggregation: "count_distinct" })]),
+    /needs a column to aggregate/,
+  );
 });
 
 test("sum and avg skip blank cells and return null when nothing is usable", () => {

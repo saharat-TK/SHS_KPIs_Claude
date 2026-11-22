@@ -8,6 +8,7 @@ import {
   errorResponse,
   loadSourceShape,
   mapEntryRow,
+  loadRefChecker,
   resolveColumnOptions,
 } from "@/lib/kpi/dataSourcesServer";
 import { requireActor } from "@/lib/auth/session";
@@ -57,8 +58,10 @@ export async function PATCH(
     }
     if ("values" in b) {
       const columns = await resolveColumnOptions(pool, source.columns);
+      const cells = validateEntryValues(columns, b.values ?? {});
+      (await loadRefChecker(pool, source.columns))(cells);
       setClauses.push("values_json = ?");
-      values.push(JSON.stringify(validateEntryValues(columns, b.values ?? {})));
+      values.push(JSON.stringify(cells));
     }
     if ("note" in b) {
       setClauses.push("note = ?");

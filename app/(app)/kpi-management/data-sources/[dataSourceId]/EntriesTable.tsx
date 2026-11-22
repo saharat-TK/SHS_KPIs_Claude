@@ -16,6 +16,9 @@ import { formatCellValue, formatEntryPeriod, isHttpUrl } from "@/lib/kpi/dataSou
 import type { DataSourceColumn, DataSourceEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/** Stored as numbers: right-aligned and sorted numerically. */
+const NUMERIC_TYPES = new Set<string>(["number", "year_ce", "month"]);
+
 const DATA_TABLE_COLUMN_WIDTHS = {
   period: 80,
   custom: 112,
@@ -200,7 +203,7 @@ export function EntriesTable({
               {columns.map((c) => (
                 <Td
                   key={c.id}
-                  align={c.dataType === "number" ? "right" : "left"}
+                  align={NUMERIC_TYPES.has(c.dataType) ? "right" : "left"}
                 >
                   {c.dataType === "url" ? (
                     <UrlCell
@@ -350,7 +353,7 @@ function DataTableHeader({
             sortable
             sortDir={sort?.key === columnSortKey(column) ? sort.direction : null}
             onSort={() => onSort(columnSortKey(column))}
-            align={column.dataType === "number" ? "right" : "left"}
+            align={NUMERIC_TYPES.has(column.dataType) ? "right" : "left"}
             className="bg-surface-lowest"
           >
             {column.label}
@@ -441,7 +444,7 @@ function compareEntries(
   if (leftValue === null) return rightValue === null ? 0 : 1;
   if (rightValue === null) return -1;
 
-  if (column.dataType === "number") return Number(leftValue) - Number(rightValue);
+  if (NUMERIC_TYPES.has(column.dataType)) return Number(leftValue) - Number(rightValue);
   if (column.dataType === "date") {
     return new Date(String(leftValue)).getTime() - new Date(String(rightValue)).getTime();
   }

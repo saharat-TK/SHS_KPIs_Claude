@@ -429,6 +429,7 @@ function DataSourceDetail({ id }: { id: number }) {
               setEditingLink(null);
             }}
             dataSourceId={id}
+            committeeId={source?.committeeId ?? null}
             link={editingLink}
           />
 
