@@ -260,9 +260,14 @@ async function applyLink(
         // `matched` so the numerator stays a subset of the denominator. With a
         // numerator column the two sides can share every row and still differ,
         // so an empty condition list is no longer "nothing to divide".
+        // A distinct key swaps row counts for distinct-value counts on both sides.
+        const distinctKey = mapping.distinctColumnKey ?? null;
         const proportion =
           mapping.denominatorSource === "faculty"
-            ? { denominator: facultyHeadcount(roster, mapping.facultyRanks ?? ACADEMIC_RANKS) }
+            ? {
+                denominator: facultyHeadcount(roster, mapping.facultyRanks ?? ACADEMIC_RANKS),
+                distinctKey,
+              }
             : mapping.numeratorFilters?.length || mapping.numeratorColumnKey
               ? {
                   numerator: mapping.numeratorFilters?.length
@@ -271,6 +276,7 @@ async function applyLink(
                       )
                     : matched,
                   numeratorColumnKey: mapping.numeratorColumnKey ?? null,
+                  distinctKey,
                 }
               : undefined;
         const parts: AggregateParts = aggregateParts(
