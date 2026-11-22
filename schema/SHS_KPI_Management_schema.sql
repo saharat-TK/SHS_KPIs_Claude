@@ -561,14 +561,22 @@ CREATE TABLE data_source_column (
   col_key        VARCHAR(40)  NOT NULL,                -- slug, e.g. "student_count"
   label          VARCHAR(255) NOT NULL,
   data_type      ENUM('text','url','number','date','select','boolean',
-                      'faculty','program','curriculum') NOT NULL DEFAULT 'text',
+                      'faculty','program','curriculum','year_ce','month') NOT NULL DEFAULT 'text',
                                                        -- faculty: stores a faculty.id ("fac-001")
                                                        -- program: stores a PROGRAMS abbr ("PH")
                                                        -- curriculum: stores a CURRICULUMS abbr ("PHB")
-  unit           VARCHAR(50)  NULL,                    -- free text, same convention as library_kpi.unit
+                                                       -- year_ce: a CE year as a number (2026); BE years rejected
+                                                       -- month: 1-12 as a number
+                                                       -- (year_ce/month added by scripts/migrate-data-source-date-types.mjs)
+  unit          VARCHAR(50)  NULL,                    -- free text, same convention as library_kpi.unit
   options        JSON NULL,                            -- string[] of allowed values; only for data_type='select'.
                                                        -- NULL for faculty/program/curriculum: their options are DERIVED
                                                        -- (roster / shared catalog), never authored or stored.
+  ref_col_key    VARCHAR(40)  NULL,                    -- "ref by": col_key of the program column this faculty/curriculum
+                                                       -- column is linked to (filters choices, auto-fills the program)
+  is_multiple    TINYINT(1) NOT NULL DEFAULT 0,        -- entry form takes several values; saves one row per value (max one per source)
+  auto_fill      VARCHAR(20)  NULL,                    -- 'share' = number column filled with 1/n of those rows
+                                                       -- (added by scripts/migrate-data-source-column-links.mjs)
   is_required    TINYINT(1) NOT NULL DEFAULT 0,
   sort_order     INT NOT NULL DEFAULT 0,
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

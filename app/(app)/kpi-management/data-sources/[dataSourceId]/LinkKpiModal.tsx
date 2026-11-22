@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Button, Field, Select } from "@/components/ui";
 import {
+  useCommittees,
   useCreateDataSourceLink,
   useDataSourceColumns,
   useDataSourceEntries,
@@ -29,17 +30,23 @@ export function LinkKpiModal({
   open,
   onClose,
   dataSourceId,
+  committeeId,
   link,
 }: {
   open: boolean;
   onClose: () => void;
   dataSourceId: number;
+  /** The data source's owning committee — the Committee filter's default. */
+  committeeId?: string | null;
   /** Present = edit mode. */
   link?: DataSourceLink | null;
 }) {
   const isEdit = !!link;
   const setsQ = useStrategicSets();
+  const committeesQ = useCommittees();
   const [setId, setSetId] = useState(0);
+  // "" = all committees.
+  const [committee, setCommittee] = useState("");
   const [kpiId, setKpiId] = useState(0);
   const [metricId, setMetricId] = useState(0);
   const [note, setNote] = useState("");
@@ -64,10 +71,17 @@ export function LinkKpiModal({
     setMappings((link?.mappings ?? []).map(toDraft));
     if (!link) {
       setSetId(0);
+      setCommittee(committeeId ?? "");
       setKpiId(0);
       setMetricId(0);
     }
-  }, [open, link]);
+  }, [open, link, committeeId]);
+
+  // Only the chosen committee's KPIs; "All committees" shows every KPI in the set.
+  const kpis = useMemo(
+    () => (kpisQ.data ?? []).filter((k) => !committee || k.committeeId === committee),
+    [kpisQ.data, committee],
+  );
 
   // Only used for the tip naming the aggregation that divides — the mapping
   // itself is the same shape for every target.
@@ -134,13 +148,20 @@ export function LinkKpiModal({
         ) : (
           <TargetPicker
             sets={setsQ.data ?? []}
-            kpis={kpisQ.data ?? []}
+            committees={committeesQ.data ?? []}
+            kpis={kpis}
             metrics={metricsQ.data ?? []}
             setId={setId}
+            committee={committee}
             kpiId={kpiId}
             metricId={metricId}
             onSet={(v) => {
               setSetId(v);
+              setKpiId(0);
+              setMetricId(0);
+            }}
+            onCommittee={(v) => {
+              setCommittee(v);
               setKpiId(0);
               setMetricId(0);
             }}
@@ -170,25 +191,36 @@ export function LinkKpiModal({
 
 function TargetPicker({
   sets,
+  committees,
   kpis,
   metrics,
   setId,
+  committee,
   kpiId,
   metricId,
   onSet,
+  onCommittee,
   onKpi,
   onMetric,
 }: {
   sets: { id: number; name: string }[];
+  committees: { id: string; name: string }[];
   kpis: { id: number; name: string }[];
   metrics: { id: number; name: string }[];
   setId: number;
+  committee: string;
   kpiId: number;
   metricId: number;
   onSet: (v: number) => void;
+  onCommittee: (v: string) => void;
   onKpi: (v: number) => void;
   onMetric: (v: number) => void;
 }) {
+  const kpiPlaceholder = !setId
+    ? "Select a set first"
+    : kpis.length === 0 && committee
+      ? "No KPIs for this committee in this set"
+      : "Select a KPI…";
   return (
     <>
       <Field label="Strategic set">
@@ -202,13 +234,24 @@ function TargetPicker({
         </Select>
       </Field>
 
+      <Field label="Committee" hint="Narrows the KPI list to the KPIs this committee owns.">
+        <Select value={committee} onChange={(e) => onCommittee(e.target.value)}>
+          <option value="">All committees</option>
+          {committees.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
       <Field label="KPI">
         <Select
           value={kpiId || ""}
-          disabled={!setId}
+          disabled={!setId || kpis.length === 0}
           onChange={(e) => onKpi(Number(e.target.value))}
         >
-          <option value="">{setId ? "Select a KPI…" : "Select a set first"}</option>
+          <option value="">{kpiPlaceholder}</option>
           {kpis.map((k) => (
             <option key={k.id} value={k.id}>
               {k.name}

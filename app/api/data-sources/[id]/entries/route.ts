@@ -8,6 +8,7 @@ import {
   errorResponse,
   loadSourceShape,
   mapEntryRow,
+  loadRefChecker,
   resolveColumnOptions,
 } from "@/lib/kpi/dataSourcesServer";
 import { normalizeEntryPeriod, validateEntryValues } from "@/lib/kpi/dataSources";
@@ -82,6 +83,7 @@ export async function POST(
     );
     const columns = await resolveColumnOptions(pool, source.columns);
     const values = validateEntryValues(columns, b.values ?? {});
+    (await loadRefChecker(pool, source.columns))(values);
 
     // Write and re-feed in one transaction: a feed failure must not leave the
     // entry saved but the KPIs it feeds stale.
