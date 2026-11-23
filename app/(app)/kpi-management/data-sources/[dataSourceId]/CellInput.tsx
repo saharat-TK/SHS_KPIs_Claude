@@ -4,6 +4,7 @@ import { Input, Select } from "@/components/ui";
 import { catalogOptionLabel, curriculaForProgram } from "@/lib/kpi/academicCatalog";
 import { FORMAT_EXAMPLE, MONTHS, monthLabel } from "@/lib/kpi/cellFormats";
 import type { AcademicCatalog, DataSourceColumn, FacultyRecord } from "@/lib/types";
+import { DateInput } from "./DateInput";
 
 /** Keeps a stored code that isn't in the current option list selectable, rather
  *  than letting the Select silently blank it. Covers values typed in before the
@@ -123,18 +124,15 @@ export function CellInput({
         </Select>
       );
     case "date":
-      // Typed in the Buddhist era, DD/MM/YYYY. A native date picker can't be
-      // made to show BE (it follows the browser locale), so this is text, like
-      // Year (BE); the value is checked as it is typed and stored as CE.
+      // Typed in the Buddhist era, DD/MM/YYYY, or picked from a BE calendar. A
+      // native date picker can't show BE (it follows the browser locale), so the
+      // calendar is ours; the value is checked as it is typed and stored as CE.
       return (
-        <Input
+        <DateInput
           value={value}
           disabled={disabled}
-          inputMode="numeric"
-          maxLength={10}
-          placeholder="15/03/2569"
           title={FORMAT_EXAMPLE.date}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={onChange}
         />
       );
     case "year_be":
