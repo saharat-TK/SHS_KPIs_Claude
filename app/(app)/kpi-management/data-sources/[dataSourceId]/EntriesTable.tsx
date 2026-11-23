@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -13,22 +15,27 @@ import { Table, Th, Td, EmptyState, useConfirm } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { useDeleteDataSourceEntry } from "@/lib/data/hooks";
 import { formatCellValue, formatEntryPeriod, isHttpUrl } from "@/lib/kpi/dataSources";
+import { groupEntries, perRowColKeys, type EntryGroupRows } from "@/lib/kpi/entryGroups";
 import type { DataSourceColumn, DataSourceEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import {
+  computeColumnLayout,
+  fallbackColumnLayout,
+  type ColumnLayout,
+} from "./columnWidths";
+
+/** Cell/header spacing. Must match CELL_PAD_X in columnWidths.ts (6px a side). */
+const CELL = "!px-sm !py-xs !align-top";
+const HEAD = "bg-surface-lowest !px-sm !py-xs !align-top";
+/** First (Period) column: 20px left padding. Must equal 6px + FIRST_COLUMN_EXTRA_LEFT
+ *  in columnWidths.ts; written as a literal so Tailwind's scanner emits it. */
+const FIRST_COL = "!pl-[20px]";
+/** First visible row: 12px top padding, 8px more than the 4px base, so it doesn't
+ *  sit right under the header line. */
+const FIRST_ROW = "!pt-[12px]";
 
 /** Stored as numbers: right-aligned and sorted numerically. */
 const NUMERIC_TYPES = new Set<string>(["number", "year_be", "month"]);
-
-const DATA_TABLE_COLUMN_WIDTHS = {
-  period: 80,
-  custom: 112,
-  note: 56,
-  createdAt: 112,
-  actions: 88,
-  titleMinimum: 180,
-  tableMinimum: 640,
-} as const;
-const TITLE_COLUMN_SHARE = 0.18;
 
 export function EntriesTable({
   columns,
@@ -57,31 +64,21 @@ export function EntriesTable({
   const [tooltip, setTooltip] = useState<CellTooltip | null>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const bodyScrollRef = useRef<HTMLDivElement>(null);
-  const titleColumnId = columns.find(isTitleColumn)?.id;
-  const fixedColumnWidth =
-    DATA_TABLE_COLUMN_WIDTHS.period +
-    DATA_TABLE_COLUMN_WIDTHS.note +
-    DATA_TABLE_COLUMN_WIDTHS.createdAt +
-    (canRecord ? DATA_TABLE_COLUMN_WIDTHS.actions : 0) +
-    columns.filter((column) => column.id !== titleColumnId).length *
-      DATA_TABLE_COLUMN_WIDTHS.custom;
-  const tableMinimumWidth = Math.ceil(
-    Math.max(
-      DATA_TABLE_COLUMN_WIDTHS.tableMinimum,
-      titleColumnId
-        ? Math.max(
-            fixedColumnWidth / (1 - TITLE_COLUMN_SHARE),
-            DATA_TABLE_COLUMN_WIDTHS.titleMinimum / TITLE_COLUMN_SHARE,
-          )
-        : fixedColumnWidth,
-    ),
-  );
+  const rootRef = useRef<HTMLDivElement>(null);
+  const layout = useColumnLayout(rootRef, columns, entries, canRecord, cellLabels);
 
-  const filteredEntries = useMemo(() => {
+  // A multiple-input source stores one row per value; regroup them into the
+  // entries they came from. Without a multiple column every group is one row.
+  const groups = useMemo(() => groupEntries(entries, columns), [entries, columns]);
+  const perRowKeys = useMemo(() => perRowColKeys(columns), [columns]);
+
+  // A group stays whole: it shows when any of its rows matches, so searching for
+  // one author still shows the paper's other authors.
+  const filteredGroups = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
-    if (!needle) return entries;
+    if (!needle) return groups;
 
-    return entries.filter((entry) =>
+    const matches = (entry: DataSourceEntry) =>
       [
         formatEntryPeriod(entry.year, entry.quarter),
         ...columns.map((column) =>
@@ -92,18 +89,20 @@ export function EntriesTable({
       ]
         .join(" ")
         .toLocaleLowerCase()
-        .includes(needle),
-    );
-  }, [cellLabels, columns, entries, query]);
+        .includes(needle);
+    return groups.filter((group) => group.rows.some(matches));
+  }, [cellLabels, columns, groups, query]);
 
-  const visibleEntries = useMemo(() => {
-    if (!sort) return filteredEntries;
-    return [...filteredEntries].sort((left, right) => {
-      const comparison = compareEntries(left, right, sort.key, columns, cellLabels);
+  // Sorting orders whole groups by their first row, so an entry never splits.
+  const visibleGroups = useMemo(() => {
+    if (!sort) return filteredGroups;
+    return [...filteredGroups].sort((left, right) => {
+      const [a, b] = [left.rows[0], right.rows[0]];
+      const comparison = compareEntries(a, b, sort.key, columns, cellLabels);
       const directed = sort.direction === "asc" ? comparison : -comparison;
-      return directed || left.id - right.id;
+      return directed || a.id - b.id;
     });
-  }, [cellLabels, columns, filteredEntries, sort]);
+  }, [cellLabels, columns, filteredGroups, sort]);
 
   const setSortKey = (key: string) =>
     setSort((current) =>
@@ -148,8 +147,8 @@ export function EntriesTable({
   };
 
   return (
-    <>
-      {visibleEntries.length === 0 ? (
+    <div ref={rootRef}>
+      {visibleGroups.length === 0 ? (
         <EmptyState
           icon="search_off"
           title="No matching data"
@@ -165,14 +164,10 @@ export function EntriesTable({
           className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           <table
-            className="w-full !border-separate border-spacing-0 table-fixed text-body-sm"
-            style={{ minWidth: `${tableMinimumWidth}px` }}
+            className="!border-separate border-spacing-0 table-fixed text-body-sm"
+            style={{ width: `${layout.total}px` }}
           >
-            <DataTableColumnGroup
-              columns={columns}
-              titleColumnId={titleColumnId}
-              canRecord={canRecord}
-            />
+            <DataTableColumnGroup columns={columns} layout={layout} canRecord={canRecord} />
             <DataTableHeader columns={columns} canRecord={canRecord} sort={sort} onSort={setSortKey} />
           </table>
         </div>
@@ -183,100 +178,32 @@ export function EntriesTable({
         className="overflow-x-auto scroll-thin"
       >
         <table
-          className="w-full !border-separate border-spacing-0 table-fixed text-body-sm"
-          style={{ minWidth: `${tableMinimumWidth}px` }}
+          className="!border-separate border-spacing-0 table-fixed text-body-sm"
+          style={{ width: `${layout.total}px` }}
         >
-          <DataTableColumnGroup
-            columns={columns}
-            titleColumnId={titleColumnId}
-            canRecord={canRecord}
-          />
-        <tbody>
-          {visibleEntries.map((e) => (
-            <tr key={e.id} className="group border-t border-hairline hover:bg-surface-soft">
-              <Td className="whitespace-nowrap font-medium">
-                <CellPreview
-                  text={formatEntryPeriod(e.year, e.quarter)}
-                  {...tooltipEvents(formatEntryPeriod(e.year, e.quarter))}
-                />
-              </Td>
-              {columns.map((c) => (
-                <Td
-                  key={c.id}
-                  align={NUMERIC_TYPES.has(c.dataType) ? "right" : "left"}
-                >
-                  {c.dataType === "url" ? (
-                    <UrlCell
-                      value={formatCellValue(c, e.values[c.colKey] ?? null, cellLabels)}
-                      tooltipEvents={tooltipEvents}
-                    />
-                  ) : (
-                    <CellPreview
-                      text={
-                        c.id === titleColumnId
-                          ? clipText(
-                              formatCellValue(c, e.values[c.colKey] ?? null, cellLabels),
-                              30,
-                            )
-                          : formatCellValue(c, e.values[c.colKey] ?? null, cellLabels)
-                      }
-                      className={
-                        c.id === titleColumnId ? "w-full min-w-0 !max-w-full" : undefined
-                      }
-                      {...tooltipEvents(
-                        formatCellValue(c, e.values[c.colKey] ?? null, cellLabels),
-                      )}
-                    />
-                  )}
-                </Td>
-              ))}
-              <Td className="text-mute">
-                <NoteCell note={e.note} tooltipEvents={tooltipEvents} />
-              </Td>
-              <Td className="text-mute">
-                <CellPreview
-                  text={formatEntryCreatedAt(e.createdAt)}
-                  {...tooltipEvents(formatEntryCreatedAt(e.createdAt))}
-                />
-              </Td>
-              {canRecord && (
-                <Td
-                  align="right"
-                  className="sticky right-0 z-10 !px-md border-l border-hairline bg-surface-lowest shadow-[-8px_0_12px_-10px_rgb(0_0_0_/_0.35)] transition-colors group-hover:bg-surface-soft"
-                >
-                  <div className="inline-flex items-center gap-xxs">
-                    <button
-                      type="button"
-                      aria-label="Edit entry"
-                      title="Edit entry"
-                      onClick={() => onEdit(e)}
-                      className="grid h-7 w-7 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
-                    >
-                      <Icon name="edit" className="text-[18px]" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Delete entry"
-                      title="Delete entry"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          title: "Delete this entry?",
-                          message: `The ${formatEntryPeriod(e.year, e.quarter)} row will be permanently removed.`,
-                          tone: "danger",
-                          confirmLabel: "Delete",
-                        });
-                        if (ok) remove.mutate({ dataSourceId, entryId: e.id });
-                      }}
-                      className="grid h-7 w-7 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
-                    >
-                      <Icon name="delete" className="text-[18px]" />
-                    </button>
-                  </div>
-                </Td>
-              )}
-            </tr>
+          <DataTableColumnGroup columns={columns} layout={layout} canRecord={canRecord} />
+          {visibleGroups.map((group, groupIndex) => (
+            <GroupBody
+              key={group.key}
+              group={group}
+              groupIndex={groupIndex}
+              columns={columns}
+              perRowKeys={perRowKeys}
+              canRecord={canRecord}
+              cellLabels={cellLabels}
+              tooltipEvents={tooltipEvents}
+              onEdit={onEdit}
+              onDelete={async (e) => {
+                const ok = await confirm({
+                  title: "Delete this entry?",
+                  message: `The ${formatEntryPeriod(e.year, e.quarter)} row will be permanently removed.`,
+                  tone: "danger",
+                  confirmLabel: "Delete",
+                });
+                if (ok) remove.mutate({ dataSourceId, entryId: e.id });
+              }}
+            />
           ))}
-        </tbody>
         </table>
       </div>
       </div>
@@ -291,36 +218,149 @@ export function EntriesTable({
           {tooltip.text}
         </div>
       )}
-    </>
+    </div>
+  );
+}
+
+/** One entry (a group of rows). Columns the rows share are drawn once in the
+ *  first row and span the group; per-row columns and Actions repeat on each row. */
+function GroupBody({
+  group,
+  groupIndex,
+  columns,
+  perRowKeys,
+  canRecord,
+  cellLabels,
+  tooltipEvents,
+  onEdit,
+  onDelete,
+}: {
+  group: EntryGroupRows;
+  groupIndex: number;
+  columns: DataSourceColumn[];
+  perRowKeys: Set<string>;
+  canRecord: boolean;
+  cellLabels: Record<string, string>;
+  tooltipEvents: (text: string) => TooltipEvents;
+  onEdit: (entry: DataSourceEntry) => void;
+  onDelete: (entry: DataSourceEntry) => void;
+}) {
+  const span = group.rows.length > 1 ? group.rows.length : undefined;
+
+  return (
+    <tbody className="group hover:bg-surface-soft">
+      {group.rows.map((e, rowIndex) => {
+        const first = rowIndex === 0;
+        const last = rowIndex === group.rows.length - 1;
+        // Only the table's very first row gets the extra top padding.
+        const rowPad = groupIndex === 0 && first ? FIRST_ROW : undefined;
+        // Inside a group the divider between rows is lighter than between groups.
+        const inner = last ? undefined : "!border-dashed";
+
+        const valueCell = (c: DataSourceColumn) => {
+          const text = formatCellValue(c, e.values[c.colKey] ?? null, cellLabels);
+          const perRow = perRowKeys.has(c.colKey);
+          return (
+            <Td
+              key={c.id}
+              rowSpan={perRow ? undefined : span}
+              className={cn(CELL, rowPad, perRow && inner)}
+              align={NUMERIC_TYPES.has(c.dataType) ? "right" : "left"}
+            >
+              {c.dataType === "url" ? (
+                <UrlCell value={text} tooltipEvents={tooltipEvents} />
+              ) : (
+                <CellPreview text={text} {...tooltipEvents(text)} />
+              )}
+            </Td>
+          );
+        };
+
+        return (
+          <tr key={e.id}>
+            {first && (
+              <Td
+                rowSpan={span}
+                className={cn(CELL, FIRST_COL, rowPad, "whitespace-nowrap font-medium")}
+              >
+                <CellPreview
+                  text={formatEntryPeriod(e.year, e.quarter)}
+                  {...tooltipEvents(formatEntryPeriod(e.year, e.quarter))}
+                />
+              </Td>
+            )}
+            {columns
+              .filter((c) => first || perRowKeys.has(c.colKey))
+              .map(valueCell)}
+            {first && (
+              <>
+                <Td rowSpan={span} className={cn(CELL, rowPad, "text-mute")}>
+                  <NoteCell note={e.note} tooltipEvents={tooltipEvents} />
+                </Td>
+                <Td rowSpan={span} className={cn(CELL, rowPad, "text-mute")}>
+                  <CellPreview
+                    text={formatEntryCreatedAt(e.createdAt)}
+                    {...tooltipEvents(formatEntryCreatedAt(e.createdAt))}
+                  />
+                </Td>
+              </>
+            )}
+            {canRecord && (
+              <Td
+                align="right"
+                className={cn(
+                  rowPad,
+                  inner,
+                  "sticky right-0 z-10 !px-md !py-xs border-l border-hairline bg-surface-lowest shadow-[-8px_0_12px_-10px_rgb(0_0_0_/_0.35)] transition-colors group-hover:bg-surface-soft",
+                )}
+              >
+                <div className="inline-flex items-center gap-xxs">
+                  <button
+                    type="button"
+                    aria-label="Edit entry"
+                    title="Edit entry"
+                    onClick={() => onEdit(e)}
+                    className="grid h-7 w-7 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
+                  >
+                    <Icon name="edit" className="text-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Delete entry"
+                    title="Delete entry"
+                    onClick={() => onDelete(e)}
+                    className="grid h-7 w-7 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
+                  >
+                    <Icon name="delete" className="text-[18px]" />
+                  </button>
+                </div>
+              </Td>
+            )}
+          </tr>
+        );
+      })}
+    </tbody>
   );
 }
 
 function DataTableColumnGroup({
   columns,
-  titleColumnId,
+  layout,
   canRecord,
 }: {
   columns: DataSourceColumn[];
-  titleColumnId?: number;
+  layout: ColumnLayout;
   canRecord: boolean;
 }) {
   return (
     <colgroup>
-      <col style={{ width: `${DATA_TABLE_COLUMN_WIDTHS.period}px` }} />
-      {columns.map((column) => (
-        <col
-          key={column.id}
-          style={{
-            width:
-              column.id === titleColumnId
-                ? `${TITLE_COLUMN_SHARE * 100}%`
-                : `${DATA_TABLE_COLUMN_WIDTHS.custom}px`,
-          }}
-        />
+      <col style={{ width: `${layout.period}px` }} />
+      {columns.map((column, index) => (
+        <col key={column.id} style={{ width: `${layout.columns[index]}px` }} />
       ))}
-      <col style={{ width: `${DATA_TABLE_COLUMN_WIDTHS.note}px` }} />
-      <col style={{ width: `${DATA_TABLE_COLUMN_WIDTHS.createdAt}px` }} />
-      {canRecord && <col style={{ width: `${DATA_TABLE_COLUMN_WIDTHS.actions}px` }} />}
+      <col style={{ width: `${layout.note}px` }} />
+      <col style={{ width: `${layout.createdAt}px` }} />
+      {canRecord && <col style={{ width: `${layout.actions}px` }} />}
     </colgroup>
   );
 }
@@ -343,7 +383,8 @@ function DataTableHeader({
           sortable
           sortDir={sort?.key === "__period" ? sort.direction : null}
           onSort={() => onSort("__period")}
-          className="bg-surface-lowest"
+          wrap
+          className={cn(HEAD, FIRST_COL)}
         >
           Period
         </Th>
@@ -354,7 +395,8 @@ function DataTableHeader({
             sortDir={sort?.key === columnSortKey(column) ? sort.direction : null}
             onSort={() => onSort(columnSortKey(column))}
             align={NUMERIC_TYPES.has(column.dataType) ? "right" : "left"}
-            className="bg-surface-lowest"
+            wrap
+            className={HEAD}
           >
             {column.label}
             {column.unit ? ` (${column.unit})` : ""}
@@ -364,7 +406,8 @@ function DataTableHeader({
           sortable
           sortDir={sort?.key === "__note" ? sort.direction : null}
           onSort={() => onSort("__note")}
-          className="bg-surface-lowest"
+          wrap
+          className={HEAD}
         >
           Note
         </Th>
@@ -372,14 +415,15 @@ function DataTableHeader({
           sortable
           sortDir={sort?.key === "__createdAt" ? sort.direction : null}
           onSort={() => onSort("__createdAt")}
-          className="bg-surface-lowest"
+          wrap
+          className={HEAD}
         >
           Created at
         </Th>
         {canRecord && (
           <Th
             align="right"
-            className="sticky right-0 z-10 !px-md border-l border-hairline bg-surface-lowest shadow-[-8px_0_12px_-10px_rgb(0_0_0_/_0.35)]"
+            className="sticky right-0 z-10 !px-md !align-top border-l border-hairline bg-surface-lowest shadow-[-8px_0_12px_-10px_rgb(0_0_0_/_0.35)]"
           >
             Actions
           </Th>
@@ -400,10 +444,6 @@ type TooltipEvents = {
 
 function columnSortKey(column: DataSourceColumn) {
   return `column:${column.colKey}`;
-}
-
-function isTitleColumn(column: DataSourceColumn) {
-  return column.label.trim().toLocaleLowerCase() === "title";
 }
 
 export function formatEntryCreatedAt(value: string) {
@@ -458,10 +498,6 @@ function compareText(left: string, right: string) {
   return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function clipText(value: string, maxLength: number) {
-  return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
-}
-
 function CellPreview({
   text,
   className,
@@ -471,7 +507,7 @@ function CellPreview({
     <span
       tabIndex={0}
       className={cn(
-        "block max-w-[12rem] truncate rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-container",
+        "max-w-full line-clamp-3 break-words leading-[1.15] rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-container",
         className,
       )}
       {...events}
@@ -525,4 +561,46 @@ function NoteCell({
       <Icon name="sticky_note_2" className="text-[18px]" />
     </span>
   );
+}
+
+/** Measures content-fit column widths in the table's real font, and again once
+ *  webfonts finish loading (the first measure may have used the fallback face).
+ *  Built from every entry, not the filtered ones, so searching never resizes columns. */
+function useColumnLayout(
+  rootRef: RefObject<HTMLElement>,
+  columns: DataSourceColumn[],
+  entries: DataSourceEntry[],
+  canRecord: boolean,
+  cellLabels: Record<string, string>,
+): ColumnLayout {
+  const [fontFamily, setFontFamily] = useState<string | null>(null);
+  const [fontsTick, setFontsTick] = useState(0);
+
+  useLayoutEffect(() => {
+    if (rootRef.current) setFontFamily(getComputedStyle(rootRef.current).fontFamily);
+  }, [rootRef]);
+
+  useEffect(() => {
+    let live = true;
+    document.fonts?.ready.then(() => live && setFontsTick((tick) => tick + 1));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  return useMemo(() => {
+    if (!fontFamily) return fallbackColumnLayout(columns.length, canRecord);
+    return computeColumnLayout({
+      fontFamily,
+      columns,
+      entries,
+      canRecord,
+      periodText: (entry) => formatEntryPeriod(entry.year, entry.quarter),
+      createdText: (entry) => formatEntryCreatedAt(entry.createdAt),
+      cellText: (column, entry) =>
+        formatCellValue(column, entry.values[column.colKey] ?? null, cellLabels),
+    });
+    // fontsTick re-runs the measure after webfonts load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontFamily, fontsTick, columns, entries, canRecord, cellLabels]);
 }
