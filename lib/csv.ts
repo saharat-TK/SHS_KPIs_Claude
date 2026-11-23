@@ -72,8 +72,11 @@ export function parseCsv(text: string, delimiter = ","): string[][] {
   return rows;
 }
 
+/** Always ships a UTF-8 BOM (added here if the caller didn't already) — without
+ *  it Excel opens the file in a legacy codepage and Thai text becomes mojibake. */
 export function downloadCsv(filename: string, content: string): void {
-  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const body = content.startsWith(UTF8_BOM) ? content : UTF8_BOM + content;
+  const blob = new Blob([body], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
