@@ -299,7 +299,7 @@ function DataSourceDetail({ id }: { id: number }) {
           />
 
           {tab === "data" && (
-            <Card className="overflow-visible">
+            <Card elevated className="overflow-visible">
               <QueryBoundary isLoading={entriesQ.isLoading} isError={entriesQ.isError}>
                 {columns.length === 0 ? (
                   <EmptyState
@@ -348,7 +348,7 @@ function DataSourceDetail({ id }: { id: number }) {
           )}
 
           {tab === "columns" && (
-            <Card className="overflow-hidden">
+            <Card elevated className="overflow-hidden">
               {columns.length === 0 ? (
                 <EmptyState
                   icon="view_column"
@@ -398,7 +398,7 @@ function DataSourceDetail({ id }: { id: number }) {
           )}
 
           {tab === "links" && (
-            <Card className="overflow-hidden">
+            <Card elevated className="overflow-hidden">
               <QueryBoundary isLoading={linksQ.isLoading} isError={linksQ.isError}>
                 {links.length === 0 ? (
                   <EmptyState

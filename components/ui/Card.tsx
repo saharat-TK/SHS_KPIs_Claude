@@ -3,19 +3,27 @@ import { cn } from "@/lib/utils";
 export function Card({
   className,
   title,
+  elevated = false,
   children,
 }: {
   className?: string;
   /** Native tooltip. For a second reading of the card's own number, not for a
    *  heading — use CardHeader for that. */
   title?: string;
+  /** Lift the card with a soft shadow instead of a 1px outline. Opt-in: the
+   *  outlined card is still the default everywhere else. */
+  elevated?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <section
       title={title}
       className={cn(
-        "bg-surface-lowest rounded-lg border border-hairline",
+        // Chosen here rather than overridden by `className`: cn() only
+        // concatenates, so a `border-0` passed in would not reliably win.
+        elevated
+          ? "bg-surface-lowest rounded-lg shadow-md"
+          : "bg-surface-lowest rounded-lg border border-hairline",
         className,
       )}
     >
