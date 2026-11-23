@@ -254,7 +254,7 @@ export function ProgressPanel({
           </div>
         )}
 
-        <Card className="overflow-hidden">
+        <Card elevated className="overflow-hidden">
           {/* Boxed quarter tabs across the top of the single card. */}
           <div className="flex">
             {QUARTERS.map((q, i) => {
@@ -329,7 +329,7 @@ export function ProgressPanel({
       </div>
 
       <div className="flex flex-col gap-lg">
-        <Card className={surface?.card}>
+        <Card elevated className={surface?.card}>
           <CardHeader title="Threshold" subtitle={`Year ${year}`} className={surface?.card} />
           <CardBody className="flex flex-col gap-md">
             <div className="flex items-center justify-between">

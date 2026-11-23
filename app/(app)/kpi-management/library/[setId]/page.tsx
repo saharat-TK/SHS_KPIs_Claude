@@ -296,7 +296,7 @@ function SetDetail() {
 
       <Tabs items={tabs} active={activeCat} onChange={setCat} variant="filled" />
 
-      <Card className="overflow-hidden">
+      <Card elevated className="overflow-hidden">
         <QueryBoundary isLoading={kpisQ.isLoading} isError={kpisQ.isError}>
           {rows.length === 0 ? (
             <EmptyState

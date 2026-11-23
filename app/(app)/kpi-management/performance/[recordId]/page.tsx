@@ -428,7 +428,7 @@ function PerformanceRecordDetail() {
         </span>
       </div>
 
-      <div className="flex flex-col gap-md rounded-lg border border-hairline bg-surface-lowest px-md py-sm 2xl:flex-row 2xl:items-center 2xl:justify-between">
+      <div className="flex flex-col gap-md rounded-lg bg-surface-lowest px-md py-sm shadow-md 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div className="flex flex-col gap-sm">
           <div className="flex flex-wrap items-center gap-sm text-label-md">
             <Icon name="event_available" size={18} className="text-stone" />
@@ -588,7 +588,7 @@ function PerformanceRecordDetail() {
         <div className="flex flex-col gap-md">
           <Tabs items={tabs} active={activeCat} onChange={setCat} variant="filled" />
 
-          <Card className="overflow-hidden">
+          <Card elevated className="overflow-hidden">
         <QueryBoundary isLoading={kpisQ.isLoading} isError={kpisQ.isError}>
           {rows.length === 0 ? (
             <EmptyState
