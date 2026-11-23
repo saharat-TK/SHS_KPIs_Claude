@@ -18,6 +18,7 @@ import {
   Field,
   Select,
   SearchInput,
+  HoverInfoCard,
   healthOf,
   HEALTH_LABEL,
 } from "@/components/ui";
@@ -84,6 +85,46 @@ export default function PerformanceRecordPage() {
     <RequirePermission action="view_dashboards">
       <PerformanceRecordDetail />
     </RequirePermission>
+  );
+}
+
+/** Info icon beside the page title. It replaces a full-width line of text that
+ *  every visitor had to read past: the note is one hover (or Tab) away, in the
+ *  same dark-cyan card the KPI detail page uses for its own ⓘ. The panel is
+ *  interactive with a short close delay so the pointer can reach "KPIs Library". */
+function ReadOnlyDefinitionsInfo({ onOpenLibrary }: { onOpenLibrary: () => void }) {
+  return (
+    <HoverInfoCard
+      panelWidth={320}
+      closeDelayMs={200}
+      panelInteractive
+      panel={
+        <div className="flex flex-col gap-sm">
+          <p className="text-body-sm font-bold leading-snug">Definitions are read-only</p>
+          <p className="text-caption-sm">
+            KPI and sub-KPI definitions here are read-only. Edit them in the{" "}
+            <button
+              type="button"
+              className="text-cyan-200 underline hover:text-white"
+              onClick={onOpenLibrary}
+            >
+              KPIs Library
+            </button>
+            , then use <span className="font-bold">Sync from Library</span> to pull the changes
+            in (entered progress is preserved).
+          </p>
+        </div>
+      }
+    >
+      <button
+        type="button"
+        aria-label="About read-only KPI definitions"
+        title="About read-only KPI definitions"
+        className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-mute hover:bg-surface-soft hover:text-on-surface"
+      >
+        <Icon name="info" size={18} />
+      </button>
+    </HoverInfoCard>
   );
 }
 
@@ -365,6 +406,9 @@ function PerformanceRecordDetail() {
     <>
       <PageHeader
         title={record ? record.name : "Performance Record"}
+        titleAdornment={
+          <ReadOnlyDefinitionsInfo onOpenLibrary={() => router.push("/kpi-management/library")} />
+        }
         description={
           record
             ? `${record.startYear}–${record.endYear} · ${record.status}${
@@ -412,21 +456,6 @@ function PerformanceRecordDetail() {
           </>
         }
       />
-
-      <div className="flex items-start gap-sm text-caption-sm text-mute">
-        <Icon name="lock" size={16} className="mt-tiny shrink-0 text-stone" />
-        <span>
-          KPI and sub-KPI definitions here are read-only. Edit them in the{" "}
-          <button
-            className="text-link-blue hover:underline"
-            onClick={() => router.push("/kpi-management/library")}
-          >
-            KPIs Library
-          </button>
-          , then use <span className="font-medium">Sync from Library</span> to pull the changes in
-          (entered progress is preserved).
-        </span>
-      </div>
 
       <div className="flex flex-col gap-md rounded-lg bg-surface-lowest px-md py-sm shadow-md 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div className="flex flex-col gap-sm">
