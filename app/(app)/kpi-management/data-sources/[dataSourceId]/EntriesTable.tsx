@@ -175,7 +175,15 @@ export function EntriesTable({
         />
       ) : (
       <>
-      <div className={cn("overflow-y-auto scroll-thin [scrollbar-gutter:stable]", heightClass)}>
+      {/* rounded-lg: the card around this is rounded but not clipping, so the
+          sticky header's square white band would otherwise stick out past its
+          corners. A scroll box clips its children to its own radius. */}
+      <div
+        className={cn(
+          "overflow-y-auto rounded-lg scroll-thin [scrollbar-gutter:stable]",
+          heightClass,
+        )}
+      >
       <div className="sticky top-0 z-20 bg-surface-lowest">
         <div
           ref={headerScrollRef}
