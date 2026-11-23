@@ -22,7 +22,7 @@ import {
 } from "@/lib/kpi/dataSourceFilters";
 import { useAcademicCatalog } from "@/lib/data/hooks";
 import { EMPTY_ACADEMIC_CATALOG, catalogOptionLabel } from "@/lib/kpi/academicCatalog";
-import { FORMAT_EXAMPLE, MONTHS, monthLabel } from "@/lib/kpi/cellFormats";
+import { FORMAT_EXAMPLE, MONTHS, formatDateBE, monthLabel } from "@/lib/kpi/cellFormats";
 import { formatNumber } from "@/lib/utils";
 import { unitNeedsDivisor } from "@/lib/kpi/progress";
 import { ACADEMIC_RANKS, RANKS } from "@/lib/types";
@@ -1039,7 +1039,18 @@ function ValueInput({
         </Select>
       );
     case "date":
-      return <Input type="date" value={value} onChange={(e) => onChange(e.target.value)} />;
+      // Typed in BE (DD/MM/YYYY). A saved operand arrives as the stored CE value
+      // and is shown as BE; whatever is typed replaces it.
+      return (
+        <Input
+          value={formatDateBE(value)}
+          inputMode="numeric"
+          maxLength={10}
+          placeholder="15/03/2569"
+          title={FORMAT_EXAMPLE.date}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
     case "year_be":
       return (
         <Input

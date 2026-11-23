@@ -9,7 +9,14 @@ import type {
   FilterOperator,
   Rank,
 } from "@/lib/types";
-import { CellFormatError, parseDate, parseMonth, parseYearBE } from "./cellFormats.ts";
+import {
+  CellFormatError,
+  formatDateBE,
+  parseDate,
+  parseMonth,
+  parseStoredDate,
+  parseYearBE,
+} from "./cellFormats.ts";
 
 // Which rows of a data source count toward a KPI, and how they become a number.
 //
@@ -155,13 +162,35 @@ function parseYear(raw: string, label: string): number {
   return Number(m[1]);
 }
 
+/** A date operand from the link editor. Typed dates are BE (parseDate), but an
+ *  operand the editor loaded from a saved filter is still the CE value that was
+ *  stored, and goes back unchanged when the link is saved without touching it —
+ *  so an exact CE "YYYY-MM-DD" is accepted as-is, while any other CE spelling
+ *  (15/03/2026) gets parseDate's CE-year error. */
+function parseDateOperand(raw: unknown): string {
+  try {
+    return parseDate(raw);
+  } catch (err) {
+    try {
+      return parseStoredDate(raw);
+    } catch {
+      throw err;
+    }
+  }
+}
+
 /** Coerce a filter operand to something comparable against a stored cell.
  *  Stored cells were already coerced on write by validateEntryValues, so this
- *  only has to bring the operand into the same shape. */
+ *  only has to bring the operand into the same shape.
+ *
+ *  `stored` says where the operand came from. A date typed into the editor is in
+ *  the Buddhist era and becomes CE here; one read back from a saved filter is
+ *  already CE (that is what validateFilter stored), so it is only checked. */
 function normalizeOperand(
   column: FilterColumnSpec,
   raw: unknown,
   what: string,
+  stored = false,
 ): string | number | boolean {
   if (raw === null || raw === undefined || raw === "") {
     throw invalid(`${what} needs a value`);
@@ -179,7 +208,7 @@ function normalizeOperand(
       try {
         if (column.dataType === "year_be") return parseYearBE(raw);
         if (column.dataType === "month") return parseMonth(raw);
-        return parseDate(raw);
+        return stored ? parseStoredDate(raw) : parseDateOperand(raw);
       } catch (err) {
         if (err instanceof CellFormatError) throw invalid(`${what} ${err.message}`);
         throw err;
@@ -222,22 +251,22 @@ function cellMatches(
   const left = cell as string | number | boolean;
   switch (filter.operator) {
     case "eq":
-      return cmp(left, normalizeOperand(column, filter.value, "Value")) === 0;
+      return cmp(left, normalizeOperand(column, filter.value, "Value", true)) === 0;
     case "in": {
       // OR within this one field. An empty list matches nothing rather than
       // everything — validateFilter rejects it, so this is only a guard.
       const options = filter.values ?? [];
       return options.some(
-        (v) => cmp(left, normalizeOperand(column, v, "Value")) === 0,
+        (v) => cmp(left, normalizeOperand(column, v, "Value", true)) === 0,
       );
     }
     case "gte":
-      return cmp(left, normalizeOperand(column, filter.value, "Value")) >= 0;
+      return cmp(left, normalizeOperand(column, filter.value, "Value", true)) >= 0;
     case "lte":
-      return cmp(left, normalizeOperand(column, filter.value, "Value")) <= 0;
+      return cmp(left, normalizeOperand(column, filter.value, "Value", true)) <= 0;
     case "between": {
-      const lo = normalizeOperand(column, filter.value, "Range start");
-      const hi = normalizeOperand(column, filter.valueTo, "Range end");
+      const lo = normalizeOperand(column, filter.value, "Range start", true);
+      const hi = normalizeOperand(column, filter.valueTo, "Range end", true);
       return cmp(left, lo) >= 0 && cmp(left, hi) <= 0; // both bounds inclusive
     }
     default:
@@ -661,15 +690,17 @@ export function describeFilter(
   columns: FilterColumnSpec[],
   labels?: Record<string, string>,
 ): string {
+  const column = columns.find((c) => c.colKey === filter.field);
+  // Stored dates are CE; people read the Buddhist era.
+  const isDate = column?.dataType === "date";
   const show = (v: unknown) => {
-    const s = String(v ?? "");
+    const s = isDate ? formatDateBE(v) : String(v ?? "");
     return labels?.[s] ?? s;
   };
 
   if (filter.field === PERIOD_FIELD) {
     return `Period is ${show(filter.value)} → ${show(filter.valueTo)}`;
   }
-  const column = columns.find((c) => c.colKey === filter.field);
   const name = column?.label ?? filter.field;
   const op = OPERATOR_LABELS[filter.operator] ?? filter.operator;
 

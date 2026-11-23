@@ -9,6 +9,7 @@ import {
   CellFormatError,
   FORMAT_EXAMPLE,
   MONTHS,
+  formatDateBE,
   monthShortLabel,
   parseDate,
   parseMonth,
@@ -143,7 +144,7 @@ export function coerceCellValue(
       if (raw === "false" || raw === 0 || raw === "0") return false;
       throw invalid(`"${column.label}" must be true or false`);
     // Formatted types share their parsing with paste, CSV and the input hints
-    // (cellFormats.ts). A date is stored as YYYY-MM-DD whatever form it came in.
+    // (cellFormats.ts). A date is typed in BE and stored as CE YYYY-MM-DD.
     case "date":
     case "year_be":
     case "month": {
@@ -265,6 +266,8 @@ export function formatCellValue(
   if (value === null || value === undefined) return "—";
   if (column.dataType === "boolean") return value ? "Yes" : "No";
   if (column.dataType === "month" && typeof value === "number") return monthShortLabel(value);
+  // Stored as CE, read in the Buddhist era.
+  if (column.dataType === "date") return formatDateBE(value);
 
   const raw = String(value);
   return isDerivedOptionType(column.dataType) ? (labels?.[raw] ?? raw) : raw;
@@ -351,7 +354,7 @@ function escapeCsvCell(value: string): string {
 function describeColumnInput(column: ColumnSpec): string {
   switch (column.dataType) {
     case "date":
-      return `Format: YYYY-MM-DD or DD/MM/YYYY (CE), ${FORMAT_EXAMPLE.date}.`;
+      return "Format: DD/MM/YYYY in the Buddhist era (BE), e.g. 15/03/2569. Not a CE year.";
     case "year_be":
       return `A 4-digit Buddhist-era (BE) year, ${FORMAT_EXAMPLE.year_be}. Not a CE year.`;
     case "month":

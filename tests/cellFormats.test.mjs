@@ -3,8 +3,10 @@ import test from "node:test";
 import {
   monthLabel,
   monthShortLabel,
+  formatDateBE,
   normalizeCellInput,
   parseDate,
+  parseStoredDate,
   parseMonth,
   currentBEYear,
   parseYearBE,
@@ -51,43 +53,58 @@ test("month labels", () => {
   assert.equal(monthShortLabel(13), "13");
 });
 
-test("a date accepts ISO and day-first slashes, dashes and dots", () => {
-  assert.equal(parseDate("2026-03-15"), "2026-03-15");
-  assert.equal(parseDate("2026-3-5"), "2026-03-05");
-  assert.equal(parseDate("15/03/2026"), "2026-03-15");
-  assert.equal(parseDate("5/3/2026"), "2026-03-05");
-  assert.equal(parseDate("15-03-2026"), "2026-03-15");
-  assert.equal(parseDate("15.03.2026"), "2026-03-15");
+test("a date is typed in BE and stored as CE, day first, with / - or .", () => {
+  assert.equal(parseDate("15/03/2569"), "2026-03-15");
+  assert.equal(parseDate("5/3/2569"), "2026-03-05");
+  assert.equal(parseDate("15-03-2569"), "2026-03-15");
+  assert.equal(parseDate("15.03.2569"), "2026-03-15");
+  assert.equal(parseDate("2569-03-15"), "2026-03-15");
+  assert.equal(parseDate("2569-3-5"), "2026-03-05");
   // Day first, always: 03/04 is 3 April.
-  assert.equal(parseDate("03/04/2026"), "2026-04-03");
+  assert.equal(parseDate("03/04/2569"), "2026-04-03");
 });
 
 test("an impossible date is rejected, leap years included", () => {
-  assert.equal(parseDate("29/02/2024"), "2024-02-29");
-  assert.throws(() => parseDate("29/02/2026"), /not a real date/);
-  assert.throws(() => parseDate("31/04/2026"), /not a real date/);
+  assert.equal(parseDate("29/02/2567"), "2024-02-29");
+  assert.throws(() => parseDate("29/02/2569"), /not a real date/);
+  assert.throws(() => parseDate("31/04/2569"), /not a real date/);
   // A US-style month-first date fails instead of being misread.
-  assert.throws(() => parseDate("03/15/2026"), /not a real date/);
-  assert.throws(() => parseDate("2026-13-01"), /not a real date/);
+  assert.throws(() => parseDate("03/15/2569"), /not a real date/);
+  assert.throws(() => parseDate("2569-13-01"), /not a real date/);
 });
 
-test("a BE year inside a date is rejected with the CE version", () => {
-  assert.throws(() => parseDate("15/03/2569"), /Buddhist-era year — write 15\/03\/2026/);
-  assert.throws(() => parseDate("2569-03-15"), /write 15\/03\/2026/);
+test("a CE year inside a date is rejected with the BE version", () => {
+  assert.throws(() => parseDate("15/03/2026"), /looks like a CE year — write 15\/03\/2569/);
+  assert.throws(() => parseDate("2026-03-15"), /write 15\/03\/2569/);
 });
 
 test("an Excel date serial is read; other junk is not", () => {
   assert.equal(parseDate("46096"), "2026-03-15");
-  for (const bad of ["15 March 2026", "2026/03/15", "123", "", "15/03/26"]) {
-    assert.throws(() => parseDate(bad), /must be a date like 2026-03-15 or 15\/03\/2026/, bad);
+  for (const bad of ["15 March 2569", "2569/03/15", "123", "", "15/03/69"]) {
+    assert.throws(() => parseDate(bad), /must be a date like 15\/03\/2569 \(DD\/MM\/YYYY, BE\)/, bad);
   }
 });
 
+test("a stored date is canonical CE and is shown in BE", () => {
+  assert.equal(parseStoredDate("2026-03-15"), "2026-03-15");
+  assert.throws(() => parseStoredDate("15/03/2569"), /not a stored CE date/);
+  assert.throws(() => parseStoredDate("2569-03-15"), /not a stored CE date/);
+  assert.throws(() => parseStoredDate("2026-02-30"), /not a stored CE date/);
+  assert.equal(formatDateBE("2026-03-15"), "15/03/2569");
+  assert.equal(formatDateBE("2024-02-29"), "29/02/2567");
+  // Anything that is not a canonical CE date is shown as it is, never hidden.
+  assert.equal(formatDateBE("2569-03-15"), "2569-03-15");
+  assert.equal(formatDateBE("soon"), "soon");
+  assert.equal(formatDateBE(null), "");
+});
+
 test("normalizeCellInput shows what will be saved, and leaves bad input alone", () => {
-  assert.equal(normalizeCellInput("date", "15/03/2026"), "2026-03-15");
+  assert.equal(normalizeCellInput("date", "2569-03-15"), "15/03/2569");
+  assert.equal(normalizeCellInput("date", "5-3-2569"), "05/03/2569");
   assert.equal(normalizeCellInput("month", "มี.ค."), "3");
   assert.equal(normalizeCellInput("year_be", " 2569 "), "2569");
-  assert.equal(normalizeCellInput("date", "31/02/2026"), "31/02/2026");
+  assert.equal(normalizeCellInput("date", "31/02/2569"), "31/02/2569");
+  assert.equal(normalizeCellInput("date", "15/03/2026"), "15/03/2026");
   assert.equal(normalizeCellInput("year_be", "2026"), "2026");
   assert.equal(normalizeCellInput("text", "15/03/2026"), "15/03/2026");
   assert.equal(normalizeCellInput("date", ""), "");

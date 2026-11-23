@@ -1,5 +1,11 @@
 // Parsing for the formatted cell types: Year (BE), Month and Date.
 //
+// Dates are typed, pasted and shown in the Buddhist era (15/03/2569) but stored
+// as CE ISO (2026-03-15), so sorting and date comparisons stay ordinary. That
+// makes two parsers: parseDate reads what a person types (BE in, CE ISO out),
+// parseStoredDate reads what is already stored (CE ISO), and formatDateBE turns
+// a stored date back into what people read.
+//
 // One source of truth for what these accept, used by cell validation
 // (coerceCellValue), Excel paste and CSV import (normalizeCellInput), link
 // filter operands, and the examples shown next to every input — so the form,
@@ -29,7 +35,7 @@ export const currentBEYear = (now: Date = new Date()) => now.getFullYear() + BE_
 export const FORMAT_EXAMPLE = {
   year_be: "e.g. 2569",
   month: "1–12, e.g. 3 (March)",
-  date: "e.g. 2026-03-15 or 15/03/2026",
+  date: "e.g. 15/03/2569 (DD/MM/YYYY, BE)",
 } as const;
 
 export const MONTHS = [
@@ -115,8 +121,11 @@ function isRealDate(y: number, m: number, d: number): boolean {
 // as one (1927-2173), so a stray small number is never taken for a date.
 const EXCEL_EPOCH_MS = Date.UTC(1899, 11, 30);
 
-/** A date as "YYYY-MM-DD". Accepts ISO, D/M/YYYY with / - or . (always day
- *  first — the Thai convention), and an Excel date serial from a paste. */
+/** A typed date, in the Buddhist era, as the canonical CE "YYYY-MM-DD" to store.
+ *  Accepts D/M/BBBB with / - or . (always day first — the Thai convention),
+ *  BBBB-MM-DD, and an Excel date serial from a paste. A CE year is rejected with
+ *  its BE spelling rather than converted: like Year (BE), silently moving a date
+ *  by 543 years is worse than asking. */
 export function parseDate(raw: unknown): string {
   const s = text(raw);
   let y: number, m: number, d: number;
@@ -133,21 +142,47 @@ export function parseDate(raw: unknown): string {
     return fail(`must be a date ${FORMAT_EXAMPLE.date.replace("e.g.", "like")}`);
   }
 
-  if (y >= BE_YEAR_FROM) {
-    fail(
-      `is ${s}, which uses a Buddhist-era year — write ${pad(d)}/${pad(m)}/${y - BE_OFFSET}`,
-    );
+  if (y >= MIN_CE_YEAR && y < BE_YEAR_FROM) {
+    fail(`is ${s}, which looks like a CE year — write ${pad(d)}/${pad(m)}/${y + BE_OFFSET}`);
   }
-  if (y < MIN_CE_YEAR || !isRealDate(y, m, d)) {
+  const ce = y - BE_OFFSET;
+  if (y > MAX_BE_YEAR || ce < MIN_CE_YEAR || !isRealDate(ce, m, d)) {
     fail(`is ${s}, which is not a real date (${FORMAT_EXAMPLE.date})`);
   }
-  return `${y}-${pad(m)}-${pad(d)}`;
+  return `${ce}-${pad(m)}-${pad(d)}`;
+}
+
+/** An already-stored date: canonical CE "YYYY-MM-DD", checked and returned as
+ *  is. Stored cells and saved link-filter operands go through this, never
+ *  parseDate, which reads BE. */
+export function parseStoredDate(raw: unknown): string {
+  const s = text(raw);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (
+    !match ||
+    Number(match[1]) < MIN_CE_YEAR ||
+    Number(match[1]) >= BE_YEAR_FROM ||
+    !isRealDate(Number(match[1]), Number(match[2]), Number(match[3]))
+  ) {
+    return fail(`is ${s}, which is not a stored CE date (YYYY-MM-DD)`);
+  }
+  return s;
+}
+
+/** A stored CE date as people read it: "2026-03-15" → "15/03/2569". Anything
+ *  that is not a canonical CE date is returned untouched, so a legacy or odd
+ *  value is shown rather than hidden. */
+export function formatDateBE(value: unknown): string {
+  const s = String(value ?? "");
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!match || Number(match[1]) >= BE_YEAR_FROM) return s;
+  return `${match[3]}/${match[2]}/${Number(match[1]) + BE_OFFSET}`;
 }
 
 export type FormattedType = keyof typeof FORMAT_EXAMPLE;
 export const isFormattedType = (t: string): t is FormattedType => t in FORMAT_EXAMPLE;
 
-/** Canonical text for an input box, so a pasted "15/03/2026" or "มี.ค." shows
+/** Canonical text for an input box, so a pasted "2569-03-15" or "มี.ค." shows
  *  as what will be saved. Anything unparseable is returned untouched for
  *  validation to report — this never hides a bad value. */
 export function normalizeCellInput(dataType: string, raw: string): string {
@@ -155,7 +190,7 @@ export function normalizeCellInput(dataType: string, raw: string): string {
   try {
     if (dataType === "year_be") return String(parseYearBE(raw));
     if (dataType === "month") return String(parseMonth(raw));
-    if (dataType === "date") return parseDate(raw);
+    if (dataType === "date") return formatDateBE(parseDate(raw));
   } catch {
     /* left for validation to report */
   }

@@ -137,7 +137,7 @@ test("buildEntryTemplateCsv marks required columns and names the input format", 
       col({ colKey: "ok", label: "OK", dataType: "boolean" }),
     ],
   });
-  assert.match(csv, /Seen on \[seen_on\] — Date, required\. Format: YYYY-MM-DD or DD\/MM\/YYYY \(CE\), e\.g\. 2026-03-15 or 15\/03\/2026\./);
+  assert.match(csv, /Seen on \[seen_on\] — Date, required\. Format: DD\/MM\/YYYY in the Buddhist era \(BE\), e\.g\. 15\/03\/2569\. Not a CE year\./);
   assert.match(csv, /OK \[ok\] — Yes \/ No\. Enter true or false\./);
 });
 
@@ -267,12 +267,12 @@ test("collectEntryRows flags a bad date and a missing required cell", () => {
     col({ colKey: "seen_on", label: "Seen on", dataType: "date" }),
     col({ colKey: "count", label: "Count", isRequired: true }),
   ];
-  const [row] = collect([["2568", "1", "2025-13-01", "", ""]], {
+  const [row] = collect([["2568", "1", "2568-13-01", "", ""]], {
     columns,
     header: ["Year", "Quarter", "Seen on", "Count", "Note"],
   });
   assert.equal(row.errors.length, 2);
-  assert.match(row.errors[0].message, /"Seen on" is 2025-13-01, which is not a real date/);
+  assert.match(row.errors[0].message, /"Seen on" is 2568-13-01, which is not a real date/);
   assert.deepEqual(row.errors[1], {
     colKey: "count",
     message: '"Count" is required',
