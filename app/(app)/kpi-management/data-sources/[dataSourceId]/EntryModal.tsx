@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Modal, Button, Field, Input, RadioGroup, Select } from "@/components/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Modal, Button, Field, Input, RadioGroup, Select, useConfirm } from "@/components/ui";
 import {
   useAcademicCatalog,
   useBulkCreateDataSourceEntries,
   useCreateDataSourceEntry,
   useFacultyRecords,
+  useSaveDataSourceEntryGroup,
   useUpdateDataSourceEntry,
 } from "@/lib/data/hooks";
 import { COLUMN_TYPE_LABELS, coerceCellValue } from "@/lib/kpi/dataSources";
@@ -31,6 +32,7 @@ import {
   type BatchMode,
 } from "@/lib/kpi/batchEntry";
 import { EMPTY_ACADEMIC_CATALOG, buildCellLabels } from "@/lib/kpi/academicCatalog";
+import { groupEntries, notesDiffer } from "@/lib/kpi/entryGroups";
 import type {
   DataSourceCellValue,
   DataSourceColumn,
@@ -95,6 +97,8 @@ export function EntryModal({
   const create = useCreateDataSourceEntry();
   const update = useUpdateDataSourceEntry();
   const bulk = useBulkCreateDataSourceEntries();
+  const saveGroup = useSaveDataSourceEntryGroup();
+  const confirm = useConfirm();
 
   // Only fetch the roster when a faculty column is actually on this source.
   const needsFaculty = columns.some((c) => c.dataType === "faculty");
@@ -120,6 +124,15 @@ export function EntryModal({
   const [note, setNote] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [mode, setMode] = useState<BatchMode>("single");
+  // Editing a multi-input entry opens every row of it, so the entry is edited
+  // and saved as a whole. Read through a ref: a refetch while the window is open
+  // must not reset what the user has typed.
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+  const [groupRows, setGroupRows] = useState<DataSourceEntry[]>([]);
+  // Imported rows each keep their own note; editing the entry must not copy one
+  // note over all of them.
+  const ownNotes = useMemo(() => notesDiffer(groupRows), [groupRows]);
 
   // "Ref by" pairs and the multiple column move to a right-hand section; the
   // rest of the form stays on the left. See lib/kpi/columnLinks.ts.
@@ -149,15 +162,30 @@ export function EntryModal({
         }),
       ),
     );
-    const cell = (key: string | undefined) => {
-      const v = key ? entry?.values[key] : undefined;
+    const cell = (row: DataSourceEntry | null, key: string | undefined) => {
+      const v = key && row ? row.values[key] : undefined;
       return v === null || v === undefined ? "" : String(v);
     };
+    const rows = entry
+      ? (groupEntries(entriesRef.current, columns).find((g) =>
+          g.rows.some((r) => r.id === entry.id),
+        )?.rows ?? [entry])
+      : [];
+    setGroupRows(rows);
+    if (notesDiffer(rows)) setNote("");
     setItems(
       Object.fromEntries(
         layout.groups.map((g) => [
           g.main.colKey,
-          entry ? [{ main: cell(g.main.colKey), target: cell(g.target?.colKey) }] : [blankItem()],
+          !entry
+            ? [blankItem()]
+            : g.multiple
+              ? rows.map((r) => ({
+                  main: cell(r, g.main.colKey),
+                  target: cell(r, g.target?.colKey),
+                  entryId: r.id,
+                }))
+              : [{ main: cell(entry, g.main.colKey), target: cell(entry, g.target?.colKey) }],
         ]),
       ),
     );
@@ -257,7 +285,8 @@ export function EntryModal({
     : isBatch
       ? yearValid && batch.canSubmit
       : yearValid && requiredFilled && !hasFormatError;
-  const submitting = create.isPending || update.isPending || bulk.isPending;
+  const submitting =
+    create.isPending || update.isPending || bulk.isPending || saveGroup.isPending;
 
   const submitBatch = () => {
     const rows = isFree
@@ -301,6 +330,36 @@ export function EntryModal({
       return;
     }
 
+    // Editing a multi-input entry: every row of it is saved together, with the
+    // values added, changed or dropped and the 1/n share recomputed for all.
+    if (entry && linked && multipleGroup) {
+      const kept = (items[multipleGroup.main.colKey] ?? []).filter((it) => it.main.trim() !== "");
+      // With every value cleared expandEntry yields one blank row; it reuses the first row.
+      const ids = kept.length
+        ? kept.map((it) => it.entryId)
+        : [(items[multipleGroup.main.colKey] ?? [])[0]?.entryId];
+      saveGroup.mutate(
+        {
+          id: dataSourceId,
+          input: {
+            originalIds: groupRows.map((r) => r.id),
+            rows: linkedRows.map((rowValues, i) => ({
+              id: ids[i],
+              year: Number(year),
+              quarter: batchQuarter,
+              values: rowValues,
+              // A row that was imported keeps its own note; added rows have none.
+              note: ownNotes
+                ? ((groupRows.find((r) => r.id === ids[i])?.note ?? "").trim() || null)
+                : note.trim() || null,
+            })),
+          },
+        },
+        { onSuccess: onClose },
+      );
+      return;
+    }
+
     // Empty string means "no value"; the API turns it into null.
     const payloadValues: Record<string, DataSourceCellValue> = linked
       ? linkedRows[0]
@@ -324,11 +383,28 @@ export function EntryModal({
     }
   };
 
+  const deleteEntry = async () => {
+    const ok = await confirm({
+      title: "Delete this entire entry?",
+      message: `All ${groupRows.length} rows of this entry will be permanently removed. This cannot be undone. Type DELETE ENTRY to proceed.`,
+      tone: "danger",
+      confirmLabel: "Delete entry",
+      confirmPhrase: "DELETE ENTRY",
+    });
+    if (!ok) return;
+    saveGroup.mutate(
+      { id: dataSourceId, input: { originalIds: groupRows.map((r) => r.id), rows: [] } },
+      { onSuccess: onClose },
+    );
+  };
+
   const batchCount = isFree ? freeRows.included.length : batch.included.length;
   const submitLabel = isBatch
     ? `Add ${batchCount} ${batchCount === 1 ? "Entry" : "Entries"}`
     : entry
-      ? "Save"
+      ? multipleGroup && linkedRows.length > 1
+        ? `Save (${linkedRows.length} rows)`
+        : "Save"
       : linked && linkedRows.length > 1
         ? `Add Entry (${linkedRows.length} rows)`
         : "Add Entry";
@@ -412,7 +488,11 @@ export function EntryModal({
       </Field>
     ));
 
-  const noteField = (
+  const noteField = ownNotes ? (
+    <Field label="Note" hint="Each row keeps its own note (set by the import); they are left as they are.">
+      <Input value="" disabled placeholder={`${groupRows.length} different notes`} readOnly />
+    </Field>
+  ) : (
     <Field
       label="Note"
       hint={
@@ -432,7 +512,9 @@ export function EntryModal({
       title={entry ? "Edit Entry" : "Add Entry"}
       subtitle={
         entry
-          ? "One row of raw data for this source."
+          ? multipleGroup
+            ? `One entry; it is saved as one row per ${multipleGroup.main.label}.`
+            : "One row of raw data for this source."
           : isBatch
             ? `${hintFor(mode, !!programColumn, hasLevelColumn)} All rows share the period below.`
             : split && multipleGroup
@@ -445,6 +527,17 @@ export function EntryModal({
       fitViewport
       footer={
         <>
+          {entry && multipleGroup && (
+            <Button
+              variant="ghost"
+              icon="delete"
+              className="mr-auto text-error hover:text-error"
+              disabled={submitting}
+              onClick={deleteEntry}
+            >
+              Delete entire entry
+            </Button>
+          )}
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
@@ -503,7 +596,7 @@ export function EntryModal({
               catalog={catalog}
               lookups={lookups}
               duplicates={duplicates}
-              allowAdd={!entry}
+              allowAdd
             />
           </div>
         ) : (

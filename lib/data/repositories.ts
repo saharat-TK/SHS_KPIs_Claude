@@ -877,6 +877,21 @@ export const dataSourcesRepo = {
       }),
       "Failed to import entries",
     ),
+  /** Save one multi-input entry as a whole: rows with an id update, rows
+   *  without insert, and `originalIds` missing from `rows` are removed. An empty
+   *  `rows` deletes the entry. One transaction, one KPI re-feed. */
+  saveEntryGroup: async (
+    id: number,
+    input: DataSourceEntryGroupInput,
+  ): Promise<{ updated: number; inserted: number; removed: number }> =>
+    jsonOrThrow(
+      await fetch(`/api/data-sources/${id}/entries/group`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      "Failed to save entry",
+    ),
   updateEntry: async (
     entryId: number,
     input: Partial<DataSourceEntryInput>,
@@ -971,6 +986,13 @@ export interface DataSourceBulkEntryInput {
     values: Record<string, DataSourceCellValue>;
     note?: string | null;
   }[];
+}
+
+/** An edited multi-input entry: its original row ids and the rows to leave in
+ *  its place. See dataSourcesRepo.saveEntryGroup. */
+export interface DataSourceEntryGroupInput {
+  originalIds: number[];
+  rows: (DataSourceEntryInput & { id?: number })[];
 }
 
 export type {

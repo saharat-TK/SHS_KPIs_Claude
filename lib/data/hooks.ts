@@ -39,6 +39,7 @@ import {
   edpexRepo,
   type DataSourceColumnInput,
   type DataSourceBulkEntryInput,
+  type DataSourceEntryGroupInput,
   type DataSourceEntryInput,
   type DataSourceLinkInput,
   type LinkWriteResult,
@@ -1135,6 +1136,26 @@ export function useUpdateDataSourceEntry() {
     meta: { toast: "Entry updated" },
     onSuccess: (_d, { dataSourceId }) => {
       qc.invalidateQueries({ queryKey: ["dataSourceEntries", dataSourceId] });
+      invalidatePerformanceValues(qc);
+    },
+  });
+}
+
+/** Save an edited multi-input entry (all its rows) in one request. */
+export function useSaveDataSourceEntryGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: DataSourceEntryGroupInput }) =>
+      dataSourcesRepo.saveEntryGroup(id, input),
+    meta: {
+      toast: (d: unknown) => {
+        const r = d as { updated: number; inserted: number };
+        return r.updated + r.inserted === 0 ? "Entry deleted" : "Entry updated";
+      },
+    },
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: ["dataSourceEntries", id] });
+      qc.invalidateQueries({ queryKey: ["dataSources"] });
       invalidatePerformanceValues(qc);
     },
   });

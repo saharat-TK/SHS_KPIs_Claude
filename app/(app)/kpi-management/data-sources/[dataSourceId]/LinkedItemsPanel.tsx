@@ -16,6 +16,8 @@ import { CellInput } from "./CellInput";
 export interface DraftItem {
   main: string;
   target: string;
+  /** Editing an entry: the saved row this item came from. New items have none. */
+  entryId?: number;
 }
 
 export const blankItem = (): DraftItem => ({ main: "", target: "" });

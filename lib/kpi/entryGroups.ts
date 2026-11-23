@@ -25,9 +25,12 @@ export function perRowColKeys(columns: DataSourceColumn[]): Set<string> {
   return keys;
 }
 
-/** Rows with the same period, note and shared-column values form one group.
- *  Groups are ordered by their first row's position and rows keep their
- *  incoming order, so an already-sorted list stays sorted. */
+/** Rows with the same period and shared-column values form one group. The note
+ *  is deliberately not part of the key: the entry form saves one note on every
+ *  row, but an import gives each row its own (e.g. "pub:<key>:<author>"), and
+ *  those rows are still one paper. Groups are ordered by their first row's
+ *  position and rows keep their incoming order, so an already-sorted list stays
+ *  sorted. */
 export function groupEntries(
   entries: DataSourceEntry[],
   columns: DataSourceColumn[],
@@ -43,7 +46,6 @@ export function groupEntries(
     const key = JSON.stringify([
       entry.year,
       entry.quarter,
-      entry.note ?? "",
       ...shared.map((c) => {
         const v = entry.values[c.colKey];
         return v === undefined || v === "" ? null : v;
@@ -54,4 +56,51 @@ export function groupEntries(
     else groups.set(key, { key, rows: [entry] });
   }
   return [...groups.values()];
+}
+
+/** True when the rows of a group don't all carry the same note — an imported
+ *  entry. Such notes belong to their own row, so editing the group leaves them
+ *  alone rather than copying one note onto every row. */
+export function notesDiffer(rows: { note: string | null }[]): boolean {
+  const first = rows[0]?.note ?? "";
+  return rows.some((row) => (row.note ?? "") !== first);
+}
+
+export interface GroupSavePlan {
+  /** Existing rows that stay, with their new values. */
+  update: number[];
+  /** Rows without an id: new values added to the entry. */
+  insert: number;
+  /** Original rows no longer present: values removed from the entry. */
+  remove: number[];
+}
+
+/** What saving an edited entry does to the table: rows that carry one of the
+ *  entry's original ids are updated, rows without an id are inserted, and
+ *  original rows that were dropped are removed. An id that is not one of the
+ *  originals (or is repeated) is an error, so a request can never touch a row
+ *  outside the entry it was opened from. */
+export function planGroupSave(
+  originalIds: number[],
+  rows: { id?: number }[],
+): GroupSavePlan {
+  const original = new Set(originalIds);
+  const kept = new Set<number>();
+  let insert = 0;
+  for (const row of rows) {
+    if (row.id === undefined) {
+      insert += 1;
+      continue;
+    }
+    if (!original.has(row.id)) {
+      throw new RangeError(`Row ${row.id} does not belong to this entry`);
+    }
+    if (kept.has(row.id)) throw new RangeError(`Row ${row.id} appears twice`);
+    kept.add(row.id);
+  }
+  return {
+    update: [...kept],
+    insert,
+    remove: originalIds.filter((id) => !kept.has(id)),
+  };
 }
