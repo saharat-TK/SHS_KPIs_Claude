@@ -14,7 +14,12 @@ import {
 import { Table, Th, Td, EmptyState, useConfirm } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { useDeleteDataSourceEntry } from "@/lib/data/hooks";
-import { formatCellValue, formatEntryPeriod, isHttpUrl } from "@/lib/kpi/dataSources";
+import {
+  describeEntryForConfirm,
+  formatCellValue,
+  formatEntryPeriod,
+  isHttpUrl,
+} from "@/lib/kpi/dataSources";
 import {
   groupEntries,
   notesDiffer,
@@ -201,7 +206,7 @@ export function EntriesTable({
               onDelete={async (e) => {
                 const ok = await confirm({
                   title: "Delete this entry?",
-                  message: `The ${formatEntryPeriod(e.year, e.quarter)} row will be permanently removed.`,
+                  message: `The ${describeEntryForConfirm(columns, e, cellLabels)} row will be permanently removed.`,
                   tone: "danger",
                   confirmLabel: "Delete",
                 });

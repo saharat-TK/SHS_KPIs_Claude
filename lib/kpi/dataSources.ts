@@ -278,6 +278,28 @@ export function formatEntryPeriod(year: number, quarter: number | null): string 
   return quarter === null ? String(year) : `${year} Q${quarter}`;
 }
 
+/** What a delete confirm calls an entry: the value in its second column (the first
+ *  data column after Period), quoted, so "which one?" is answerable — a Period is
+ *  shared by many rows. Falls back to the bare period when that cell is empty, the
+ *  source has no columns, or the column is a derived option (program, faculty…)
+ *  and the caller has no `labels` to turn its id into a name. */
+export function describeEntryForConfirm(
+  columns: ColumnSpec[],
+  entry: { year: number; quarter: number | null; values: Record<string, DataSourceCellValue> },
+  labels?: Record<string, string>,
+  max = 60,
+): string {
+  const column = columns[0];
+  if (column && (labels || !isDerivedOptionType(column.dataType))) {
+    const value = entry.values[column.colKey] ?? null;
+    const text = formatCellValue(column, value, labels).replace(/\s+/g, " ").trim();
+    if (text && text !== "—") {
+      return `"${text.length > max ? `${text.slice(0, max).trimEnd()}…` : text}"`;
+    }
+  }
+  return formatEntryPeriod(entry.year, entry.quarter);
+}
+
 /* ------------------------------------------------------------------------- *
  * CSV template + bulk import
  *

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   coerceCellValue,
+  describeEntryForConfirm,
   formatCellValue,
   formatEntryPeriod,
   normalizeEntryPeriod,
@@ -186,6 +187,36 @@ test("formatCellValue renders booleans and blanks readably", () => {
 test("formatEntryPeriod omits the quarter for annual entries", () => {
   assert.equal(formatEntryPeriod(2568, 3), "2568 Q3");
   assert.equal(formatEntryPeriod(2568, null), "2568");
+});
+
+const entryOf = (values, year = 2569, quarter = 1) => ({ year, quarter, values });
+const titleCol = col({ colKey: "title", label: "Title", dataType: "text" });
+
+test("describeEntryForConfirm names an entry by its second-column value, quoted", () => {
+  assert.equal(
+    describeEntryForConfirm([titleCol], entryOf({ title: "  Deep   learning\nfor X " })),
+    '"Deep learning for X"',
+  );
+});
+
+test("describeEntryForConfirm cuts long values and formats dates in BE", () => {
+  const long = "a".repeat(80);
+  assert.equal(describeEntryForConfirm([titleCol], entryOf({ title: long })), `"${"a".repeat(60)}…"`);
+  const dateCol = col({ colKey: "d", label: "Date", dataType: "date" });
+  assert.equal(describeEntryForConfirm([dateCol], entryOf({ d: "2026-03-15" })), '"15/03/2569"');
+});
+
+test("describeEntryForConfirm falls back to the period when there is nothing to name", () => {
+  assert.equal(describeEntryForConfirm([titleCol], entryOf({ title: null })), "2569 Q1");
+  assert.equal(describeEntryForConfirm([titleCol], entryOf({ title: "   " }, 2569, null)), "2569");
+  assert.equal(describeEntryForConfirm([], entryOf({})), "2569 Q1");
+});
+
+test("describeEntryForConfirm needs labels to name a derived-option column", () => {
+  const program = col({ colKey: "program", label: "Program", dataType: "program" });
+  const entry = entryOf({ program: "12" });
+  assert.equal(describeEntryForConfirm([program], entry), "2569 Q1");
+  assert.equal(describeEntryForConfirm([program], entry, { 12: "Nursing" }), '"Nursing"');
 });
 
 // ── Derived-option column types (faculty / program) ─────────────────────────
