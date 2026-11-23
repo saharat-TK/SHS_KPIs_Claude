@@ -28,6 +28,7 @@ export function Th({
   sortDir,
   onSort,
   align = "left",
+  wrap = false,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -35,6 +36,8 @@ export function Th({
   sortDir?: "asc" | "desc" | null;
   onSort?: () => void;
   align?: "left" | "right" | "center";
+  /** Let the label wrap to at most two lines instead of staying on one. */
+  wrap?: boolean;
 }) {
   return (
     <th
@@ -48,13 +51,23 @@ export function Th({
       )}
       onClick={sortable ? onSort : undefined}
     >
-      <span className={cn("inline-flex items-center gap-xs", align === "right" && "flex-row-reverse")}>
-        {children}
+      <span
+        className={cn(
+          "inline-flex gap-xs",
+          wrap ? "max-w-full items-start" : "items-center",
+          align === "right" && "justify-end",
+        )}
+      >
+        {wrap ? (
+          <span className="line-clamp-2 min-w-0 break-words leading-tight">{children}</span>
+        ) : (
+          children
+        )}
         {sortable && (
           <Icon
             name={sortDir === "asc" ? "arrow_upward" : sortDir === "desc" ? "arrow_downward" : "unfold_more"}
             size={14}
-            className={cn(sortDir ? "text-on-surface" : "text-stone")}
+            className={cn("shrink-0", wrap && "mt-px", sortDir ? "text-on-surface" : "text-stone")}
           />
         )}
       </span>
@@ -67,15 +80,18 @@ export function Td({
   className,
   align = "left",
   onClick,
+  rowSpan,
 }: {
   children: React.ReactNode;
   className?: string;
   align?: "left" | "right" | "center";
   onClick?: (e: React.MouseEvent<HTMLTableCellElement>) => void;
+  rowSpan?: number;
 }) {
   return (
     <td
       onClick={onClick}
+      rowSpan={rowSpan}
       className={cn(
         "border-b border-hairline px-lg py-sm text-on-surface align-middle",
         align === "right" && "text-right",

@@ -347,6 +347,7 @@ function DataSourceDetail({ id }: { id: number }) {
                       <Th align="center">Type</Th>
                       <Th align="center">Unit</Th>
                       <Th align="center">Required</Th>
+                      <Th align="center">Multiple inputs</Th>
                       <Th>Options</Th>
                     </tr>
                   </thead>
@@ -362,6 +363,7 @@ function DataSourceDetail({ id }: { id: number }) {
                           {c.unit ?? "—"}
                         </Td>
                         <Td align="center">{c.isRequired ? "Yes" : "—"}</Td>
+                        <Td align="center">{c.isMultiple ? "Yes" : "—"}</Td>
                         <Td className="text-mute">{c.options?.join(", ") ?? "—"}</Td>
                       </tr>
                     ))}
