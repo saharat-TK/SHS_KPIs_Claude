@@ -45,7 +45,7 @@ export function TransferList<T extends TransferListItem>({
           value={searchAvailable}
           onChange={(e) => setSearchAvailable(e.target.value)}
         />
-        <div className="h-[220px] overflow-y-auto scroll-thin rounded-DEFAULT border border-hairline">
+        <div className="h-[220px] overflow-y-auto scroll-thin rounded border border-hairline">
           {filteredAvailable.length === 0 ? (
             <p className="p-md text-caption-sm text-mute">No one available</p>
           ) : (
@@ -71,7 +71,7 @@ export function TransferList<T extends TransferListItem>({
           value={searchSelected}
           onChange={(e) => setSearchSelected(e.target.value)}
         />
-        <div className="h-[220px] overflow-y-auto scroll-thin rounded-DEFAULT border border-hairline">
+        <div className="h-[220px] overflow-y-auto scroll-thin rounded border border-hairline">
           {filteredSelected.length === 0 ? (
             <p className="p-md text-caption-sm text-mute">No one selected</p>
           ) : (

@@ -40,7 +40,7 @@ export function RadioGroup<T extends string>({
           <label
             key={opt.value}
             className={cn(
-              "flex items-start gap-sm rounded-DEFAULT px-md py-sm cursor-pointer transition-colors",
+              "flex items-start gap-sm rounded px-md py-sm cursor-pointer transition-colors",
               selected ? "bg-surface-soft" : "hover:bg-surface-soft"
             )}
           >

@@ -87,7 +87,7 @@ export function Sidebar({
             aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
             title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
             className={cn(
-              "ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT text-[#8a8a8a] transition-colors hover:bg-[#151515] hover:text-white lg:flex",
+              "ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded text-[#8a8a8a] transition-colors hover:bg-[#151515] hover:text-white lg:flex",
               collapsed && "lg:absolute lg:left-[52px] lg:ml-0 lg:border lg:border-[#272727] lg:bg-black",
             )}
           >
@@ -184,7 +184,7 @@ function NavLeaf({
       onClick={onClose}
       title={collapsed ? t(item.label) : undefined}
       className={cn(
-        "flex items-center gap-tiny rounded-DEFAULT border-y border-r border-l-4 px-sm py-xs text-[15px] transition-colors",
+        "flex items-center gap-tiny rounded border-y border-r border-l-4 px-sm py-xs text-[15px] transition-colors",
         collapsed && "lg:h-10 lg:w-10 lg:justify-center lg:p-0",
         indented && !collapsed && "pl-md",
         active
@@ -192,7 +192,7 @@ function NavLeaf({
           : "border-transparent text-white hover:bg-[#151515]",
       )}
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT text-white">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-white">
         <Icon name={item.icon} size={indented ? 17 : 19} />
       </span>
       <span className={cn("min-w-0 truncate", collapsed && "lg:hidden")}>
@@ -253,7 +253,7 @@ function NavParent({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={cn(
-          "flex items-center gap-tiny rounded-DEFAULT border border-transparent px-sm py-xs text-[15px] transition-colors",
+          "flex items-center gap-tiny rounded border border-transparent px-sm py-xs text-[15px] transition-colors",
           childActive && !open
             ? "text-primary-container"
             : "text-white hover:bg-[#151515]",
@@ -261,7 +261,7 @@ function NavParent({
       >
         <span
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-DEFAULT",
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded",
             childActive ? "text-primary-container" : "text-white",
           )}
         >

@@ -266,9 +266,11 @@ function DataSourceDetail({ id }: { id: number }) {
                 title="Rows missing a required value are not counted in any KPI until completed"
                 onClick={() => setOnlyIncomplete((v) => !v)}
                 className={`inline-flex shrink-0 items-center gap-xs rounded-full border px-md py-xs text-caption-sm font-medium ${
+                  // Always orange, since it flags rows that no KPI counts yet;
+                  // the tint is what shows the filter is switched on.
                   onlyIncomplete
-                    ? "border-warning bg-warning/10 text-warning"
-                    : "border-hairline-strong text-mute hover:text-on-surface"
+                    ? "border-warning bg-warning/15 text-warning"
+                    : "border-warning text-warning hover:bg-warning/10"
                 }`}
               >
                 <Icon name="warning" className="text-[16px]" />
@@ -299,7 +301,7 @@ function DataSourceDetail({ id }: { id: number }) {
           />
 
           {tab === "data" && (
-            <Card className="overflow-visible">
+            <Card elevated className="overflow-visible">
               <QueryBoundary isLoading={entriesQ.isLoading} isError={entriesQ.isError}>
                 {columns.length === 0 ? (
                   <EmptyState
@@ -348,7 +350,7 @@ function DataSourceDetail({ id }: { id: number }) {
           )}
 
           {tab === "columns" && (
-            <Card className="overflow-hidden">
+            <Card elevated className="overflow-hidden">
               {columns.length === 0 ? (
                 <EmptyState
                   icon="view_column"
@@ -398,7 +400,7 @@ function DataSourceDetail({ id }: { id: number }) {
           )}
 
           {tab === "links" && (
-            <Card className="overflow-hidden">
+            <Card elevated className="overflow-hidden">
               <QueryBoundary isLoading={linksQ.isLoading} isError={linksQ.isError}>
                 {links.length === 0 ? (
                   <EmptyState

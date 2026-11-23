@@ -78,7 +78,7 @@ export function LinkedDataSourcesSection({
   const linkedSourceIds = sources.map((s) => s.id);
 
   return (
-    <Card className="overflow-visible">
+    <Card elevated className="overflow-visible">
       <div className="flex items-start justify-between gap-md border-b border-hairline px-md py-md">
         <div className="flex flex-col gap-tiny">
           <h3 className="text-heading-md text-on-surface">Linked Data Sources</h3>

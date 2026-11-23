@@ -84,7 +84,7 @@ export function AnnualQuarterProgressMatrix({
   const subtitle = `Year ${year}${kpi.startYear ? ` · ${kpi.startYear + year - 1}` : ""}`;
 
   return (
-    <Card className="bg-white">
+    <Card elevated className="bg-white">
       <CardHeader title="Annual & Quarterly Progress" subtitle={subtitle} />
       <CardBody className="flex flex-col gap-md">
         <div className="flex flex-col gap-xs">

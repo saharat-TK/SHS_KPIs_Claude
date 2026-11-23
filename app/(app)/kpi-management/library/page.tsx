@@ -68,7 +68,7 @@ function Library() {
         }
       />
 
-      <Card className="overflow-hidden">
+      <Card elevated className="overflow-hidden">
         <QueryBoundary isLoading={setsQ.isLoading} isError={setsQ.isError}>
           {sets.length === 0 ? (
             <EmptyState

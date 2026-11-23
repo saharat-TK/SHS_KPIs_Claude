@@ -177,7 +177,7 @@ function CategoryRow({
         onDrop();
       }}
       className={cn(
-        "flex items-start gap-sm rounded-DEFAULT px-md py-sm border-t-2 transition-colors",
+        "flex items-start gap-sm rounded px-md py-sm border-t-2 transition-colors",
         dragging ? "opacity-40" : "",
         dragOver ? "border-primary-container" : "border-transparent",
       )}
@@ -254,7 +254,7 @@ function CategoryRow({
               deleteCat.mutate(category.id);
             }
           }}
-          className="flex h-[30px] w-[30px] items-center justify-center rounded-DEFAULT text-mute transition-colors enabled:hover:bg-error/10 enabled:hover:text-error disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-[30px] w-[30px] items-center justify-center rounded text-mute transition-colors enabled:hover:bg-error/10 enabled:hover:text-error disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Icon name="delete" size={18} />
         </button>

@@ -202,7 +202,7 @@ export function ActionMenu({
           }
         }}
         className={cn(
-          "grid h-8 w-8 place-items-center rounded-DEFAULT text-mute transition-colors",
+          "grid h-8 w-8 place-items-center rounded text-mute transition-colors",
           "hover:bg-surface-soft hover:text-on-surface",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container",
           open && "bg-surface-soft text-on-surface",

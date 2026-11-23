@@ -149,7 +149,7 @@ export function MetricEditor({
       : undefined;
 
   return (
-    <Card>
+    <Card elevated>
       <CardHeader
         title="Sub-KPIs (Metrics)"
         subtitle="Component metrics that roll up into this KPI."

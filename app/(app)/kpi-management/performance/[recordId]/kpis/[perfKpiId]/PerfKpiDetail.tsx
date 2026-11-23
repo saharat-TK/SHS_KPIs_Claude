@@ -663,7 +663,7 @@ function ApprovalNoteModal({
           </Button>
           <Button
             icon="send"
-            className="rounded-DEFAULT"
+            className="rounded"
             disabled={text.trim().length < 3 || submitting}
             onClick={() => onSend(text.trim())}
           >
@@ -710,7 +710,7 @@ function ApproveConfirmModal({
           </Button>
           <Button
             icon="approval"
-            className="rounded-DEFAULT"
+            className="rounded"
             disabled={submitting}
             onClick={onApprove}
           >

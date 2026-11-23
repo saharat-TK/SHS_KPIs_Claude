@@ -67,7 +67,7 @@ function DataSources() {
         actions={newButton}
       />
 
-      <Card className="overflow-hidden">
+      <Card elevated className="overflow-hidden">
         <div className="flex items-center gap-sm border-b border-hairline p-md">
           <Select
             value={committeeFilter}

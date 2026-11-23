@@ -37,7 +37,9 @@ import {
 
 /** Cell/header spacing. Must match CELL_PAD_X in columnWidths.ts (6px a side). */
 const CELL = "!px-sm !py-xs !align-top";
-const HEAD = "bg-surface-lowest !px-sm !py-xs !align-top";
+/** Header cells: 12px above the label (the same gap as above the first data row)
+ *  and 8px below. Literal arbitrary classes so Tailwind's scanner emits them. */
+const HEAD = "bg-surface-lowest !px-sm !pt-[12px] !pb-[8px] !align-top";
 /** First (Period) column: 20px left padding. Must equal 6px + FIRST_COLUMN_EXTRA_LEFT
  *  in columnWidths.ts; written as a literal so Tailwind's scanner emits it. */
 const FIRST_COL = "!pl-[20px]";
@@ -173,7 +175,15 @@ export function EntriesTable({
         />
       ) : (
       <>
-      <div className={cn("overflow-y-auto scroll-thin [scrollbar-gutter:stable]", heightClass)}>
+      {/* rounded-lg: the card around this is rounded but not clipping, so the
+          sticky header's square white band would otherwise stick out past its
+          corners. A scroll box clips its children to its own radius. */}
+      <div
+        className={cn(
+          "overflow-y-auto rounded-lg scroll-thin [scrollbar-gutter:stable]",
+          heightClass,
+        )}
+      >
       <div className="sticky top-0 z-20 bg-surface-lowest">
         <div
           ref={headerScrollRef}
@@ -425,8 +435,11 @@ function DataTableHeader({
           sortable
           sortDir={sort?.key === "__period" ? sort.direction : null}
           onSort={() => onSort("__period")}
+          align="center"
           wrap
-          className={cn(HEAD, FIRST_COL)}
+          // No FIRST_COL indent here: it exists to inset the left-aligned body
+          // values, and on a centred label it would push it right of centre.
+          className={HEAD}
         >
           Period
         </Th>
@@ -436,7 +449,7 @@ function DataTableHeader({
             sortable
             sortDir={sort?.key === columnSortKey(column) ? sort.direction : null}
             onSort={() => onSort(columnSortKey(column))}
-            align={NUMERIC_TYPES.has(column.dataType) ? "right" : "left"}
+            align="center"
             wrap
             className={HEAD}
           >
@@ -448,6 +461,7 @@ function DataTableHeader({
           sortable
           sortDir={sort?.key === "__note" ? sort.direction : null}
           onSort={() => onSort("__note")}
+          align="center"
           wrap
           className={HEAD}
         >
@@ -457,6 +471,7 @@ function DataTableHeader({
           sortable
           sortDir={sort?.key === "__createdAt" ? sort.direction : null}
           onSort={() => onSort("__createdAt")}
+          align="center"
           wrap
           className={HEAD}
         >
@@ -464,8 +479,8 @@ function DataTableHeader({
         </Th>
         {canRecord && (
           <Th
-            align="right"
-            className="sticky right-0 z-10 !px-md !align-top border-l border-hairline bg-surface-lowest shadow-[-8px_0_12px_-10px_rgb(0_0_0_/_0.35)]"
+            align="center"
+            className="sticky right-0 z-10 !px-md !pt-[12px] !pb-[8px] !align-top border-l border-hairline bg-surface-lowest shadow-[-8px_0_12px_-10px_rgb(0_0_0_/_0.35)]"
           >
             Actions
           </Th>

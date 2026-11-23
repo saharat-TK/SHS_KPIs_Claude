@@ -459,7 +459,7 @@ function KpiDetail() {
               title={t("kpiDetail.deleteKpi")}
               disabled={saving || del.isPending}
               onClick={askDelete}
-              className="flex h-[36px] w-[36px] items-center justify-center rounded-DEFAULT text-mute transition-colors enabled:hover:bg-error/10 enabled:hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-[36px] w-[36px] items-center justify-center rounded text-mute transition-colors enabled:hover:bg-error/10 enabled:hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Icon name="delete" size={18} />
             </button>
@@ -472,7 +472,7 @@ function KpiDetail() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-lg">
             <div className="flex flex-col gap-lg">
               {/* Core Configuration */}
-              <Card>
+              <Card elevated>
                 <CardHeader title={t("kpiDetail.coreConfig")} />
                 <CardBody className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
                   <Field label={t("kpiDetail.name")}>
@@ -615,7 +615,7 @@ function KpiDetail() {
               </Card>
 
               {/* Annual Target (5 years) */}
-              <Card>
+              <Card elevated>
                 <CardHeader
                   title={t("kpiDetail.annualTarget")}
                   subtitle={t("kpiDetail.annualTargetSubtitle")}
@@ -674,7 +674,7 @@ function KpiDetail() {
               </Card>
 
               {/* KPI Calculation Logic */}
-              <Card>
+              <Card elevated>
                 <CardHeader
                   title={t("kpiDetail.calcLogic")}
                   subtitle={t(CALC_LABEL[draft.calculationType])}
@@ -875,7 +875,7 @@ function KpiDetail() {
 
             {/* Threshold Settings sidebar */}
             <div className="flex flex-col gap-lg">
-              <Card>
+              <Card elevated>
                 <CardHeader
                   title={t("kpiDetail.thresholdSettings")}
                   subtitle={t("kpiDetail.thresholdSubtitle")}
@@ -925,7 +925,7 @@ function KpiDetail() {
                 </CardBody>
               </Card>
 
-              <Card>
+              <Card elevated>
                 <CardHeader title={t("kpiDetail.rollup")} />
                 <CardBody>
                   <Badge tone={hasChildren ? "info" : "neutral"}>
