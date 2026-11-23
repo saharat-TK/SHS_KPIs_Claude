@@ -140,7 +140,7 @@ export function Combobox({
         disabled={disabled}
         onClick={() => (open ? close() : openNow())}
         className={cn(
-          "w-full h-[36px] px-md bg-surface-lowest rounded-DEFAULT border border-hairline",
+          "w-full h-[36px] px-md bg-surface-lowest rounded border border-hairline",
           "focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none",
           "text-body-sm text-left transition-colors flex items-center justify-between gap-sm",
           "disabled:bg-surface-soft disabled:text-mute disabled:cursor-not-allowed",

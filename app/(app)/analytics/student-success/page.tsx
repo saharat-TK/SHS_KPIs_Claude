@@ -117,7 +117,7 @@ export default function StudentSuccessPage() {
             key={p}
             onClick={() => setPeriod(p)}
             className={
-              "rounded-DEFAULT px-md py-sm text-label-md border transition-colors " +
+              "rounded px-md py-sm text-label-md border transition-colors " +
               (p === period
                 ? "border-primary-container bg-surface-soft text-primary-dark"
                 : "border-hairline bg-surface-lowest text-mute hover:text-on-surface")

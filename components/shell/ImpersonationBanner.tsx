@@ -40,7 +40,7 @@ export function ImpersonationBanner() {
       <button
         onClick={stop}
         disabled={busy}
-        className="shrink-0 rounded-DEFAULT border border-hairline px-sm py-tiny text-caption-sm text-on-surface hover:bg-surface-soft transition-colors disabled:opacity-50"
+        className="shrink-0 rounded border border-hairline px-sm py-tiny text-caption-sm text-on-surface hover:bg-surface-soft transition-colors disabled:opacity-50"
       >
         {busy ? "Stopping…" : "Stop"}
       </button>

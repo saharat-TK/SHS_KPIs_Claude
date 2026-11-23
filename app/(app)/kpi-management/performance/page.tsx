@@ -473,7 +473,7 @@ function RecordingPeriodsModal({
                           type="button"
                           title={auditText(yearNo, quarterNo)}
                           className={[
-                            "flex h-[34px] items-center justify-center rounded-DEFAULT border px-sm text-label-md transition-colors",
+                            "flex h-[34px] items-center justify-center rounded border px-sm text-label-md transition-colors",
                             isOpen
                               ? "border-primary-container bg-primary text-on-primary"
                               : "border-hairline bg-surface-soft text-mute hover:text-on-surface",

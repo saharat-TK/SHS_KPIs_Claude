@@ -239,7 +239,7 @@ export function FreeEntryGrid({
         </span>
       </div>
 
-      <div className="min-w-0 overflow-hidden rounded-DEFAULT border border-hairline">
+      <div className="min-w-0 overflow-hidden rounded border border-hairline">
         <Table>
           <thead>
             <tr>

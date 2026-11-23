@@ -459,7 +459,7 @@ function KpiDetail() {
               title={t("kpiDetail.deleteKpi")}
               disabled={saving || del.isPending}
               onClick={askDelete}
-              className="flex h-[36px] w-[36px] items-center justify-center rounded-DEFAULT text-mute transition-colors enabled:hover:bg-error/10 enabled:hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-[36px] w-[36px] items-center justify-center rounded text-mute transition-colors enabled:hover:bg-error/10 enabled:hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Icon name="delete" size={18} />
             </button>

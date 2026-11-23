@@ -322,7 +322,7 @@ function KpiDetail() {
                       <button
                         key={d.id}
                         onClick={() => toggleCommittee(d.id)}
-                        className="flex items-center justify-between gap-sm rounded-DEFAULT px-md py-sm hover:bg-surface-soft transition-colors text-left"
+                        className="flex items-center justify-between gap-sm rounded px-md py-sm hover:bg-surface-soft transition-colors text-left"
                       >
                         <span className="text-body-sm">{committeeName(d.id)}</span>
                         <Icon

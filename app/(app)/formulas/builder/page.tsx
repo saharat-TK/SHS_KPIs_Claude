@@ -135,7 +135,7 @@ function FormulaBuilder() {
                     onChange={(e) => setExpression(e.target.value)}
                     rows={3}
                     spellCheck={false}
-                    className="w-full rounded-DEFAULT border border-hairline bg-surface-lowest px-md py-sm font-mono text-body-md text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none resize-none"
+                    className="w-full rounded border border-hairline bg-surface-lowest px-md py-sm font-mono text-body-md text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none resize-none"
                   />
                 </Field>
 
@@ -144,7 +144,7 @@ function FormulaBuilder() {
                     <button
                       key={t}
                       onClick={() => insert(t)}
-                      className="rounded-DEFAULT border border-hairline bg-surface-soft px-md py-xs font-mono text-body-sm hover:border-hairline-strong transition-colors"
+                      className="rounded border border-hairline bg-surface-soft px-md py-xs font-mono text-body-sm hover:border-hairline-strong transition-colors"
                     >
                       {t}
                     </button>

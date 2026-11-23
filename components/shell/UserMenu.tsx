@@ -79,7 +79,7 @@ export function UserMenu() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex h-[36px] items-center gap-sm rounded-DEFAULT px-sm hover:bg-surface-soft transition-colors"
+        className="flex h-[36px] items-center gap-sm rounded px-sm hover:bg-surface-soft transition-colors"
         title={
           impersonating
             ? t("userMenu.viewingAs", { name: user.name })
@@ -133,7 +133,7 @@ export function UserMenu() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("userMenu.searchFaculty")}
-                  className="h-[32px] w-full rounded-DEFAULT border border-hairline bg-surface-soft px-sm text-caption-sm text-on-surface outline-none focus:border-primary-dark"
+                  className="h-[32px] w-full rounded border border-hairline bg-surface-soft px-sm text-caption-sm text-on-surface outline-none focus:border-primary-dark"
                 />
               </div>
               {candidates.map((f) => (

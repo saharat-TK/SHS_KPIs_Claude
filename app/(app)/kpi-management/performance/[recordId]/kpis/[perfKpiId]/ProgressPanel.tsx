@@ -577,7 +577,7 @@ export function QuarterEntry({
             {approvalLock?.locked && !hideApprovalLockMessage ? (
               <div
                 className={cn(
-                  "inline-flex max-w-full items-center gap-sm rounded-DEFAULT bg-surface-soft px-md py-sm text-body-sm sm:max-w-[420px] sm:text-right",
+                  "inline-flex max-w-full items-center gap-sm rounded bg-surface-soft px-md py-sm text-body-sm sm:max-w-[420px] sm:text-right",
                   approvalLock.tone === "success" ? "text-[#2f6500]" : "text-[#8a4b00]",
                 )}
               >
@@ -606,7 +606,7 @@ export function QuarterEntry({
       )}
 
       {prefilledFromQuarter != null && (
-        <div className="flex items-center gap-sm rounded-DEFAULT border border-hairline bg-surface-soft px-md py-sm text-caption-sm text-mute">
+        <div className="flex items-center gap-sm rounded border border-hairline bg-surface-soft px-md py-sm text-caption-sm text-mute">
           <Badge tone="info">draft</Badge>
           Pre-filled from Q{prefilledFromQuarter} — review, adjust, and Save. Nothing is
           recorded until you save.
@@ -647,7 +647,7 @@ export function QuarterEntry({
               </div>
             )}
           </div>
-          <div className="flex items-center justify-between rounded-DEFAULT border border-hairline bg-surface-lowest px-md py-sm">
+          <div className="flex items-center justify-between rounded border border-hairline bg-surface-lowest px-md py-sm">
             <span className="text-body-sm text-mute">Computed value (Cumulative)</span>
             <span className="text-body-strong text-on-surface">
               {computedValue == null ? "—" : `${formatNumber(computedValue, 2)} ${unit ?? ""}`}
@@ -715,7 +715,7 @@ export function QuarterEntry({
               placeholder="Enter recorded value"
             />
           ) : (
-            <div className="flex h-[36px] items-center justify-end rounded-DEFAULT border border-hairline bg-surface-soft px-md text-body-md font-bold text-on-surface">
+            <div className="flex h-[36px] items-center justify-end rounded border border-hairline bg-surface-soft px-md text-body-md font-bold text-on-surface">
               {existing?.progressValue == null
                 ? "— (awaiting sub-KPI data)"
                 : `${formatNumber(existing.progressValue, 2)} ${unit ?? ""}`}
@@ -768,7 +768,7 @@ function RequiredArea({
         disabled={readOnly}
         onChange={(e) => onChange(e.target.value)}
         rows={3}
-        className="w-full px-md py-sm bg-surface-lowest rounded-DEFAULT border border-hairline focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none text-body-sm text-on-surface placeholder:text-stone disabled:bg-surface-soft"
+        className="w-full px-md py-sm bg-surface-lowest rounded border border-hairline focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none text-body-sm text-on-surface placeholder:text-stone disabled:bg-surface-soft"
         placeholder={placeholder}
       />
     </div>
