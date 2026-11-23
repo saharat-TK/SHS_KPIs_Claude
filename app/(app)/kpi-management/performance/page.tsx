@@ -82,7 +82,7 @@ function Performance() {
         }
       />
 
-      <Card className="overflow-hidden">
+      <Card elevated className="overflow-hidden">
         <QueryBoundary isLoading={recordsQ.isLoading} isError={recordsQ.isError}>
           {records.length === 0 ? (
             <EmptyState
