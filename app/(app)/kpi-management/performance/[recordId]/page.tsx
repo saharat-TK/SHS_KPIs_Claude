@@ -549,7 +549,7 @@ function PerformanceRecordDetail() {
               >
                 <p
                   className={cn(
-                    "text-body-strong",
+                    "text-[17px] font-bold leading-tight",
                     effectiveCommitteeFilter === "all" ? "text-white" : "text-on-surface",
                   )}
                 >
@@ -586,7 +586,7 @@ function PerformanceRecordDetail() {
                   >
                     <p
                       className={cn(
-                        "line-clamp-2 leading-tight text-body-strong",
+                        "line-clamp-2 text-[17px] font-bold leading-tight",
                         on ? "text-white" : "text-on-surface",
                       )}
                     >
@@ -710,7 +710,7 @@ function PerformanceRecordDetail() {
                       : null;
                   return (
                     <Tr key={k.id} onClick={() => setSelectedKpiId(k.id)}>
-                      <Td className="font-medium">{k.name}</Td>
+                      <Td className="text-[15px] font-medium">{k.name}</Td>
                       <Td align="center" className={SECONDARY_CELL}>
                         <Badge tone={TYPE_TONE[k.kpiType] ?? "neutral"}>
                           {typeLabel(k.kpiType)}
