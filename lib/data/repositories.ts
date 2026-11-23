@@ -868,7 +868,7 @@ export const dataSourcesRepo = {
   bulkCreateEntries: async (
     id: number,
     input: DataSourceBulkEntryInput,
-  ): Promise<{ inserted: number }> =>
+  ): Promise<{ inserted: number; incomplete: number }> =>
     jsonOrThrow(
       await fetch(`/api/data-sources/${id}/entries/bulk`, {
         method: "POST",
@@ -894,7 +894,7 @@ export const dataSourcesRepo = {
     ),
   updateEntry: async (
     entryId: number,
-    input: Partial<DataSourceEntryInput>,
+    input: Partial<DataSourceEntryInput> & { allowIncomplete?: boolean },
   ): Promise<DataSourceEntry> =>
     jsonOrThrow(
       await fetch(`/api/data-source-entries/${entryId}`, {
@@ -980,6 +980,9 @@ export interface DataSourceEntryInput {
 /** A CSV import. The actor is carried once for the batch rather than repeated on
  *  every row — one upload is one person's action. */
 export interface DataSourceBulkEntryInput {
+  /** Accept rows with an empty required cell, stored as incomplete (no KPI counts
+   *  them until they are filled in). Without it the route rejects them. */
+  allowIncomplete?: boolean;
   rows: {
     year: number;
     quarter: number | null;
@@ -991,6 +994,8 @@ export interface DataSourceBulkEntryInput {
 /** An edited multi-input entry: its original row ids and the rows to leave in
  *  its place. See dataSourcesRepo.saveEntryGroup. */
 export interface DataSourceEntryGroupInput {
+  /** Same opt-in as DataSourceBulkEntryInput.allowIncomplete. */
+  allowIncomplete?: boolean;
   originalIds: number[];
   rows: (DataSourceEntryInput & { id?: number })[];
 }

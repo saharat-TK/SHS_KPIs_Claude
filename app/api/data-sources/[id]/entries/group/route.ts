@@ -21,6 +21,7 @@ import {
 import {
   DataSourceValidationError,
   normalizeEntryPeriod,
+  isEntryComplete,
   validateEntryValues,
 } from "@/lib/kpi/dataSources";
 import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
@@ -47,6 +48,9 @@ export async function PUT(
   try {
     const actor = await requireActor();
     const b = await req.json();
+    // Opt-in: keep an entry saved while a required value is still empty (flagged
+    // incomplete, skipped by the KPI feed) instead of rejecting the save.
+    const allowIncomplete = b.allowIncomplete === true;
     const originalIds: number[] = Array.isArray(b.originalIds)
       ? b.originalIds.map(Number)
       : [];
@@ -100,7 +104,7 @@ export async function PUT(
     const prepared = rows.map((row, i) => {
       try {
         const period = normalizeEntryPeriod(source.periodGrain, row.year, row.quarter);
-        const cells = validateEntryValues(columns, row.values ?? {});
+        const cells = validateEntryValues(columns, row.values ?? {}, { allowIncomplete });
         checkRefs(cells);
         return {
           id: row.id === undefined || row.id === null ? undefined : Number(row.id),
@@ -108,6 +112,7 @@ export async function PUT(
           quarter: period.quarter,
           valuesJson: JSON.stringify(cells),
           note: row.note?.trim() || null,
+          isIncomplete: isEntryComplete(columns, cells) ? 0 : 1,
         };
       } catch (err) {
         if (err instanceof DataSourceValidationError) {
@@ -125,9 +130,9 @@ export async function PUT(
         if (row.id === undefined) continue;
         await conn.query<ResultSetHeader>(
           `UPDATE data_source_entry
-              SET year = ?, quarter = ?, values_json = ?, note = ?
+              SET year = ?, quarter = ?, values_json = ?, note = ?, is_incomplete = ?
             WHERE id = ? AND data_source_id = ?`,
-          [row.year, row.quarter, row.valuesJson, row.note, row.id, params.id],
+          [row.year, row.quarter, row.valuesJson, row.note, row.isIncomplete, row.id, params.id],
         );
       }
 
@@ -135,7 +140,7 @@ export async function PUT(
       if (fresh.length > 0) {
         await conn.query<ResultSetHeader>(
           `INSERT INTO data_source_entry
-             (data_source_id, year, quarter, values_json, note, recorded_by)
+             (data_source_id, year, quarter, values_json, note, is_incomplete, recorded_by)
            VALUES ?`,
           [
             fresh.map((row) => [
@@ -144,6 +149,7 @@ export async function PUT(
               row.quarter,
               row.valuesJson,
               row.note,
+              row.isIncomplete,
               actor.facultyId,
             ]),
           ],

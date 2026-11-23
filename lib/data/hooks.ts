@@ -1110,8 +1110,11 @@ export function useBulkCreateDataSourceEntries() {
       dataSourcesRepo.bulkCreateEntries(id, input),
     meta: {
       toast: (d: unknown) => {
-        const n = (d as { inserted: number }).inserted;
-        return `${n} ${n === 1 ? "entry" : "entries"} imported`;
+        const { inserted: n, incomplete } = d as { inserted: number; incomplete?: number };
+        const done = `${n} ${n === 1 ? "entry" : "entries"} imported`;
+        return incomplete
+          ? `${done} — ${incomplete} flagged incomplete, not counted in KPIs until completed`
+          : done;
       },
     },
     onSuccess: (_d, { id }) => {
@@ -1131,7 +1134,7 @@ export function useUpdateDataSourceEntry() {
     }: {
       dataSourceId: number;
       entryId: number;
-      input: Partial<DataSourceEntryInput>;
+      input: Partial<DataSourceEntryInput> & { allowIncomplete?: boolean };
     }) => dataSourcesRepo.updateEntry(entryId, input),
     meta: { toast: "Entry updated" },
     onSuccess: (_d, { dataSourceId }) => {

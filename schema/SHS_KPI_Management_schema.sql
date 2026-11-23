@@ -599,6 +599,7 @@ CREATE TABLE data_source_entry (
                                                        -- NULL iff the source's period_grain = 'annual'
   values_json    JSON NOT NULL,
   note           TEXT NULL,
+  is_incomplete  TINYINT(1) NOT NULL DEFAULT 0,        -- 1 = saved with a required value empty; the KPI feed skips it until completed
   recorded_by    VARCHAR(20) NULL,                     -- FK -> faculty.id
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -10,7 +10,11 @@ import {
   useSaveDataSourceEntryGroup,
   useUpdateDataSourceEntry,
 } from "@/lib/data/hooks";
-import { COLUMN_TYPE_LABELS, coerceCellValue, describeEntryForConfirm } from "@/lib/kpi/dataSources";
+import {
+  COLUMN_TYPE_LABELS,
+  coerceCellValue,
+  describeEntryForConfirm,
+} from "@/lib/kpi/dataSources";
 import {
   CellFormatError,
   FORMAT_EXAMPLE,
@@ -281,13 +285,19 @@ export function EntryModal({
         columns.every((c) => !c.isRequired || (row[c.colKey] ?? "") !== ""),
       )
     : columns.every((c) => !c.isRequired || (values[c.colKey] ?? "").trim() !== "");
+  // An entry flagged incomplete (imported with a flag) may be saved as it is, so
+  // people can finish it in several passes. Add Entry and entries that were
+  // never flagged keep the strict rule.
+  const editingIncomplete = !!entry && groupRows.some((r) => r.isIncomplete);
   const isFree = mode === "rows";
   const isBatch = mode !== "single";
   const valid = isFree
     ? yearValid && freeRows.canSubmit
     : isBatch
       ? yearValid && batch.canSubmit
-      : yearValid && requiredFilled && !hasFormatError;
+      : yearValid &&
+        (editingIncomplete ? !linked || duplicates.length === 0 : requiredFilled) &&
+        !hasFormatError;
   const submitting =
     create.isPending || update.isPending || bulk.isPending || saveGroup.isPending;
 
@@ -345,6 +355,7 @@ export function EntryModal({
         {
           id: dataSourceId,
           input: {
+            allowIncomplete: editingIncomplete,
             originalIds: groupRows.map((r) => r.id),
             rows: linkedRows.map((rowValues, i) => ({
               id: ids[i],
@@ -378,7 +389,7 @@ export function EntryModal({
 
     if (entry) {
       update.mutate(
-        { dataSourceId, entryId: entry.id, input },
+        { dataSourceId, entryId: entry.id, input: { ...input, allowIncomplete: editingIncomplete } },
         { onSuccess: onClose },
       );
     } else {
@@ -553,6 +564,11 @@ export function EntryModal({
       }
     >
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-md">
+        {editingIncomplete && (
+          <p className="rounded border border-warning/30 bg-warning/10 px-md py-sm text-body-sm text-on-surface">
+            Required fields are empty — this entry won&apos;t count in KPIs until it is completed.
+          </p>
+        )}
         {showModes && (
           // Not wrapped in a Field: Field is a <label>, and nesting the radios'
           // own labels inside it would make any click select the first option.

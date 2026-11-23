@@ -194,6 +194,7 @@ export function coerceCellValue(
 export function validateEntryValues(
   columns: ColumnSpec[],
   values: Record<string, unknown>,
+  opts: { allowIncomplete?: boolean } = {},
 ): Record<string, DataSourceCellValue> {
   const byKey = new Map(columns.map((c) => [c.colKey, c]));
 
@@ -206,12 +207,57 @@ export function validateEntryValues(
   const out: Record<string, DataSourceCellValue> = {};
   for (const column of columns) {
     const value = coerceCellValue(column, values[column.colKey]);
-    if (column.isRequired && value === null) {
+    if (column.isRequired && value === null && !opts.allowIncomplete) {
       throw invalid(`"${column.label}" is required`);
     }
     out[column.colKey] = value;
   }
   return out;
+}
+
+/** Parsed cells in the form the API takes them back. The upload preview holds
+ *  dates as the stored CE ISO string, but the API validates what a person types:
+ *  Buddhist-era DD/MM/BBBB, with a CE year rejected. Sending the CE string back
+ *  would be refused, so render each date as BE first. Round-trips through
+ *  validateEntryValues. */
+export function valuesForSubmit(
+  columns: ColumnSpec[],
+  values: Record<string, DataSourceCellValue>,
+): Record<string, DataSourceCellValue> {
+  const out = { ...values };
+  for (const column of columns) {
+    const value = out[column.colKey];
+    if (column.dataType === "date" && typeof value === "string") {
+      out[column.colKey] = formatDateBE(value);
+    }
+  }
+  return out;
+}
+
+/** Labels of the required columns this entry leaves empty. */
+export function missingRequired(
+  columns: ColumnSpec[],
+  values: Record<string, DataSourceCellValue | undefined>,
+): string[] {
+  return columns
+    .filter((c) => c.isRequired && (values[c.colKey] ?? null) === null)
+    .map((c) => c.label);
+}
+
+/** True when no required column is empty. Decides the stored `isIncomplete` flag
+ *  at write time; reads use the flag, so marking a column Required later never
+ *  pulls rows that were recorded before out of a KPI. */
+export function isEntryComplete(
+  columns: ColumnSpec[],
+  values: Record<string, DataSourceCellValue | undefined>,
+): boolean {
+  return missingRequired(columns, values).length === 0;
+}
+
+/** The entries a KPI calculation may use: flagged-incomplete ones are held back
+ *  until someone finishes them, so a half-filled import never moves a number. */
+export function countableEntries<E extends { isIncomplete?: boolean }>(entries: E[]): E[] {
+  return entries.filter((e) => !e.isIncomplete);
 }
 
 /** A source's grain decides whether an entry carries a quarter at all.
@@ -346,6 +392,21 @@ export interface TemplateHeaderMap {
 export interface EntryRowError {
   colKey: string | null;
   message: string;
+  /** An empty required cell. Unlike every other error this one can be imported
+   *  anyway, as an incomplete row that no KPI counts until it is filled in. */
+  missing?: true;
+}
+
+/** Split a row's errors: `blocking` stop an import outright, `missing` are empty
+ *  required cells (importable with a flag). */
+export function splitRowErrors(errors: EntryRowError[]): {
+  blocking: EntryRowError[];
+  missing: EntryRowError[];
+} {
+  return {
+    blocking: errors.filter((e) => !e.missing),
+    missing: errors.filter((e) => e.missing),
+  };
 }
 
 export interface ParsedEntryRow {
@@ -621,7 +682,11 @@ function readCell(
     if (column.isRequired && value === null) {
       return {
         value: null,
-        error: { colKey: column.colKey, message: `"${column.label}" is required` },
+        error: {
+          colKey: column.colKey,
+          message: `"${column.label}" is required`,
+          missing: true,
+        },
       };
     }
     return { value, error: null };

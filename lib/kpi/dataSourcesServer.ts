@@ -86,7 +86,8 @@ export function mapColumnRow(row: RowDataPacket): DataSourceColumn {
 
 export const ENTRY_SELECT = `
   e.id, e.data_source_id AS dataSourceId, e.year, e.quarter,
-  e.values_json AS valuesJson, e.note, e.recorded_by AS recordedBy,
+  e.values_json AS valuesJson, e.note, e.is_incomplete AS isIncomplete,
+  e.recorded_by AS recordedBy,
   e.created_at AS createdAt, e.updated_at AS updatedAt,
   f.name AS recordedByName
 `;
@@ -104,6 +105,7 @@ export function mapEntryRow(row: RowDataPacket): DataSourceEntry {
     quarter: row.quarter == null ? null : Number(row.quarter),
     values: parseJsonColumn(row.valuesJson, {}),
     note: row.note ?? null,
+    isIncomplete: !!row.isIncomplete,
     recordedBy: row.recordedBy ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

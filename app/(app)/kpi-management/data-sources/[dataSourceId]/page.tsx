@@ -81,6 +81,7 @@ function DataSourceDetail({ id }: { id: number }) {
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [findData, setFindData] = useState("");
+  const [onlyIncomplete, setOnlyIncomplete] = useState(false);
 
   const source = sourceQ.data;
   const columns = useMemo(() => columnsQ.data ?? [], [columnsQ.data]);
@@ -96,7 +97,7 @@ function DataSourceDetail({ id }: { id: number }) {
   const canRecord = !!source && can("submit_metrics", { committeeId: source.committeeId });
 
   const entriesQ = useDataSourceEntries(id);
-  const entries = entriesQ.data ?? [];
+  const entries = useMemo(() => entriesQ.data ?? [], [entriesQ.data]);
 
   // Derived cells store a code (faculty id, program abbr); the table and the CSV
   // both resolve it through this one map so the two always agree.
@@ -105,6 +106,12 @@ function DataSourceDetail({ id }: { id: number }) {
   const cellLabels = useMemo(
     () => buildCellLabels(facultyQ.data ?? [], catalogQ.data),
     [facultyQ.data, catalogQ.data],
+  );
+
+  // Entries flagged incomplete: stored, but no KPI counts them yet.
+  const incompleteCount = useMemo(
+    () => entries.filter((e) => e.isIncomplete).length,
+    [entries],
   );
 
   const fileSlug = source?.name.replace(/\s+/g, "-").toLowerCase() ?? "data-source";
@@ -252,6 +259,22 @@ function DataSourceDetail({ id }: { id: number }) {
               <span className="shrink-0">·</span>
               <span className="shrink-0">{source.periodGrain} entries</span>
             </div>
+            {tab === "data" && incompleteCount > 0 && (
+              <button
+                type="button"
+                aria-pressed={onlyIncomplete}
+                title="Rows missing a required value are not counted in any KPI until completed"
+                onClick={() => setOnlyIncomplete((v) => !v)}
+                className={`inline-flex shrink-0 items-center gap-xs rounded-full border px-md py-xs text-caption-sm font-medium ${
+                  onlyIncomplete
+                    ? "border-warning bg-warning/10 text-warning"
+                    : "border-hairline-strong text-mute hover:text-on-surface"
+                }`}
+              >
+                <Icon name="warning" className="text-[16px]" />
+                Incomplete ({incompleteCount})
+              </button>
+            )}
             {tab === "data" && columns.length > 0 && (
               <div className="w-full sm:ml-md sm:w-80 sm:shrink-0">
                 <SearchInput
@@ -316,6 +339,7 @@ function DataSourceDetail({ id }: { id: number }) {
                     dataSourceId={id}
                     cellLabels={cellLabels}
                     query={findData}
+                    onlyIncomplete={onlyIncomplete && incompleteCount > 0}
                     onEdit={setEditing}
                   />
                 )}
