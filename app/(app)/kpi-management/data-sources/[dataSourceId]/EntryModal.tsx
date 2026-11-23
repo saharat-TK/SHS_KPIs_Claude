@@ -10,7 +10,7 @@ import {
   useSaveDataSourceEntryGroup,
   useUpdateDataSourceEntry,
 } from "@/lib/data/hooks";
-import { COLUMN_TYPE_LABELS, coerceCellValue } from "@/lib/kpi/dataSources";
+import { COLUMN_TYPE_LABELS, coerceCellValue, describeEntryForConfirm } from "@/lib/kpi/dataSources";
 import {
   CellFormatError,
   FORMAT_EXAMPLE,
@@ -387,9 +387,11 @@ export function EntryModal({
   };
 
   const deleteEntry = async () => {
+    const target = groupRows[0] ?? entry;
+    const name = target ? describeEntryForConfirm(columns, target) : "this entry";
     const ok = await confirm({
       title: "Delete this entire entry?",
-      message: `All ${groupRows.length} rows of this entry will be permanently removed. This cannot be undone. Type DELETE ENTRY to proceed.`,
+      message: `All ${groupRows.length} rows of ${name} will be permanently removed. This cannot be undone. Type DELETE ENTRY to proceed.`,
       tone: "danger",
       confirmLabel: "Delete entry",
       confirmPhrase: "DELETE ENTRY",
