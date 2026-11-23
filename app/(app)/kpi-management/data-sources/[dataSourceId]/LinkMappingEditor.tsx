@@ -27,6 +27,7 @@ import { formatNumber } from "@/lib/utils";
 import { unitNeedsDivisor } from "@/lib/kpi/progress";
 import { ACADEMIC_RANKS, RANKS } from "@/lib/types";
 import { facultyHeadcount } from "@/lib/kpi/facultyHeadcount";
+import { DateInput } from "./DateInput";
 import type {
   AcademicCatalog,
   AggregationKind,
@@ -1042,13 +1043,10 @@ function ValueInput({
       // Typed in BE (DD/MM/YYYY). A saved operand arrives as the stored CE value
       // and is shown as BE; whatever is typed replaces it.
       return (
-        <Input
+        <DateInput
           value={formatDateBE(value)}
-          inputMode="numeric"
-          maxLength={10}
-          placeholder="15/03/2569"
           title={FORMAT_EXAMPLE.date}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={onChange}
         />
       );
     case "year_be":
