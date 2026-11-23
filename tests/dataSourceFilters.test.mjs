@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   PERIOD_FIELD,
   aggregate,
+  describeFilter,
   describeMapping,
   matchesFilters,
   operatorsFor,
@@ -74,9 +75,30 @@ test("date ranges compare chronologically and are inclusive", () => {
   assert.equal(matchesFilters(on("2025-12-31"), COLUMNS, [range]), true);
   assert.equal(matchesFilters(on("2026-01-01"), COLUMNS, [range]), false);
   assert.equal(matchesFilters(on("2024-12-31"), COLUMNS, [range]), false);
-  // A bound may be typed day-first; a BE bound is refused, like a BE cell.
-  assert.equal(matchesFilters(on("2025-06-30"), COLUMNS, [F("pub_date", "between", "01/06/2025", "30/06/2025")]), true);
-  assert.throws(() => matchesFilters(on("2025-06-30"), COLUMNS, [F("pub_date", "between", "2568-01-01", "2568-12-31")]), /Buddhist-era/);
+  // Saved bounds are stored CE; a bound that is not canonical CE is refused.
+  assert.throws(() => matchesFilters(on("2025-06-30"), COLUMNS, [F("pub_date", "between", "01/06/2568", "30/06/2568")]), /not a stored CE date/);
+  assert.throws(() => matchesFilters(on("2025-06-30"), COLUMNS, [F("pub_date", "between", "2568-01-01", "2568-12-31")]), /not a stored CE date/);
+});
+
+test("date bounds are typed in BE, stored as CE, and described in BE", () => {
+  const mapping = (valueFrom, valueTo) => ({
+    aggregation: "count",
+    columnKey: null,
+    filters: [{ field: "pub_date", operator: "between", value: valueFrom, valueTo }],
+  });
+  const [m] = validateMappings(COLUMNS, "quarterly", [mapping("01/06/2568", "30/06/2568")]);
+  assert.deepEqual(m.filters[0], {
+    field: "pub_date",
+    operator: "between",
+    value: "2025-06-01",
+    valueTo: "2025-06-30",
+  });
+  assert.equal(describeFilter(m.filters[0], COLUMNS), "Published is between 01/06/2568 → 30/06/2568");
+  // A bound loaded from a saved filter is CE and goes back unchanged...
+  const [again] = validateMappings(COLUMNS, "quarterly", [mapping("2025-06-01", "2025-06-30")]);
+  assert.equal(again.filters[0].value, "2025-06-01");
+  // ...but a CE date typed day-first is refused like a CE cell.
+  assert.throws(() => validateMappings(COLUMNS, "quarterly", [mapping("01/06/2025", "30/06/2025")]), /looks like a CE year/);
 });
 
 test("year and month columns filter numerically and accept month names", () => {

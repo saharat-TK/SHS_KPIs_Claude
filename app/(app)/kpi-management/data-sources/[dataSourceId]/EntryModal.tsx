@@ -15,6 +15,7 @@ import {
   CellFormatError,
   FORMAT_EXAMPLE,
   currentBEYear,
+  formatDateBE,
   isFormattedType,
   parseYearBE,
 } from "@/lib/kpi/cellFormats";
@@ -158,7 +159,9 @@ export function EntryModal({
       Object.fromEntries(
         columns.map((c) => {
           const v = entry?.values[c.colKey];
-          return [c.colKey, v === null || v === undefined ? "" : String(v)];
+          if (v === null || v === undefined) return [c.colKey, ""];
+          // Dates are stored as CE but typed and shown in BE.
+          return [c.colKey, c.dataType === "date" ? formatDateBE(v) : String(v)];
         }),
       ),
     );

@@ -63,13 +63,19 @@ test("coerceCellValue accepts the usual boolean spellings", () => {
   assert.throws(() => coerceCellValue(c, "maybe"), /"Passed" must be true or false/);
 });
 
-test("coerceCellValue stores dates as ISO, accepting DD/MM/YYYY and rejecting BE years", () => {
+test("coerceCellValue takes dates in BE, stores them as CE ISO, and rejects CE years", () => {
   const c = col({ dataType: "date", label: "Recorded on" });
-  assert.equal(coerceCellValue(c, "2026-07-18"), "2026-07-18");
-  assert.equal(coerceCellValue(c, "18/07/2026"), "2026-07-18");
-  assert.throws(() => coerceCellValue(c, "2026-13-40"), /"Recorded on" is 2026-13-40, which is not a real date/);
-  assert.throws(() => coerceCellValue(c, "18/07/2569"), /"Recorded on" .*Buddhist-era year — write 18\/07\/2026/);
-  assert.throws(() => coerceCellValue(c, "July 18"), /"Recorded on" must be a date like 2026-03-15/);
+  assert.equal(coerceCellValue(c, "18/07/2569"), "2026-07-18");
+  assert.equal(coerceCellValue(c, "2569-07-18"), "2026-07-18");
+  assert.throws(() => coerceCellValue(c, "2569-13-40"), /"Recorded on" is 2569-13-40, which is not a real date/);
+  assert.throws(() => coerceCellValue(c, "18/07/2026"), /"Recorded on" .*looks like a CE year — write 18\/07\/2569/);
+  assert.throws(() => coerceCellValue(c, "July 18"), /"Recorded on" must be a date like 15\/03\/2569/);
+});
+
+test("formatCellValue shows a stored CE date in BE", () => {
+  const c = col({ dataType: "date", label: "Recorded on" });
+  assert.equal(formatCellValue(c, "2026-07-18"), "18/07/2569");
+  assert.equal(formatCellValue(c, null), "—");
 });
 
 test("coerceCellValue validates Year (BE) and Month and stores numbers", () => {

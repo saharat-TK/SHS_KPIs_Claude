@@ -123,13 +123,16 @@ export function CellInput({
         </Select>
       );
     case "date":
-      // The native picker can only produce a real YYYY-MM-DD date. A Thai-locale
-      // browser may display it in BE, but it always submits the CE value.
+      // Typed in the Buddhist era, DD/MM/YYYY. A native date picker can't be
+      // made to show BE (it follows the browser locale), so this is text, like
+      // Year (BE); the value is checked as it is typed and stored as CE.
       return (
         <Input
-          type="date"
           value={value}
           disabled={disabled}
+          inputMode="numeric"
+          maxLength={10}
+          placeholder="15/03/2569"
           title={FORMAT_EXAMPLE.date}
           onChange={(e) => onChange(e.target.value)}
         />

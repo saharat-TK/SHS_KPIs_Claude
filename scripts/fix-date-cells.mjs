@@ -8,7 +8,7 @@
 // the seeded sources stored BE dates (2566-01-12). Dates are now CE, and a BE
 // year is rejected on write, so those rows could no longer be edited. --apply
 // rewrites each BE date (year >= 2400) to year - 543, checking the result with
-// the same parseDate the app uses, in one transaction.
+// the app's parseStoredDate, in one transaction.
 //
 // Only dates are converted. A Year (BE) or Month cell that fails is reported for
 // a person to fix: guessing a number's meaning is not safe.
@@ -20,13 +20,14 @@ import {
   BE_OFFSET,
   BE_YEAR_FROM,
   CellFormatError,
-  parseDate,
+  parseStoredDate,
   parseMonth,
   parseYearBE,
 } from "../lib/kpi/cellFormats.ts";
 
 const apply = process.argv.includes("--apply");
-const PARSERS = { date: parseDate, year_be: parseYearBE, month: parseMonth };
+// Stored dates are CE ISO, so they are checked with parseStoredDate (parseDate reads BE input).
+const PARSERS = { date: parseStoredDate, year_be: parseYearBE, month: parseMonth };
 const BE_ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 async function main() {
@@ -63,7 +64,7 @@ async function main() {
         const m = col.type === "date" ? BE_ISO.exec(v) : null;
         if (m && Number(m[1]) >= BE_YEAR_FROM) {
           const to = `${Number(m[1]) - BE_OFFSET}-${m[2]}-${m[3]}`;
-          parseDate(to); // throws if the CE date isn't real — never write a bad one
+          parseStoredDate(to); // throws if the CE date isn't real — never write a bad one
           conversions.push({ entryId: id, path, from: v, to });
           converted += 1;
           continue;
