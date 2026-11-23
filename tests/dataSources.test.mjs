@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   coerceCellValue,
+  countableEntries,
   describeEntryForConfirm,
+  isEntryComplete,
+  missingRequired,
+  valuesForSubmit,
   formatCellValue,
   formatEntryPeriod,
   normalizeEntryPeriod,
@@ -284,4 +288,76 @@ test("formatCellValue falls back to the raw value when a lookup misses", () => {
 test("formatCellValue leaves non-derived types alone", () => {
   const labels = { "12": "should not be used" };
   assert.equal(formatCellValue(col(), 12, labels), "12");
+});
+
+test("validateEntryValues can accept an empty required value when asked", () => {
+  const columns = [
+    col({ isRequired: true }),
+    col({ colKey: "seen_on", label: "Seen on", dataType: "date" }),
+  ];
+  assert.throws(() => validateEntryValues(columns, {}), /"Count" is required/);
+  assert.deepEqual(validateEntryValues(columns, {}, { allowIncomplete: true }), {
+    count: null,
+    seen_on: null,
+  });
+  // The opt-in covers empty required cells only; a wrong value still fails.
+  assert.throws(
+    () => validateEntryValues(columns, { seen_on: "2026-03-15" }, { allowIncomplete: true }),
+    /Buddhist|CE year|not a real date|Seen on/,
+  );
+  assert.throws(
+    () => validateEntryValues(columns, { nope: 1 }, { allowIncomplete: true }),
+    /Unknown column "nope"/,
+  );
+});
+
+test("an entry is incomplete while a required column is empty", () => {
+  const columns = [
+    col({ colKey: "title", label: "Title", dataType: "text", isRequired: true }),
+    col({ colKey: "count", label: "Count", isRequired: true }),
+    col({ colKey: "note", label: "Remark", dataType: "text" }),
+  ];
+  assert.deepEqual(missingRequired(columns, { title: "A", count: 3 }), []);
+  assert.deepEqual(missingRequired(columns, { title: null, count: 3 }), ["Title"]);
+  // A key the row never stored counts as empty (a column made required later).
+  assert.deepEqual(missingRequired(columns, { title: "A" }), ["Count"]);
+  // Zero and false are values, not gaps.
+  assert.equal(isEntryComplete(columns, { title: "A", count: 0 }), true);
+  assert.equal(isEntryComplete(columns, { title: null, count: 1 }), false);
+});
+
+test("countableEntries holds flagged rows back from KPI calculations", () => {
+  const rows = [
+    { id: 1, isIncomplete: false },
+    { id: 2, isIncomplete: true },
+    { id: 3 },
+  ];
+  assert.deepEqual(
+    countableEntries(rows).map((r) => r.id),
+    [1, 3],
+  );
+});
+
+test("a required column added later does not flag rows recorded before it", () => {
+  // Incompleteness is a stored flag, decided when a row is written. A row that
+  // lacks a now-required value is still counted until someone saves it flagged.
+  const columns = [col({ colKey: "date", label: "Date", dataType: "date", isRequired: true })];
+  const legacy = { id: 9, values: {}, isIncomplete: false };
+  assert.deepEqual(missingRequired(columns, legacy.values), ["Date"]);
+  assert.deepEqual(countableEntries([legacy]).map((r) => r.id), [9]);
+});
+
+test("valuesForSubmit hands dates back in BE so the API accepts what the preview held", () => {
+  const columns = [
+    col({ colKey: "seen_on", label: "Seen on", dataType: "date" }),
+    col({ isRequired: true }),
+  ];
+  const parsed = { seen_on: coerceCellValue(columns[0], "15/03/2569"), count: 3 };
+  assert.equal(parsed.seen_on, "2026-03-15"); // the preview holds stored CE
+  // Sending that CE string straight back is refused...
+  assert.throws(() => validateEntryValues(columns, parsed), /CE year/);
+  // ...the submit form round-trips to the same stored value.
+  assert.deepEqual(validateEntryValues(columns, valuesForSubmit(columns, parsed)), parsed);
+  // Empty dates and other types pass through untouched.
+  assert.deepEqual(valuesForSubmit(columns, { seen_on: null, count: 3 }), { seen_on: null, count: 3 });
 });

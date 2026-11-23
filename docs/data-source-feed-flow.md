@@ -49,6 +49,14 @@ request.
   — on metric rows as well as KPI rows. It **never** writes `issue` / `solution` —
   a computed number has no narrative, so it bypasses the HTTP progress routes that
   require them.
+- **Incomplete rows are not counted.** `data_source_entry.is_incomplete` is set
+  when a row is written with a *required* column empty — a CSV import using
+  "Import anyway with flag", or an edit saved still incomplete — and
+  `countableEntries` drops flagged rows before any aggregation, filter or
+  denominator, so a half-filled import never moves a number. Every write that
+  touches `values` re-decides the flag (`isEntryComplete`), so completing a row
+  clears it and the same save re-feeds the KPIs. The flag is stored, not derived:
+  marking a column Required later never pulls older rows out of a KPI.
 - The feed **respects guards** (unlike the roll-up): a closed recording period, an
   approval-locked/under-review quarter, or a period with no rows is skipped and
   reported, never stamped over.

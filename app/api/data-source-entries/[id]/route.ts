@@ -12,7 +12,11 @@ import {
   resolveColumnOptions,
 } from "@/lib/kpi/dataSourcesServer";
 import { requireActor } from "@/lib/auth/session";
-import { normalizeEntryPeriod, validateEntryValues } from "@/lib/kpi/dataSources";
+import {
+  isEntryComplete,
+  normalizeEntryPeriod,
+  validateEntryValues,
+} from "@/lib/kpi/dataSources";
 import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
 
 export const dynamic = "force-dynamic";
@@ -58,10 +62,15 @@ export async function PATCH(
     }
     if ("values" in b) {
       const columns = await resolveColumnOptions(pool, source.columns);
-      const cells = validateEntryValues(columns, b.values ?? {});
+      // Opt-in, sent only when editing an entry that is (or is being left) incomplete.
+      const cells = validateEntryValues(columns, b.values ?? {}, {
+        allowIncomplete: b.allowIncomplete === true,
+      });
       (await loadRefChecker(pool, source.columns))(cells);
-      setClauses.push("values_json = ?");
-      values.push(JSON.stringify(cells));
+      setClauses.push("values_json = ?", "is_incomplete = ?");
+      // Re-decided on every values write: completing the row clears the flag, and
+      // the KPI feed below then counts it.
+      values.push(JSON.stringify(cells), isEntryComplete(columns, cells) ? 0 : 1);
     }
     if ("note" in b) {
       setClauses.push("note = ?");

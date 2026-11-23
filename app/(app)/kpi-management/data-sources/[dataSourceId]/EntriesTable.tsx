@@ -19,6 +19,7 @@ import {
   formatCellValue,
   formatEntryPeriod,
   isHttpUrl,
+  missingRequired,
 } from "@/lib/kpi/dataSources";
 import {
   groupEntries,
@@ -54,6 +55,7 @@ export function EntriesTable({
   dataSourceId,
   cellLabels,
   query,
+  onlyIncomplete = false,
   onEdit,
   heightClass = "max-h-[60vh]",
 }: {
@@ -63,6 +65,8 @@ export function EntriesTable({
   dataSourceId: number;
   cellLabels: Record<string, string>;
   query: string;
+  /** Show only entries still missing a required value. */
+  onlyIncomplete?: boolean;
   onEdit: (entry: DataSourceEntry) => void;
   /** Height of the vertical scroll box. Must be a literal Tailwind class —
    *  arbitrary values have to exist in the source for the scanner to emit them. */
@@ -85,8 +89,11 @@ export function EntriesTable({
   // A group stays whole: it shows when any of its rows matches, so searching for
   // one author still shows the paper's other authors.
   const filteredGroups = useMemo(() => {
+    const pool = onlyIncomplete
+      ? groups.filter((group) => group.rows.some((r) => r.isIncomplete))
+      : groups;
     const needle = query.trim().toLocaleLowerCase();
-    if (!needle) return groups;
+    if (!needle) return pool;
 
     const matches = (entry: DataSourceEntry) =>
       [
@@ -100,8 +107,8 @@ export function EntriesTable({
         .join(" ")
         .toLocaleLowerCase()
         .includes(needle);
-    return groups.filter((group) => group.rows.some(matches));
-  }, [cellLabels, columns, groups, query]);
+    return pool.filter((group) => group.rows.some(matches));
+  }, [cellLabels, columns, groups, onlyIncomplete, query]);
 
   // Sorting orders whole groups by their first row, so an entry never splits.
   const visibleGroups = useMemo(() => {
@@ -259,6 +266,11 @@ function GroupBody({
   // Imported rows each carry their own note, so it is drawn per row; a note the
   // form saved on every row is drawn once and spans the group.
   const ownNotes = notesDiffer(group.rows);
+  // Flagged entries are stored but no KPI counts them until they are completed.
+  // Name the required columns still empty (rows saved before a column became
+  // required are not flagged, so they never show here).
+  const flagged = group.rows.filter((r) => r.isIncomplete);
+  const missing = Array.from(new Set(flagged.flatMap((r) => missingRequired(columns, r.values))));
 
   return (
     <tbody className="group hover:bg-surface-soft">
@@ -273,6 +285,8 @@ function GroupBody({
         const valueCell = (c: DataSourceColumn) => {
           const text = formatCellValue(c, e.values[c.colKey] ?? null, cellLabels);
           const perRow = perRowKeys.has(c.colKey);
+          const emptyRequired =
+            e.isIncomplete && c.isRequired && (e.values[c.colKey] ?? null) === null;
           return (
             <Td
               key={c.id}
@@ -282,6 +296,10 @@ function GroupBody({
             >
               {c.dataType === "url" ? (
                 <UrlCell value={text} tooltipEvents={tooltipEvents} />
+              ) : emptyRequired ? (
+                <span className="text-error" title={`"${c.label}" is required`}>
+                  {text}
+                </span>
               ) : (
                 <CellPreview text={text} {...tooltipEvents(text)} />
               )}
@@ -300,6 +318,14 @@ function GroupBody({
                   text={formatEntryPeriod(e.year, e.quarter)}
                   {...tooltipEvents(formatEntryPeriod(e.year, e.quarter))}
                 />
+                {flagged.length > 0 && (
+                  <span
+                    className="block text-caption-sm font-normal text-warning"
+                    title={`${missing.length > 0 ? `Missing: ${missing.join(", ")}. ` : ""}Not counted in KPIs until completed.`}
+                  >
+                    Incomplete
+                  </span>
+                )}
               </Td>
             )}
             {columns

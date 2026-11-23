@@ -18,6 +18,7 @@ import {
 } from "@/lib/kpi/dataSourcesServer";
 import {
   DataSourceValidationError,
+  isEntryComplete,
   normalizeEntryPeriod,
   validateEntryValues,
 } from "@/lib/kpi/dataSources";
@@ -38,6 +39,9 @@ export async function POST(
     const actor = await requireActor();
     const b = await req.json();
     const rows = Array.isArray(b.rows) ? b.rows : [];
+    // An explicit opt-in: rows missing a required value are stored flagged
+    // incomplete (the KPI feed skips them) instead of being rejected.
+    const allowIncomplete = b.allowIncomplete === true;
 
     const source = await loadSourceShape(pool, params.id);
     if (!source) {
@@ -73,18 +77,22 @@ export async function POST(
     const columns = await resolveColumnOptions(pool, source.columns);
     const checkRefs = await loadRefChecker(pool, source.columns);
 
+    let incomplete = 0;
     const values: unknown[][] = rows.map(
       (row: { year: unknown; quarter: unknown; values?: Record<string, unknown>; note?: string | null }, i: number) => {
         try {
           const period = normalizeEntryPeriod(source.periodGrain, row.year, row.quarter);
-          const cells = validateEntryValues(columns, row.values ?? {});
+          const cells = validateEntryValues(columns, row.values ?? {}, { allowIncomplete });
           checkRefs(cells);
+          const flagged = !isEntryComplete(columns, cells);
+          if (flagged) incomplete += 1;
           return [
             params.id,
             period.year,
             period.quarter,
             JSON.stringify(cells),
             row.note?.trim() || null,
+            flagged ? 1 : 0,
             actor.facultyId,
           ];
         } catch (err) {
@@ -103,14 +111,17 @@ export async function POST(
       await conn.beginTransaction();
       const [ins] = await conn.query<ResultSetHeader>(
         `INSERT INTO data_source_entry
-           (data_source_id, year, quarter, values_json, note, recorded_by)
+           (data_source_id, year, quarter, values_json, note, is_incomplete, recorded_by)
          VALUES ?`,
         [values],
       );
       await feedFromDataSource(conn, Number(params.id));
       await conn.commit();
       return NextResponse.json(
-        { inserted: ins.affectedRows ?? values.length },
+        {
+          inserted: ins.affectedRows ?? values.length,
+          incomplete,
+        },
         { status: 201 },
       );
     } catch (err) {

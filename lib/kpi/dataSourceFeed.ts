@@ -14,6 +14,7 @@ import type {
 } from "@/lib/types";
 import type { AggregateParts } from "@/lib/kpi/dataSourceFilters";
 import { aggregateParts, matchesFilters } from "@/lib/kpi/dataSourceFilters";
+import { countableEntries } from "@/lib/kpi/dataSources";
 import { isApprovalDataLocked } from "@/lib/kpi/approvalWorkflow";
 import { getApprovalState } from "@/lib/kpi/approvalServer";
 import { facultyHeadcount } from "@/lib/kpi/facultyHeadcount";
@@ -35,6 +36,7 @@ interface Entry {
   year: number;
   quarter: number | null;
   values: Record<string, DataSourceCellValue>;
+  isIncomplete: boolean;
 }
 
 interface LinkRow {
@@ -47,7 +49,7 @@ interface LinkRow {
 
 async function loadEntries(db: Db, dataSourceId: number): Promise<Entry[]> {
   const [rows] = await db.query<RowDataPacket[]>(
-    "SELECT id, year, quarter, values_json FROM data_source_entry WHERE data_source_id = ?",
+    "SELECT id, year, quarter, values_json, is_incomplete FROM data_source_entry WHERE data_source_id = ?",
     [dataSourceId],
   );
   return rows.map((r) => ({
@@ -55,6 +57,7 @@ async function loadEntries(db: Db, dataSourceId: number): Promise<Entry[]> {
     year: Number(r.year),
     quarter: r.quarter == null ? null : Number(r.quarter),
     values: parseJsonColumn<Record<string, DataSourceCellValue>>(r.values_json, {}),
+    isIncomplete: !!r.is_incomplete,
   }));
 }
 
@@ -346,7 +349,8 @@ export async function feedFromDataSource(
   if (links.length === 0) return emptyOutcome();
 
   const columns = await loadColumns(conn, dataSourceId);
-  const entries = await loadEntries(conn, dataSourceId);
+  // Rows flagged incomplete are held back until completed.
+  const entries = countableEntries(await loadEntries(conn, dataSourceId));
   const roster = await loadRoster(conn);
 
   let outcome = emptyOutcome();
@@ -383,7 +387,10 @@ export async function feedRecord(
   for (const link of links) {
     if (!columnsBySource.has(link.dataSourceId)) {
       columnsBySource.set(link.dataSourceId, await loadColumns(conn, link.dataSourceId));
-      entriesBySource.set(link.dataSourceId, await loadEntries(conn, link.dataSourceId));
+      entriesBySource.set(
+        link.dataSourceId,
+        countableEntries(await loadEntries(conn, link.dataSourceId)),
+      );
     }
     outcome = mergeOutcomes(
       outcome,

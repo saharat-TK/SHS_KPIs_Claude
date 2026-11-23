@@ -688,6 +688,10 @@ export interface DataSourceEntry {
   quarter: number | null;
   values: Record<string, DataSourceCellValue>;
   note: string | null;
+  /** Saved with a required value empty (CSV "Import anyway with flag", or an edit
+   *  left incomplete). Stored, not derived: no KPI counts the row until a save
+   *  that fills it in clears the flag. */
+  isIncomplete: boolean;
   recordedBy: string | null;
   createdAt: string;
   updatedAt: string;

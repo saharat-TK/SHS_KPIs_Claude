@@ -7,6 +7,7 @@ import {
   entryFingerprint,
   matchTemplateHeaders,
   readEntryTemplateCsv,
+  splitRowErrors,
   withResolvedOptions,
 } from "../lib/kpi/dataSources.ts";
 
@@ -276,7 +277,27 @@ test("collectEntryRows flags a bad date and a missing required cell", () => {
   assert.deepEqual(row.errors[1], {
     colKey: "count",
     message: '"Count" is required',
+    missing: true,
   });
+});
+
+test("splitRowErrors separates an empty required cell from blocking errors", () => {
+  const columns = [
+    col({ colKey: "seen_on", label: "Seen on", dataType: "date" }),
+    col({ colKey: "count", label: "Count", isRequired: true }),
+  ];
+  const header = ["Year", "Quarter", "Seen on", "Count", "Note"];
+
+  const [both] = collect([["2568", "1", "2568-13-01", "", ""]], { columns, header });
+  const split = splitRowErrors(both.errors);
+  assert.equal(split.blocking.length, 1);
+  assert.match(split.blocking[0].message, /not a real date/);
+  assert.deepEqual(split.missing.map((e) => e.colKey), ["count"]);
+
+  // Only the empty required cell: nothing blocks, so the row can import with a flag.
+  const [onlyMissing] = collect([["2568", "1", "", "", ""]], { columns, header });
+  assert.equal(splitRowErrors(onlyMissing.errors).blocking.length, 0);
+  assert.equal(splitRowErrors(onlyMissing.errors).missing.length, 1);
 });
 
 test("collectEntryRows accepts Yes/No for a boolean column", () => {

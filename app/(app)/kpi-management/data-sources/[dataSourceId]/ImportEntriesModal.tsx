@@ -10,6 +10,8 @@ import {
   formatCellValue,
   formatEntryPeriod,
   readEntryTemplateCsv,
+  splitRowErrors,
+  valuesForSubmit,
   withResolvedOptions,
   type ParsedEntryRow,
   type TemplateChoice,
@@ -24,9 +26,13 @@ import type {
  *
  *  The preview runs the same coercion the API will (readEntryTemplateCsv wraps
  *  coerceCellValue), so what the user sees here is what gets stored — the modal
- *  adds no rules of its own. Import stays disabled while any row has an error:
- *  the whole file lands in one transaction, so a half-valid file has no useful
- *  outcome to offer.
+ *  adds no rules of its own. Import stays disabled while any row has a blocking
+ *  error: the whole file lands in one transaction, so a half-valid file has no
+ *  useful outcome to offer.
+ *
+ *  An empty *required* cell is the one error that is not blocking. Those rows
+ *  can be imported anyway, flagged incomplete: they are stored, shown in the
+ *  table, and skipped by every KPI calculation until someone fills the cell in.
  *
  *  Duplicates are only ever a warning. A data source legitimately holds many
  *  rows per period (one per curriculum, say), so there is no key to upsert on —
@@ -155,22 +161,34 @@ export function ImportEntriesModal({
       return next;
     });
 
-  const errorCount = rows.filter((r) => r.errors.length > 0).length;
-  const selected = rows.filter(
-    (r) => r.errors.length === 0 && !excluded.has(r.lineNumber),
+  // Blocking errors stop the import; empty required cells only make a row
+  // "incomplete", which can still be imported with a flag.
+  const split = (r: ParsedEntryRow) => splitRowErrors(r.errors);
+  const errorCount = rows.filter((r) => split(r).blocking.length > 0).length;
+  const incompleteRows = rows.filter(
+    (r) => split(r).blocking.length === 0 && split(r).missing.length > 0,
   );
+  const selected = rows.filter(
+    (r) => split(r).blocking.length === 0 && !excluded.has(r.lineNumber),
+  );
+  const completeSelected = selected.filter((r) => split(r).missing.length === 0);
+  const incompleteSelected = selected.length - completeSelected.length;
   const canImport = errorCount === 0 && selected.length > 0 && !bulk.isPending;
+  const canImportComplete =
+    errorCount === 0 && completeSelected.length > 0 && !bulk.isPending;
 
-  const submit = () => {
+  const submit = (withFlag: boolean) => {
+    const chosen = withFlag ? selected : completeSelected;
     bulk.mutate(
       {
         id: dataSourceId,
         input: {
-          rows: selected.map((r) => ({
+          allowIncomplete: withFlag,
+          rows: chosen.map((r) => ({
             // errors.length === 0 guarantees the period normalised.
             year: r.year as number,
             quarter: r.quarter,
-            values: r.values,
+            values: valuesForSubmit(columns, r.values),
             note: r.note,
           })),
         },
@@ -191,11 +209,28 @@ export function ImportEntriesModal({
           <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
-          <Button disabled={!canImport} onClick={submit}>
-            {bulk.isPending
-              ? "Importing…"
-              : `Import ${selected.length} ${selected.length === 1 ? "entry" : "entries"}`}
-          </Button>
+          {incompleteSelected > 0 ? (
+            <>
+              <Button
+                variant="outline"
+                disabled={!canImportComplete}
+                onClick={() => submit(false)}
+              >
+                {`Import complete only (${completeSelected.length})`}
+              </Button>
+              <Button disabled={!canImport} onClick={() => submit(true)}>
+                {bulk.isPending
+                  ? "Importing…"
+                  : `Import anyway with flag (${selected.length})`}
+              </Button>
+            </>
+          ) : (
+            <Button disabled={!canImport} onClick={() => submit(false)}>
+              {bulk.isPending
+                ? "Importing…"
+                : `Import ${selected.length} ${selected.length === 1 ? "entry" : "entries"}`}
+            </Button>
+          )}
         </>
       }
     >
@@ -274,12 +309,26 @@ export function ImportEntriesModal({
                   {errorCount} {errorCount === 1 ? "row has" : "rows have"} errors
                 </Badge>
               )}
+              {incompleteRows.length > 0 && (
+                <Badge tone="warning">
+                  {incompleteRows.length} incomplete
+                </Badge>
+              )}
               {duplicates.size > 0 && (
                 <Badge tone="warning">
                   {duplicates.size} possible {duplicates.size === 1 ? "duplicate" : "duplicates"}
                 </Badge>
               )}
             </div>
+
+            {incompleteRows.length > 0 && (
+              <p className="text-body-sm text-mute">
+                {incompleteRows.length === 1 ? "1 row has" : `${incompleteRows.length} rows have`}{" "}
+                an empty required cell. Import anyway with flag stores{" "}
+                {incompleteRows.length === 1 ? "it" : "them"} as incomplete — no KPI
+                counts {incompleteRows.length === 1 ? "it" : "them"} until the data is completed.
+              </p>
+            )}
 
             <div className="max-h-[45vh] overflow-auto rounded border border-hairline">
               <Table>
@@ -299,7 +348,8 @@ export function ImportEntriesModal({
                 </thead>
                 <tbody>
                   {rows.map((row) => {
-                    const failed = row.errors.length > 0;
+                    const failed = split(row).blocking.length > 0;
+                    const incomplete = !failed && split(row).missing.length > 0;
                     const badCells = new Set(
                       row.errors.map((e) => e.colKey).filter(Boolean) as string[],
                     );
@@ -321,6 +371,8 @@ export function ImportEntriesModal({
                         <Td>
                           {failed ? (
                             <Badge tone="error">error</Badge>
+                          ) : incomplete ? (
+                            <Badge tone="warning">incomplete</Badge>
                           ) : duplicates.has(row.lineNumber) ? (
                             <Badge tone="warning">duplicate</Badge>
                           ) : (
@@ -390,8 +442,11 @@ function ErrorBox({ title, lines }: { title?: string; lines: string[] }) {
  *  render a thousand list items the user will not read. */
 function ErrorList({ rows }: { rows: ParsedEntryRow[] }) {
   const LIMIT = 20;
+  // Empty required cells are not listed: they import with a flag, and the row's
+  // status badge and red cell already say so. A row that also has a blocking
+  // error still shows only that one — fixing it will surface the rest.
   const all = rows.flatMap((row) =>
-    row.errors.map((e) => `Line ${row.lineNumber}: ${e.message}`),
+    splitRowErrors(row.errors).blocking.map((e) => `Line ${row.lineNumber}: ${e.message}`),
   );
   const shown = all.slice(0, LIMIT);
   return (
