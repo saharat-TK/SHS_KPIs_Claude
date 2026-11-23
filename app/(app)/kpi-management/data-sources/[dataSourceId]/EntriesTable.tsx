@@ -15,7 +15,12 @@ import { Table, Th, Td, EmptyState, useConfirm } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { useDeleteDataSourceEntry } from "@/lib/data/hooks";
 import { formatCellValue, formatEntryPeriod, isHttpUrl } from "@/lib/kpi/dataSources";
-import { groupEntries, perRowColKeys, type EntryGroupRows } from "@/lib/kpi/entryGroups";
+import {
+  groupEntries,
+  notesDiffer,
+  perRowColKeys,
+  type EntryGroupRows,
+} from "@/lib/kpi/entryGroups";
 import type { DataSourceColumn, DataSourceEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
@@ -246,6 +251,9 @@ function GroupBody({
   onDelete: (entry: DataSourceEntry) => void;
 }) {
   const span = group.rows.length > 1 ? group.rows.length : undefined;
+  // Imported rows each carry their own note, so it is drawn per row; a note the
+  // form saved on every row is drawn once and spans the group.
+  const ownNotes = notesDiffer(group.rows);
 
   return (
     <tbody className="group hover:bg-surface-soft">
@@ -292,18 +300,21 @@ function GroupBody({
             {columns
               .filter((c) => first || perRowKeys.has(c.colKey))
               .map(valueCell)}
+            {(first || ownNotes) && (
+              <Td
+                rowSpan={ownNotes ? undefined : span}
+                className={cn(CELL, rowPad, ownNotes && inner, "text-mute")}
+              >
+                <NoteCell note={e.note} tooltipEvents={tooltipEvents} />
+              </Td>
+            )}
             {first && (
-              <>
-                <Td rowSpan={span} className={cn(CELL, rowPad, "text-mute")}>
-                  <NoteCell note={e.note} tooltipEvents={tooltipEvents} />
-                </Td>
-                <Td rowSpan={span} className={cn(CELL, rowPad, "text-mute")}>
-                  <CellPreview
-                    text={formatEntryCreatedAt(e.createdAt)}
-                    {...tooltipEvents(formatEntryCreatedAt(e.createdAt))}
-                  />
-                </Td>
-              </>
+              <Td rowSpan={span} className={cn(CELL, rowPad, "text-mute")}>
+                <CellPreview
+                  text={formatEntryCreatedAt(e.createdAt)}
+                  {...tooltipEvents(formatEntryCreatedAt(e.createdAt))}
+                />
+              </Td>
             )}
             {canRecord && (
               <Td
