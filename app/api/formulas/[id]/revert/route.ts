@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import { bumpVersion } from "@/lib/formula";
+import { requirePermission, actorErrorResponse, auditName } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
+    const actor = await requirePermission("configure_kpis");
     const b = await req.json();
     const versionId = b?.versionId;
     if (!versionId) {
@@ -45,7 +47,7 @@ export async function POST(
       );
       await conn.query(
         "INSERT INTO formula_version (formula_id, version, expression, author, change_note) VALUES (?, ?, ?, ?, ?)",
-        [params.id, nextVersion, expression, b.author ?? null, `Reverted to ${target[0].version}.`],
+        [params.id, nextVersion, expression, auditName(actor), `Reverted to ${target[0].version}.`],
       );
       await conn.commit();
 
@@ -61,6 +63,8 @@ export async function POST(
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to revert formula" },
       { status: 500 },

@@ -4,6 +4,7 @@ import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { LIBRARY_METRIC_FIELDS } from "@/lib/kpi/fields";
 import { syncActiveRecordsForSet, setIdForKpi } from "@/lib/kpi/performance";
 import { validateWeight } from "@/lib/kpi/weight";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ const targetModeOf = (value: unknown) =>
 
 export async function GET(req: NextRequest) {
   try {
+    await requireActor();
     const kpiId = req.nextUrl.searchParams.get("kpiId");
     if (!kpiId) {
       return NextResponse.json({ error: "kpiId is required" }, { status: 400 });
@@ -23,6 +25,8 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json(rows);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load metrics" },
       { status: 500 },
@@ -32,6 +36,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await requirePermission("configure_kpis");
     const b = await req.json();
     if (!b.kpiId) {
       return NextResponse.json({ error: "kpiId is required" }, { status: 400 });
@@ -95,6 +100,8 @@ export async function POST(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create metric" },
       { status: 500 },

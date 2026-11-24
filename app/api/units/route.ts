@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +19,14 @@ function cleanNullableString(value: unknown) {
 
 export async function GET() {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${SELECT_FIELDS} FROM units ORDER BY unit_name_en`,
     );
     return NextResponse.json(rows);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load units" },
       { status: 500 },
@@ -32,6 +36,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    await requirePermission("configure_kpis");
     const body = await req.json();
     const unitNameTh = cleanString(body.unitNameTh);
     const unitNameEn = cleanString(body.unitNameEn);
@@ -67,6 +72,8 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json(rows[0], { status: 201 });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create unit" },
       { status: 500 },

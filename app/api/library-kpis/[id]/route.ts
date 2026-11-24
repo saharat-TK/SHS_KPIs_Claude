@@ -11,6 +11,7 @@ import { syncInheritedMetricTargetsForKpi } from "@/lib/kpi/targetInheritance";
 import { isCalculationType } from "@/lib/types";
 import { edpexAreaFitsTopic, normaliseEdpex } from "@/lib/kpi/edpex";
 import { loadEdpexCatalog } from "@/lib/kpi/edpexServer";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${LIBRARY_KPI_FIELDS} FROM library_kpi k WHERE k.id = ?`,
       [params.id],
@@ -83,6 +85,8 @@ export async function GET(
     );
     return NextResponse.json({ ...toLibraryKpiRow(rows[0]), annualTargets: targets });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load KPI" },
       { status: 500 },
@@ -95,6 +99,7 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const body = await req.json();
     if ("calculationType" in body && !isCalculationType(body.calculationType)) {
       return NextResponse.json(
@@ -187,6 +192,8 @@ export async function PATCH(
     );
     return NextResponse.json(toLibraryKpiRow(rows[0]));
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update KPI" },
       { status: 500 },
@@ -199,6 +206,7 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const kpiId = Number(params.id);
     const conn = await pool.getConnection();
     try {
@@ -236,6 +244,8 @@ export async function DELETE(
     }
     return NextResponse.json({ id: kpiId });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to delete KPI" },
       { status: 500 },

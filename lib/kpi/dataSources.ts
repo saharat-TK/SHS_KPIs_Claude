@@ -4,6 +4,8 @@ import type {
   DataSourceColumn,
   DataSourceColumnType,
   DataSourcePeriodGrain,
+  Position,
+  Role,
 } from "@/lib/types";
 import {
   CellFormatError,
@@ -96,6 +98,48 @@ export class DataSourceValidationError extends Error {
 }
 
 const invalid = (message: string) => new DataSourceValidationError(message);
+
+/** The committee position that may maintain its own committee's data source
+ *  columns alongside admins. */
+export const SECRETARY_POSITION: Position = "Committee and Secretary";
+
+/** Who may manage a data source's setup — its columns and its KPI links —
+ *  and on what terms.
+ *
+ *  - "admin": any source, anything — unchanged from before secretaries could.
+ *  - "secretary": a committee-role member whose position on *the source's own
+ *    committee* is Committee and Secretary. Same powers as an admin, except:
+ *    the columns route refuses a save that breaks a KPI link owned by a
+ *    committee they don't sit on, and a new link may only target a KPI or
+ *    metric of one of their own committees. Existing links they may edit and
+ *    unlink whatever they target.
+ *  - null: no access.
+ *
+ *  The committee app role is required as well as the position, matching
+ *  checkEntryWriteAccess: a secretary whose app role is viewer gets nothing.
+ *  Pure, so the page (to show the button) and the route (to refuse) agree. */
+export function sourceManagerAccess(
+  role: Role | null | undefined,
+  positionOnSourceCommittee: Position | null | undefined,
+): "admin" | "secretary" | null {
+  if (role === "admin") return "admin";
+  if (role === "committee" && positionOnSourceCommittee === SECRETARY_POSITION) {
+    return "secretary";
+  }
+  return null;
+}
+
+/** Whether a KPI or metric may be offered as a new link target. `allowed`
+ *  undefined = no restriction (admins). Otherwise the target's own committee
+ *  must be one of them; an unassigned target is not. A metric is judged by its
+ *  own committee, not its KPI's — the same rule the links route applies. */
+export function isAllowedLinkTarget(
+  targetCommitteeId: string | null | undefined,
+  allowed: string[] | undefined,
+): boolean {
+  if (!allowed) return true;
+  return !!targetCommitteeId && allowed.includes(targetCommitteeId);
+}
 
 /** Slugify a column label into a stable col_key. Mirrors the `slugify` in
  *  scripts/migrate-kpi-categories-set-scope.mjs, but also guarantees the

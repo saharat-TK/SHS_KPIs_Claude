@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { isPerformanceStatus } from "@/lib/kpi/performanceRecordStatus";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${SELECT_FIELDS} FROM performance_record r WHERE r.id = ?`,
       [params.id],
@@ -32,6 +34,8 @@ export async function GET(
     }
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load performance record" },
       { status: 500 },
@@ -44,6 +48,7 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const body = await req.json();
     if ("status" in body && !isPerformanceStatus(body.status)) {
       return NextResponse.json({ error: "Invalid performance record status" }, { status: 400 });
@@ -73,6 +78,8 @@ export async function PATCH(
     );
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update performance record" },
       { status: 500 },
@@ -85,6 +92,7 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     // perf_kpi / perf_metric / targets / progress cascade via FK.
     const [result] = await pool.query<ResultSetHeader>(
       "DELETE FROM performance_record WHERE id = ?",
@@ -95,6 +103,8 @@ export async function DELETE(
     }
     return NextResponse.json({ id: Number(params.id) });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to delete performance record" },
       { status: 500 },

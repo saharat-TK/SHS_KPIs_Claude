@@ -15,6 +15,7 @@ import {
   useUpdateDataSourceLink,
 } from "@/lib/data/hooks";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
+import { isAllowedLinkTarget } from "@/lib/kpi/dataSources";
 import type { DataSourceLink } from "@/lib/types";
 import {
   LinkMappingSection,
@@ -31,6 +32,7 @@ export function LinkKpiModal({
   onClose,
   dataSourceId,
   committeeId,
+  allowedCommitteeIds,
   link,
 }: {
   open: boolean;
@@ -38,6 +40,9 @@ export function LinkKpiModal({
   dataSourceId: number;
   /** The data source's owning committee — the Committee filter's default. */
   committeeId?: string | null;
+  /** Set for a secretary: only these committees' KPIs and metrics may be
+   *  linked, and the server refuses anything else. Undefined for an admin. */
+  allowedCommitteeIds?: string[];
   /** Present = edit mode. */
   link?: DataSourceLink | null;
 }) {
@@ -78,9 +83,29 @@ export function LinkKpiModal({
   }, [open, link, committeeId]);
 
   // Only the chosen committee's KPIs; "All committees" shows every KPI in the set.
+  // A secretary sees only targets they may link (isAllowedLinkTarget).
   const kpis = useMemo(
-    () => (kpisQ.data ?? []).filter((k) => !committee || k.committeeId === committee),
-    [kpisQ.data, committee],
+    () =>
+      (kpisQ.data ?? []).filter(
+        (k) =>
+          (!committee || k.committeeId === committee) &&
+          isAllowedLinkTarget(k.committeeId, allowedCommitteeIds),
+      ),
+    [kpisQ.data, committee, allowedCommitteeIds],
+  );
+  const metrics = useMemo(
+    () =>
+      (metricsQ.data ?? []).filter((m) =>
+        isAllowedLinkTarget(m.committeeId, allowedCommitteeIds),
+      ),
+    [metricsQ.data, allowedCommitteeIds],
+  );
+  const committees = useMemo(
+    () =>
+      (committeesQ.data ?? []).filter(
+        (c) => !allowedCommitteeIds || allowedCommitteeIds.includes(c.id),
+      ),
+    [committeesQ.data, allowedCommitteeIds],
   );
 
   // Only used for the tip naming the aggregation that divides — the mapping
@@ -148,9 +173,10 @@ export function LinkKpiModal({
         ) : (
           <TargetPicker
             sets={setsQ.data ?? []}
-            committees={committeesQ.data ?? []}
+            committees={committees}
+            allowAllCommittees={!allowedCommitteeIds}
             kpis={kpis}
-            metrics={metricsQ.data ?? []}
+            metrics={metrics}
             setId={setId}
             committee={committee}
             kpiId={kpiId}
@@ -192,6 +218,7 @@ export function LinkKpiModal({
 function TargetPicker({
   sets,
   committees,
+  allowAllCommittees,
   kpis,
   metrics,
   setId,
@@ -205,6 +232,8 @@ function TargetPicker({
 }: {
   sets: { id: number; name: string }[];
   committees: { id: string; name: string }[];
+  /** False for a secretary, who may only pick among their own committees. */
+  allowAllCommittees: boolean;
   kpis: { id: number; name: string }[];
   metrics: { id: number; name: string }[];
   setId: number;
@@ -236,7 +265,7 @@ function TargetPicker({
 
       <Field label="Committee" hint="Narrows the KPI list to the KPIs this committee owns.">
         <Select value={committee} onChange={(e) => onCommittee(e.target.value)}>
-          <option value="">All committees</option>
+          {allowAllCommittees && <option value="">All committees</option>}
           {committees.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +26,14 @@ const SELECT_JOIN = `
 
 export async function GET() {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `${SELECT_JOIN} ORDER BY c.name, f.name`,
     );
     return NextResponse.json(rows);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load committee memberships" },
       { status: 500 },
@@ -39,6 +43,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    await requirePermission("manage_faculty");
     const body = await req.json();
     const { facultyId, committeeId, position, kpiFocus } = body;
 
@@ -76,6 +81,8 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json(rows[0], { status: 201 });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create membership" },
       { status: 500 },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import { slugify } from "@/lib/kpi/slug";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ const SELECT_FIELDS =
 
 export async function GET(req: NextRequest) {
   try {
+    await requireActor();
     // Scope to a strategic set when ?setId is provided; otherwise return all
     // (legacy/global consumers such as the prototype manager and dashboard).
     const setIdParam = req.nextUrl.searchParams.get("setId");
@@ -27,6 +29,8 @@ export async function GET(req: NextRequest) {
         )[0];
     return NextResponse.json(rows);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load categories" },
       { status: 500 },
@@ -36,6 +40,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await requirePermission("configure_kpis");
     const body = await req.json();
     const { name, description, sortOrder, setId, kpiType } = body;
 
@@ -97,6 +102,8 @@ export async function POST(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create category" },
       { status: 500 },

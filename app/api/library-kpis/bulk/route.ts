@@ -20,11 +20,13 @@ import {
   type KpiBatchLookups,
 } from "@/lib/kpi/kpiBatch";
 import { loadEdpexCatalog } from "@/lib/kpi/edpexServer";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    await requirePermission("configure_kpis");
     const b = await req.json();
     const setId = Number(b.setId);
     if (!Number.isInteger(setId) || setId <= 0) {
@@ -111,6 +113,8 @@ export async function POST(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create KPIs" },
       { status: 500 },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ const SELECT_FIELDS =
 // heals any gaps/dupes left over from ad-hoc inserts.
 export async function PATCH(req: NextRequest) {
   try {
+    await requirePermission("configure_kpis");
     const body = await req.json();
     const order: unknown = body?.order;
 
@@ -46,6 +48,8 @@ export async function PATCH(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to reorder categories" },
       { status: 500 },

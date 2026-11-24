@@ -4,12 +4,16 @@ import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import {
   LINK_FROM,
   LINK_SELECT,
+  checkSourceManagerAccess,
   errorResponse,
+  linkTargetCommittee,
+  loadSourceShape,
   mapLinkRow,
   validateLinkMappings,
 } from "@/lib/kpi/dataSourcesServer";
 import { describeOutcome, type FeedOutcome } from "@/lib/kpi/feedOutcome";
 import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
+import { requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +22,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${LINK_SELECT} ${LINK_FROM}
         WHERE l.data_source_id = ?
@@ -38,15 +43,42 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
+    // Admins, and the source's own committee's Committee and Secretary.
+    const actor = await requireActor();
     const b = await req.json();
     const libraryKpiId = b.libraryKpiId ? Number(b.libraryKpiId) : null;
     const libraryMetricId = b.libraryMetricId ? Number(b.libraryMetricId) : null;
+
+    const source = await loadSourceShape(pool, params.id);
+    if (!source) {
+      return NextResponse.json({ error: "Data source not found" }, { status: 404 });
+    }
+    const permit = await checkSourceManagerAccess(pool, source, actor.facultyId, actor.role);
+    if ("error" in permit) {
+      return NextResponse.json({ error: permit.error }, { status: 403 });
+    }
 
     if ((libraryKpiId === null) === (libraryMetricId === null)) {
       return NextResponse.json(
         { error: "Link exactly one KPI or one metric" },
         { status: 400 },
       );
+    }
+
+    // A secretary feeds only their own committees' KPIs: the feed writes the
+    // target's progress, so another committee's numbers aren't theirs to set.
+    // An unassigned target counts as not theirs.
+    if (permit.access === "secretary") {
+      const targetCommittee = await linkTargetCommittee(pool, { libraryKpiId, libraryMetricId });
+      if (targetCommittee === undefined) {
+        return NextResponse.json({ error: "KPI or metric not found" }, { status: 404 });
+      }
+      if (!targetCommittee || !actor.committeeIds.includes(targetCommittee)) {
+        return NextResponse.json(
+          { error: "You can link only KPIs and metrics of your own committees" },
+          { status: 403 },
+        );
+      }
     }
 
     // Authoritative regardless of what the UI offered.

@@ -8,6 +8,7 @@ import {
   activeRecordsHaveMetricProgress,
 } from "@/lib/kpi/performance";
 import { validateWeight } from "@/lib/kpi/weight";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${LIBRARY_METRIC_FIELDS} FROM library_metric m WHERE m.id = ?`,
       [params.id],
@@ -70,6 +72,8 @@ export async function GET(
     );
     return NextResponse.json({ ...rows[0], annualTargets: targets });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load metric" },
       { status: 500 },
@@ -82,6 +86,7 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const body = await req.json();
     if ("weight" in body) {
       const weight = validateWeight(body.weight);
@@ -131,6 +136,8 @@ export async function PATCH(
     );
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update metric" },
       { status: 500 },
@@ -143,6 +150,7 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const metricId = Number(params.id);
     const conn = await pool.getConnection();
     try {
@@ -179,6 +187,8 @@ export async function DELETE(
     }
     return NextResponse.json({ id: metricId });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to delete metric" },
       { status: 500 },

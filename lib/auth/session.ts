@@ -9,6 +9,7 @@ import { ActorError } from "./errors";
 import { resolveActor, type ActorRow, type SessionActor } from "./allowlist";
 
 export type { SessionActor } from "./allowlist";
+export { auditName } from "./allowlist";
 export { ActorError, actorErrorResponse } from "./errors";
 
 /**

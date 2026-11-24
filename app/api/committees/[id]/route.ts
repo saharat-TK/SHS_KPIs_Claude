@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import { describeCommitteeUsage } from "@/lib/kpi/committee";
 import { loadCommitteeUsage } from "@/lib/kpi/committeeServer";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ function cleanNullableString(value: unknown) {
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${SELECT_FIELDS} FROM committees WHERE id = ?`,
       [params.id],
@@ -39,6 +41,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     }
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load committee" },
       { status: 500 },
@@ -48,6 +52,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    await requirePermission("manage_faculty");
     const body = await req.json();
     const setClauses: string[] = [];
     const values: unknown[] = [];
@@ -107,6 +112,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     );
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update committee" },
       { status: 500 },
@@ -116,6 +123,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    await requirePermission("manage_faculty");
     // The client disables the button using the same rule, but authority is here:
     // deleting would cascade the roster away and unassign library KPIs/metrics.
     const blocked = describeCommitteeUsage(await loadCommitteeUsage(pool, params.id));
@@ -134,6 +142,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
     return NextResponse.json({ id: params.id });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to delete committee" },
       { status: 500 },

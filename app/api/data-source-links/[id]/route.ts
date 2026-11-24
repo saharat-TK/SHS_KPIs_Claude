@@ -4,12 +4,42 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import {
   LINK_FROM,
   LINK_SELECT,
+  checkSourceManagerAccess,
   errorResponse,
   mapLinkRow,
   validateLinkMappings,
 } from "@/lib/kpi/dataSourcesServer";
 import { describeOutcome, type FeedOutcome } from "@/lib/kpi/feedOutcome";
 import { feedFromDataSource } from "@/lib/kpi/dataSourceFeed";
+import { requireActor, type SessionActor } from "@/lib/auth/session";
+
+/** Loads a link's source and checks the actor may manage it: an admin, or the
+ *  source's own committee's Committee and Secretary — whatever the link
+ *  targets. Returns the response to send (404/403), or the link's source id. */
+async function denyLinkWrite(
+  linkId: string,
+  actor: SessionActor,
+): Promise<{ response: NextResponse } | { dataSourceId: number }> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT l.data_source_id AS dataSourceId, d.committee_id AS committeeId
+       FROM data_source_link l JOIN data_source d ON d.id = l.data_source_id
+      WHERE l.id = ?`,
+    [linkId],
+  );
+  if (rows.length === 0) {
+    return { response: NextResponse.json({ error: "Link not found" }, { status: 404 }) };
+  }
+  const permit = await checkSourceManagerAccess(
+    pool,
+    { committeeId: rows[0].committeeId as string },
+    actor.facultyId,
+    actor.role,
+  );
+  if ("error" in permit) {
+    return { response: NextResponse.json({ error: permit.error }, { status: 403 }) };
+  }
+  return { dataSourceId: Number(rows[0].dataSourceId) };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -20,15 +50,10 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
+    const access = await denyLinkWrite(params.id, await requireActor());
+    if ("response" in access) return access.response;
+    const { dataSourceId } = access;
     const b = await req.json();
-
-    const [existing] = await pool.query<RowDataPacket[]>(
-      "SELECT data_source_id AS dataSourceId FROM data_source_link WHERE id = ?",
-      [params.id],
-    );
-    if (existing.length === 0) {
-      return NextResponse.json({ error: "Link not found" }, { status: 404 });
-    }
 
     const setClauses: string[] = [];
     const values: unknown[] = [];
@@ -36,7 +61,7 @@ export async function PATCH(
     if ("mappings" in b) {
       const mappings = await validateLinkMappings(
         pool,
-        existing[0].dataSourceId,
+        dataSourceId,
         b.mappings,
       );
       setClauses.push("mappings = ?");
@@ -62,7 +87,7 @@ export async function PATCH(
         `UPDATE data_source_link SET ${setClauses.join(", ")} WHERE id = ?`,
         values,
       );
-      outcome = await feedFromDataSource(conn, Number(existing[0].dataSourceId));
+      outcome = await feedFromDataSource(conn, dataSourceId);
       await conn.commit();
     } catch (err) {
       await conn.rollback();
@@ -86,6 +111,8 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    const access = await denyLinkWrite(params.id, await requireActor());
+    if ("response" in access) return access.response;
     const [result] = await pool.query<ResultSetHeader>(
       "DELETE FROM data_source_link WHERE id = ?",
       [params.id],

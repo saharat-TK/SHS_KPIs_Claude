@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import { syncRecordFromLibrary, recomputeRecordRollups } from "@/lib/kpi/performance";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -54,6 +56,8 @@ export async function POST(
     }
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to sync performance record" },
       { status: 500 },

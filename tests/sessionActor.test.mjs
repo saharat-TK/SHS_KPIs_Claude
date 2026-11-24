@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveActor } from "../lib/auth/allowlist.ts";
+import { auditName, resolveActor } from "../lib/auth/allowlist.ts";
 
 const admin = {
   facultyId: "fac-022",
@@ -53,7 +53,15 @@ test("an admin may view as someone else", () => {
   // The real person must survive: the audit trail records them.
   assert.equal(actor.realFacultyId, "fac-022");
   assert.equal(actor.realName, admin.name);
+  assert.equal(actor.realEmail, admin.email);
   assert.equal(actor.realRole, "admin");
+  assert.equal(auditName(actor), `${admin.name} (as ${member.name})`);
+});
+
+test("auditName is just the name when nobody is impersonating", () => {
+  const actor = resolveActor({ real: member, impersonateTarget: null });
+  assert.equal(auditName(actor), member.name);
+  assert.equal(actor.realEmail, member.email);
 });
 
 test("a non-admin's impersonation cookie is ignored", () => {

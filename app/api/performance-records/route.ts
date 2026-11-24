@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { copySetIntoRecord } from "@/lib/kpi/performance";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +18,14 @@ const SELECT_FIELDS = `
 
 export async function GET() {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${SELECT_FIELDS} FROM performance_record r ORDER BY r.start_year DESC, r.id DESC`,
     );
     return NextResponse.json(rows);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load performance records" },
       { status: 500 },
@@ -32,6 +36,7 @@ export async function GET() {
 // Activate a library set: snapshot its whole KPI tree into a new record.
 export async function POST(req: NextRequest) {
   try {
+    await requirePermission("configure_kpis");
     const b = await req.json();
     if (!b.sourceSetId) {
       return NextResponse.json({ error: "sourceSetId is required" }, { status: 400 });
@@ -80,6 +85,8 @@ export async function POST(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to activate performance record" },
       { status: 500 },

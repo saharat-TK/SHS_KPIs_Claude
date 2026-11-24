@@ -35,7 +35,14 @@ export interface SessionActor extends ActorRow {
   /** The person actually signed in. Audit trails must record this one. */
   realFacultyId: string;
   realName: string;
+  realEmail: string;
   realRole: Role;
+}
+
+/** The name to stamp on an audit field: who acted, and as whom when an admin
+ *  is viewing as someone else. Matches the approval event log. */
+export function auditName(actor: SessionActor): string {
+  return actor.impersonating ? `${actor.realName} (as ${actor.name})` : actor.name;
 }
 
 /**
@@ -59,6 +66,7 @@ export function resolveActor(input: {
     impersonating: false,
     realFacultyId: real.facultyId,
     realName: real.name,
+    realEmail: real.email,
     realRole: real.role,
   };
 
@@ -72,6 +80,7 @@ export function resolveActor(input: {
     impersonating: true,
     realFacultyId: real.facultyId,
     realName: real.name,
+    realEmail: real.email,
     realRole: real.role,
   };
 }

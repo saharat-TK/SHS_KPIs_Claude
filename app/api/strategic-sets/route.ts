@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import { slugify } from "@/lib/kpi/slug";
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
-import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +17,14 @@ const SELECT_FIELDS = `
 
 export async function GET() {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${SELECT_FIELDS} FROM strategic_set s ORDER BY s.start_year DESC, s.id DESC`,
     );
     return NextResponse.json(rows);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return (
       actorErrorResponse(err) ??
       NextResponse.json(

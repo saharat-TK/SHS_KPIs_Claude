@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import { committeeIdFromName } from "@/lib/kpi/committee";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import type { PoolConnection } from "mysql2/promise";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -45,11 +46,14 @@ async function nextCommitteeId(conn: PoolConnection, name: string) {
 
 export async function GET() {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${SELECT_FIELDS} FROM committees ORDER BY name`,
     );
     return NextResponse.json(rows);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load committees" },
       { status: 500 },
@@ -59,6 +63,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    await requirePermission("manage_faculty");
     const body = await req.json();
     const name = cleanString(body.name);
     const faculty = cleanString(body.faculty) || DEFAULT_FACULTY;
@@ -112,6 +117,8 @@ export async function POST(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create committee" },
       { status: 500 },
