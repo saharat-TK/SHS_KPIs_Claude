@@ -1,3 +1,4 @@
+import type { Locale } from "@/lib/i18n/config";
 import type {
   AcademicCatalog,
   DataSourceCellValue,
@@ -363,9 +364,15 @@ export function formatCellValue(
   return isDerivedOptionType(column.dataType) ? (labels?.[raw] ?? raw) : raw;
 }
 
-/** Label for an entry's period, e.g. "2568 Q3" or "2568". */
-export function formatEntryPeriod(year: number, quarter: number | null): string {
-  return quarter === null ? String(year) : `${year} Q${quarter}`;
+/** Label for an entry's period, e.g. "2568 Q3" or "2568". Thai reads
+ *  "ไตรมาส 3 ปี 2568"; CSV exports and templates keep the English form. */
+export function formatEntryPeriod(
+  year: number,
+  quarter: number | null,
+  locale: Locale = "en",
+): string {
+  if (quarter === null) return String(year);
+  return locale === "th" ? `ไตรมาส ${quarter} ปี ${year}` : `${year} Q${quarter}`;
 }
 
 /** What a delete confirm calls an entry: the value in its second column (the first

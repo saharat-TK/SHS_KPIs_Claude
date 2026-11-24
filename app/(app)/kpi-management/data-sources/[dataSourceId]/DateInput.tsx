@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { Input } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { useLocale, useT } from "@/lib/i18n/useT";
 import { cn } from "@/lib/utils";
 import { MONTHS, currentBEYear, formatDateBE, parseDate } from "@/lib/kpi/cellFormats";
 import {
@@ -24,7 +25,15 @@ import {
   todayParts,
 } from "@/lib/kpi/calendar";
 
-const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const WEEKDAY_KEYS = [
+  "dataSources.date.weekdaySu",
+  "dataSources.date.weekdayMo",
+  "dataSources.date.weekdayTu",
+  "dataSources.date.weekdayWe",
+  "dataSources.date.weekdayTh",
+  "dataSources.date.weekdayFr",
+  "dataSources.date.weekdaySa",
+] as const;
 const GAP_PX = 4;
 /** Earliest year offered in the year list (BE). */
 const FIRST_YEAR = 2480;
@@ -56,10 +65,12 @@ export function DateInput({
   placeholder?: string;
   title?: string;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState(() => {
-    const t = todayParts();
-    return { beYear: t.beYear, month: t.month };
+    const now = todayParts();
+    return { beYear: now.beYear, month: now.month };
   });
   const [focusIso, setFocusIso] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
@@ -234,10 +245,10 @@ export function DateInput({
         />
         <button
           type="button"
-          aria-label="Open calendar"
+          aria-label={t("dataSources.date.openCalendar")}
           aria-haspopup="dialog"
           aria-expanded={open}
-          title="Pick from calendar"
+          title={t("dataSources.date.pickFromCalendar")}
           disabled={disabled}
           onClick={() => (open ? close(false) : openPanel())}
           className={cn(
@@ -258,7 +269,7 @@ export function DateInput({
           <div
             ref={panelRef}
             role="dialog"
-            aria-label="Choose a date"
+            aria-label={t("dataSources.date.chooseDate")}
             onKeyDown={onPanelKeyDown}
             style={{
               top: coords?.top ?? -9999,
@@ -271,26 +282,26 @@ export function DateInput({
             <div className="mb-sm flex items-center gap-xs">
               <button
                 type="button"
-                aria-label="Previous month"
+                aria-label={t("dataSources.date.previousMonth")}
                 onClick={() => step(-1)}
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
               >
                 <Icon name="chevron_left" size={20} />
               </button>
               <select
-                aria-label="Month"
+                aria-label={t("dataSources.date.month")}
                 value={view.month}
                 onChange={(e) => setView({ ...view, month: Number(e.target.value) })}
                 className="h-8 min-w-0 flex-1 cursor-pointer rounded-md border border-hairline bg-surface-lowest px-xs text-body-sm text-on-surface"
               >
                 {MONTHS.map((m) => (
                   <option key={m.value} value={m.value}>
-                    {m.en}
+                    {locale === "th" ? m.th : m.en}
                   </option>
                 ))}
               </select>
               <select
-                aria-label="Year (BE)"
+                aria-label={t("dataSources.date.yearBe")}
                 value={view.beYear}
                 onChange={(e) => setView({ ...view, beYear: Number(e.target.value) })}
                 className="h-8 w-[76px] shrink-0 cursor-pointer rounded-md border border-hairline bg-surface-lowest px-xs text-body-sm text-on-surface"
@@ -303,7 +314,7 @@ export function DateInput({
               </select>
               <button
                 type="button"
-                aria-label="Next month"
+                aria-label={t("dataSources.date.nextMonth")}
                 onClick={() => step(1)}
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
               >
@@ -311,15 +322,18 @@ export function DateInput({
               </button>
             </div>
 
-            <div role="grid" aria-label={`${MONTHS[view.month - 1].en} ${view.beYear}`}>
+            <div
+              role="grid"
+              aria-label={`${locale === "th" ? MONTHS[view.month - 1].th : MONTHS[view.month - 1].en} ${view.beYear}`}
+            >
               <div role="row" className="grid grid-cols-7">
-                {WEEKDAYS.map((d) => (
+                {WEEKDAY_KEYS.map((key) => (
                   <span
-                    key={d}
+                    key={key}
                     role="columnheader"
                     className="grid h-8 place-items-center text-caption-sm text-mute"
                   >
-                    {d}
+                    {t(key)}
                   </span>
                 ))}
               </div>
