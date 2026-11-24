@@ -9,7 +9,6 @@ import {
   type FocusEvent,
   type MouseEvent,
   type RefObject,
-  type UIEvent,
 } from "react";
 import { Table, Th, Td, EmptyState, useConfirm } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
@@ -38,8 +37,10 @@ import {
 /** Cell/header spacing. Must match CELL_PAD_X in columnWidths.ts (6px a side). */
 const CELL = "!px-sm !py-xs !align-top";
 /** Header cells: 12px above the label (the same gap as above the first data row)
- *  and 8px below. Literal arbitrary classes so Tailwind's scanner emits them. */
-const HEAD = "bg-surface-lowest !px-sm !pt-[12px] !pb-[8px] !align-top";
+ *  and 8px below. Literal arbitrary classes so Tailwind's scanner emits them.
+ *  Sticky to the top of the table's scroll box, so the header stays in view
+ *  while the rows scroll under it. */
+const HEAD = "sticky top-0 z-20 bg-surface-lowest !px-sm !pt-[12px] !pb-[8px] !align-top";
 /** First (Period) column: 20px left padding. Must equal 6px + FIRST_COLUMN_EXTRA_LEFT
  *  in columnWidths.ts; written as a literal so Tailwind's scanner emits it. */
 const FIRST_COL = "!pl-[20px]";
@@ -78,8 +79,6 @@ export function EntriesTable({
   const remove = useDeleteDataSourceEntry();
   const [sort, setSort] = useState<SortState | null>(null);
   const [tooltip, setTooltip] = useState<CellTooltip | null>(null);
-  const headerScrollRef = useRef<HTMLDivElement>(null);
-  const bodyScrollRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const layout = useColumnLayout(rootRef, columns, entries, canRecord, cellLabels);
 
@@ -155,16 +154,6 @@ export function EntriesTable({
     onBlur: () => setTooltip(null),
   });
 
-  const syncHorizontalScroll = (
-    targetRef: RefObject<HTMLDivElement>,
-    event: UIEvent<HTMLDivElement>,
-  ) => {
-    const target = targetRef.current;
-    if (target && target.scrollLeft !== event.currentTarget.scrollLeft) {
-      target.scrollLeft = event.currentTarget.scrollLeft;
-    }
-  };
-
   return (
     <div ref={rootRef}>
       {visibleGroups.length === 0 ? (
@@ -175,40 +164,24 @@ export function EntriesTable({
         />
       ) : (
       <>
-      {/* rounded-lg: the card around this is rounded but not clipping, so the
+      {/* One box scrolls both ways, so its horizontal scrollbar sits at the
+          bottom of the visible box instead of below the last row. The header
+          cells are sticky inside it (HEAD), so no second table or scroll sync.
+          rounded-lg: the card around this is rounded but not clipping, so the
           sticky header's square white band would otherwise stick out past its
           corners. A scroll box clips its children to its own radius. */}
       <div
         className={cn(
-          "overflow-y-auto rounded-lg scroll-thin [scrollbar-gutter:stable]",
+          "overflow-auto rounded-lg scroll-thin [scrollbar-gutter:stable]",
           heightClass,
         )}
-      >
-      <div className="sticky top-0 z-20 bg-surface-lowest">
-        <div
-          ref={headerScrollRef}
-          onScroll={(event) => syncHorizontalScroll(bodyScrollRef, event)}
-          className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          <table
-            className="!border-separate border-spacing-0 table-fixed text-body-sm"
-            style={{ width: `${layout.total}px` }}
-          >
-            <DataTableColumnGroup columns={columns} layout={layout} canRecord={canRecord} />
-            <DataTableHeader columns={columns} canRecord={canRecord} sort={sort} onSort={setSortKey} />
-          </table>
-        </div>
-      </div>
-      <div
-        ref={bodyScrollRef}
-        onScroll={(event) => syncHorizontalScroll(headerScrollRef, event)}
-        className="overflow-x-auto scroll-thin"
       >
         <table
           className="!border-separate border-spacing-0 table-fixed text-body-sm"
           style={{ width: `${layout.total}px` }}
         >
           <DataTableColumnGroup columns={columns} layout={layout} canRecord={canRecord} />
+          <DataTableHeader columns={columns} canRecord={canRecord} sort={sort} onSort={setSortKey} />
           {visibleGroups.map((group, groupIndex) => (
             <GroupBody
               key={group.key}
@@ -232,7 +205,6 @@ export function EntriesTable({
             />
           ))}
         </table>
-      </div>
       </div>
       </>
       )}
@@ -480,7 +452,9 @@ function DataTableHeader({
         {canRecord && (
           <Th
             align="center"
-            className="sticky right-0 z-10 !px-md !pt-[12px] !pb-[8px] !align-top border-l border-hairline bg-surface-lowest shadow-[-8px_0_12px_-10px_rgb(0_0_0_/_0.35)]"
+            // Pinned top and right: z-30 keeps this corner above both the other
+            // header cells (z-20) and the body's Actions cells (z-10).
+            className="sticky right-0 top-0 z-30 !px-md !pt-[12px] !pb-[8px] !align-top border-l border-hairline bg-surface-lowest shadow-[-8px_0_12px_-10px_rgb(0_0_0_/_0.35)]"
           >
             Actions
           </Th>

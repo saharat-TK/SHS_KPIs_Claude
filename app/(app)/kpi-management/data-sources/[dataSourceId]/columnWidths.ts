@@ -1,8 +1,8 @@
 // Content-fit column widths for EntriesTable.
 //
-// EntriesTable is two `table-fixed` tables (sticky header + scrolling body) that
-// must share one <colgroup>, so the browser's own auto-sizing is off the table:
-// the widths are measured here with canvas and handed to both.
+// EntriesTable is a `table-fixed` table (its header cells sticky inside one
+// scroll box), so the browser's own auto-sizing is off the table: the widths
+// are measured here with canvas and handed to its <colgroup>.
 
 import type { DataSourceColumn, DataSourceEntry } from "@/lib/types";
 import { isHttpUrl } from "@/lib/kpi/dataSources";

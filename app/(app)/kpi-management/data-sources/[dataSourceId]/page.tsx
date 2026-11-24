@@ -50,6 +50,15 @@ import { downloadEntryTemplate } from "./entryTemplate";
 import { LinkKpiModal } from "./LinkKpiModal";
 import { ManageColumnsModal } from "./ManageColumnsModal";
 import { EntriesTable, formatEntryCreatedAt } from "./EntriesTable";
+import { cn } from "@/lib/utils";
+
+// The Columns and Linked KPIs tables each scroll in one box, both ways, so the
+// horizontal scrollbar sits at the bottom of the visible box rather than below
+// the last row. Literal classes so Tailwind's scanner emits them.
+const SCROLL_BOX = "max-h-[60vh] overflow-y-auto rounded-lg [scrollbar-gutter:stable]";
+/** Sticky header cells need separated borders: a collapsed border scrolls away. */
+const SCROLL_TABLE = "!border-separate border-spacing-0";
+const STICKY_TH = "sticky top-0 z-10 bg-surface-lowest";
 
 
 export default function DataSourceDetailPage({
@@ -381,32 +390,34 @@ function DataSourceDetail({ id }: { id: number }) {
                   }
                 />
               ) : (
-                <Table>
+                <Table className={SCROLL_TABLE} scrollClassName={SCROLL_BOX}>
                   <thead>
                     <tr>
-                      <Th>Label</Th>
-                      <Th>Stored as</Th>
-                      <Th align="center">Type</Th>
-                      <Th align="center">Unit</Th>
-                      <Th align="center">Required</Th>
-                      <Th align="center">Multiple inputs</Th>
-                      <Th>Options</Th>
+                      <Th className={STICKY_TH}>Label</Th>
+                      <Th className={cn(STICKY_TH, "whitespace-nowrap")}>Stored as</Th>
+                      <Th align="center" className={STICKY_TH}>Type</Th>
+                      <Th align="center" className={STICKY_TH}>Unit</Th>
+                      <Th align="center" className={STICKY_TH}>Required</Th>
+                      <Th align="center" className={cn(STICKY_TH, "whitespace-nowrap")}>
+                        Multiple inputs
+                      </Th>
+                      <Th className={STICKY_TH}>Options</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {columns.map((c) => (
-                      <tr key={c.id} className="border-t border-hairline">
-                        <Td className="font-medium">{c.label}</Td>
-                        <Td className="text-mute">
+                      <tr key={c.id}>
+                        <Td className="min-w-[12rem] font-medium">{c.label}</Td>
+                        <Td className="whitespace-nowrap text-mute">
                           <code>{c.colKey}</code>
                         </Td>
-                        <Td align="center">{c.dataType}</Td>
-                        <Td align="center" className="text-mute">
+                        <Td align="center" className="whitespace-nowrap">{c.dataType}</Td>
+                        <Td align="center" className="whitespace-nowrap text-mute">
                           {c.unit ?? "—"}
                         </Td>
-                        <Td align="center">{c.isRequired ? "Yes" : "—"}</Td>
-                        <Td align="center">{c.isMultiple ? "Yes" : "—"}</Td>
-                        <Td className="text-mute">{c.options?.join(", ") ?? "—"}</Td>
+                        <Td align="center" className="whitespace-nowrap">{c.isRequired ? "Yes" : "—"}</Td>
+                        <Td align="center" className="whitespace-nowrap">{c.isMultiple ? "Yes" : "—"}</Td>
+                        <Td className="min-w-[16rem] text-mute">{c.options?.join(", ") ?? "—"}</Td>
                       </tr>
                     ))}
                   </tbody>
@@ -539,75 +550,73 @@ function LinksTable({
   const remove = useDeleteDataSourceLink();
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <thead>
-          <tr>
-            <Th>Strategic Set</Th>
-            <Th>KPI</Th>
-            <Th>Metric</Th>
-            <Th>Feeds</Th>
-            <Th>Note</Th>
-            {canManage && <Th align="right">Actions</Th>}
-          </tr>
-        </thead>
-        <tbody>
-          {links.map((l) => (
-            <tr key={l.id} className="border-t border-hairline">
-              <Td className="text-mute">{l.setName ?? "—"}</Td>
-              <Td className="font-medium">{l.kpiName ?? "—"}</Td>
-              <Td>{l.metricName ?? "—"}</Td>
-              <Td>
-                {l.mappings.length === 0 ? (
-                  <span className="text-caption-sm text-mute">evidence only</span>
-                ) : (
-                  <div className="flex flex-col gap-xxs">
-                    {l.mappings.map((m, i) => (
-                      <span key={i} className="text-caption-sm">
-                        {describeMapping(m, columns, cellLabels)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </Td>
-              <Td className="text-mute">{l.note ?? "—"}</Td>
-              {canManage && (
-                <Td align="right">
-                  <div className="inline-flex items-center gap-xxs">
-                    <button
-                      type="button"
-                      aria-label="Edit link"
-                      title="Edit link"
-                      onClick={() => onEdit(l)}
-                      className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
-                    >
-                      <Icon name="edit" className="text-[18px]" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Remove link"
-                      title="Remove link"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          title: "Remove this link?",
-                          message:
-                            "The raw data stays; only the link to the KPI is removed. Values it already fed keep their last computed number.",
-                          tone: "danger",
-                          confirmLabel: "Remove",
-                        });
-                        if (ok) remove.mutate({ dataSourceId, linkId: l.id });
-                      }}
-                      className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
-                    >
-                      <Icon name="link_off" className="text-[18px]" />
-                    </button>
-                  </div>
-                </Td>
+    <Table className={SCROLL_TABLE} scrollClassName={SCROLL_BOX}>
+      <thead>
+        <tr>
+          <Th className={cn(STICKY_TH, "whitespace-nowrap")}>Strategic Set</Th>
+          <Th className={STICKY_TH}>KPI</Th>
+          <Th className={STICKY_TH}>Metric</Th>
+          <Th className={STICKY_TH}>Feeds</Th>
+          <Th className={STICKY_TH}>Note</Th>
+          {canManage && <Th align="right" className={STICKY_TH}>Actions</Th>}
+        </tr>
+      </thead>
+      <tbody>
+        {links.map((l) => (
+          <tr key={l.id}>
+            <Td className="whitespace-nowrap text-mute">{l.setName ?? "—"}</Td>
+            <Td className="min-w-[18rem] font-medium">{l.kpiName ?? "—"}</Td>
+            <Td className="min-w-[14rem]">{l.metricName ?? "—"}</Td>
+            <Td className="min-w-[16rem]">
+              {l.mappings.length === 0 ? (
+                <span className="text-caption-sm text-mute">evidence only</span>
+              ) : (
+                <div className="flex flex-col gap-xxs">
+                  {l.mappings.map((m, i) => (
+                    <span key={i} className="text-caption-sm">
+                      {describeMapping(m, columns, cellLabels)}
+                    </span>
+                  ))}
+                </div>
               )}
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-    </div>
+            </Td>
+            <Td className="min-w-[10rem] text-mute">{l.note ?? "—"}</Td>
+            {canManage && (
+              <Td align="right" className="whitespace-nowrap">
+                <div className="inline-flex items-center gap-xxs">
+                  <button
+                    type="button"
+                    aria-label="Edit link"
+                    title="Edit link"
+                    onClick={() => onEdit(l)}
+                    className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
+                  >
+                    <Icon name="edit" className="text-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Remove link"
+                    title="Remove link"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "Remove this link?",
+                        message:
+                          "The raw data stays; only the link to the KPI is removed. Values it already fed keep their last computed number.",
+                        tone: "danger",
+                        confirmLabel: "Remove",
+                      });
+                      if (ok) remove.mutate({ dataSourceId, linkId: l.id });
+                    }}
+                    className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
+                  >
+                    <Icon name="link_off" className="text-[18px]" />
+                  </button>
+                </div>
+              </Td>
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }
