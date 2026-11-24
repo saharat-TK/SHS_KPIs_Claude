@@ -109,7 +109,12 @@ export function useFreeRows({
         let error: string | null = null;
         let duplicate = false;
         try {
-          const cells = validateEntryValues(validationColumns, toPayload({}, row.values, columns));
+          const cells = validateEntryValues(
+            validationColumns,
+            toPayload({}, row.values, columns),
+            {},
+            t,
+          );
           duplicate = year != null && recorded.has(entryFingerprint(columns, year, quarter, cells));
         } catch (err) {
           error =

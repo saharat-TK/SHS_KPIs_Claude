@@ -140,6 +140,7 @@ export function ImportEntriesModal({
       grain: periodGrain,
       columns: checkColumns,
       labels: cellLabels,
+      t,
     });
     setHeaderErrors(result.headerErrors);
     setRows(result.rows);

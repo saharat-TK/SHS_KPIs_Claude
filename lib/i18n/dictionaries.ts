@@ -592,7 +592,8 @@ export type Localized<T> = {
 };
 type Dictionary = Localized<typeof en>;
 
-const DICTIONARIES: Record<Locale, unknown> = { en, th };
+/** Both dictionaries, exported so the parity test can walk every key. */
+export const DICTIONARIES: Record<Locale, unknown> = { en, th };
 
 /** Union of every dotted key path in the dictionary, e.g. "nav.items.dashboard". */
 export type TranslationKey = DotPaths<typeof en>;

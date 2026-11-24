@@ -152,7 +152,7 @@ export function useBatchRows({
         let error: string | null = null;
         if (included) {
           try {
-            validateEntryValues(validationColumns, toPayload(r.locked, values, columns));
+            validateEntryValues(validationColumns, toPayload(r.locked, values, columns), {}, t);
           } catch (err) {
             error =
               err instanceof DataSourceValidationError

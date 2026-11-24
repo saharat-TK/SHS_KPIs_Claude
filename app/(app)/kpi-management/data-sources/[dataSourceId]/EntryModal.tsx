@@ -226,12 +226,14 @@ export function EntryModal({
 
   const yearError = useMemo(() => {
     try {
-      parseYearBE(year);
+      parseYearBE(year, t);
       return null;
     } catch (err) {
-      return err instanceof CellFormatError ? `Year ${err.message}` : String(err);
+      return err instanceof CellFormatError
+        ? t("dataSources.validation.yearPrefix", { message: err.message })
+        : String(err);
     }
-  }, [year]);
+  }, [year, t]);
   const yearValid = yearError === null;
   const batchQuarter = periodGrain === "annual" ? null : Number(quarter);
   const batch = useBatchRows({
@@ -268,13 +270,13 @@ export function EntryModal({
       const v = (values[c.colKey] ?? "").trim();
       if (!v || !FORMAT_CHECKED.has(c.dataType)) continue;
       try {
-        coerceCellValue(c, v);
+        coerceCellValue(c, v, t);
       } catch (err) {
         out[c.colKey] = err instanceof Error ? err.message : String(err);
       }
     }
     return out;
-  }, [columns, values]);
+  }, [columns, values, t]);
   const leftKeys = new Set((linked ? layout.left : columns).map((c) => c.colKey));
   const hasFormatError = Object.keys(formatErrors).some((k) => leftKeys.has(k));
 

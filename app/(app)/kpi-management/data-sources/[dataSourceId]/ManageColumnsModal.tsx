@@ -141,6 +141,7 @@ export function ManageColumnsModal({
         isMultiple: d.isMultiple,
         autoFill: d.share ? "share" : null,
       })),
+      t,
     ),
   ];
   const valid = problems.length === 0;
