@@ -6,14 +6,18 @@ import { Icon } from "./Icon";
 export function Table({
   children,
   className,
+  scrollClassName,
   style,
 }: {
   children: React.ReactNode;
   className?: string;
+  /** Extra classes for the scroll wrapper, e.g. a max height plus
+   *  overflow-y-auto to make it one box that scrolls both ways. */
+  scrollClassName?: string;
   style?: React.CSSProperties;
 }) {
   return (
-    <div className="overflow-x-auto scroll-thin">
+    <div className={cn("overflow-x-auto scroll-thin", scrollClassName)}>
       <table className={cn("w-full border-collapse text-body-sm", className)} style={style}>
         {children}
       </table>
