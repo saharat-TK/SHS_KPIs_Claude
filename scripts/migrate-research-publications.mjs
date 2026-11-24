@@ -1,8 +1,11 @@
 // Migrate the "Research publications" data source into the database in
 // .env.local: the source, its columns, its KPI links and its entries.
 //
-//   node --env-file=.env.local scripts/migrate-research-publications.mjs --dry-run
-//   node --env-file=.env.local scripts/migrate-research-publications.mjs
+//   npm run migrate:research-publications -- --dry-run
+//   npm run migrate:research-publications
+//
+// It imports lib/kpi/sourceSnapshot.ts, so it runs under tsx (a devDependency):
+// Node 20 can't load .ts on its own.
 //
 // Reads scripts/data/research-publications.snapshot.json, written by
 // scripts/export-research-publications.mjs from the database where the source
