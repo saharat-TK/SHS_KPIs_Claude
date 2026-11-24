@@ -25,6 +25,7 @@
     "migrate:data-source-date-types": "node --env-file=.env.local scripts/migrate-data-source-date-types.mjs",
     "fix:date-cells": "node --env-file=.env.local scripts/fix-date-cells.mjs",
     "migrate:data-source-year-be": "node --env-file=.env.local scripts/migrate-data-source-year-be.mjs",
+    "migrate:data-source-entry-incomplete": "node --env-file=.env.local scripts/migrate-data-source-entry-incomplete.mjs",
     "migrate:curriculum-degree-level": "node --env-file=.env.local scripts/migrate-curriculum-degree-level.mjs",
     "migrate:backfill-kpi-variables": "node --env-file=.env.local scripts/backfill-kpi-quarter-variables.mjs",
     "migrate:metric-quarter-variables": "node --env-file=.env.local scripts/migrate-metric-quarter-variables.mjs",
@@ -36,7 +37,9 @@
     "seed:ip": "node --env-file=.env.local scripts/seed-intellectual-property.mjs",
     "seed:ip-usage-count": "node --env-file=.env.local scripts/seed-ip-usage-count.mjs",
     "seed:manuscripts": "node --env-file=.env.local scripts/seed-research-manuscripts.mjs",
-    "seed:research-units": "node --env-file=.env.local scripts/seed-research-units.mjs"
+    "seed:research-units": "node --env-file=.env.local scripts/seed-research-units.mjs",
+    "export:research-publications": "node --env-file=.env.local scripts/export-research-publications.mjs",
+    "migrate:research-publications": "node --env-file=.env.local scripts/migrate-research-publications.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
