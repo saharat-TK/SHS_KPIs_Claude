@@ -7,10 +7,9 @@
 import { useMemo, useState } from "react";
 import { Button, Field, Input, Select, Badge } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/lib/i18n/useT";
 import {
   AGGREGATION_KINDS,
-  AGGREGATION_LABELS,
-  OPERATOR_LABELS,
   PERIOD_FIELD,
   aggregateParts,
   aggregationAllowsColumn,
@@ -194,6 +193,7 @@ export function MappingCard({
   onChange: (patch: Partial<DraftMapping>) => void;
   onRemove: () => void;
 }) {
+  const t = useT();
   const numberColumns = columns.filter((c) => c.dataType === "number");
   // "Count of rows (distinct)" compares values rather than adding them, so any
   // column can be counted — e.g. a paper key, to count papers not author rows.
@@ -209,7 +209,7 @@ export function MappingCard({
   // "Count of rows (distinct)": both sides count distinct values of one column.
   const distinctMode = isProportion && mapping.distinct;
   const distinctLabel =
-    columns.find((c) => c.colKey === mapping.distinctColumnKey)?.label ?? "values";
+    columns.find((c) => c.colKey === mapping.distinctColumnKey)?.label ?? t("dataSources.linkEditor.valuesFallback");
   // Same helper the server feeds with, so the preview can't disagree with the
   // number that ends up stored.
   const headcount = facultyHeadcount(faculty, mapping.facultyRanks);
@@ -276,7 +276,7 @@ export function MappingCard({
           neighbours, and bottom-alignment would push their labels out of line. */}
       <div className="flex flex-wrap items-start gap-sm">
         <div className="w-56">
-          <Field label="Aggregate">
+          <Field label={t("dataSources.linkEditor.aggregate")}>
             <Select
               value={mapping.aggregation}
               onChange={(e) => {
@@ -296,7 +296,7 @@ export function MappingCard({
             >
               {AGGREGATION_KINDS.map((k) => (
                 <option key={k} value={k}>
-                  {AGGREGATION_LABELS[k]}
+                  {t(`dataSources.aggregation.${k}`)}
                 </option>
               ))}
             </Select>
@@ -305,18 +305,18 @@ export function MappingCard({
         {aggregationAllowsColumn(mapping.aggregation) && (
           <div className="min-w-[10rem] flex-1">
             <Field
-              label="Column"
+              label={t("dataSources.linkEditor.column")}
               hint={
                 anyColumn
-                  ? "Counts each distinct value once — pick the column that identifies one item."
+                  ? t("dataSources.linkEditor.columnHintDistinct")
                   : distinctMode
                     ? undefined
                     : numberColumns.length === 0
                       ? isProportion
-                        ? "Count rows — this source has no number columns to total."
-                        : "No number columns on this source."
+                        ? t("dataSources.linkEditor.columnHintNoNumberProportion")
+                        : t("dataSources.linkEditor.columnHintNoNumber")
                       : isProportion
-                        ? "Count rows, count distinct values, or total a number column."
+                        ? t("dataSources.linkEditor.columnHintProportion")
                         : undefined
               }
             >
@@ -342,10 +342,14 @@ export function MappingCard({
                 }}
               >
                 <option value="">
-                  {isProportion ? "Count of rows" : "Select a column…"}
+                  {isProportion
+                    ? t("dataSources.linkEditor.countRows")
+                    : t("dataSources.linkEditor.selectColumn")}
                 </option>
                 {isProportion && (
-                  <option value={DISTINCT_OPTION}>Count of rows (distinct)</option>
+                  <option value={DISTINCT_OPTION}>
+                    {t("dataSources.aggregation.count_distinct")}
+                  </option>
                 )}
                 {aggregatable.map((c) => (
                   <option key={c.id} value={c.colKey}>
@@ -359,14 +363,14 @@ export function MappingCard({
         {distinctMode && (
           <div className="min-w-[10rem] flex-1">
             <Field
-              label="Distinct by"
-              hint="Counts each distinct value once — pick the column that identifies one item."
+              label={t("dataSources.linkEditor.distinctBy")}
+              hint={t("dataSources.linkEditor.columnHintDistinct")}
             >
               <Select
                 value={mapping.distinctColumnKey}
                 onChange={(e) => onChange({ distinctColumnKey: e.target.value })}
               >
-                <option value="">Select a column…</option>
+                <option value="">{t("dataSources.linkEditor.selectColumn")}</option>
                 {columns.map((c) => (
                   <option key={c.id} value={c.colKey}>
                     {c.label}
@@ -378,8 +382,8 @@ export function MappingCard({
         )}
         <button
           type="button"
-          aria-label="Remove mapping"
-          title="Remove mapping"
+          aria-label={t("dataSources.linkEditor.removeMapping")}
+          title={t("dataSources.linkEditor.removeMapping")}
           onClick={onRemove}
           // mt-xl skips past the Field-label row, so this lines up with the
           // inputs now that the group is top- rather than bottom-aligned.
@@ -392,11 +396,13 @@ export function MappingCard({
       <div className="mt-md flex flex-col gap-sm border-t border-hairline pt-md">
         {isProportion && (
           <div className="flex flex-wrap items-center gap-md pb-sm">
-            <span className="text-label-md text-on-surface">Out of</span>
+            <span className="text-label-md text-on-surface">
+              {t("dataSources.linkEditor.outOf")}
+            </span>
             {(
               [
-                ["rows", "Rows of this data source"],
-                ["faculty", "Faculty headcount"],
+                ["rows", t("dataSources.linkEditor.denomRows")],
+                ["faculty", t("dataSources.linkEditor.denomFaculty")],
               ] as [DenominatorSource, string][]
             ).map(([value, label]) => (
               <label key={value} className="flex items-center gap-xs text-body-sm">
@@ -416,18 +422,18 @@ export function MappingCard({
           heading={
             byFaculty
               ? distinctMode
-                ? `Count distinct ${distinctLabel} where…`
-                : "Count rows where…"
+                ? t("dataSources.linkEditor.headingCountDistinct", { label: distinctLabel })
+                : t("dataSources.linkEditor.headingCountRows")
               : isProportion
-                ? "Out of rows where…"
+                ? t("dataSources.linkEditor.headingOutOfRows")
                 : undefined
           }
           emptyText={
             byFaculty
-              ? "No conditions — every row of this data source counts toward the top."
+              ? t("dataSources.linkEditor.emptyFaculty")
               : isProportion
-                ? "No conditions — every row of this data source is the denominator."
-                : "No conditions — every row of this data source counts."
+                ? t("dataSources.linkEditor.emptyProportion")
+                : t("dataSources.linkEditor.emptyPlain")
           }
           filters={mapping.filters}
           columns={columns}
@@ -441,11 +447,11 @@ export function MappingCard({
             {!distinctMode && (
               <div className="max-w-xs">
                 <Field
-                  label="Numerator column"
+                  label={t("dataSources.linkEditor.numeratorColumn")}
                   hint={
                     !mapping.columnKey
-                      ? "Pick a column above first — a column total has no row count to divide by."
-                      : "For fractions whose top and bottom are two different columns."
+                      ? t("dataSources.linkEditor.numeratorHintNone")
+                      : t("dataSources.linkEditor.numeratorHint")
                   }
                 >
                   <Select
@@ -453,7 +459,7 @@ export function MappingCard({
                     disabled={!mapping.columnKey}
                     onChange={(e) => onChange({ numeratorColumnKey: e.target.value })}
                   >
-                    <option value="">Same column as the denominator</option>
+                    <option value="">{t("dataSources.linkEditor.sameAsDenominator")}</option>
                     {numberColumns
                       .filter((c) => c.colKey !== mapping.columnKey)
                       .map((c) => (
@@ -469,15 +475,17 @@ export function MappingCard({
             <ConditionList
               heading={
                 distinctMode
-                  ? `Of those, count distinct ${distinctLabel} where…`
+                  ? t("dataSources.linkEditor.headingOfThoseDistinct", { label: distinctLabel })
                   : twoColumn
-                    ? `Of those, total ${numeratorColumn!.label} where…`
-                    : "Of those, count rows where…"
+                    ? t("dataSources.linkEditor.headingOfThoseTotal", {
+                        label: numeratorColumn!.label,
+                      })
+                    : t("dataSources.linkEditor.headingOfThoseRows")
               }
               emptyText={
                 twoColumn
-                  ? "No conditions — the whole population above is totalled on both columns."
-                  : "Add at least one — without it the answer is always 100%."
+                  ? t("dataSources.linkEditor.emptyTwoColumn")
+                  : t("dataSources.linkEditor.emptyAtLeastOne")
               }
               filters={mapping.numeratorFilters}
               columns={columns}
@@ -489,7 +497,9 @@ export function MappingCard({
 
         {byFaculty && (
           <div className="mt-sm flex flex-col gap-xs border-t border-hairline pt-md">
-            <span className="text-label-md text-on-surface">Divide by active faculty</span>
+            <span className="text-label-md text-on-surface">
+              {t("dataSources.linkEditor.divideByFaculty")}
+            </span>
             <div className="flex flex-wrap gap-md">
               {RANKS.map((rank) => (
                 <label key={rank} className="flex items-center gap-xs text-body-sm">
@@ -512,8 +522,13 @@ export function MappingCard({
             </div>
             <p className="text-caption-sm text-mute">
               {mapping.facultyRanks.length === 0
-                ? "Pick at least one rank — there is nothing to divide by."
-                : `${headcount} active ${headcount === 1 ? "person" : "people"}. Uses the current roster, so earlier quarters are divided by today's headcount.`}
+                ? t("dataSources.linkEditor.pickRank")
+                : t(
+                    headcount === 1
+                      ? "dataSources.linkEditor.headcountOne"
+                      : "dataSources.linkEditor.headcountMany",
+                    { count: headcount },
+                  )}
             </p>
           </div>
         )}
@@ -524,33 +539,55 @@ export function MappingCard({
               <Badge tone={preview.matched > 0 ? "success" : "warning"}>
                 {distinctMode && mapping.distinctColumnKey
                   ? byFaculty
-                    ? `${preview.parts.numerator ?? 0} distinct ${distinctLabel} ÷ ${headcount} faculty`
-                    : `${preview.parts.numerator ?? 0} of ${preview.parts.denominator ?? 0} distinct ${distinctLabel}`
+                    ? t("dataSources.linkEditor.previewDistinctFaculty", {
+                        numerator: preview.parts.numerator ?? 0,
+                        label: distinctLabel,
+                        headcount,
+                      })
+                    : t("dataSources.linkEditor.previewDistinctOf", {
+                        numerator: preview.parts.numerator ?? 0,
+                        denominator: preview.parts.denominator ?? 0,
+                        label: distinctLabel,
+                      })
                   : byFaculty
-                  ? `${preview.matched} rows ÷ ${headcount} faculty`
+                  ? t("dataSources.linkEditor.previewRowsFaculty", {
+                      matched: preview.matched,
+                      headcount,
+                    })
                   : // Row counts would mislead in two-column mode — the fraction
                     // is two column totals, often over the very same rows.
                     twoColumn &&
                       preview.parts.numerator != null &&
                       preview.parts.denominator != null
-                    ? `${formatNumber(preview.parts.numerator, 2)} of ${formatNumber(preview.parts.denominator, 2)}`
+                    ? t("dataSources.linkEditor.previewTwoColumn", {
+                        numerator: formatNumber(preview.parts.numerator, 2),
+                        denominator: formatNumber(preview.parts.denominator, 2),
+                      })
                     : isProportion
-                      ? `${preview.numerator} of ${preview.matched} rows`
-                      : `${preview.matched} of ${preview.total} rows`}
+                      ? t("dataSources.linkEditor.previewProportion", {
+                          numerator: preview.numerator ?? 0,
+                          matched: preview.matched,
+                        })
+                      : t("dataSources.linkEditor.previewRows", {
+                          matched: preview.matched,
+                          total: preview.total,
+                        })}
               </Badge>{" "}
               {preview.pending
-                ? "· finish the condition to preview"
-                : `· ${AGGREGATION_LABELS[mapping.aggregation].toLowerCase()} = ${
-                    preview.value == null
-                      ? "—"
-                      : // A count is a whole number; everything else may not be.
-                        formatNumber(
-                          preview.value,
-                          mapping.aggregation === "count" || mapping.aggregation === "count_distinct"
-                            ? 0
-                            : 2,
-                        )
-                  }`}
+                ? t("dataSources.linkEditor.previewPending")
+                : t("dataSources.linkEditor.previewValue", {
+                    agg: t(`dataSources.aggregation.${mapping.aggregation}`).toLowerCase(),
+                    value:
+                      preview.value == null
+                        ? "—"
+                        : // A count is a whole number; everything else may not be.
+                          formatNumber(
+                            preview.value,
+                            mapping.aggregation === "count" || mapping.aggregation === "count_distinct"
+                              ? 0
+                              : 2,
+                          ),
+                  })}
             </span>
           </div>
         )}
@@ -597,6 +634,7 @@ export function LinkMappingSection({
    *  "no columns" copy below would misdescribe that. */
   placeholder?: string;
 }) {
+  const t = useT();
   const addMapping = () => onChange([...mappings, newMapping()]);
 
   return (
@@ -604,15 +642,16 @@ export function LinkMappingSection({
       <div className="border-t border-hairline pt-md">
         <div className="mb-sm flex items-center justify-between">
           <div>
-            <h3 className="text-label-md text-on-surface">Which rows count</h3>
+            <h3 className="text-label-md text-on-surface">
+              {t("dataSources.linkEditor.whichRowsCount")}
+            </h3>
             <p className="text-caption-sm text-mute">
-              Matching rows are aggregated into the quarterly value, cumulatively
-              within each year.
+              {t("dataSources.linkEditor.whichRowsHint")}
             </p>
           </div>
           {!placeholder && mappings.length === 0 && (
             <Button size="sm" variant="ghost" icon="add" onClick={addMapping}>
-              Add mapping
+              {t("dataSources.linkEditor.addMapping")}
             </Button>
           )}
         </div>
@@ -621,11 +660,11 @@ export function LinkMappingSection({
           <p className="text-body-sm text-mute">{placeholder}</p>
         ) : columns.length === 0 ? (
           <p className="text-body-sm text-mute">
-            This data source has no columns yet, so there is nothing to filter on.
+            {t("dataSources.linkEditor.noColumns")}
           </p>
         ) : mappings.length === 0 ? (
           <p className="text-body-sm text-mute">
-            No mapping — this link is evidence only and will not change any value.
+            {t("dataSources.linkEditor.noMapping")}
           </p>
         ) : (
           <div className="flex flex-col gap-md">
@@ -650,14 +689,23 @@ export function LinkMappingSection({
             target needs the kind that divides rather than a second mapping. */}
         {!placeholder && unitNeedsDivisor(targetUnit) && mappings.length > 0 && (
           <p className="mt-sm flex items-center gap-xs text-caption-sm text-mute">
-            <Badge tone="neutral">tip</Badge>A {targetUnit} target is fed by{" "}
-            {targetUnit?.trim().toLowerCase() === "ratio" ? "Ratio of" : "Percent of"} —
-            it records the dividend and divisor behind the number.
+            <Badge tone="neutral">{t("dataSources.linkEditor.tip")}</Badge>
+            {t("dataSources.linkEditor.tipText", {
+              unit: targetUnit ?? "",
+              kind: t(
+                targetUnit?.trim().toLowerCase() === "ratio"
+                  ? "dataSources.aggregation.ratio_of"
+                  : "dataSources.aggregation.percent_of",
+              ),
+            })}
           </p>
         )}
       </div>
 
-      <Field label="Note" hint="Optional — how this data supports the KPI.">
+      <Field
+        label={t("dataSources.linkEditor.noteLabel")}
+        hint={t("dataSources.linkEditor.noteHint")}
+      >
         <Input value={note} onChange={(e) => onNote(e.target.value)} />
       </Field>
     </>
@@ -681,6 +729,7 @@ function ConditionList({
   labels: Record<string, string>;
   onChange: (filters: DraftFilter[]) => void;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-sm">
       {heading && <span className="text-label-md text-on-surface">{heading}</span>}
@@ -709,7 +758,7 @@ function ConditionList({
           icon="add"
           onClick={() => onChange([...filters, newFilter()])}
         >
-          Add condition
+          {t("dataSources.linkEditor.addCondition")}
         </Button>
       </div>
     </div>
@@ -729,6 +778,7 @@ function FilterRow({
   onChange: (patch: Partial<DraftFilter>) => void;
   onRemove: () => void;
 }) {
+  const t = useT();
   const column = columns.find((c) => c.colKey === filter.field);
   const isPeriod = filter.field === PERIOD_FIELD;
   const allowed: FilterOperator[] = isPeriod
@@ -740,7 +790,7 @@ function FilterRow({
   return (
     <div className="flex flex-wrap items-start gap-sm">
       <div className="min-w-[9rem] flex-1">
-        <Field label="Field">
+        <Field label={t("dataSources.linkEditor.field")}>
           <Select
             value={filter.field}
             onChange={(e) => {
@@ -754,19 +804,19 @@ function FilterRow({
               onChange({ field, operator: next, value: "", valueTo: "", values: [] });
             }}
           >
-            <option value="">Select a field…</option>
+            <option value="">{t("dataSources.linkEditor.selectField")}</option>
             {columns.map((c) => (
               <option key={c.id} value={c.colKey}>
                 {c.label}
               </option>
             ))}
-            <option value={PERIOD_FIELD}>Period (year / quarter)</option>
+            <option value={PERIOD_FIELD}>{t("dataSources.linkEditor.periodField")}</option>
           </Select>
         </Field>
       </div>
 
       <div className="w-36">
-        <Field label="Is">
+        <Field label={t("dataSources.linkEditor.is")}>
           <Select
             value={filter.operator}
             disabled={allowed.length === 1}
@@ -782,7 +832,7 @@ function FilterRow({
           >
             {allowed.map((op) => (
               <option key={op} value={op}>
-                {OPERATOR_LABELS[op]}
+                {t(`dataSources.operator.${op}`)}
               </option>
             ))}
           </Select>
@@ -791,8 +841,16 @@ function FilterRow({
 
       {isPeriod ? (
         <>
-          <PeriodBound label="From" value={filter.value} onChange={(v) => onChange({ value: v })} />
-          <PeriodBound label="To" value={filter.valueTo} onChange={(v) => onChange({ valueTo: v })} />
+          <PeriodBound
+            yearLabel={t("dataSources.linkEditor.fromYear")}
+            value={filter.value}
+            onChange={(v) => onChange({ value: v })}
+          />
+          <PeriodBound
+            yearLabel={t("dataSources.linkEditor.toYear")}
+            value={filter.valueTo}
+            onChange={(v) => onChange({ valueTo: v })}
+          />
         </>
       ) : isMultiValueOperator(filter.operator) ? (
         <div className="min-w-[14rem] flex-[2]">
@@ -806,7 +864,13 @@ function FilterRow({
       ) : (
         <>
           <div className="min-w-[9rem] flex-1">
-            <Field label={filter.operator === "between" ? "From" : "Value"}>
+            <Field
+              label={
+                filter.operator === "between"
+                  ? t("dataSources.linkEditor.from")
+                  : t("dataSources.linkEditor.value")
+              }
+            >
               <ValueInput
                 column={column}
                 labels={labels}
@@ -817,7 +881,7 @@ function FilterRow({
           </div>
           {filter.operator === "between" && (
             <div className="min-w-[9rem] flex-1">
-              <Field label="To">
+              <Field label={t("dataSources.linkEditor.to")}>
                 <ValueInput
                   column={column}
                   labels={labels}
@@ -832,8 +896,8 @@ function FilterRow({
 
       <button
         type="button"
-        aria-label="Remove condition"
-        title="Remove condition"
+        aria-label={t("dataSources.linkEditor.removeCondition")}
+        title={t("dataSources.linkEditor.removeCondition")}
         onClick={onRemove}
         // mt-xl skips past the Field-label row above, so this lines up with
         // the input row now that the group is top- rather than bottom-aligned.
@@ -848,21 +912,22 @@ function FilterRow({
 /** A "YYYY-Q" bound, entered as a year plus a quarter so the encoding is never
  *  the user's problem. */
 function PeriodBound({
-  label,
+  yearLabel,
   value,
   onChange,
 }: {
-  label: string;
+  yearLabel: string;
   value: string;
   onChange: (value: string) => void;
 }) {
+  const t = useT();
   const [year, quarter] = value.split("-");
   const emit = (y: string, q: string) => onChange(y && q ? `${y}-${q}` : "");
 
   return (
     <div className="flex items-end gap-xs">
       <div className="w-24">
-        <Field label={`${label} year`}>
+        <Field label={yearLabel}>
           <Input
             value={year ?? ""}
             inputMode="numeric"
@@ -872,14 +937,14 @@ function PeriodBound({
         </Field>
       </div>
       <div className="w-20">
-        <Field label="Qtr">
+        <Field label={t("dataSources.linkEditor.qtr")}>
           <Select
             value={quarter ?? "1"}
             onChange={(e) => emit(year ?? "", e.target.value)}
           >
             {[1, 2, 3, 4].map((q) => (
               <option key={q} value={q}>
-                Q{q}
+                {t("dataSources.entry.quarterOption", { q })}
               </option>
             ))}
           </Select>
@@ -932,6 +997,7 @@ function MultiValueInput({
   values: string[];
   onChange: (values: string[]) => void;
 }) {
+  const t = useT();
   const catalog = useAcademicCatalog().data ?? EMPTY_ACADEMIC_CATALOG;
   const options = choiceOptions(column, labels, catalog) ?? [];
   const remaining = options.filter((o) => !values.includes(o.value));
@@ -939,8 +1005,8 @@ function MultiValueInput({
 
   return (
     <Field
-      label="Values"
-      hint={values.length === 0 ? "Pick one or more — a row matches any of them." : undefined}
+      label={t("dataSources.linkEditor.values")}
+      hint={values.length === 0 ? t("dataSources.linkEditor.valuesHint") : undefined}
     >
       <div className="flex flex-col gap-xs">
         <Select
@@ -952,10 +1018,10 @@ function MultiValueInput({
         >
           <option value="">
             {!column
-              ? "Pick a field first"
+              ? t("dataSources.linkEditor.pickFieldFirst")
               : remaining.length === 0
-                ? "All values added"
-                : "Add a value…"}
+                ? t("dataSources.linkEditor.allValuesAdded")
+                : t("dataSources.linkEditor.addValue")}
           </option>
           {remaining.map((o) => (
             <option key={o.value} value={o.value}>
@@ -973,8 +1039,8 @@ function MultiValueInput({
                     {labelFor(v)}
                     <button
                       type="button"
-                      aria-label={`Remove ${labelFor(v)}`}
-                      title={`Remove ${labelFor(v)}`}
+                      aria-label={t("dataSources.linkEditor.removeValue", { label: labelFor(v) })}
+                      title={t("dataSources.linkEditor.removeValue", { label: labelFor(v) })}
                       onClick={() => onChange(values.filter((x) => x !== v))}
                       className="text-mute hover:text-error"
                     >
@@ -1004,9 +1070,17 @@ function ValueInput({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const t = useT();
   const catalog = useAcademicCatalog().data ?? EMPTY_ACADEMIC_CATALOG;
   if (!column) {
-    return <Input value={value} disabled placeholder="Pick a field first" onChange={() => {}} />;
+    return (
+      <Input
+        value={value}
+        disabled
+        placeholder={t("dataSources.linkEditor.pickFieldFirst")}
+        onChange={() => {}}
+      />
+    );
   }
 
   // Choice-like types share their option list with the "is any of" picker.
@@ -1024,7 +1098,7 @@ function ValueInput({
             the catalog doesn't know. Keep it visible, or the Select would render
             blank and quietly rewrite the filter on the next save. */}
         {value && !choices.some((o) => o.value === value) && (
-          <option value={value}>{value} — not in the catalog</option>
+          <option value={value}>{t("dataSources.cell.notInCatalog", { value })}</option>
         )}
       </Select>
     );
@@ -1035,8 +1109,8 @@ function ValueInput({
       return (
         <Select value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">—</option>
-          <option value="true">Yes</option>
-          <option value="false">No</option>
+          <option value="true">{t("dataSources.cell.yes")}</option>
+          <option value="false">{t("dataSources.cell.no")}</option>
         </Select>
       );
     case "date":

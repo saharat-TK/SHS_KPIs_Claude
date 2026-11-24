@@ -1,5 +1,5 @@
-import { type Locale, DEFAULT_LOCALE } from "./config";
-import { dataSourcesEn, dataSourcesTh } from "./dataSourcesDictionary";
+import { type Locale, DEFAULT_LOCALE } from "./config.ts";
+import { dataSourcesEn, dataSourcesTh } from "./dataSourcesDictionary.ts";
 
 // The English dictionary is the canonical shape; `th` must mirror it exactly
 // (TypeScript enforces this via the `Dictionary` type below). Keys are grouped
@@ -647,3 +647,13 @@ export function translate(
   }
   return text;
 }
+
+/** A bound translate function. `useT()` returns one for components; pure lib
+ *  code takes one as an optional argument and defaults to `englishT`, so server
+ *  paths and tests keep seeing the same English sentences. */
+export type Translator = (
+  key: TranslationKey,
+  vars?: Record<string, string | number>,
+) => string;
+
+export const englishT: Translator = (key, vars) => translate("en", key, vars);

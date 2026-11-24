@@ -598,7 +598,7 @@ function LinksTable({
                 <div className="flex flex-col gap-xxs">
                   {l.mappings.map((m, i) => (
                     <span key={i} className="text-caption-sm">
-                      {describeMapping(m, columns, cellLabels)}
+                      {describeMapping(m, columns, cellLabels, t)}
                     </span>
                   ))}
                 </div>

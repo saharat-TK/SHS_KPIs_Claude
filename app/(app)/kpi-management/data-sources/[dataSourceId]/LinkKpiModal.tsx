@@ -14,6 +14,7 @@ import {
   useStrategicSets,
   useUpdateDataSourceLink,
 } from "@/lib/data/hooks";
+import { useT } from "@/lib/i18n/useT";
 import { buildCellLabels } from "@/lib/kpi/academicCatalog";
 import { isAllowedLinkTarget } from "@/lib/kpi/dataSources";
 import type { DataSourceLink } from "@/lib/types";
@@ -46,6 +47,7 @@ export function LinkKpiModal({
   /** Present = edit mode. */
   link?: DataSourceLink | null;
 }) {
+  const t = useT();
   const isEdit = !!link;
   const setsQ = useStrategicSets();
   const committeesQ = useCommittees();
@@ -146,19 +148,25 @@ export function LinkKpiModal({
       open={open}
       onClose={onClose}
       size="lg"
-      title={isEdit ? "Edit Link" : "Link to a KPI"}
+      title={isEdit ? t("dataSources.link.editTitle") : t("dataSources.link.createTitle")}
       subtitle={
         isEdit
-          ? `Which rows of this data source produce “${link?.metricName || link?.kpiName}”.`
-          : "Pick the target, then say which rows count toward it. Leave the mapping empty to record the link as evidence only."
+          ? t("dataSources.link.editSubtitle", {
+              name: link?.metricName || link?.kpiName || "",
+            })
+          : t("dataSources.link.createSubtitle")
       }
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t("dataSources.modal.cancel")}
           </Button>
           <Button disabled={!valid || submitting} onClick={submit}>
-            {submitting ? "Saving…" : isEdit ? "Save Link" : "Link"}
+            {submitting
+              ? t("dataSources.modal.saving")
+              : isEdit
+                ? t("dataSources.link.saveLink")
+                : t("dataSources.link.link")}
           </Button>
         </>
       }
@@ -166,7 +174,7 @@ export function LinkKpiModal({
       <div className="grid gap-md">
         {isEdit ? (
           <div className="rounded-md border border-hairline bg-surface-lowest px-md py-sm text-body-sm">
-            <span className="text-mute">Feeding </span>
+            <span className="text-mute">{t("dataSources.link.feeding")} </span>
             <span className="font-medium">{link?.metricName || link?.kpiName}</span>
             {link?.setName && <span className="text-mute"> · {link.setName}</span>}
           </div>
@@ -245,16 +253,17 @@ function TargetPicker({
   onKpi: (v: number) => void;
   onMetric: (v: number) => void;
 }) {
+  const t = useT();
   const kpiPlaceholder = !setId
-    ? "Select a set first"
+    ? t("dataSources.link.kpiSelectSetFirst")
     : kpis.length === 0 && committee
-      ? "No KPIs for this committee in this set"
-      : "Select a KPI…";
+      ? t("dataSources.link.kpiNoneForCommittee")
+      : t("dataSources.link.kpiSelect");
   return (
     <>
-      <Field label="Strategic set">
+      <Field label={t("dataSources.link.setLabel")}>
         <Select value={setId || ""} onChange={(e) => onSet(Number(e.target.value))}>
-          <option value="">Select a set…</option>
+          <option value="">{t("dataSources.link.selectSet")}</option>
           {sets.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -263,9 +272,12 @@ function TargetPicker({
         </Select>
       </Field>
 
-      <Field label="Committee" hint="Narrows the KPI list to the KPIs this committee owns.">
+      <Field
+        label={t("dataSources.link.committeeLabel")}
+        hint={t("dataSources.link.committeeHint")}
+      >
         <Select value={committee} onChange={(e) => onCommittee(e.target.value)}>
-          {allowAllCommittees && <option value="">All committees</option>}
+          {allowAllCommittees && <option value="">{t("dataSources.allCommittees")}</option>}
           {committees.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -274,7 +286,7 @@ function TargetPicker({
         </Select>
       </Field>
 
-      <Field label="KPI">
+      <Field label={t("dataSources.link.kpiLabel")}>
         <Select
           value={kpiId || ""}
           disabled={!setId || kpis.length === 0}
@@ -289,13 +301,16 @@ function TargetPicker({
         </Select>
       </Field>
 
-      <Field label="Metric" hint="Optional — leave blank to feed the KPI itself.">
+      <Field
+        label={t("dataSources.link.metricLabel")}
+        hint={t("dataSources.link.metricHint")}
+      >
         <Select
           value={metricId || ""}
           disabled={!kpiId || metrics.length === 0}
           onChange={(e) => onMetric(Number(e.target.value))}
         >
-          <option value="">The KPI itself</option>
+          <option value="">{t("dataSources.link.metricKpiItself")}</option>
           {metrics.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
