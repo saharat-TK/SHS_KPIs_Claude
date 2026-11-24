@@ -18,28 +18,28 @@
     "migrate:kpi-combined-types": "node --env-file=.env.local scripts/migrate-kpi-combined-types.mjs",
     "migrate:kpi-type-table": "node --env-file=.env.local scripts/migrate-kpi-type-table.mjs",
     "migrate:academic-catalog": "node --env-file=.env.local scripts/migrate-academic-catalog.mjs",
-    "migrate:recompute-parent-rollups": "node --env-file=.env.local scripts/recompute-parent-rollups.mjs",
+    "migrate:recompute-parent-rollups": "tsx --env-file=.env.local scripts/recompute-parent-rollups.mjs",
     "migrate:kpi-value-source": "node --env-file=.env.local scripts/migrate-kpi-value-source.mjs",
     "migrate:kpi-draft-flag": "node --env-file=.env.local scripts/migrate-kpi-draft-flag.mjs",
     "migrate:data-source-column-links": "node --env-file=.env.local scripts/migrate-data-source-column-links.mjs",
     "migrate:data-source-date-types": "node --env-file=.env.local scripts/migrate-data-source-date-types.mjs",
-    "fix:date-cells": "node --env-file=.env.local scripts/fix-date-cells.mjs",
+    "fix:date-cells": "tsx --env-file=.env.local scripts/fix-date-cells.mjs",
     "migrate:data-source-year-be": "node --env-file=.env.local scripts/migrate-data-source-year-be.mjs",
     "migrate:data-source-entry-incomplete": "node --env-file=.env.local scripts/migrate-data-source-entry-incomplete.mjs",
     "migrate:curriculum-degree-level": "node --env-file=.env.local scripts/migrate-curriculum-degree-level.mjs",
-    "migrate:backfill-kpi-variables": "node --env-file=.env.local scripts/backfill-kpi-quarter-variables.mjs",
+    "migrate:backfill-kpi-variables": "tsx --env-file=.env.local scripts/backfill-kpi-quarter-variables.mjs",
     "migrate:metric-quarter-variables": "node --env-file=.env.local scripts/migrate-metric-quarter-variables.mjs",
     "migrate:link-value-slots": "node --env-file=.env.local scripts/migrate-link-value-slots.mjs",
     "migrate:edpex": "node --env-file=.env.local scripts/migrate-edpex.mjs",
     "migrate:edpex-indicator": "node --env-file=.env.local scripts/migrate-edpex-indicator.mjs",
     "migrate:subkpi-catalog-labels": "node --env-file=.env.local scripts/migrate-subkpi-catalog-labels.mjs",
-    "clear:stale-closed-periods": "node --env-file=.env.local scripts/clear-stale-closed-period-values.mjs",
+    "clear:stale-closed-periods": "tsx --env-file=.env.local scripts/clear-stale-closed-period-values.mjs",
     "seed:ip": "node --env-file=.env.local scripts/seed-intellectual-property.mjs",
     "seed:ip-usage-count": "node --env-file=.env.local scripts/seed-ip-usage-count.mjs",
     "seed:manuscripts": "node --env-file=.env.local scripts/seed-research-manuscripts.mjs",
     "seed:research-units": "node --env-file=.env.local scripts/seed-research-units.mjs",
-    "export:research-publications": "node --env-file=.env.local scripts/export-research-publications.mjs",
-    "migrate:research-publications": "node --env-file=.env.local scripts/migrate-research-publications.mjs"
+    "export:research-publications": "tsx --env-file=.env.local scripts/export-research-publications.mjs",
+    "migrate:research-publications": "tsx --env-file=.env.local scripts/migrate-research-publications.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
@@ -61,6 +61,7 @@
     "eslint-config-next": "^14.2.35",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
+    "tsx": "^4.23.15",
     "typescript": "^5.6.3"
   }
 }

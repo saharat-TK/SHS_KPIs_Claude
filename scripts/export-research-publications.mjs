@@ -1,8 +1,11 @@
 // Export the "Research publications" data source to a snapshot file that
 // scripts/migrate-research-publications.mjs can apply to another database.
 //
-//   node --env-file=.env.local scripts/export-research-publications.mjs
-//   node --env-file=.env.local scripts/export-research-publications.mjs --out some/other.json
+//   npm run export:research-publications
+//   npm run export:research-publications -- --out some/other.json
+//
+// It imports lib/kpi/sourceSnapshot.ts, so it runs under tsx (a devDependency):
+// Node 20 can't load .ts on its own.
 //
 // Read-only. Writes scripts/data/research-publications.snapshot.json holding
 //   * the source (owner committee, grain, description),
