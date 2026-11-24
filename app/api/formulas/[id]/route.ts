@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { bumpVersion } from "@/lib/formula";
+import { requirePermission, actorErrorResponse, requireActor, auditName } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       "SELECT id, name, expression, current_version AS currentVersion FROM formula WHERE id = ?",
       [params.id],
@@ -29,6 +31,8 @@ export async function GET(
     );
     return NextResponse.json({ ...rows[0], variables: vars, versions });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load formula" },
       { status: 500 },
@@ -43,6 +47,7 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
+    const actor = await requirePermission("configure_kpis");
     const b = await req.json();
     if (!b.expression || !b.expression.trim()) {
       return NextResponse.json({ error: "expression is required" }, { status: 400 });
@@ -66,7 +71,7 @@ export async function PATCH(
       );
       await conn.query(
         "INSERT INTO formula_version (formula_id, version, expression, author, change_note) VALUES (?, ?, ?, ?, ?)",
-        [params.id, nextVersion, b.expression.trim(), b.author ?? null, b.changeNote?.trim() || null],
+        [params.id, nextVersion, b.expression.trim(), auditName(actor), b.changeNote?.trim() || null],
       );
       await conn.commit();
 
@@ -82,6 +87,8 @@ export async function PATCH(
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to save formula" },
       { status: 500 },

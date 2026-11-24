@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { requirePermission, actorErrorResponse, requireActor, auditName } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 // of JSON_ARRAYAGG for MariaDB 10.4 compatibility.)
 export async function GET() {
   try {
+    await requireActor();
     const [formulas] = await pool.query<RowDataPacket[]>(
       "SELECT id, name, expression, current_version AS currentVersion FROM formula ORDER BY name",
     );
@@ -23,6 +25,8 @@ export async function GET() {
     const result = formulas.map((f) => ({ ...f, variables: byFormula.get(f.id) ?? [] }));
     return NextResponse.json(result);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load formulas" },
       { status: 500 },
@@ -33,6 +37,7 @@ export async function GET() {
 // Create a new formula + its variables + the initial v1.0 version.
 export async function POST(req: NextRequest) {
   try {
+    const actor = await requirePermission("configure_kpis");
     const b = await req.json();
     if (!b.name || !b.name.trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
@@ -60,7 +65,7 @@ export async function POST(req: NextRequest) {
       }
       await conn.query(
         "INSERT INTO formula_version (formula_id, version, expression, author, change_note) VALUES (?, 'v1.0', ?, ?, ?)",
-        [id, b.expression.trim(), b.author ?? null, b.changeNote?.trim() || "Initial version."],
+        [id, b.expression.trim(), auditName(actor), b.changeNote?.trim() || "Initial version."],
       );
       await conn.commit();
 
@@ -80,6 +85,8 @@ export async function POST(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create formula" },
       { status: 500 },

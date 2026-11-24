@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import { LINK_SELECT, LINK_FROM, mapLinkRow } from "@/lib/kpi/dataSourcesServer";
 import type { PerfKpiSource } from "@/lib/types";
+import { requireActor, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const [kpiRows] = await pool.query<RowDataPacket[]>(
       "SELECT source_kpi_id AS sourceKpiId FROM perf_kpi WHERE id = ?",
       [params.id],
@@ -68,6 +70,8 @@ export async function GET(
 
     return NextResponse.json([...bySource.values()]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load linked data sources" },
       { status: 500 },

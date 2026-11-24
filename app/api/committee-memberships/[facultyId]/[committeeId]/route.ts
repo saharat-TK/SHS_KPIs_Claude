@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export async function PATCH(
   { params }: { params: { facultyId: string; committeeId: string } },
 ) {
   try {
+    await requirePermission("manage_faculty");
     const body = await req.json();
     const { position, kpiFocus } = body;
 
@@ -56,6 +58,8 @@ export async function PATCH(
     );
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update membership" },
       { status: 500 },
@@ -68,6 +72,7 @@ export async function DELETE(
   { params }: { params: { facultyId: string; committeeId: string } },
 ) {
   try {
+    await requirePermission("manage_faculty");
     const [result] = await pool.query<ResultSetHeader>(
       "DELETE FROM committee_memberships WHERE faculty_id = ? AND committee_id = ?",
       [params.facultyId, params.committeeId],
@@ -79,6 +84,8 @@ export async function DELETE(
 
     return NextResponse.json({ facultyId: params.facultyId, committeeId: params.committeeId });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to remove membership" },
       { status: 500 },

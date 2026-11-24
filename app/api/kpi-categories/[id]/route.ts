@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const body = await req.json();
     const setClauses: string[] = [];
     const values: unknown[] = [];
@@ -52,6 +54,8 @@ export async function PATCH(
     );
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update category" },
       { status: 500 },
@@ -64,6 +68,7 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const [result] = await pool.query<ResultSetHeader>(
       "DELETE FROM kpi_categories WHERE id = ?",
       [params.id],
@@ -75,6 +80,8 @@ export async function DELETE(
 
     return NextResponse.json({ id: params.id });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to remove category" },
       { status: 500 },

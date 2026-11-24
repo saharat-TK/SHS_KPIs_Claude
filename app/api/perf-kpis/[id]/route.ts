@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import { KPI_QUARTER_PROGRESS_FIELDS, PERF_KPI_FIELDS } from "@/lib/kpi/fields";
+import { requireActor, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${PERF_KPI_FIELDS}, r.start_year AS startYear
        FROM perf_kpi k JOIN performance_record r ON r.id = k.record_id
@@ -50,6 +52,8 @@ export async function GET(
         : null,
     });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load performance KPI" },
       { status: 500 },

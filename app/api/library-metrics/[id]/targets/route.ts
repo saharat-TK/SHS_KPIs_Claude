@@ -3,6 +3,7 @@ import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import { validateAnnualTargets } from "@/lib/kpi/targets";
 import { syncActiveRecordsForSet, setIdForMetric } from "@/lib/kpi/performance";
+import { requirePermission, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export async function PUT(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const body = await req.json();
     const targets = body?.targets;
     if (!Array.isArray(targets)) {
@@ -62,6 +64,8 @@ export async function PUT(
     );
     return NextResponse.json(rows);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to save targets" },
       { status: 500 },

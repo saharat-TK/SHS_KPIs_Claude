@@ -9,11 +9,13 @@ import {
 import { isCalculationType } from "@/lib/types";
 import { normaliseEdpex } from "@/lib/kpi/edpex";
 import { loadEdpexCatalog } from "@/lib/kpi/edpexServer";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    await requireActor();
     const setId = req.nextUrl.searchParams.get("setId");
     if (!setId) {
       return NextResponse.json({ error: "setId is required" }, { status: 400 });
@@ -26,6 +28,8 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json(rows.map(toLibraryKpiRow));
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load KPIs" },
       { status: 500 },
@@ -35,6 +39,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await requirePermission("configure_kpis");
     const b = await req.json();
     if (!b.setId) {
       return NextResponse.json({ error: "setId is required" }, { status: 400 });
@@ -84,6 +89,8 @@ export async function POST(req: NextRequest) {
       conn.release();
     }
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create KPI" },
       { status: 500 },

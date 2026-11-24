@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import type { ColumnAutoFill, DataSourceColumnType } from "@/lib/types";
-import { COLUMN_SELECT, errorResponse, mapColumnRow } from "@/lib/kpi/dataSourcesServer";
-import { requirePermission } from "@/lib/auth/session";
+import {
+  COLUMN_SELECT,
+  checkSourceManagerAccess,
+  errorResponse,
+  foreignLinksBrokenByColumns,
+  loadSourceShape,
+  mapColumnRow,
+} from "@/lib/kpi/dataSourcesServer";
+import { requireActor, actorErrorResponse } from "@/lib/auth/session";
 import { validateColumnConfig } from "@/lib/kpi/columnLinks";
 import {
   DATA_SOURCE_COLUMN_TYPES,
@@ -19,6 +26,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${COLUMN_SELECT} FROM data_source_column
         WHERE data_source_id = ? ORDER BY sort_order, id`,
@@ -26,6 +34,8 @@ export async function GET(
     );
     return NextResponse.json(rows.map(mapColumnRow));
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load columns" },
       { status: 500 },
@@ -57,17 +67,19 @@ export async function PUT(
   { params }: { params: { id: string } },
 ) {
   try {
-    // The columns editor is admin-only in the UI; this route must say so too.
-    await requirePermission("configure_kpis");
+    // Admins, and the source's own committee's Committee and Secretary (see
+    // sourceManagerAccess). The page shows Manage Columns by the same rule.
+    const actor = await requireActor();
     const body = await req.json();
     const input: ColumnInput[] = Array.isArray(body?.columns) ? body.columns : [];
 
-    const [sources] = await pool.query<RowDataPacket[]>(
-      "SELECT id FROM data_source WHERE id = ?",
-      [params.id],
-    );
-    if (sources.length === 0) {
+    const source = await loadSourceShape(pool, params.id);
+    if (!source) {
       return NextResponse.json({ error: "Data source not found" }, { status: 404 });
+    }
+    const permit = await checkSourceManagerAccess(pool, source, actor.facultyId, actor.role);
+    if ("error" in permit) {
+      return NextResponse.json({ error: permit.error }, { status: 403 });
     }
 
     // Validate + assign keys before touching the database.
@@ -187,6 +199,23 @@ export async function PUT(
               c.isRequired,
               i,
             ],
+          );
+        }
+      }
+
+      // A secretary may reshape their source freely, but not in a way that
+      // stops another committee's KPI from being fed. Checked against the
+      // columns as written above, so every kind of breakage counts.
+      if (permit.access === "secretary") {
+        const broken = await foreignLinksBrokenByColumns(conn, params.id, actor.committeeIds);
+        if (broken.length > 0) {
+          await conn.rollback();
+          const names = broken.map((b) => `"${b.name}"`).join(", ");
+          return NextResponse.json(
+            {
+              error: `This change would break the data feed to ${names}, which belongs to another committee. Ask an admin to make this change.`,
+            },
+            { status: 409 },
           );
         }
       }

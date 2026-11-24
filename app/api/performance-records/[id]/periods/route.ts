@@ -7,6 +7,7 @@ import {
 } from "@/lib/kpi/performancePeriods";
 import { feedRecord } from "@/lib/kpi/dataSourceFeed";
 import { describeOutcome } from "@/lib/kpi/feedOutcome";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -62,11 +63,14 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     if (!(await recordExists(params.id))) {
       return NextResponse.json({ error: "Performance record not found" }, { status: 404 });
     }
     return NextResponse.json(await loadPeriods(params.id));
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load recording periods" },
       { status: 500 },
@@ -79,6 +83,7 @@ export async function PUT(
   { params }: { params: { id: string } },
 ) {
   try {
+    const actor = await requirePermission("configure_kpis");
     const body = await req.json();
     const periods = normalizePerformancePeriodInput(body.periods ?? []);
     const seen = new Set(periods.map((p) => keyOf(p.yearNo, p.quarterNo)));
@@ -94,7 +99,9 @@ export async function PUT(
       return NextResponse.json({ error: "Performance record not found" }, { status: 404 });
     }
 
-    const updatedBy = typeof body.updatedBy === "string" ? body.updatedBy : null;
+    // From the session, not the body. The real signed-in person: when an admin
+    // is viewing as someone else, they are the one changing the periods.
+    const updatedBy = actor.realEmail;
     let feedSummary: string | null = null;
     const conn = await pool.getConnection();
     try {
@@ -144,6 +151,8 @@ export async function PUT(
 
     return NextResponse.json({ periods: await loadPeriods(params.id), feedSummary });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to save recording periods" },
       { status: 500 },

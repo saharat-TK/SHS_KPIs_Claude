@@ -9,9 +9,10 @@ import type {
   DataSourceEntry,
   DataSourceLink,
   DataSourceLinkMapping,
+  Position,
   Role,
 } from "@/lib/types";
-import { DataSourceValidationError } from "@/lib/kpi/dataSources";
+import { sourceManagerAccess, DataSourceValidationError } from "@/lib/kpi/dataSources";
 import { actorErrorResponse } from "@/lib/auth/errors";
 import { validateMappings } from "@/lib/kpi/dataSourceFilters";
 import { loadAcademicCatalog } from "@/lib/kpi/academicCatalogServer";
@@ -299,4 +300,95 @@ export async function checkEntryWriteAccess(
   return rows.length > 0
     ? null
     : "You can only record data for your own committee's data sources";
+}
+
+/** Who may manage a source's columns and KPI links: an admin, or a
+ *  committee-role Committee and Secretary of the source's own committee
+ *  (sourceManagerAccess).
+ *  Returns the access kind, or an error message to answer 403 with. */
+export async function checkSourceManagerAccess(
+  db: Db,
+  source: { committeeId: string },
+  actorId: string,
+  actorRole: Role,
+): Promise<{ access: "admin" | "secretary" } | { error: string }> {
+  let position: Position | null = null;
+  if (actorRole !== "admin") {
+    const [rows] = await db.query<RowDataPacket[]>(
+      `SELECT position FROM committee_memberships WHERE faculty_id = ? AND committee_id = ?`,
+      [actorId, source.committeeId],
+    );
+    position = (rows[0]?.position as Position | undefined) ?? null;
+  }
+  const access = sourceManagerAccess(actorRole, position);
+  return access
+    ? { access }
+    : {
+        error:
+          "Only an admin or this committee's Committee and Secretary can manage this data source",
+      };
+}
+
+/** Links on this source whose mappings no longer validate against its current
+ *  columns *and* whose KPI or metric belongs to a committee outside `ownCommitteeIds`
+ *  (an unassigned target counts as outside). Run inside the columns transaction,
+ *  after the writes, so it sees the columns as they are about to be committed.
+ *
+ *  Re-uses validateMappings — the same check saving a link applies — so any
+ *  breakage counts: a deleted column, a changed type, a removed choice. */
+/** The committee a link target belongs to: a metric's own committee, else its
+ *  KPI's — the same choice foreignLinksBrokenByColumns makes. `null` when the
+ *  target exists but is unassigned; `undefined` when there is no such target. */
+export async function linkTargetCommittee(
+  db: Db,
+  target: { libraryKpiId: number | null; libraryMetricId: number | null },
+): Promise<string | null | undefined> {
+  const [rows] = target.libraryMetricId !== null
+    ? await db.query<RowDataPacket[]>(
+        "SELECT committee_id AS committeeId FROM library_metric WHERE id = ?",
+        [target.libraryMetricId],
+      )
+    : await db.query<RowDataPacket[]>(
+        "SELECT committee_id AS committeeId FROM library_kpi WHERE id = ?",
+        [target.libraryKpiId],
+      );
+  if (rows.length === 0) return undefined;
+  return (rows[0].committeeId as string | null) ?? null;
+}
+
+export async function foreignLinksBrokenByColumns(
+  db: Db,
+  dataSourceId: number | string,
+  ownCommitteeIds: string[],
+): Promise<{ name: string; committeeId: string | null }[]> {
+  const source = await loadSourceShape(db, dataSourceId);
+  if (!source) return [];
+  const columns = await resolveColumnOptions(db, source.columns);
+
+  const [links] = await db.query<RowDataPacket[]>(
+    `SELECT l.mappings,
+            COALESCE(m.name, k.name) AS targetName,
+            CASE WHEN l.library_metric_id IS NOT NULL THEN m.committee_id
+                 ELSE k.committee_id END AS targetCommitteeId
+       FROM data_source_link l
+       LEFT JOIN library_metric m ON m.id = l.library_metric_id
+       LEFT JOIN library_kpi    k ON k.id = COALESCE(l.library_kpi_id, m.kpi_id)
+      WHERE l.data_source_id = ?`,
+    [dataSourceId],
+  );
+
+  return links.flatMap((row) => {
+    const committeeId = (row.targetCommitteeId as string | null) ?? null;
+    if (committeeId && ownCommitteeIds.includes(committeeId)) return [];
+
+    const mappings = parseJsonColumn<unknown[]>(row.mappings, []);
+    // Evidence-only links read no columns, so nothing can break them.
+    if (mappings.length === 0) return [];
+    try {
+      validateMappings(columns, source.periodGrain, mappings);
+      return [];
+    } catch {
+      return [{ name: String(row.targetName ?? "a linked KPI"), committeeId }];
+    }
+  });
 }

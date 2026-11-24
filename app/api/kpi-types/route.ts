@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
+import { requireActor, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ const SELECT_FIELDS =
 // scripts/migrate-kpi-type-table.mjs and there is no UI to edit them.
 export async function GET(req: NextRequest) {
   try {
+    await requireActor();
     // ?forCategories=1 narrows to the types a CATEGORY may be classified as
     // (Strategic / Routine). Operational applies to KPIs only.
     const forCategories = req.nextUrl.searchParams.get("forCategories");
@@ -24,6 +26,8 @@ export async function GET(req: NextRequest) {
       rows.map((r) => ({ ...r, appliesToCategories: Boolean(r.appliesToCategories) })),
     );
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load KPI types" },
       { status: 500 },

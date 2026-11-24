@@ -20,6 +20,7 @@ import { RequirePermission } from "@/components/shell/Guard";
 import { useBreadcrumbLabel } from "@/components/shell/BreadcrumbLabels";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
+  useCommitteeMemberships,
   useCommittees,
   useDataSource,
   useDataSourceColumns,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/data/hooks";
 import {
   buildColumnChoices,
+  sourceManagerAccess,
   formatCellValue,
   formatEntryPeriod,
 } from "@/lib/kpi/dataSources";
@@ -65,8 +67,9 @@ export default function DataSourceDetailPage({
 function DataSourceDetail({ id }: { id: number }) {
   const router = useRouter();
   const confirm = useConfirm();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const sourceQ = useDataSource(id);
+  const membershipsQ = useCommitteeMemberships();
   const columnsQ = useDataSourceColumns(id);
   const linksQ = useDataSourceLinks(id);
   const committeesQ = useCommittees();
@@ -93,6 +96,19 @@ function DataSourceDetail({ id }: { id: number }) {
   );
 
   const isAdmin = can("configure_kpis");
+  // Columns and KPI links: admins, plus this source's own committee's Committee
+  // and Secretary — the same rule the columns and links routes enforce. Exact
+  // membership row only, as the routes read it, so no control offers a save
+  // that would be refused.
+  const positionHere =
+    membershipsQ.data?.find(
+      (m) => m.facultyId === user.facultyId && m.committeeId === source?.committeeId,
+    )?.position ?? null;
+  const managerAccess = source ? sourceManagerAccess(user.role, positionHere) : null;
+  const canManageSource = managerAccess !== null;
+  // A secretary may only link KPIs and metrics of their own committees.
+  const linkableCommitteeIds =
+    managerAccess === "secretary" ? (user.committeeIds ?? []) : undefined;
   // can() already blocks a committee user acting on another committee.
   const canRecord = !!source && can("submit_metrics", { committeeId: source.committeeId });
 
@@ -236,12 +252,12 @@ function DataSourceDetail({ id }: { id: number }) {
                     </Button>
                   </>
                 )}
-                {tab === "columns" && isAdmin && (
+                {tab === "columns" && canManageSource && (
                   <Button icon="edit" onClick={() => setShowColumns(true)}>
                     Manage Columns
                   </Button>
                 )}
-                {tab === "links" && isAdmin && (
+                {tab === "links" && canManageSource && (
                   <Button icon="add_link" onClick={() => setShowLink(true)}>
                     Link KPI
                   </Button>
@@ -309,7 +325,7 @@ function DataSourceDetail({ id }: { id: number }) {
                     title="No columns defined yet"
                     message="This data source needs columns before anyone can record data against it."
                     action={
-                      isAdmin ? (
+                      canManageSource ? (
                         <Button icon="edit" onClick={() => setShowColumns(true)}>
                           Manage Columns
                         </Button>
@@ -357,7 +373,7 @@ function DataSourceDetail({ id }: { id: number }) {
                   title="No columns defined yet"
                   message="Columns describe what this data source collects."
                   action={
-                    isAdmin ? (
+                    canManageSource ? (
                       <Button icon="edit" onClick={() => setShowColumns(true)}>
                         Manage Columns
                       </Button>
@@ -408,7 +424,7 @@ function DataSourceDetail({ id }: { id: number }) {
                     title="Not linked to any KPI yet"
                     message="Linking records that this data source is the evidence behind a KPI or metric. It does not feed values into progress — that stays manual."
                     action={
-                      isAdmin ? (
+                      canManageSource ? (
                         <Button icon="add_link" onClick={() => setShowLink(true)}>
                           Link KPI
                         </Button>
@@ -421,7 +437,7 @@ function DataSourceDetail({ id }: { id: number }) {
                     links={links}
                     columns={columns}
                     cellLabels={cellLabels}
-                    isAdmin={isAdmin}
+                    canManage={canManageSource}
                     onEdit={setEditingLink}
                   />
                 )}
@@ -458,6 +474,7 @@ function DataSourceDetail({ id }: { id: number }) {
             }}
             dataSourceId={id}
             committeeId={source?.committeeId ?? null}
+            allowedCommitteeIds={linkableCommitteeIds}
             link={editingLink}
           />
 
@@ -507,14 +524,15 @@ function LinksTable({
   links,
   columns,
   cellLabels,
-  isAdmin,
+  canManage,
   onEdit,
 }: {
   dataSourceId: number;
   links: DataSourceLink[];
   columns: DataSourceColumn[];
   cellLabels: Record<string, string>;
-  isAdmin: boolean;
+  /** Edit/Remove per row: an admin, or this source's Committee and Secretary. */
+  canManage: boolean;
   onEdit: (link: DataSourceLink) => void;
 }) {
   const confirm = useConfirm();
@@ -530,7 +548,7 @@ function LinksTable({
             <Th>Metric</Th>
             <Th>Feeds</Th>
             <Th>Note</Th>
-            {isAdmin && <Th align="right">Actions</Th>}
+            {canManage && <Th align="right">Actions</Th>}
           </tr>
         </thead>
         <tbody>
@@ -553,7 +571,7 @@ function LinksTable({
                 )}
               </Td>
               <Td className="text-mute">{l.note ?? "—"}</Td>
-              {isAdmin && (
+              {canManage && (
                 <Td align="right">
                   <div className="inline-flex items-center gap-xxs">
                     <button

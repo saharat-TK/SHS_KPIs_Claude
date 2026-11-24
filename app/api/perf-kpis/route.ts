@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket } from "mysql2";
 import { KPI_QUARTER_PROGRESS_FIELDS, PERF_KPI_FIELDS } from "@/lib/kpi/fields";
+import { requireActor, actorErrorResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 // opening each KPI). Batched, mirroring app/api/perf-metrics/route.ts.
 export async function GET(req: NextRequest) {
   try {
+    await requireActor();
     const recordId = req.nextUrl.searchParams.get("recordId");
     if (!recordId) {
       return NextResponse.json({ error: "recordId is required" }, { status: 400 });
@@ -65,6 +67,8 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json(result);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load performance KPIs" },
       { status: 500 },

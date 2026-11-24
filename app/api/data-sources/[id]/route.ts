@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/mysql";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { DATA_SOURCE_FROM, DATA_SOURCE_SELECT } from "@/lib/kpi/dataSourcesServer";
+import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requireActor();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT ${DATA_SOURCE_SELECT} ${DATA_SOURCE_FROM} WHERE d.id = ?`,
       [params.id],
@@ -27,6 +29,8 @@ export async function GET(
     }
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load data source" },
       { status: 500 },
@@ -39,6 +43,7 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     const body = await req.json();
 
     // Changing the grain would strand existing entries (a quarterly entry has a
@@ -83,6 +88,8 @@ export async function PATCH(
     );
     return NextResponse.json(rows[0]);
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update data source" },
       { status: 500 },
@@ -95,6 +102,7 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    await requirePermission("configure_kpis");
     // Columns, entries and links cascade via FK.
     const [result] = await pool.query<ResultSetHeader>(
       "DELETE FROM data_source WHERE id = ?",
@@ -105,6 +113,8 @@ export async function DELETE(
     }
     return NextResponse.json({ id: Number(params.id) });
   } catch (err) {
+    const authError = actorErrorResponse(err);
+    if (authError) return authError;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to delete data source" },
       { status: 500 },
