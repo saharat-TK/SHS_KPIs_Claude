@@ -998,7 +998,7 @@ export const dataSourcesTh: Localized<typeof dataSourcesEn> = {
     previewRows: "{matched} จาก {total} แถว",
     previewPending: "· กรอกเงื่อนไขให้ครบเพื่อดูตัวอย่าง",
     previewValue: "· {agg} = {value}",
-    whichRowsCount: "แถวใดบ้างที่นับ",
+    whichRowsCount: "รูปแบบการนับข้อมูล",
     whichRowsHint:
       "แถวที่ตรงเงื่อนไขจะถูกรวมเป็นค่ารายไตรมาส โดยสะสมภายในแต่ละปี",
     addMapping: "เพิ่มการแมป",
