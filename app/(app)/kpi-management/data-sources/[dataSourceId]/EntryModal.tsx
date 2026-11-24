@@ -10,11 +10,8 @@ import {
   useSaveDataSourceEntryGroup,
   useUpdateDataSourceEntry,
 } from "@/lib/data/hooks";
-import {
-  COLUMN_TYPE_LABELS,
-  coerceCellValue,
-  describeEntryForConfirm,
-} from "@/lib/kpi/dataSources";
+import { useT } from "@/lib/i18n/useT";
+import { coerceCellValue, describeEntryForConfirm } from "@/lib/kpi/dataSources";
 import {
   CellFormatError,
   FORMAT_EXAMPLE,
@@ -30,7 +27,6 @@ const FORMAT_CHECKED = new Set(["number", "url", "date", "year_be", "month"]);
 /** Touched-set key for the period Year; no column key can start with "@". */
 const YEAR_FIELD = "@year";
 import {
-  batchModeLabel,
   availableBatchModes,
   degreeLevelColumn,
   withDegreeLevel,
@@ -55,25 +51,6 @@ import { CellInput } from "./CellInput";
 import { LinkedItemsPanel, blankItem, type DraftItem } from "./LinkedItemsPanel";
 import { BatchEntryGrid, toPayload, useBatchRows } from "./BatchEntryGrid";
 import { FreeEntryGrid, useFreeRows } from "./FreeEntryGrid";
-
-const BATCH_MODE_HINTS: Record<BatchMode, string> = {
-  single: "Add one row and fill it in yourself.",
-  rows: "Several rows of your own; paste from Excel or add rows one by one.",
-  programs: "One row per academic program, with the program already chosen.",
-  curricula: "One row per curriculum, with the curriculum already chosen.",
-};
-
-/** The curriculum batch only fills a program (or degree level) in when the
- *  source has somewhere to put one, so the hint must not promise it otherwise. */
-const hintFor = (mode: BatchMode, hasProgramColumn: boolean, hasLevelColumn = false) => {
-  if (mode !== "curricula" || (!hasProgramColumn && !hasLevelColumn)) {
-    return BATCH_MODE_HINTS[mode];
-  }
-  const filled = [hasProgramColumn && "its program", hasLevelColumn && "degree level"]
-    .filter(Boolean)
-    .join(" and ");
-  return `One row per curriculum, with the curriculum and ${filled} already chosen.`;
-};
 
 /** Add or edit one row of raw data — or a batch at once: free-form rows typed or
  *  pasted from Excel, or, when the source records per program or per
@@ -104,6 +81,29 @@ export function EntryModal({
   const bulk = useBulkCreateDataSourceEntries();
   const saveGroup = useSaveDataSourceEntryGroup();
   const confirm = useConfirm();
+  const t = useT();
+
+  /** The curriculum batch only fills a program (or degree level) in when the
+   *  source has somewhere to put one, so the hint must not promise it otherwise.
+   *  Each variant is one whole sentence: Thai word order differs from English. */
+  const hintFor = (mode: BatchMode, hasProgramColumn: boolean, hasLevelColumn = false) => {
+    if (mode === "curricula" && hasProgramColumn && hasLevelColumn) {
+      return t("dataSources.entry.hintCurriculaBoth");
+    }
+    if (mode === "curricula" && hasProgramColumn) {
+      return t("dataSources.entry.hintCurriculaProgram");
+    }
+    if (mode === "curricula" && hasLevelColumn) {
+      return t("dataSources.entry.hintCurriculaLevel");
+    }
+    return t(`dataSources.entry.hint.${mode}`);
+  };
+  const modeLabel = (mode: BatchMode) =>
+    mode === "programs" || mode === "curricula"
+      ? t(`dataSources.entry.mode.${mode}`, {
+          count: mode === "programs" ? catalog.programs.length : catalog.curricula.length,
+        })
+      : t(`dataSources.entry.mode.${mode}`);
 
   // Only fetch the roster when a faculty column is actually on this source.
   const needsFaculty = columns.some((c) => c.dataType === "faculty");
@@ -399,12 +399,14 @@ export function EntryModal({
 
   const deleteEntry = async () => {
     const target = groupRows[0] ?? entry;
-    const name = target ? describeEntryForConfirm(columns, target) : "this entry";
+    const name = target
+      ? describeEntryForConfirm(columns, target)
+      : t("dataSources.entry.fallbackName");
     const ok = await confirm({
-      title: "Delete this entire entry?",
-      message: `All ${groupRows.length} rows of ${name} will be permanently removed. This cannot be undone. Type DELETE ENTRY to proceed.`,
+      title: t("dataSources.entry.deleteTitle"),
+      message: t("dataSources.entry.deleteMessage", { count: groupRows.length, name }),
       tone: "danger",
-      confirmLabel: "Delete entry",
+      confirmLabel: t("dataSources.entry.deleteConfirm"),
       confirmPhrase: "DELETE ENTRY",
     });
     if (!ok) return;
@@ -416,20 +418,25 @@ export function EntryModal({
 
   const batchCount = isFree ? freeRows.included.length : batch.included.length;
   const submitLabel = isBatch
-    ? `Add ${batchCount} ${batchCount === 1 ? "Entry" : "Entries"}`
+    ? t(batchCount === 1 ? "dataSources.entry.addBatchOne" : "dataSources.entry.addBatchMany", {
+        count: batchCount,
+      })
     : entry
       ? multipleGroup && linkedRows.length > 1
-        ? `Save (${linkedRows.length} rows)`
-        : "Save"
+        ? t("dataSources.entry.saveRows", { count: linkedRows.length })
+        : t("dataSources.modal.save")
       : linked && linkedRows.length > 1
-        ? `Add Entry (${linkedRows.length} rows)`
-        : "Add Entry";
+        ? t("dataSources.entry.addEntryRows", { count: linkedRows.length })
+        : t("dataSources.detail.addEntry");
   const split = linked && !isBatch;
 
 
   const periodFields = (
     <div className="flex gap-md">
-      <Field label="Year (BE)" hint={`Buddhist era · ${FORMAT_EXAMPLE.year_be}`}>
+      <Field
+        label={t("dataSources.date.yearBe")}
+        hint={t("dataSources.entry.yearHint", { example: FORMAT_EXAMPLE.year_be })}
+      >
         <span
           className="contents"
           onBlur={() => setTouched((prev) => new Set(prev).add(YEAR_FIELD))}
@@ -449,11 +456,11 @@ export function EntryModal({
         )}
       </Field>
       {periodGrain === "quarterly" && (
-        <Field label="Quarter">
+        <Field label={t("dataSources.entry.quarterLabel")}>
           <Select value={quarter} onChange={(e) => setQuarter(e.target.value)}>
             {[1, 2, 3, 4].map((q) => (
               <option key={q} value={q}>
-                Q{q}
+                {t("dataSources.entry.quarterOption", { q })}
               </option>
             ))}
           </Select>
@@ -468,7 +475,7 @@ export function EntryModal({
         key={c.id}
         label={`${c.label}${c.isRequired ? " *" : ""}`}
         hint={[
-          COLUMN_TYPE_LABELS[c.dataType],
+          t(`dataSources.columnType.${c.dataType}`),
           c.unit,
           isFormattedType(c.dataType) ? FORMAT_EXAMPLE[c.dataType] : null,
         ]
@@ -505,16 +512,24 @@ export function EntryModal({
     ));
 
   const noteField = ownNotes ? (
-    <Field label="Note" hint="Each row keeps its own note (set by the import); they are left as they are.">
-      <Input value="" disabled placeholder={`${groupRows.length} different notes`} readOnly />
+    <Field
+      label={t("dataSources.entry.noteLabel")}
+      hint={t("dataSources.entry.noteOwnHint")}
+    >
+      <Input
+        value=""
+        disabled
+        placeholder={t("dataSources.entry.noteOwnPlaceholder", { count: groupRows.length })}
+        readOnly
+      />
     </Field>
   ) : (
     <Field
-      label="Note"
+      label={t("dataSources.entry.noteLabel")}
       hint={
         split && linkedRows.length > 1
-          ? "Optional context, saved on every row."
-          : "Optional context for this row."
+          ? t("dataSources.entry.noteHintMany")
+          : t("dataSources.entry.noteHintOne")
       }
     >
       <Input value={note} onChange={(e) => setNote(e.target.value)} />
@@ -525,17 +540,19 @@ export function EntryModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={entry ? "Edit Entry" : "Add Entry"}
+      title={entry ? t("dataSources.entry.editTitle") : t("dataSources.detail.addEntry")}
       subtitle={
         entry
           ? multipleGroup
-            ? `One entry; it is saved as one row per ${multipleGroup.main.label}.`
-            : "One row of raw data for this source."
+            ? t("dataSources.entry.subtitleMultiple", { label: multipleGroup.main.label })
+            : t("dataSources.entry.subtitleRow")
           : isBatch
-            ? `${hintFor(mode, !!programColumn, hasLevelColumn)} All rows share the period below.`
+            ? t("dataSources.entry.subtitleBatch", {
+                hint: hintFor(mode, !!programColumn, hasLevelColumn),
+              })
             : split && multipleGroup
-              ? `One entry; it is saved as one row per ${multipleGroup.main.label}.`
-              : "One row of raw data for this source."
+              ? t("dataSources.entry.subtitleMultiple", { label: multipleGroup.main.label })
+              : t("dataSources.entry.subtitleRow")
       }
       // All three batch modes share one width, so switching between them does
       // not resize the dialog; it never outgrows the screen in any mode.
@@ -551,14 +568,14 @@ export function EntryModal({
               disabled={submitting}
               onClick={deleteEntry}
             >
-              Delete entire entry
+              {t("dataSources.entry.deleteEntire")}
             </Button>
           )}
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t("dataSources.modal.cancel")}
           </Button>
           <Button disabled={!valid || submitting} onClick={submit}>
-            {submitting ? "Saving…" : submitLabel}
+            {submitting ? t("dataSources.modal.saving") : submitLabel}
           </Button>
         </>
       }
@@ -566,14 +583,14 @@ export function EntryModal({
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-md">
         {editingIncomplete && (
           <p className="rounded border border-warning/30 bg-warning/10 px-md py-sm text-body-sm text-on-surface">
-            Required fields are empty — this entry won&apos;t count in KPIs until it is completed.
+            {t("dataSources.entry.incompleteBanner")}
           </p>
         )}
         {showModes && (
           // Not wrapped in a Field: Field is a <label>, and nesting the radios'
           // own labels inside it would make any click select the first option.
           <div className="flex flex-col gap-xs">
-            <h3 className="text-label-md text-on-surface">What to add</h3>
+            <h3 className="text-label-md text-on-surface">{t("dataSources.entry.whatToAdd")}</h3>
             <RadioGroup
               name="batch-mode"
               orientation="horizontal"
@@ -581,7 +598,7 @@ export function EntryModal({
               onChange={setMode}
               options={modes.map((m) => ({
                 value: m,
-                label: batchModeLabel(m, catalog),
+                label: modeLabel(m),
                 hint: hintFor(m, !!programColumn, hasLevelColumn),
               }))}
             />

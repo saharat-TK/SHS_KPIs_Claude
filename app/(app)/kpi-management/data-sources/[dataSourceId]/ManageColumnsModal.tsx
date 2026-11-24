@@ -4,10 +4,9 @@ import { useEffect, useState } from "react";
 import { Modal, Button, Field, Input, Select, UnitSelect } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { useSaveDataSourceColumns } from "@/lib/data/hooks";
+import { useT } from "@/lib/i18n/useT";
 import {
-  COLUMN_TYPE_LABELS,
   DATA_SOURCE_COLUMN_TYPES,
-  DERIVED_OPTION_SOURCE,
   isDerivedOptionType,
   slugifyColumnKey,
 } from "@/lib/kpi/dataSources";
@@ -90,6 +89,7 @@ export function ManageColumnsModal({
   dataSourceId: number;
   columns: DataSourceColumn[];
 }) {
+  const t = useT();
   const save = useSaveDataSourceColumns();
   const [drafts, setDrafts] = useState<Draft[]>([]);
 
@@ -124,9 +124,9 @@ export function ManageColumnsModal({
 
   const problems = [
     ...drafts.flatMap((d) => {
-      if (!d.label.trim()) return ["Every column needs a label"];
+      if (!d.label.trim()) return [t("dataSources.columns.problemLabelRequired")];
       if (d.dataType === "select" && d.options.filter(Boolean).length === 0) {
-        return [`"${d.label.trim()}" is a choice column, so it needs at least one option`];
+        return [t("dataSources.columns.problemNeedsOption", { label: d.label.trim() })];
       }
       return [];
     }),
@@ -150,13 +150,13 @@ export function ManageColumnsModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Manage Columns"
-      subtitle="Define what this data source collects. Renaming a column keeps the data already recorded under it; deleting one hides its values."
+      title={t("dataSources.columns.title")}
+      subtitle={t("dataSources.columns.subtitle")}
       size="lg"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t("dataSources.modal.cancel")}
           </Button>
           <Button
             disabled={!valid || save.isPending}
@@ -181,7 +181,9 @@ export function ManageColumnsModal({
               )
             }
           >
-            {save.isPending ? "Saving…" : "Save Columns"}
+            {save.isPending
+              ? t("dataSources.modal.saving")
+              : t("dataSources.columns.save")}
           </Button>
         </>
       }
@@ -189,7 +191,7 @@ export function ManageColumnsModal({
       <div className="flex flex-col gap-md">
         {drafts.length === 0 ? (
           <p className="text-body-sm text-mute">
-            No columns yet. Add the first one below.
+            {t("dataSources.columns.noColumns")}
           </p>
         ) : (
           <div className="flex flex-col gap-sm">
@@ -220,7 +222,7 @@ export function ManageColumnsModal({
             icon="add"
             onClick={() => setDrafts((ds) => [...ds, newDraft()])}
           >
-            Add column
+            {t("dataSources.columns.addColumn")}
           </Button>
         </div>
       </div>
@@ -246,31 +248,32 @@ function ColumnRow({
   onRemove: () => void;
   onMove: (delta: number) => void;
 }) {
+  const t = useT();
   const key = draft.colKey ?? slugifyColumnKey(draft.label || "column");
 
   return (
     <div className="rounded-md border border-hairline p-md">
       <div className="flex flex-wrap items-end gap-sm">
         <div className="min-w-[12rem] flex-1">
-          <Field label="Label">
+          <Field label={t("dataSources.columns.labelField")}>
             <Input
               value={draft.label}
               onChange={(e) => onChange({ label: e.target.value })}
-              placeholder="e.g. Student count"
+              placeholder={t("dataSources.columns.labelPlaceholder")}
             />
           </Field>
         </div>
         <div className="w-40">
-          <Field label="Type">
+          <Field label={t("dataSources.columns.typeField")}>
             <Select
               value={draft.dataType}
               onChange={(e) =>
                 onChange({ dataType: e.target.value as DataSourceColumnType })
               }
             >
-              {DATA_SOURCE_COLUMN_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {COLUMN_TYPE_LABELS[t]}
+              {DATA_SOURCE_COLUMN_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {t(`dataSources.columnType.${type}`)}
                 </option>
               ))}
             </Select>
@@ -278,7 +281,7 @@ function ColumnRow({
         </div>
         {draft.dataType === "number" && (
           <div className="w-40">
-            <Field label="Unit">
+            <Field label={t("dataSources.columns.unitField")}>
               <UnitSelect
                 value={draft.unit ?? ""}
                 onChange={(unit) => onChange({ unit: unit || null })}
@@ -292,18 +295,35 @@ function ColumnRow({
             checked={draft.isRequired}
             onChange={(e) => onChange({ isRequired: e.target.checked })}
           />
-          Required
+          {t("dataSources.columns.required")}
         </label>
         <div className="flex items-center gap-xxs pb-xs">
-          <IconButton icon="arrow_upward" label="Move up" disabled={isFirst} onClick={() => onMove(-1)} />
-          <IconButton icon="arrow_downward" label="Move down" disabled={isLast} onClick={() => onMove(1)} />
-          <IconButton icon="delete" label="Remove column" onClick={onRemove} />
+          <IconButton
+            icon="arrow_upward"
+            label={t("dataSources.columns.moveUp")}
+            disabled={isFirst}
+            onClick={() => onMove(-1)}
+          />
+          <IconButton
+            icon="arrow_downward"
+            label={t("dataSources.columns.moveDown")}
+            disabled={isLast}
+            onClick={() => onMove(1)}
+          />
+          <IconButton
+            icon="delete"
+            label={t("dataSources.columns.removeColumn")}
+            onClick={onRemove}
+          />
         </div>
       </div>
 
       {draft.dataType === "select" && (
         <div className="mt-sm">
-          <Field label="Options" hint="Comma-separated list of allowed values.">
+          <Field
+            label={t("dataSources.columns.optionsField")}
+            hint={t("dataSources.columns.optionsHint")}
+          >
             <Input
               value={draft.options.join(", ")}
               onChange={(e) =>
@@ -311,7 +331,7 @@ function ColumnRow({
                   options: e.target.value.split(",").map((o) => o.trim()),
                 })
               }
-              placeholder="e.g. BSc, MSc, PhD"
+              placeholder={t("dataSources.columns.optionsPlaceholder")}
             />
           </Field>
         </div>
@@ -324,11 +344,11 @@ function ColumnRow({
           {REF_TARGET_TYPE[draft.dataType] && (
             <div className="w-64">
               <Field
-                label="Ref by"
+                label={t("dataSources.columns.refBy")}
                 hint={
                   refCandidates.length === 0
-                    ? "Add a Programs column to link this one to it."
-                    : "Picking a program narrows this list; picking a value fills in its program."
+                    ? t("dataSources.columns.refByNoCandidates")
+                    : t("dataSources.columns.refByHint")
                 }
               >
                 <Select
@@ -336,10 +356,10 @@ function ColumnRow({
                   disabled={refCandidates.length === 0}
                   onChange={(e) => onChange({ refKey: e.target.value || null })}
                 >
-                  <option value="">None</option>
+                  <option value="">{t("dataSources.columns.refNone")}</option>
                   {refCandidates.map((o) => (
                     <option key={o.key} value={o.key}>
-                      {o.label.trim() || "(unnamed column)"}
+                      {o.label.trim() || t("dataSources.columns.unnamedColumn")}
                     </option>
                   ))}
                 </Select>
@@ -349,27 +369,27 @@ function ColumnRow({
           {MULTIPLE_TYPES.includes(draft.dataType) && (
             <label
               className="flex items-center gap-xs pb-sm text-body-sm"
-              title="The entry form takes several values (e.g. several authors) and saves one row per value."
+              title={t("dataSources.columns.multipleHint")}
             >
               <input
                 type="checkbox"
                 checked={draft.isMultiple}
                 onChange={(e) => onChange({ isMultiple: e.target.checked })}
               />
-              Multiple input
+              {t("dataSources.columns.multipleInput")}
             </label>
           )}
           {draft.dataType === "number" && (
             <label
               className="flex items-center gap-xs pb-sm text-body-sm"
-              title="Filled in automatically: each row of a multiple entry gets 1/n."
+              title={t("dataSources.columns.shareHint")}
             >
               <input
                 type="checkbox"
                 checked={draft.share}
                 onChange={(e) => onChange({ share: e.target.checked })}
               />
-              Fill with share of multiple (1/n)
+              {t("dataSources.columns.shareLabel")}
             </label>
           )}
         </div>
@@ -378,13 +398,15 @@ function ColumnRow({
       {isDerivedOptionType(draft.dataType) && (
         <p className="mt-sm flex items-center gap-xs text-caption-sm text-mute">
           <Icon name="auto_awesome" className="text-[16px]" />
-          {DERIVED_OPTION_SOURCE[draft.dataType]} They stay up to date on their own.
+          {draft.dataType === "faculty" || draft.dataType === "program" || draft.dataType === "curriculum"
+            ? t(`dataSources.columns.derived.${draft.dataType}`)
+            : null}
         </p>
       )}
 
       <p className="mt-xs text-caption-sm text-mute">
-        Stored as <code>{key}</code>
-        {draft.id ? "" : " (new)"}
+        {t("dataSources.columns.storedAs")} <code>{key}</code>
+        {draft.id ? "" : ` ${t("dataSources.columns.newSuffix")}`}
       </p>
     </div>
   );

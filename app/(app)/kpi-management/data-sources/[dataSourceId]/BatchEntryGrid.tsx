@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Input, Table, Td, Th } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/lib/i18n/useT";
 import {
   DataSourceValidationError,
   buildColumnChoices,
@@ -86,6 +87,7 @@ export function useBatchRows({
   year: number | null;
   quarter: number | null;
 }): BatchRowsState {
+  const t = useT();
   const base = useMemo(
     () => buildBatchRows(mode, catalog, columns),
     [mode, catalog, columns],
@@ -155,7 +157,7 @@ export function useBatchRows({
             error =
               err instanceof DataSourceValidationError
                 ? err.message
-                : "This row could not be validated.";
+                : t("dataSources.free.couldNotValidate");
           }
         }
 
@@ -170,7 +172,7 @@ export function useBatchRows({
           error,
         };
       }),
-    [base, drafts, checked, duplicates, validationColumns, columns],
+    [base, drafts, checked, duplicates, validationColumns, columns, t],
   );
 
   const included = rows.filter((r) => r.included);
@@ -247,12 +249,13 @@ export function BatchEntryGrid({
   /** Catalog code -> Thai name, for rendering the locked cells. */
   labels: Record<string, string>;
 }) {
+  const t = useT();
   const { rows, included, editableColumns, duplicateCount, errorCount } = state;
 
   if (rows.length === 0) {
     return (
       <p className="text-body-sm text-mute">
-        The academic catalog has no entries to build this batch from.
+        {t("dataSources.batch.emptyCatalog")}
       </p>
     );
   }
@@ -264,16 +267,21 @@ export function BatchEntryGrid({
     <div className="flex min-w-0 flex-col gap-sm">
       <div className="flex flex-wrap items-center gap-sm">
         <Badge tone="neutral">
-          {included.length} of {rows.length} rows selected
+          {t("dataSources.batch.selected", { selected: included.length, total: rows.length })}
         </Badge>
         {duplicateCount > 0 && (
           <Badge tone="warning">
-            {duplicateCount} already recorded this period
+            {t("dataSources.free.duplicates", { count: duplicateCount })}
           </Badge>
         )}
         {errorCount > 0 && (
           <Badge tone="error">
-            {errorCount} {errorCount === 1 ? "row needs" : "rows need"} fixing
+            {t(
+              errorCount === 1
+                ? "dataSources.free.fixOne"
+                : "dataSources.free.fixMany",
+              { count: errorCount },
+            )}
           </Badge>
         )}
       </div>
@@ -283,7 +291,7 @@ export function BatchEntryGrid({
           <thead>
             <tr>
               <Th className="px-md">
-                <span className="sr-only">Include</span>
+                <span className="sr-only">{t("dataSources.batch.include")}</span>
               </Th>
               {columns.map((c) => {
                 const locked = c.colKey in (rows[0]?.locked ?? {});
@@ -295,8 +303,8 @@ export function BatchEntryGrid({
                       {!locked && (
                         <button
                           type="button"
-                          aria-label={`Copy ${c.label} down to every selected row`}
-                          title={`Copy ${c.label} down to every selected row`}
+                          aria-label={t("dataSources.batch.fillDown", { label: c.label })}
+                          title={t("dataSources.batch.fillDown", { label: c.label })}
                           onClick={() => state.fillDown(c.colKey)}
                           className="grid h-6 w-6 place-items-center rounded text-mute hover:bg-surface-container-high hover:text-on-surface"
                         >
@@ -307,8 +315,8 @@ export function BatchEntryGrid({
                   </Th>
                 );
               })}
-              <Th className="px-md">Note</Th>
-              <Th className="px-md">Status</Th>
+              <Th className="px-md">{t("dataSources.entries.colNote")}</Th>
+              <Th className="px-md">{t("dataSources.import.colStatus")}</Th>
             </tr>
           </thead>
           <tbody>
@@ -330,7 +338,7 @@ export function BatchEntryGrid({
                     <input
                       type="checkbox"
                       className="accent-primary-container"
-                      aria-label={`Include ${row.code}`}
+                      aria-label={t("dataSources.batch.includeRow", { code: row.code })}
                       checked={row.included}
                       onChange={() => state.toggle(row.code)}
                     />
@@ -373,7 +381,7 @@ export function BatchEntryGrid({
                   <Td className="px-md py-xs">
                     <div className="min-w-[8rem]">
                       <Input
-                        aria-label={`Note for ${row.code}`}
+                        aria-label={t("dataSources.batch.noteFor", { code: row.code })}
                         value={row.note}
                         onChange={(e) => state.setNote(row.code, e.target.value)}
                       />
@@ -390,14 +398,16 @@ export function BatchEntryGrid({
                       </span>
                     ) : row.duplicate ? (
                       <span className="whitespace-nowrap text-caption-sm text-mute">
-                        already recorded this period
+                        {t("dataSources.free.alreadyRecorded")}
                       </span>
                     ) : row.included ? (
                       <span className="whitespace-nowrap text-caption-sm text-success">
-                        will be added
+                        {t("dataSources.free.willBeAdded")}
                       </span>
                     ) : (
-                      <span className="text-caption-sm text-mute">skipped</span>
+                      <span className="text-caption-sm text-mute">
+                        {t("dataSources.batch.skipped")}
+                      </span>
                     )}
                   </Td>
                 </tr>
@@ -409,8 +419,11 @@ export function BatchEntryGrid({
 
       {editableColumns.length === 0 && (
         <p className="text-caption-sm text-mute">
-          Every column on this source is filled in by the batch. Submitting adds
-          one row per {rows.length === 5 ? "department" : "curriculum"}.
+          {t(
+            rows.length === 5
+              ? "dataSources.batch.allFilledDepartment"
+              : "dataSources.batch.allFilledCurriculum",
+          )}
         </p>
       )}
     </div>

@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Badge, Button, Input, Table, Td, Th } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/lib/i18n/useT";
 import {
   DataSourceValidationError,
   buildColumnChoices,
@@ -75,6 +76,7 @@ export function useFreeRows({
   year: number | null;
   quarter: number | null;
 }): FreeRowsState {
+  const t = useT();
   const nextKey = useRef(0);
   const blankRow = (): KeyedRow => ({
     key: nextKey.current++,
@@ -113,11 +115,11 @@ export function useFreeRows({
           error =
             err instanceof DataSourceValidationError
               ? err.message
-              : "This row could not be validated.";
+              : t("dataSources.free.couldNotValidate");
         }
         return { ...row, blank: false, error, duplicate };
       }),
-    [rows, validationColumns, columns, recorded, year, quarter],
+    [rows, validationColumns, columns, recorded, year, quarter, t],
   );
 
   const included = view.filter((r) => !r.blank);
@@ -211,6 +213,7 @@ export function FreeEntryGrid({
   catalog: AcademicCatalog;
   faculty: FacultyRecord[];
 }) {
+  const t = useT();
   const { rows, included, errorCount, duplicateCount, tooMany } = state;
   const programKey = columns.find((c) => c.dataType === "program")?.colKey ?? null;
 
@@ -219,23 +222,37 @@ export function FreeEntryGrid({
     <div className="flex min-w-0 flex-col gap-sm">
       <div className="flex flex-wrap items-center gap-sm">
         <Button size="sm" variant="outline" icon="add" onClick={state.addRow}>
-          Add row
+          {t("dataSources.free.addRow")}
         </Button>
         <Badge tone={included.length - errorCount > 0 ? "success" : "neutral"}>
-          {included.length - errorCount} {included.length - errorCount === 1 ? "row" : "rows"} ready
+          {t(
+            included.length - errorCount === 1
+              ? "dataSources.free.readyOne"
+              : "dataSources.free.readyMany",
+            { count: included.length - errorCount },
+          )}
         </Badge>
         {errorCount > 0 && (
           <Badge tone="error">
-            {errorCount} {errorCount === 1 ? "row needs" : "rows need"} fixing
+            {t(
+              errorCount === 1
+                ? "dataSources.free.fixOne"
+                : "dataSources.free.fixMany",
+              { count: errorCount },
+            )}
           </Badge>
         )}
         {duplicateCount > 0 && (
-          <Badge tone="warning">{duplicateCount} already recorded this period</Badge>
+          <Badge tone="warning">
+            {t("dataSources.free.duplicates", { count: duplicateCount })}
+          </Badge>
         )}
-        {tooMany && <Badge tone="error">At most {FREE_ROWS_MAX} rows at a time</Badge>}
+        {tooMany && <Badge tone="error">
+            {t("dataSources.free.tooMany", { max: FREE_ROWS_MAX })}
+          </Badge>}
         <span className="ml-auto inline-flex items-center gap-xs text-caption-sm text-mute">
           <Icon name="content_paste" size={16} />
-          Paste rows from Excel into any cell — columns in this order, then Note.
+          {t("dataSources.free.pasteHint")}
         </span>
       </div>
 
@@ -250,8 +267,8 @@ export function FreeEntryGrid({
                     {c.isRequired && <span aria-hidden>*</span>}
                     <button
                       type="button"
-                      aria-label={`Copy the first row's ${c.label} down to every filled row`}
-                      title={`Copy the first row's ${c.label} down to every filled row`}
+                      aria-label={t("dataSources.free.fillDown", { label: c.label })}
+                      title={t("dataSources.free.fillDown", { label: c.label })}
                       onClick={() => state.fillDown(c.colKey)}
                       className="grid h-6 w-6 place-items-center rounded text-mute hover:bg-surface-container-high hover:text-on-surface"
                     >
@@ -260,10 +277,10 @@ export function FreeEntryGrid({
                   </span>
                 </Th>
               ))}
-              <Th className="px-md">Note</Th>
-              <Th className="px-md">Status</Th>
+              <Th className="px-md">{t("dataSources.entries.colNote")}</Th>
+              <Th className="px-md">{t("dataSources.import.colStatus")}</Th>
               <Th className="px-md">
-                <span className="sr-only">Remove</span>
+                <span className="sr-only">{t("dataSources.linkedItems.remove")}</span>
               </Th>
             </tr>
           </thead>
@@ -305,7 +322,7 @@ export function FreeEntryGrid({
                     }}
                   >
                     <Input
-                      aria-label={`Note, row ${i + 1}`}
+                      aria-label={t("dataSources.free.noteRow", { n: i + 1 })}
                       value={row.note}
                       onChange={(e) => state.setNote(row.key, e.target.value)}
                     />
@@ -314,18 +331,20 @@ export function FreeEntryGrid({
                 <Td className="px-md py-xs">
                   <div className="flex min-h-[36px] w-[11rem] items-center">
                     {row.blank ? (
-                      <span className="text-caption-sm text-mute">empty, skipped</span>
+                      <span className="text-caption-sm text-mute">
+                        {t("dataSources.free.emptySkipped")}
+                      </span>
                     ) : row.error ? (
                       <span className="text-caption-sm text-error" title={row.error}>
                         {row.error}
                       </span>
                     ) : row.duplicate ? (
                       <span className="text-caption-sm text-[#8a4b00]">
-                        already recorded this period
+                        {t("dataSources.free.alreadyRecorded")}
                       </span>
                     ) : (
                       <span className="whitespace-nowrap text-caption-sm text-success">
-                        will be added
+                        {t("dataSources.free.willBeAdded")}
                       </span>
                     )}
                   </div>
@@ -333,8 +352,8 @@ export function FreeEntryGrid({
                 <Td className="px-md py-xs">
                   <button
                     type="button"
-                    aria-label={`Remove row ${i + 1}`}
-                    title="Remove row"
+                    aria-label={t("dataSources.free.removeRowAria", { n: i + 1 })}
+                    title={t("dataSources.free.removeRow")}
                     onClick={() => state.removeRow(row.key)}
                     className="grid h-[36px] w-8 place-items-center rounded text-mute hover:bg-surface-container-high hover:text-error"
                   >
