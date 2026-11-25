@@ -1,4 +1,5 @@
-import { type Locale, DEFAULT_LOCALE } from "./config";
+import { type Locale, DEFAULT_LOCALE } from "./config.ts";
+import { dataSourcesEn, dataSourcesTh } from "./dataSourcesDictionary.ts";
 
 // The English dictionary is the canonical shape; `th` must mirror it exactly
 // (TypeScript enforces this via the `Dictionary` type below). Keys are grouped
@@ -135,6 +136,7 @@ const en = {
       "There is no active performance record, or it has no KPIs of the selected type.",
     noKpisInGroup: "No KPIs in this group.",
   },
+  dataSources: dataSourcesEn,
   kpiDetail: {
     titleFallback: "KPI",
     kpisCrumb: "KPIs",
@@ -423,6 +425,7 @@ const th: Dictionary = {
     emptyMessage: "ยังไม่มีรอบการรายงานผลที่ใช้งานอยู่ หรือไม่มีตัวชี้วัดประเภทที่เลือก",
     noKpisInGroup: "ไม่มีตัวชี้วัดในกลุ่มนี้",
   },
+  dataSources: dataSourcesTh,
   kpiDetail: {
     titleFallback: "KPI",
     kpisCrumb: "KPI",
@@ -584,12 +587,13 @@ const th: Dictionary = {
 
 // Mirrors the `en` shape exactly (same keys, same nesting) but with plain
 // string leaves — so `th` is compile-time checked for missing/extra keys.
-type Localized<T> = {
+export type Localized<T> = {
   [K in keyof T]: T[K] extends string ? string : Localized<T[K]>;
 };
 type Dictionary = Localized<typeof en>;
 
-const DICTIONARIES: Record<Locale, unknown> = { en, th };
+/** Both dictionaries, exported so the parity test can walk every key. */
+export const DICTIONARIES: Record<Locale, unknown> = { en, th };
 
 /** Union of every dotted key path in the dictionary, e.g. "nav.items.dashboard". */
 export type TranslationKey = DotPaths<typeof en>;
@@ -644,3 +648,13 @@ export function translate(
   }
   return text;
 }
+
+/** A bound translate function. `useT()` returns one for components; pure lib
+ *  code takes one as an optional argument and defaults to `englishT`, so server
+ *  paths and tests keep seeing the same English sentences. */
+export type Translator = (
+  key: TranslationKey,
+  vars?: Record<string, string | number>,
+) => string;
+
+export const englishT: Translator = (key, vars) => translate("en", key, vars);

@@ -1,3 +1,4 @@
+import type { Locale } from "@/lib/i18n/config";
 import type {
   AcademicCatalog,
   DataSourceCellValue,
@@ -17,6 +18,7 @@ import {
   parseMonth,
   parseYearBE,
 } from "./cellFormats.ts";
+import { englishT, type Translator } from "../i18n/dictionaries.ts";
 
 export const DATA_SOURCE_COLUMN_TYPES: DataSourceColumnType[] = [
   "text",
@@ -171,6 +173,7 @@ export function uniqueColumnKey(key: string, taken: Iterable<string>): string {
 export function coerceCellValue(
   column: ColumnSpec,
   raw: unknown,
+  t: Translator = englishT,
 ): DataSourceCellValue {
   if (raw === null || raw === undefined || raw === "") return null;
 
@@ -178,7 +181,7 @@ export function coerceCellValue(
     case "number": {
       const n = Number(raw);
       if (!Number.isFinite(n)) {
-        throw invalid(`"${column.label}" must be a number`);
+        throw invalid(t("dataSources.validation.notNumber", { label: column.label }));
       }
       return n;
     }
@@ -186,25 +189,29 @@ export function coerceCellValue(
       if (typeof raw === "boolean") return raw;
       if (raw === "true" || raw === 1 || raw === "1") return true;
       if (raw === "false" || raw === 0 || raw === "0") return false;
-      throw invalid(`"${column.label}" must be true or false`);
+      throw invalid(t("dataSources.validation.notBoolean", { label: column.label }));
     // Formatted types share their parsing with paste, CSV and the input hints
     // (cellFormats.ts). A date is typed in BE and stored as CE YYYY-MM-DD.
     case "date":
     case "year_be":
     case "month": {
       try {
-        if (column.dataType === "year_be") return parseYearBE(raw);
-        if (column.dataType === "month") return parseMonth(raw);
-        return parseDate(raw);
+        if (column.dataType === "year_be") return parseYearBE(raw, t);
+        if (column.dataType === "month") return parseMonth(raw, t);
+        return parseDate(raw, t);
       } catch (err) {
-        if (err instanceof CellFormatError) throw invalid(`"${column.label}" ${err.message}`);
+        if (err instanceof CellFormatError) {
+          throw invalid(
+            t("dataSources.validation.cellPrefix", { label: column.label, message: err.message }),
+          );
+        }
         throw err;
       }
     }
     case "url": {
       const s = String(raw).trim();
       if (!isHttpUrl(s)) {
-        throw invalid(`"${column.label}" must be a valid HTTP or HTTPS URL`);
+        throw invalid(t("dataSources.validation.notUrl", { label: column.label }));
       }
       return s;
     }
@@ -221,8 +228,17 @@ export function coerceCellValue(
         // instead of enumerating the allowed values.
         throw invalid(
           isDerivedOptionType(column.dataType)
-            ? `"${column.label}": "${s}" is not a valid choice. ${DERIVED_OPTION_SOURCE[column.dataType]}`
-            : `"${column.label}" must be one of: ${options.join(", ")}`,
+            ? t("dataSources.validation.notValidChoice", {
+                label: column.label,
+                value: s,
+                source: t(
+                  `dataSources.validation.derivedSource.${column.dataType as "faculty" | "program" | "curriculum"}`,
+                ),
+              })
+            : t("dataSources.validation.mustBeOneOf", {
+                label: column.label,
+                options: options.join(", "),
+              }),
         );
       }
       return s;
@@ -239,20 +255,21 @@ export function validateEntryValues(
   columns: ColumnSpec[],
   values: Record<string, unknown>,
   opts: { allowIncomplete?: boolean } = {},
+  t: Translator = englishT,
 ): Record<string, DataSourceCellValue> {
   const byKey = new Map(columns.map((c) => [c.colKey, c]));
 
   for (const key of Object.keys(values)) {
     if (!byKey.has(key)) {
-      throw invalid(`Unknown column "${key}"`);
+      throw invalid(t("dataSources.validation.unknownColumn", { key }));
     }
   }
 
   const out: Record<string, DataSourceCellValue> = {};
   for (const column of columns) {
-    const value = coerceCellValue(column, values[column.colKey]);
+    const value = coerceCellValue(column, values[column.colKey], t);
     if (column.isRequired && value === null && !opts.allowIncomplete) {
-      throw invalid(`"${column.label}" is required`);
+      throw invalid(t("dataSources.validation.required", { label: column.label }));
     }
     out[column.colKey] = value;
   }
@@ -312,28 +329,31 @@ export function normalizeEntryPeriod(
   grain: DataSourcePeriodGrain,
   year: unknown,
   quarter: unknown,
+  t: Translator = englishT,
 ): { year: number; quarter: number | null } {
   if (year === null || year === undefined || String(year).trim() === "") {
-    throw invalid("A valid year is required");
+    throw invalid(t("dataSources.validation.yearRequired"));
   }
   let y: number;
   try {
-    y = parseYearBE(year);
+    y = parseYearBE(year, t);
   } catch (err) {
-    if (err instanceof CellFormatError) throw invalid(`Year ${err.message}`);
+    if (err instanceof CellFormatError) {
+      throw invalid(t("dataSources.validation.yearPrefix", { message: err.message }));
+    }
     throw err;
   }
 
   if (grain === "annual") {
     if (quarter !== null && quarter !== undefined && quarter !== "") {
-      throw invalid("An annual data source does not take a quarter");
+      throw invalid(t("dataSources.validation.annualNoQuarter"));
     }
     return { year: y, quarter: null };
   }
 
   const q = Number(quarter);
   if (!Number.isInteger(q) || q < 1 || q > 4) {
-    throw invalid("A quarter between 1 and 4 is required");
+    throw invalid(t("dataSources.validation.quarterRequired"));
   }
   return { year: y, quarter: q };
 }
@@ -363,9 +383,15 @@ export function formatCellValue(
   return isDerivedOptionType(column.dataType) ? (labels?.[raw] ?? raw) : raw;
 }
 
-/** Label for an entry's period, e.g. "2568 Q3" or "2568". */
-export function formatEntryPeriod(year: number, quarter: number | null): string {
-  return quarter === null ? String(year) : `${year} Q${quarter}`;
+/** Label for an entry's period, e.g. "2568 Q3" or "2568". Thai reads
+ *  "ไตรมาส 3 ปี 2568"; CSV exports and templates keep the English form. */
+export function formatEntryPeriod(
+  year: number,
+  quarter: number | null,
+  locale: Locale = "en",
+): string {
+  if (quarter === null) return String(year);
+  return locale === "th" ? `ไตรมาส ${quarter} ปี ${year}` : `${year} Q${quarter}`;
 }
 
 /** What a delete confirm calls an entry: the value in its second column (the first
@@ -644,6 +670,7 @@ export function matchTemplateHeaders(
   header: string[],
   grain: DataSourcePeriodGrain,
   columns: ColumnSpec[],
+  t: Translator = englishT,
 ): { map: TemplateHeaderMap; errors: string[] } {
   const errors: string[] = [];
   const map: TemplateHeaderMap = { year: -1, quarter: null, note: null, columns: {} };
@@ -673,28 +700,28 @@ export function matchTemplateHeaders(
 
     const column = byName.get(name);
     if (!column) {
-      errors.push(`Unrecognised column "${cell.trim()}" in the header row`);
+      errors.push(t("dataSources.import.headerUnrecognised", { column: cell.trim() }));
       return;
     }
     if (map.columns[column.colKey] !== undefined) {
-      errors.push(`Column "${column.label}" appears more than once in the header row`);
+      errors.push(t("dataSources.import.headerDuplicate", { label: column.label }));
       return;
     }
     map.columns[column.colKey] = index;
   });
 
   if (map.year === -1) {
-    errors.push(`The header row must include a "${TEMPLATE_YEAR_HEADER}" column`);
+    errors.push(t("dataSources.import.headerNeedsYear", { header: TEMPLATE_YEAR_HEADER }));
   }
   if (grain === "quarterly" && map.quarter === null) {
     errors.push(
-      `This data source records quarterly, so the header row must include a "${TEMPLATE_QUARTER_HEADER}" column`,
+      t("dataSources.import.headerNeedsQuarter", { header: TEMPLATE_QUARTER_HEADER }),
     );
   }
   // A missing required column is reported once here rather than once per row.
   for (const column of columns) {
     if (column.isRequired && map.columns[column.colKey] === undefined) {
-      errors.push(`Required column "${column.label}" is missing from the header row`);
+      errors.push(t("dataSources.import.headerMissingRequired", { label: column.label }));
     }
   }
 
@@ -717,28 +744,32 @@ function readCell(
   column: ColumnSpec,
   raw: string,
   labels: Record<string, string> | undefined,
+  t: Translator = englishT,
 ): { value: DataSourceCellValue; error: EntryRowError | null } {
   const trimmed =
     column.dataType === "boolean" ? normalizeBooleanCell(raw) : raw.trim();
 
   try {
-    const value = coerceCellValue(column, trimmed);
+    const value = coerceCellValue(column, trimmed, t);
     if (column.isRequired && value === null) {
       return {
         value: null,
         error: {
           colKey: column.colKey,
-          message: `"${column.label}" is required`,
+          message: t("dataSources.validation.required", { label: column.label }),
           missing: true,
         },
       };
     }
     return { value, error: null };
   } catch (err) {
-    let message = err instanceof Error ? err.message : `"${column.label}" is invalid`;
+    let message =
+      err instanceof Error
+        ? err.message
+        : t("dataSources.validation.invalid", { label: column.label });
     if (isDerivedOptionType(column.dataType) && labels) {
       const match = Object.entries(labels).find(([, label]) => label === trimmed);
-      if (match) message += ` — did you mean "${match[0]}"?`;
+      if (match) message += t("dataSources.validation.didYouMean", { code: match[0] });
     }
     return { value: null, error: { colKey: column.colKey, message } };
   }
@@ -753,8 +784,9 @@ export function collectEntryRows(args: {
   grain: DataSourcePeriodGrain;
   columns: ColumnSpec[];
   labels?: Record<string, string>;
+  t?: Translator;
 }): ParsedEntryRow[] {
-  const { rows, map, grain, columns, labels } = args;
+  const { rows, map, grain, columns, labels, t = englishT } = args;
   const cellAt = (cells: string[], index: number | null) =>
     index === null || index < 0 ? "" : (cells[index] ?? "");
 
@@ -769,7 +801,7 @@ export function collectEntryRows(args: {
     for (const column of columns) {
       const index = map.columns[column.colKey];
       const cell = cellAt(cells, index === undefined ? null : index);
-      const { value, error } = readCell(column, cell, labels);
+      const { value, error } = readCell(column, cell, labels, t);
       values[column.colKey] = value;
       raw[column.colKey] = cell.trim();
       if (error) errors.push(error);
@@ -780,13 +812,13 @@ export function collectEntryRows(args: {
     let year: number | null = null;
     let quarter: number | null = null;
     try {
-      const period = normalizeEntryPeriod(grain, rawYear, rawQuarter);
+      const period = normalizeEntryPeriod(grain, rawYear, rawQuarter, t);
       year = period.year;
       quarter = period.quarter;
     } catch (err) {
       errors.push({
         colKey: null,
-        message: err instanceof Error ? err.message : "The period is invalid",
+        message: err instanceof Error ? err.message : t("dataSources.validation.periodInvalid"),
       });
     }
 
@@ -812,8 +844,9 @@ export function readEntryTemplateCsv(args: {
   grain: DataSourcePeriodGrain;
   columns: ColumnSpec[];
   labels?: Record<string, string>;
+  t?: Translator;
 }): { headerErrors: string[]; rows: ParsedEntryRow[] } {
-  const { rows, grain, columns, labels } = args;
+  const { rows, grain, columns, labels, t = englishT } = args;
 
   const meaningful = rows
     .map((cells, i) => ({ lineNumber: i + 1, cells }))
@@ -824,16 +857,16 @@ export function readEntryTemplateCsv(args: {
     );
 
   if (meaningful.length === 0) {
-    return { headerErrors: ["This file has no header row"], rows: [] };
+    return { headerErrors: [t("dataSources.import.noHeaderRow")], rows: [] };
   }
 
   const [header, ...body] = meaningful;
-  const { map, errors } = matchTemplateHeaders(header.cells, grain, columns);
+  const { map, errors } = matchTemplateHeaders(header.cells, grain, columns, t);
   if (errors.length > 0) return { headerErrors: errors, rows: [] };
 
   return {
     headerErrors: [],
-    rows: collectEntryRows({ rows: body, map, grain, columns, labels }),
+    rows: collectEntryRows({ rows: body, map, grain, columns, labels, t }),
   };
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button, Field, Input, Modal, Select } from "@/components/ui";
+import { useT } from "@/lib/i18n/useT";
 import type {
   Committee,
   DataSource,
@@ -24,9 +25,6 @@ export interface DataSourceUpdateInput {
   status?: DataSourceStatus;
 }
 
-const GRAIN_HINT =
-  "Quarterly entries carry a year and quarter; annual entries carry only a year. This cannot be changed once data is recorded.";
-
 /**
  * Create/edit modal for a data source's own details. Pass `source` to edit an
  * existing one (adds a status field, locks the grain once entries exist, and
@@ -47,6 +45,7 @@ export function DataSourceModal({
   onClose: () => void;
   onSubmit: (input: DataSourceCreateInput | DataSourceUpdateInput) => void;
 }) {
+  const t = useT();
   const isEdit = !!source;
   // The grain is baked into every entry's shape, so it can't move once data
   // exists — the API rejects it with a 409, and we mirror that guard here.
@@ -102,46 +101,52 @@ export function DataSourceModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Edit Data Source" : "New Data Source"}
+      title={isEdit ? t("dataSources.modal.editTitle") : t("dataSources.modal.createTitle")}
       subtitle={
         isEdit
-          ? "Update this data source's details. Its columns and recorded data are unaffected."
-          : "The owning committee records data here; you define which columns it collects on the next screen."
+          ? t("dataSources.modal.editSubtitle")
+          : t("dataSources.modal.createSubtitle")
       }
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t("dataSources.modal.cancel")}
           </Button>
           <Button disabled={!valid || submitting} onClick={submit}>
             {submitting
               ? isEdit
-                ? "Saving…"
-                : "Creating…"
+                ? t("dataSources.modal.saving")
+                : t("dataSources.modal.creating")
               : isEdit
-                ? "Save"
-                : "Create"}
+                ? t("dataSources.modal.save")
+                : t("dataSources.modal.create")}
           </Button>
         </>
       }
     >
       <div className="grid gap-md">
-        <Field label="Name">
+        <Field label={t("dataSources.modal.nameLabel")}>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Graduate employment survey"
+            placeholder={t("dataSources.modal.namePlaceholder")}
           />
         </Field>
-        <Field label="Description" hint="Optional — what this data is and where it comes from.">
+        <Field
+          label={t("dataSources.modal.descriptionLabel")}
+          hint={t("dataSources.modal.descriptionHint")}
+        >
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
         </Field>
-        <Field label="Owning committee" hint="Only this committee's members can record entries.">
+        <Field
+          label={t("dataSources.modal.committeeLabel")}
+          hint={t("dataSources.modal.committeeHint")}
+        >
           <Select value={committeeId} onChange={(e) => setCommitteeId(e.target.value)}>
-            <option value="">Select a committee…</option>
+            <option value="">{t("dataSources.modal.committeePlaceholder")}</option>
             {committees.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -150,11 +155,11 @@ export function DataSourceModal({
           </Select>
         </Field>
         <Field
-          label="Period grain"
+          label={t("dataSources.modal.grainLabel")}
           hint={
             grainLocked
-              ? "Locked because entries have already been recorded against this source."
-              : GRAIN_HINT
+              ? t("dataSources.modal.grainLockedHint")
+              : t("dataSources.modal.grainHint")
           }
         >
           <Select
@@ -162,21 +167,21 @@ export function DataSourceModal({
             disabled={grainLocked}
             onChange={(e) => setPeriodGrain(e.target.value as DataSourcePeriodGrain)}
           >
-            <option value="quarterly">Quarterly</option>
-            <option value="annual">Annual</option>
+            <option value="quarterly">{t("dataSources.grain.quarterly")}</option>
+            <option value="annual">{t("dataSources.grain.annual")}</option>
           </Select>
         </Field>
         {isEdit && (
           <Field
-            label="Status"
-            hint="Archived sources stay visible but signal they are no longer collecting data."
+            label={t("dataSources.modal.statusLabel")}
+            hint={t("dataSources.modal.statusHint")}
           >
             <Select
               value={status}
               onChange={(e) => setStatus(e.target.value as DataSourceStatus)}
             >
-              <option value="active">Active</option>
-              <option value="archived">Archived</option>
+              <option value="active">{t("dataSources.status.active")}</option>
+              <option value="archived">{t("dataSources.status.archived")}</option>
             </Select>
           </Field>
         )}

@@ -2,6 +2,7 @@
 
 import { Button, Field } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/lib/i18n/useT";
 import {
   filterChoicesByRef,
   fractionFor,
@@ -72,6 +73,7 @@ export function LinkedItemsPanel({
   /** False when editing a saved row: it stays one row. */
   allowAdd: boolean;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-md rounded-md border border-hairline bg-surface-lowest p-md">
       {layout.groups.map((g) => {
@@ -99,10 +101,13 @@ export function LinkedItemsPanel({
               </h3>
               <p className="text-caption-sm text-mute">
                 {g.multiple
-                  ? "Add one per value; each is saved as its own row."
-                  : "Linked fields — picking one fills in the other."}
+                  ? t("dataSources.linkedItems.addOnePerValue")
+                  : t("dataSources.linkedItems.linkedFields")}
                 {share !== null &&
-                  ` ${layout.shares.map((s) => s.label).join(", ")} is filled with 1/${Math.max(1, picked.length)} per row.`}
+                  ` ${t("dataSources.linkedItems.shareFilled", {
+                    labels: layout.shares.map((s) => s.label).join(", "),
+                    count: Math.max(1, picked.length),
+                  })}`}
               </p>
             </div>
 
@@ -162,15 +167,18 @@ export function LinkedItemsPanel({
                     </MaybeField>
                   </div>
                   {share !== null && (
-                    <span className="pb-sm text-caption-sm tabular-nums text-mute" title="Share of this entry">
+                    <span className="pb-sm text-caption-sm tabular-nums text-mute" title={t("dataSources.linkedItems.shareOfEntry")}>
                       {row.main ? share : "—"}
                     </span>
                   )}
                   {g.multiple && allowAdd && rows.length > 1 && (
                     <button
                       type="button"
-                      aria-label={`Remove ${main.label} ${i + 1}`}
-                      title="Remove"
+                      aria-label={t("dataSources.linkedItems.removeAria", {
+                        label: main.label,
+                        n: i + 1,
+                      })}
+                      title={t("dataSources.linkedItems.remove")}
                       onClick={() => onChange(main.colKey, rows.filter((_, j) => j !== i))}
                       className="mb-xs grid h-8 w-8 place-items-center rounded-md text-mute transition-colors hover:bg-surface-container-high hover:text-on-surface"
                     >
@@ -178,7 +186,9 @@ export function LinkedItemsPanel({
                     </button>
                   )}
                   {isDuplicate && (
-                    <p className="w-full text-caption-sm text-error">Already added above.</p>
+                    <p className="w-full text-caption-sm text-error">
+                      {t("dataSources.linkedItems.alreadyAdded")}
+                    </p>
                   )}
                 </div>
               );
@@ -191,7 +201,7 @@ export function LinkedItemsPanel({
                   icon="add"
                   onClick={() => onChange(main.colKey, [...rows, blankItem()])}
                 >
-                  Add another
+                  {t("dataSources.linkedItems.addAnother")}
                 </Button>
               </div>
             )}

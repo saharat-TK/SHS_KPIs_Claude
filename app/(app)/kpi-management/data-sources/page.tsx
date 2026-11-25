@@ -18,7 +18,8 @@ import {
 import { RequirePermission } from "@/components/shell/Guard";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCommittees, useCreateDataSource, useDataSources } from "@/lib/data/hooks";
-import { formatDate } from "@/lib/utils";
+import { useLocale, useT } from "@/lib/i18n/useT";
+import { formatDateLocalized } from "@/lib/utils";
 import type { Committee, DataSource } from "@/lib/types";
 import { DataSourceModal, type DataSourceCreateInput } from "./DataSourceModal";
 
@@ -33,6 +34,8 @@ export default function DataSourcesPage() {
 function DataSources() {
   const router = useRouter();
   const { can, user } = useAuth();
+  const t = useT();
+  const locale = useLocale();
   const [committeeFilter, setCommitteeFilter] = useState("");
   const sourcesQ = useDataSources(
     committeeFilter ? { committeeId: committeeFilter } : undefined,
@@ -55,15 +58,15 @@ function DataSources() {
 
   const newButton = isAdmin ? (
     <Button icon="add" onClick={() => setShowCreate(true)}>
-      New Data Source
+      {t("dataSources.newButton")}
     </Button>
   ) : undefined;
 
   return (
     <>
       <PageHeader
-        title="Data Sources"
-        description="Committee-owned raw data behind the KPI numbers. Each source defines its own columns; committees record rows against them."
+        title={t("dataSources.title")}
+        description={t("dataSources.description")}
         actions={newButton}
       />
 
@@ -73,9 +76,9 @@ function DataSources() {
             value={committeeFilter}
             onChange={(e) => setCommitteeFilter(e.target.value)}
             className="max-w-xs"
-            aria-label="Filter by committee"
+            aria-label={t("dataSources.filterAria")}
           >
-            <option value="">All committees</option>
+            <option value="">{t("dataSources.allCommittees")}</option>
             {(committeesQ.data ?? []).map((c: Committee) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -88,11 +91,11 @@ function DataSources() {
           {ordered.length === 0 ? (
             <EmptyState
               icon="database"
-              title="No data sources yet"
+              title={t("dataSources.emptyTitle")}
               message={
                 isAdmin
-                  ? "Create a data source, define its columns, then let its committee record raw data against them."
-                  : "No data source has been set up for this filter yet. An administrator creates them."
+                  ? t("dataSources.emptyAdmin")
+                  : t("dataSources.emptyMember")
               }
               action={newButton}
             />
@@ -100,14 +103,14 @@ function DataSources() {
             <Table>
               <thead>
                 <tr>
-                  <Th>Name</Th>
-                  <Th>Committee</Th>
-                  <Th align="center">Grain</Th>
-                  <Th align="center">Columns</Th>
-                  <Th align="center">Entries</Th>
-                  <Th align="center">Linked KPIs</Th>
-                  <Th align="center">Latest Update</Th>
-                  <Th align="center">Status</Th>
+                  <Th>{t("dataSources.colName")}</Th>
+                  <Th>{t("dataSources.colCommittee")}</Th>
+                  <Th align="center">{t("dataSources.colGrain")}</Th>
+                  <Th align="center">{t("dataSources.colColumns")}</Th>
+                  <Th align="center">{t("dataSources.colEntries")}</Th>
+                  <Th align="center">{t("dataSources.colLinkedKpis")}</Th>
+                  <Th align="center">{t("dataSources.colLatestUpdate")}</Th>
+                  <Th align="center">{t("dataSources.colStatus")}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -118,22 +121,22 @@ function DataSources() {
                   >
                     <Td className="font-medium">{s.name}</Td>
                     <Td className="text-mute">{s.committeeName ?? s.committeeId}</Td>
-                    <Td align="center">{s.periodGrain}</Td>
+                    <Td align="center">{t(`dataSources.grain.${s.periodGrain}`)}</Td>
                     <Td align="center">
                       {s.columnCount ?? 0 ? (
                         s.columnCount
                       ) : (
-                        <Badge tone="warning">none yet</Badge>
+                        <Badge tone="warning">{t("dataSources.noColumns")}</Badge>
                       )}
                     </Td>
                     <Td align="center">{s.entryCount ?? 0}</Td>
                     <Td align="center">{s.linkCount ?? 0}</Td>
                     <Td align="center" className="text-mute">
-                      {s.lastEntryAt ? formatDate(s.lastEntryAt) : "—"}
+                      {s.lastEntryAt ? formatDateLocalized(s.lastEntryAt, locale) : "—"}
                     </Td>
                     <Td align="center">
                       <Badge tone={s.status === "active" ? "success" : "neutral"}>
-                        {s.status}
+                        {t(`dataSources.status.${s.status}`)}
                       </Badge>
                     </Td>
                   </Tr>

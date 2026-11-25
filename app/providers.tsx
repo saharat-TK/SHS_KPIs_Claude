@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { ToastProvider, ConfirmProvider, useToast } from "@/components/ui";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
+import { useT } from "@/lib/i18n/useT";
 import type { Locale } from "@/lib/i18n/config";
 
 // AuthProvider is deliberately *not* here: it needs a signed-in user, and this
@@ -39,6 +40,11 @@ function QueryProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
+  // Toast messages are built inside a MutationCache callback, outside React, so
+  // the active translator rides in on a ref (same pattern as toastRef).
+  const translate = useT();
+  const tRef = useRef(translate);
+  tRef.current = translate;
 
   const [client] = useState(
     () =>
@@ -49,7 +55,7 @@ function QueryProvider({ children }: { children: React.ReactNode }) {
         mutationCache: new MutationCache({
           onSuccess: (data, variables, _ctx, mutation) => {
             const t = mutation.meta?.toast;
-            const msg = typeof t === "function" ? t(data, variables) : t;
+            const msg = typeof t === "function" ? t(data, variables, tRef.current) : t;
             if (msg) toastRef.current(msg, "success");
           },
           onError: (err, _variables, _ctx, mutation) => {

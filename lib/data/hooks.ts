@@ -29,6 +29,7 @@ import type {
   UnitRecord,
 } from "@/lib/types";
 import type { KpiBatchRow } from "@/lib/kpi/kpiBatch";
+import type { Translator } from "@/lib/i18n/dictionaries";
 import {
   academicCatalogRepo,
   approvalsRepo,
@@ -62,7 +63,11 @@ import {
 // Every mutation declares its confirmation message once via `meta.toast`. A
 // global MutationCache handler in app/providers.tsx reads it and fires a toast
 // on success (and a default error toast on failure). See components/ui/Toast.tsx.
-type ToastMeta = string | ((data: unknown, variables: unknown) => string);
+type ToastMeta =
+  | string
+  // The third argument is the active-language translator, for messages that
+  // have a dictionary key; older metas simply ignore it.
+  | ((data: unknown, variables: unknown, t: Translator) => string);
 declare module "@tanstack/react-query" {
   interface Register {
     mutationMeta: { toast?: ToastMeta; errorToast?: string };
@@ -1042,7 +1047,9 @@ export function useCreateDataSource() {
   return useMutation({
     mutationFn: (input: Parameters<typeof dataSourcesRepo.create>[0]) =>
       dataSourcesRepo.create(input),
-    meta: { toast: (d) => `Data source "${(d as DataSource).name}" created` },
+    meta: {
+      toast: (d, _v, t) => t("dataSources.toast.created", { name: (d as DataSource).name }),
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dataSources"] }),
   });
 }
@@ -1057,7 +1064,7 @@ export function useUpdateDataSource() {
       id: number;
       patch: Parameters<typeof dataSourcesRepo.update>[1];
     }) => dataSourcesRepo.update(id, patch),
-    meta: { toast: "Data source updated" },
+    meta: { toast: (_d, _v, t) => t("dataSources.toast.updated") },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: ["dataSources"] });
       qc.invalidateQueries({ queryKey: qk.dataSource(id) });
@@ -1069,7 +1076,7 @@ export function useDeleteDataSource() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => dataSourcesRepo.remove(id),
-    meta: { toast: "Data source deleted" },
+    meta: { toast: (_d, _v, t) => t("dataSources.toast.deleted") },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dataSources"] }),
   });
 }
@@ -1079,7 +1086,7 @@ export function useSaveDataSourceColumns() {
   return useMutation({
     mutationFn: ({ id, columns }: { id: number; columns: DataSourceColumnInput[] }) =>
       dataSourcesRepo.saveColumns(id, columns),
-    meta: { toast: "Columns saved" },
+    meta: { toast: (_d, _v, t) => t("dataSources.toast.columnsSaved") },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: qk.dataSourceColumns(id) });
       // Entries render through the column set, so their view is stale too.
@@ -1094,7 +1101,7 @@ export function useCreateDataSourceEntry() {
   return useMutation({
     mutationFn: ({ id, input }: { id: number; input: DataSourceEntryInput }) =>
       dataSourcesRepo.createEntry(id, input),
-    meta: { toast: "Entry recorded" },
+    meta: { toast: (_d, _v, t) => t("dataSources.toast.entryRecorded") },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: ["dataSourceEntries", id] });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
@@ -1109,11 +1116,14 @@ export function useBulkCreateDataSourceEntries() {
     mutationFn: ({ id, input }: { id: number; input: DataSourceBulkEntryInput }) =>
       dataSourcesRepo.bulkCreateEntries(id, input),
     meta: {
-      toast: (d: unknown) => {
+      toast: (d: unknown, _v: unknown, t: Translator) => {
         const { inserted: n, incomplete } = d as { inserted: number; incomplete?: number };
-        const done = `${n} ${n === 1 ? "entry" : "entries"} imported`;
+        const done = t(
+          n === 1 ? "dataSources.toast.importedOne" : "dataSources.toast.importedMany",
+          { count: n },
+        );
         return incomplete
-          ? `${done} — ${incomplete} flagged incomplete, not counted in KPIs until completed`
+          ? t("dataSources.toast.importedIncomplete", { done, incomplete })
           : done;
       },
     },
@@ -1136,7 +1146,7 @@ export function useUpdateDataSourceEntry() {
       entryId: number;
       input: Partial<DataSourceEntryInput> & { allowIncomplete?: boolean };
     }) => dataSourcesRepo.updateEntry(entryId, input),
-    meta: { toast: "Entry updated" },
+    meta: { toast: (_d, _v, t) => t("dataSources.toast.entryUpdated") },
     onSuccess: (_d, { dataSourceId }) => {
       qc.invalidateQueries({ queryKey: ["dataSourceEntries", dataSourceId] });
       invalidatePerformanceValues(qc);
@@ -1151,9 +1161,11 @@ export function useSaveDataSourceEntryGroup() {
     mutationFn: ({ id, input }: { id: number; input: DataSourceEntryGroupInput }) =>
       dataSourcesRepo.saveEntryGroup(id, input),
     meta: {
-      toast: (d: unknown) => {
+      toast: (d: unknown, _v: unknown, t: Translator) => {
         const r = d as { updated: number; inserted: number };
-        return r.updated + r.inserted === 0 ? "Entry deleted" : "Entry updated";
+        return r.updated + r.inserted === 0
+          ? t("dataSources.toast.entryDeleted")
+          : t("dataSources.toast.entryUpdated");
       },
     },
     onSuccess: (_d, { id }) => {
@@ -1173,7 +1185,7 @@ export function useDeleteDataSourceEntry() {
       dataSourceId: number;
       entryId: number;
     }) => dataSourcesRepo.removeEntry(entryId),
-    meta: { toast: "Entry deleted" },
+    meta: { toast: (_d, _v, t) => t("dataSources.toast.entryDeleted") },
     onSuccess: (_d, { dataSourceId }) => {
       qc.invalidateQueries({ queryKey: ["dataSourceEntries", dataSourceId] });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
@@ -1194,8 +1206,9 @@ function invalidatePerformanceValues(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["perfKpiSources"] });
 }
 
-/** "Linked · 12 quarters updated · 4 skipped (4 period closed)". The feed summary
- *  is omitted for an evidence-only link, which computes nothing. */
+/** "Linked · 12 quarters updated · 4 skipped (4 period closed)". The head is
+ *  translated; the feed summary is the server's own text and is shown as sent.
+ *  It is omitted for an evidence-only link, which computes nothing. */
 function linkToast(head: string, data: unknown): string {
   const { feed } = (data ?? {}) as LinkWriteResult;
   return feed && !feed.startsWith("0 quarters") ? `${head} · ${feed}` : head;
@@ -1207,7 +1220,7 @@ export function useCreateDataSourceLink() {
     mutationFn: ({ id, input }: { id: number; input: DataSourceLinkInput }) =>
       dataSourcesRepo.createLink(id, input),
     // The link immediately recomputes what it feeds; say what that did.
-    meta: { toast: (d) => linkToast("Linked", d) },
+    meta: { toast: (d, _v, t) => linkToast(t("dataSources.toast.linked"), d) },
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: qk.dataSourceLinks(id) });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
@@ -1227,7 +1240,7 @@ export function useUpdateDataSourceLink() {
       linkId: number;
       patch: { mappings?: DataSourceLinkMapping[]; note?: string | null };
     }) => dataSourcesRepo.updateLink(linkId, patch),
-    meta: { toast: (d) => linkToast("Link updated", d) },
+    meta: { toast: (d, _v, t) => linkToast(t("dataSources.toast.linkUpdated"), d) },
     onSuccess: (_d, { dataSourceId }) => {
       qc.invalidateQueries({ queryKey: qk.dataSourceLinks(dataSourceId) });
       qc.invalidateQueries({ queryKey: ["dataSources"] });
@@ -1241,7 +1254,7 @@ export function useDeleteDataSourceLink() {
   return useMutation({
     mutationFn: ({ linkId }: { dataSourceId: number; linkId: number }) =>
       dataSourcesRepo.removeLink(linkId),
-    meta: { toast: "Link removed" },
+    meta: { toast: (_d, _v, t) => t("dataSources.toast.linkRemoved") },
     onSuccess: (_d, { dataSourceId }) => {
       qc.invalidateQueries({ queryKey: qk.dataSourceLinks(dataSourceId) });
       qc.invalidateQueries({ queryKey: ["dataSources"] });

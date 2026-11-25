@@ -13,6 +13,8 @@ import {
 import { Table, Th, Td, EmptyState, useConfirm } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { useDeleteDataSourceEntry } from "@/lib/data/hooks";
+import type { Locale } from "@/lib/i18n/config";
+import { useLocale, useT } from "@/lib/i18n/useT";
 import {
   describeEntryForConfirm,
   formatCellValue,
@@ -76,11 +78,13 @@ export function EntriesTable({
   heightClass?: string;
 }) {
   const confirm = useConfirm();
+  const t = useT();
+  const locale = useLocale();
   const remove = useDeleteDataSourceEntry();
   const [sort, setSort] = useState<SortState | null>(null);
   const [tooltip, setTooltip] = useState<CellTooltip | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const layout = useColumnLayout(rootRef, columns, entries, canRecord, cellLabels);
+  const layout = useColumnLayout(rootRef, columns, entries, canRecord, cellLabels, locale);
 
   // A multiple-input source stores one row per value; regroup them into the
   // entries they came from. Without a multiple column every group is one row.
@@ -98,18 +102,18 @@ export function EntriesTable({
 
     const matches = (entry: DataSourceEntry) =>
       [
-        formatEntryPeriod(entry.year, entry.quarter),
+        formatEntryPeriod(entry.year, entry.quarter, locale),
         ...columns.map((column) =>
           formatCellValue(column, entry.values[column.colKey] ?? null, cellLabels),
         ),
         entry.note ?? "",
-        formatEntryCreatedAt(entry.createdAt),
+        formatEntryCreatedAt(entry.createdAt, locale),
       ]
         .join(" ")
         .toLocaleLowerCase()
         .includes(needle);
     return pool.filter((group) => group.rows.some(matches));
-  }, [cellLabels, columns, groups, onlyIncomplete, query]);
+  }, [cellLabels, columns, groups, locale, onlyIncomplete, query]);
 
   // Sorting orders whole groups by their first row, so an entry never splits.
   const visibleGroups = useMemo(() => {
@@ -159,8 +163,8 @@ export function EntriesTable({
       {visibleGroups.length === 0 ? (
         <EmptyState
           icon="search_off"
-          title="No matching data"
-          message="Try a different search term."
+          title={t("dataSources.entries.noMatchTitle")}
+          message={t("dataSources.entries.noMatchMessage")}
         />
       ) : (
       <>
@@ -195,10 +199,12 @@ export function EntriesTable({
               onEdit={onEdit}
               onDelete={async (e) => {
                 const ok = await confirm({
-                  title: "Delete this entry?",
-                  message: `The ${describeEntryForConfirm(columns, e, cellLabels)} row will be permanently removed.`,
+                  title: t("dataSources.entries.deleteTitle"),
+                  message: t("dataSources.entries.deleteMessage", {
+                    entry: describeEntryForConfirm(columns, e, cellLabels),
+                  }),
                   tone: "danger",
-                  confirmLabel: "Delete",
+                  confirmLabel: t("dataSources.entries.deleteConfirm"),
                 });
                 if (ok) remove.mutate({ dataSourceId, entryId: e.id });
               }}
@@ -244,6 +250,8 @@ function GroupBody({
   onEdit: (entry: DataSourceEntry) => void;
   onDelete: (entry: DataSourceEntry) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const span = group.rows.length > 1 ? group.rows.length : undefined;
   // Imported rows each carry their own note, so it is drawn per row; a note the
   // form saved on every row is drawn once and spans the group.
@@ -279,7 +287,10 @@ function GroupBody({
               {c.dataType === "url" ? (
                 <UrlCell value={text} tooltipEvents={tooltipEvents} />
               ) : emptyRequired ? (
-                <span className="text-error" title={`"${c.label}" is required`}>
+                <span
+                  className="text-error"
+                  title={t("dataSources.entries.requiredTip", { label: c.label })}
+                >
                   {text}
                 </span>
               ) : (
@@ -297,15 +308,21 @@ function GroupBody({
                 className={cn(CELL, FIRST_COL, rowPad, "whitespace-nowrap font-medium")}
               >
                 <CellPreview
-                  text={formatEntryPeriod(e.year, e.quarter)}
-                  {...tooltipEvents(formatEntryPeriod(e.year, e.quarter))}
+                  text={formatEntryPeriod(e.year, e.quarter, locale)}
+                  {...tooltipEvents(formatEntryPeriod(e.year, e.quarter, locale))}
                 />
                 {flagged.length > 0 && (
                   <span
                     className="block text-caption-sm font-normal text-warning"
-                    title={`${missing.length > 0 ? `Missing: ${missing.join(", ")}. ` : ""}Not counted in KPIs until completed.`}
+                    title={
+                      missing.length > 0
+                        ? t("dataSources.entries.incompleteTipMissing", {
+                            missing: missing.join(", "),
+                          })
+                        : t("dataSources.entries.incompleteTipPlain")
+                    }
                   >
-                    Incomplete
+                    {t("dataSources.entries.incomplete")}
                   </span>
                 )}
               </Td>
@@ -324,8 +341,8 @@ function GroupBody({
             {first && (
               <Td rowSpan={span} className={cn(CELL, rowPad, "text-mute")}>
                 <CellPreview
-                  text={formatEntryCreatedAt(e.createdAt)}
-                  {...tooltipEvents(formatEntryCreatedAt(e.createdAt))}
+                  text={formatEntryCreatedAt(e.createdAt, locale)}
+                  {...tooltipEvents(formatEntryCreatedAt(e.createdAt, locale))}
                 />
               </Td>
             )}
@@ -341,8 +358,8 @@ function GroupBody({
                 <div className="inline-flex items-center gap-xxs">
                   <button
                     type="button"
-                    aria-label="Edit entry"
-                    title="Edit entry"
+                    aria-label={t("dataSources.entries.editEntry")}
+                    title={t("dataSources.entries.editEntry")}
                     onClick={() => onEdit(e)}
                     className="grid h-7 w-7 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
                   >
@@ -350,8 +367,8 @@ function GroupBody({
                   </button>
                   <button
                     type="button"
-                    aria-label="Delete entry"
-                    title="Delete entry"
+                    aria-label={t("dataSources.entries.deleteEntry")}
+                    title={t("dataSources.entries.deleteEntry")}
                     onClick={() => onDelete(e)}
                     className="grid h-7 w-7 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-error"
                   >
@@ -400,6 +417,7 @@ function DataTableHeader({
   sort: SortState | null;
   onSort: (key: string) => void;
 }) {
+  const t = useT();
   return (
     <thead>
       <tr>
@@ -413,7 +431,7 @@ function DataTableHeader({
           // values, and on a centred label it would push it right of centre.
           className={HEAD}
         >
-          Period
+          {t("dataSources.entries.colPeriod")}
         </Th>
         {columns.map((column) => (
           <Th
@@ -437,7 +455,7 @@ function DataTableHeader({
           wrap
           className={HEAD}
         >
-          Note
+          {t("dataSources.entries.colNote")}
         </Th>
         <Th
           sortable
@@ -447,7 +465,7 @@ function DataTableHeader({
           wrap
           className={HEAD}
         >
-          Created at
+          {t("dataSources.entries.colCreatedAt")}
         </Th>
         {canRecord && (
           <Th
@@ -456,7 +474,7 @@ function DataTableHeader({
             // header cells (z-20) and the body's Actions cells (z-10).
             className="sticky right-0 top-0 z-30 !px-md !pt-[12px] !pb-[8px] !align-top border-l border-hairline bg-surface-lowest shadow-[-8px_0_12px_-10px_rgb(0_0_0_/_0.35)]"
           >
-            Actions
+            {t("dataSources.entries.colActions")}
           </Th>
         )}
       </tr>
@@ -477,10 +495,11 @@ function columnSortKey(column: DataSourceColumn) {
   return `column:${column.colKey}`;
 }
 
-export function formatEntryCreatedAt(value: string) {
+export function formatEntryCreatedAt(value: string, locale: Locale = "en") {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-GB", {
+  // Thai reads the Buddhist-era year ("24 พ.ย. 2569 15:30"); CSV exports keep en-GB.
+  return new Intl.DateTimeFormat(locale === "th" ? "th-TH-u-ca-buddhist" : "en-GB", {
     timeZone: "Asia/Bangkok",
     day: "2-digit",
     month: "short",
@@ -555,6 +574,7 @@ function UrlCell({
   value: string;
   tooltipEvents: (text: string) => TooltipEvents;
 }) {
+  const t = useT();
   if (!isHttpUrl(value)) {
     return <CellPreview text={value} {...tooltipEvents(value)} />;
   }
@@ -564,7 +584,7 @@ function UrlCell({
       href={value}
       target="_blank"
       rel="noreferrer"
-      aria-label={`Open ${value}`}
+      aria-label={t("dataSources.entries.openUrl", { url: value })}
       className="inline-flex rounded-sm text-mute outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-primary-container"
       {...tooltipEvents(value)}
     >
@@ -580,12 +600,13 @@ function NoteCell({
   note: string | null;
   tooltipEvents: (text: string) => TooltipEvents;
 }) {
+  const t = useT();
   if (!note) return <CellPreview text="—" {...tooltipEvents("—")} />;
 
   return (
     <span
       tabIndex={0}
-      aria-label="View note"
+      aria-label={t("dataSources.entries.viewNote")}
       className="inline-flex rounded-sm text-mute outline-none transition-colors hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary-container"
       {...tooltipEvents(note)}
     >
@@ -603,6 +624,7 @@ function useColumnLayout(
   entries: DataSourceEntry[],
   canRecord: boolean,
   cellLabels: Record<string, string>,
+  locale: Locale,
 ): ColumnLayout {
   const [fontFamily, setFontFamily] = useState<string | null>(null);
   const [fontsTick, setFontsTick] = useState(0);
@@ -626,12 +648,12 @@ function useColumnLayout(
       columns,
       entries,
       canRecord,
-      periodText: (entry) => formatEntryPeriod(entry.year, entry.quarter),
-      createdText: (entry) => formatEntryCreatedAt(entry.createdAt),
+      periodText: (entry) => formatEntryPeriod(entry.year, entry.quarter, locale),
+      createdText: (entry) => formatEntryCreatedAt(entry.createdAt, locale),
       cellText: (column, entry) =>
         formatCellValue(column, entry.values[column.colKey] ?? null, cellLabels),
     });
     // fontsTick re-runs the measure after webfonts load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fontFamily, fontsTick, columns, entries, canRecord, cellLabels]);
+  }, [fontFamily, fontsTick, columns, entries, canRecord, cellLabels, locale]);
 }

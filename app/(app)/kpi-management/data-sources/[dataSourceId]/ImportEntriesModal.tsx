@@ -5,6 +5,7 @@ import { Modal, Button, Badge, Table, Th, Td } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { useBulkCreateDataSourceEntries } from "@/lib/data/hooks";
 import { parseCsv } from "@/lib/csv";
+import { useLocale, useT } from "@/lib/i18n/useT";
 import {
   entryFingerprint,
   formatCellValue,
@@ -62,6 +63,8 @@ export function ImportEntriesModal({
   cellLabels: Record<string, string>;
   onDownloadTemplate: () => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const bulk = useBulkCreateDataSourceEntries();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -120,7 +123,7 @@ export function ImportEntriesModal({
     // A CSV this size is not a data entry template; refuse before parsing rather
     // than freezing the tab on it.
     if (file.size > 2_000_000) {
-      setReadError("That file is larger than 2 MB. Import it in smaller batches.");
+      setReadError(t("dataSources.import.fileTooLarge"));
       return;
     }
 
@@ -128,7 +131,7 @@ export function ImportEntriesModal({
     try {
       text = await file.text();
     } catch {
-      setReadError("That file could not be read.");
+      setReadError(t("dataSources.import.fileUnreadable"));
       return;
     }
 
@@ -137,6 +140,7 @@ export function ImportEntriesModal({
       grain: periodGrain,
       columns: checkColumns,
       labels: cellLabels,
+      t,
     });
     setHeaderErrors(result.headerErrors);
     setRows(result.rows);
@@ -201,13 +205,13 @@ export function ImportEntriesModal({
     <Modal
       open={open}
       onClose={close}
-      title="Upload Data Entry"
-      subtitle="Fill in the downloaded template, then upload it here."
+      title={t("dataSources.import.title")}
+      subtitle={t("dataSources.import.subtitle")}
       size="lg"
       footer={
         <>
           <Button variant="ghost" onClick={close}>
-            Cancel
+            {t("dataSources.modal.cancel")}
           </Button>
           {incompleteSelected > 0 ? (
             <>
@@ -216,19 +220,24 @@ export function ImportEntriesModal({
                 disabled={!canImportComplete}
                 onClick={() => submit(false)}
               >
-                {`Import complete only (${completeSelected.length})`}
+                {t("dataSources.import.importCompleteOnly", { count: completeSelected.length })}
               </Button>
               <Button disabled={!canImport} onClick={() => submit(true)}>
                 {bulk.isPending
-                  ? "Importing…"
-                  : `Import anyway with flag (${selected.length})`}
+                  ? t("dataSources.import.importing")
+                  : t("dataSources.import.importAnyway", { count: selected.length })}
               </Button>
             </>
           ) : (
             <Button disabled={!canImport} onClick={() => submit(false)}>
               {bulk.isPending
-                ? "Importing…"
-                : `Import ${selected.length} ${selected.length === 1 ? "entry" : "entries"}`}
+                ? t("dataSources.import.importing")
+                : t(
+                    selected.length === 1
+                      ? "dataSources.import.importOne"
+                      : "dataSources.import.importMany",
+                    { count: selected.length },
+                  )}
             </Button>
           )}
         </>
@@ -266,7 +275,7 @@ export function ImportEntriesModal({
         >
           <Icon name="upload_file" size={28} className="text-mute" />
           <p className="text-body-sm text-mute">
-            {fileName ? fileName : "Drop a CSV file here, or choose one."}
+            {fileName ? fileName : t("dataSources.import.dropHint")}
           </p>
           <div className="flex items-center gap-sm">
             <Button
@@ -275,10 +284,12 @@ export function ImportEntriesModal({
               icon="folder_open"
               onClick={() => fileRef.current?.click()}
             >
-              {fileName ? "Choose another file" : "Choose CSV file"}
+              {fileName
+                ? t("dataSources.import.chooseAnother")
+                : t("dataSources.import.chooseFile")}
             </Button>
             <Button variant="ghost" size="sm" icon="download" onClick={onDownloadTemplate}>
-              Download template
+              {t("dataSources.import.downloadTemplate")}
             </Button>
           </div>
         </div>
@@ -287,14 +298,14 @@ export function ImportEntriesModal({
 
         {headerErrors.length > 0 && (
           <ErrorBox
-            title="This file's header row does not match this data source."
+            title={t("dataSources.import.headerMismatch")}
             lines={headerErrors}
           />
         )}
 
         {fileName && !readError && headerErrors.length === 0 && rows.length === 0 && (
           <p className="text-body-sm text-mute">
-            That file has a valid header row but no data rows.
+            {t("dataSources.import.noDataRows")}
           </p>
         )}
 
@@ -302,31 +313,43 @@ export function ImportEntriesModal({
           <>
             <div className="flex flex-wrap items-center gap-sm">
               <Badge tone={errorCount > 0 ? "neutral" : "success"}>
-                {selected.length} of {rows.length} rows ready
+                {t("dataSources.import.readyBadge", { selected: selected.length, total: rows.length })}
               </Badge>
               {errorCount > 0 && (
                 <Badge tone="error">
-                  {errorCount} {errorCount === 1 ? "row has" : "rows have"} errors
+                  {t(
+                    errorCount === 1
+                      ? "dataSources.import.errorsOne"
+                      : "dataSources.import.errorsMany",
+                    { count: errorCount },
+                  )}
                 </Badge>
               )}
               {incompleteRows.length > 0 && (
                 <Badge tone="warning">
-                  {incompleteRows.length} incomplete
+                  {t("dataSources.import.incompleteBadge", { count: incompleteRows.length })}
                 </Badge>
               )}
               {duplicates.size > 0 && (
                 <Badge tone="warning">
-                  {duplicates.size} possible {duplicates.size === 1 ? "duplicate" : "duplicates"}
+                  {t(
+                    duplicates.size === 1
+                      ? "dataSources.import.duplicatesOne"
+                      : "dataSources.import.duplicatesMany",
+                    { count: duplicates.size },
+                  )}
                 </Badge>
               )}
             </div>
 
             {incompleteRows.length > 0 && (
               <p className="text-body-sm text-mute">
-                {incompleteRows.length === 1 ? "1 row has" : `${incompleteRows.length} rows have`}{" "}
-                an empty required cell. Import anyway with flag stores{" "}
-                {incompleteRows.length === 1 ? "it" : "them"} as incomplete — no KPI
-                counts {incompleteRows.length === 1 ? "it" : "them"} until the data is completed.
+                {t(
+                  incompleteRows.length === 1
+                    ? "dataSources.import.incompleteNoteOne"
+                    : "dataSources.import.incompleteNoteMany",
+                  { count: incompleteRows.length },
+                )}
               </p>
             )}
 
@@ -335,15 +358,15 @@ export function ImportEntriesModal({
                 <thead>
                   <tr>
                     <Th>
-                      <span className="sr-only">Import</span>
+                      <span className="sr-only">{t("dataSources.import.colImport")}</span>
                     </Th>
-                    <Th align="right">Line</Th>
-                    <Th>Status</Th>
-                    <Th>Period</Th>
+                    <Th align="right">{t("dataSources.import.colLine")}</Th>
+                    <Th>{t("dataSources.import.colStatus")}</Th>
+                    <Th>{t("dataSources.entries.colPeriod")}</Th>
                     {columns.map((c) => (
                       <Th key={c.id}>{c.label}</Th>
                     ))}
-                    <Th>Note</Th>
+                    <Th>{t("dataSources.entries.colNote")}</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -359,7 +382,7 @@ export function ImportEntriesModal({
                           <input
                             type="checkbox"
                             className="accent-primary-container"
-                            aria-label={`Import line ${row.lineNumber}`}
+                            aria-label={t("dataSources.import.importLine", { n: row.lineNumber })}
                             disabled={failed}
                             checked={!failed && !excluded.has(row.lineNumber)}
                             onChange={() => toggle(row.lineNumber)}
@@ -370,11 +393,11 @@ export function ImportEntriesModal({
                         </Td>
                         <Td>
                           {failed ? (
-                            <Badge tone="error">error</Badge>
+                            <Badge tone="error">{t("dataSources.import.statusError")}</Badge>
                           ) : incomplete ? (
-                            <Badge tone="warning">incomplete</Badge>
+                            <Badge tone="warning">{t("dataSources.import.statusIncomplete")}</Badge>
                           ) : duplicates.has(row.lineNumber) ? (
-                            <Badge tone="warning">duplicate</Badge>
+                            <Badge tone="warning">{t("dataSources.import.statusDuplicate")}</Badge>
                           ) : (
                             <span className="text-mute">—</span>
                           )}
@@ -386,7 +409,7 @@ export function ImportEntriesModal({
                           <span className={row.year === null ? "text-error" : undefined}>
                             {row.year === null
                               ? row.rawPeriod || "—"
-                              : formatEntryPeriod(row.year, row.quarter)}
+                              : formatEntryPeriod(row.year, row.quarter, locale)}
                           </span>
                         </Td>
                         {columns.map((c) => (
@@ -400,7 +423,7 @@ export function ImportEntriesModal({
                               }
                             >
                               {badCells.has(c.colKey)
-                                ? row.raw[c.colKey] || "(empty)"
+                                ? row.raw[c.colKey] || t("dataSources.import.empty")
                                 : formatCellValue(
                                     c,
                                     row.values[c.colKey] ?? null,
@@ -441,20 +464,23 @@ function ErrorBox({ title, lines }: { title?: string; lines: string[] }) {
 /** Every problem in the file, capped so a badly mismatched upload does not
  *  render a thousand list items the user will not read. */
 function ErrorList({ rows }: { rows: ParsedEntryRow[] }) {
+  const t = useT();
   const LIMIT = 20;
   // Empty required cells are not listed: they import with a flag, and the row's
   // status badge and red cell already say so. A row that also has a blocking
   // error still shows only that one — fixing it will surface the rest.
   const all = rows.flatMap((row) =>
-    splitRowErrors(row.errors).blocking.map((e) => `Line ${row.lineNumber}: ${e.message}`),
+    splitRowErrors(row.errors).blocking.map((e) =>
+      t("dataSources.import.errorLine", { n: row.lineNumber, message: e.message }),
+    ),
   );
   const shown = all.slice(0, LIMIT);
   return (
     <ErrorBox
-      title="Fix these in the file and upload it again."
+      title={t("dataSources.import.fixTitle")}
       lines={
         all.length > shown.length
-          ? [...shown, `…and ${all.length - shown.length} more`]
+          ? [...shown, t("dataSources.import.andMore", { count: all.length - shown.length })]
           : shown
       }
     />
