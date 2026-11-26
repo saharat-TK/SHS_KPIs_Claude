@@ -529,8 +529,16 @@ export const strategicSetsRepo = {
 
 // ── KPI Management — Library KPIs (DB-backed) ───────────────────────────────
 export const libraryKpisRepo = {
-  listBySet: async (setId: number): Promise<LibraryKpi[]> =>
-    jsonOrThrow(await fetch(`/api/library-kpis?setId=${setId}`), "Failed to load KPIs"),
+  listBySet: async (
+    setId: number,
+    opts: { withTargets?: boolean } = {},
+  ): Promise<LibraryKpi[]> =>
+    jsonOrThrow(
+      await fetch(
+        `/api/library-kpis?setId=${setId}${opts.withTargets ? "&include=targets" : ""}`,
+      ),
+      "Failed to load KPIs",
+    ),
   get: async (id: number): Promise<LibraryKpi> =>
     jsonOrThrow(await fetch(`/api/library-kpis/${id}`), "Failed to load KPI"),
   create: async (input: Partial<LibraryKpi> & { setId: number; name: string }): Promise<LibraryKpi> =>

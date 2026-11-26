@@ -53,6 +53,9 @@ export function BatchAddKpisModal({
   existingNames,
   defaultKpiType,
   defaultCommitteeId,
+  setName,
+  importFile,
+  onImportConsumed,
 }: {
   open: boolean;
   onClose: () => void;
@@ -65,6 +68,13 @@ export function BatchAddKpisModal({
   defaultKpiType: string;
   /** The page's committee filter, or "" when it shows all committees. */
   defaultCommitteeId: string;
+  /** Named in the downloaded template's first line. */
+  setName?: string;
+  /** A CSV picked from the set page's "Import CSV…" shortcut. Loaded into the
+   *  grid once the modal is open, exactly as the in-modal Import CSV would. */
+  importFile?: File | null;
+  /** Called after importFile has been read, so the page can clear it. */
+  onImportConsumed?: () => void;
 }) {
   const create = useBulkCreateLibraryKpis(setId);
   const edpexQ = useEdpexCatalog();
@@ -214,6 +224,15 @@ export function BatchAddKpisModal({
     }
   };
 
+  // The page hands the file over and opens the modal in the same render; read
+  // it once the modal is open so any error shows where the user is looking.
+  useEffect(() => {
+    if (!open || !importFile) return;
+    void onImportFile(importFile);
+    onImportConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, importFile]);
+
   const submit = () => {
     const ready = rows
       .filter((r) => !isBlankKpiBatchRow(r))
@@ -289,7 +308,7 @@ export function BatchAddKpisModal({
             size="sm"
             variant="ghost"
             icon="download"
-            onClick={() => downloadCsv("kpi-batch-template.csv", buildKpiTemplateCsv(lookups))}
+            onClick={() => downloadCsv("kpi-batch-template.csv", buildKpiTemplateCsv(lookups, setName))}
           >
             Template
           </Button>

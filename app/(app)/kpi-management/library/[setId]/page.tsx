@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -22,6 +22,7 @@ import {
   Input,
   ActionMenu,
   useConfirm,
+  useToast,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
 import { useBreadcrumbLabel } from "@/components/shell/BreadcrumbLabels";
@@ -53,6 +54,10 @@ import { categoriesForKpiType } from "@/lib/kpi/kpiBatch";
 import { ManageCategoriesModal } from "./ManageCategoriesModal";
 import { BatchAddKpisModal } from "./BatchAddKpisModal";
 import { DraftBadge } from "../DraftBadge";
+import { downloadCsv } from "@/lib/csv";
+import { buildKpiTemplateCsv, type KpiBatchLookups } from "@/lib/kpi/kpiBatch";
+import { buildKpiExportCsv, buildKpiExportFilename } from "@/lib/kpi/kpiExport";
+import { libraryKpisRepo } from "@/lib/data/repositories";
 
 // Keyed on the seeded ids; kpi_type is user-extensible now, so unknown ids fall
 // back to a neutral tone rather than rendering undefined.
@@ -99,6 +104,11 @@ function SetDetail() {
   const [showCreate, setShowCreate] = useState(false);
   const [showBatch, setShowBatch] = useState(false);
   const [showManageCats, setShowManageCats] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const edpexQ = useEdpexCatalog();
+  const { toast } = useToast();
 
   const categories = useMemo(() => categoriesQ.data ?? [], [categoriesQ.data]);
   const kpis = useMemo(() => kpisQ.data ?? [], [kpisQ.data]);
@@ -208,6 +218,36 @@ function SetDetail() {
 
   const set = setQ.data;
 
+  // Same shape Batch Add builds, so the template and the export resolve
+  // labels exactly as an import will.
+  const csvLookups: KpiBatchLookups = useMemo(
+    () => ({ kpiTypes: kpiTypeOptions, categories, committees, edpex: edpexQ.data ?? [] }),
+    [kpiTypeOptions, categories, committees, edpexQ.data],
+  );
+
+  const downloadTemplate = () => {
+    if (!set) return;
+    downloadCsv(
+      `kpi-template-${set.startYear}-${set.endYear}.csv`,
+      buildKpiTemplateCsv(csvLookups, set.name),
+    );
+  };
+
+  // Whole set, whatever the filters show. Fetched fresh with annual targets,
+  // which the cached list does not carry.
+  const exportKpis = async () => {
+    if (!set) return;
+    setExporting(true);
+    try {
+      const withTargets = await libraryKpisRepo.listBySet(setId, { withTargets: true });
+      downloadCsv(buildKpiExportFilename(set), buildKpiExportCsv(withTargets, csvLookups, set));
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not export KPIs", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // No usage pre-check: the API refuses with a 409 when an active record holds
   // recorded progress, and jsonOrThrow surfaces that message in the error
   // toast. Same shape as the sub-KPI delete in MetricEditor.
@@ -259,6 +299,42 @@ function SetDetail() {
             >
               Manage Categories
             </Button>
+            <ActionMenu
+              label="CSV actions"
+              items={[
+                {
+                  icon: "download",
+                  label: "Download template",
+                  disabled: !set,
+                  onSelect: downloadTemplate,
+                },
+                {
+                  icon: "upload_file",
+                  label: "Import CSV…",
+                  onSelect: () => importInputRef.current?.click(),
+                },
+                {
+                  icon: "file_export",
+                  label: exporting ? "Exporting…" : "Export KPIs (CSV)",
+                  disabled: !set || kpis.length === 0 || exporting,
+                  title: kpis.length === 0 ? "This set has no KPIs yet" : undefined,
+                  onSelect: () => void exportKpis(),
+                },
+              ]}
+            />
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = ""; // allow picking the same file again
+                if (!file) return;
+                setImportFile(file);
+                setShowBatch(true);
+              }}
+            />
           </>
         }
       />
@@ -430,6 +506,9 @@ function SetDetail() {
         existingNames={existingNames}
         defaultKpiType={activeKpiType}
         defaultCommitteeId={committeeFilter === "all" ? "" : committeeFilter}
+        setName={set?.name}
+        importFile={importFile}
+        onImportConsumed={() => setImportFile(null)}
       />
 
       <ManageCategoriesModal

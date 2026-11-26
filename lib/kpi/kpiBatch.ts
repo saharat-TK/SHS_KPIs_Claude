@@ -316,6 +316,18 @@ export function kpiBatchRowFromCells(
 /** Template lines starting with this are instructions, skipped on read. */
 export const KPI_TEMPLATE_COMMENT = "#";
 
+/** The template ships a few completed rows to copy from. Their names start
+ *  with this marker, and any row whose name does is skipped on upload and
+ *  paste — so an example left in the file is never created as a KPI. */
+export const KPI_TEMPLATE_EXAMPLE_PREFIX = "[Example]";
+
+export function isKpiTemplateExample(name: string): boolean {
+  return name
+    .trimStart()
+    .toLocaleLowerCase()
+    .startsWith(KPI_TEMPLATE_EXAMPLE_PREFIX.toLocaleLowerCase());
+}
+
 const isCommentLine = (cells: string[]) =>
   (cells[0] ?? "").trimStart().startsWith(KPI_TEMPLATE_COMMENT);
 
@@ -339,7 +351,9 @@ export function parseKpiPaste(
     (cells) => cells.some((c) => c.trim()) && !isCommentLine(cells),
   );
   if (lines.length > 0 && isHeaderCell(lines[0][0])) lines.shift();
-  return lines.map((cells) => kpiBatchRowFromCells(cells, lookups, defaults));
+  return lines
+    .map((cells) => kpiBatchRowFromCells(cells, lookups, defaults))
+    .filter((row) => !isKpiTemplateExample(row.name));
 }
 
 /**
@@ -399,16 +413,53 @@ export function buildKpiTemplateCsv(lookups: KpiBatchLookups, setName?: string):
   note(`    Free text, up to ${EDPEX_INDICATOR_CODE_MAX} characters. When EdPEx Area is filled it must start with that area (7.1ข-…).`);
 
   note();
-  const example = lookups.edpex[0]?.areas[0];
   note(
-    `Example row: My KPI name,${lookups.kpiTypes[0]?.id ?? "strategic"},,` +
-      `${lookups.committees[0]?.id ?? ""},Short description,` +
-      `${example?.topicId ?? ""},${example?.id ?? ""},${example ? `${example.id}-1` : ""}`,
+    `The rows under the header whose Name starts with ${KPI_TEMPLATE_EXAMPLE_PREFIX} are completed examples.`,
   );
+  note("They are skipped on upload, so you can leave them, overwrite them, or delete them.");
   note();
 
   lines.push(toCsv(KPI_BATCH_COLUMNS.map((c) => c.label), []));
+  for (const row of kpiTemplateExampleRows(lookups)) lines.push(toCsv(row, []));
   return UTF8_BOM + lines.join("\n") + "\n";
+}
+
+/**
+ * Completed example rows for the template, in KPI_BATCH_COLUMNS order, built
+ * from the set's own lookups so every value is one the upload accepts. Values
+ * are the readable labels a person would type. One example per KPI type the
+ * set offers (up to three), each with a category from that type's taxonomy.
+ */
+export function kpiTemplateExampleRows(lookups: KpiBatchLookups): string[][] {
+  const descriptions = [
+    "Share of graduates employed within one year of graduation.",
+    "Number of programmes reviewed and improved during the year.",
+    "Number of academic service projects delivered to the community.",
+  ];
+  const names = [
+    "Graduate employment rate",
+    "Programmes improved",
+    "Academic service projects",
+  ];
+  const area = lookups.edpex.find((t) => t.areas.length > 0)?.areas[0];
+
+  return lookups.kpiTypes.slice(0, 3).map((type, i) => {
+    const taxonomy = categoryTaxonomyForKpiType(type.id);
+    const category = lookups.categories.filter((c) => c.kpiType === taxonomy)[0];
+    const committee = lookups.committees[i % Math.max(lookups.committees.length, 1)];
+    // EdPEx is optional: show it filled on the first example, blank after.
+    const withEdpex = i === 0 && area;
+    return [
+      `${KPI_TEMPLATE_EXAMPLE_PREFIX} ${names[i]}`,
+      type.label,
+      category?.label ?? "",
+      committee?.name ?? "",
+      descriptions[i],
+      withEdpex ? area.topicId : "",
+      withEdpex ? area.id : "",
+      withEdpex ? `${area.id}-1` : "",
+    ];
+  });
 }
 
 /** Read a filled-in template. Instruction (#) lines are skipped and columns are
@@ -442,5 +493,5 @@ export function readKpiTemplateCsv(
         defaults,
       ),
     )
-    .filter((row) => !isBlankKpiBatchRow(row));
+    .filter((row) => !isBlankKpiBatchRow(row) && !isKpiTemplateExample(row.name));
 }

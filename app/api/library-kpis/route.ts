@@ -26,7 +26,33 @@ export async function GET(req: NextRequest) {
        FROM library_kpi k WHERE k.set_id = ? ORDER BY k.sort_order, k.id`,
       [setId],
     );
-    return NextResponse.json(rows.map(toLibraryKpiRow));
+    const kpis = rows.map(toLibraryKpiRow);
+
+    // ?include=targets attaches each KPI's annual targets (CSV export). One
+    // query for the whole set rather than one per KPI.
+    if (req.nextUrl.searchParams.get("include") === "targets" && kpis.length > 0) {
+      const [targets] = await pool.query<RowDataPacket[]>(
+        `SELECT t.kpi_id AS kpiId, t.year_no AS yearNo, t.target_value AS targetValue
+           FROM library_kpi_annual_target t
+           JOIN library_kpi k ON k.id = t.kpi_id
+          WHERE k.set_id = ?
+          ORDER BY t.kpi_id, t.year_no`,
+        [setId],
+      );
+      const byKpi = new Map<number, { yearNo: number; targetValue: number | null }[]>();
+      for (const t of targets) {
+        const list = byKpi.get(Number(t.kpiId)) ?? [];
+        list.push({
+          yearNo: Number(t.yearNo),
+          targetValue: t.targetValue == null ? null : Number(t.targetValue),
+        });
+        byKpi.set(Number(t.kpiId), list);
+      }
+      return NextResponse.json(
+        kpis.map((k) => ({ ...k, annualTargets: byKpi.get(Number(k.id)) ?? [] })),
+      );
+    }
+    return NextResponse.json(kpis);
   } catch (err) {
     const authError = actorErrorResponse(err);
     if (authError) return authError;
