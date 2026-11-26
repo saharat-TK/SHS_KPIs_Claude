@@ -267,7 +267,9 @@ export function ActionMenu({
           }
         }}
         className={cn(
-          "grid h-8 w-8 place-items-center rounded text-mute transition-colors",
+          // inline-grid, not grid: a block-level trigger ignores the cell's
+          // text-align, so it would sit at the left of a right-aligned column.
+          "inline-grid h-8 w-8 place-items-center rounded align-middle text-mute transition-colors",
           "hover:bg-surface-soft hover:text-on-surface",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container",
           open && "bg-surface-soft text-on-surface",
