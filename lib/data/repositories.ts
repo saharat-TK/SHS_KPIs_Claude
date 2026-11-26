@@ -504,7 +504,12 @@ export const strategicSetsRepo = {
     ),
   update: async (
     id: number,
-    patch: { name?: string; description?: string; status?: StrategicSetStatus },
+    patch: {
+      name?: string;
+      description?: string;
+      status?: StrategicSetStatus;
+      startYear?: number;
+    },
   ): Promise<StrategicSet> =>
     jsonOrThrow(
       await fetch(`/api/strategic-sets/${id}`, {

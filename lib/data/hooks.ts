@@ -593,7 +593,12 @@ export function useUpdateStrategicSet() {
       patch,
     }: {
       id: number;
-      patch: { name?: string; description?: string; status?: StrategicSetStatus };
+      patch: {
+      name?: string;
+      description?: string;
+      status?: StrategicSetStatus;
+      startYear?: number;
+    };
     }) => strategicSetsRepo.update(id, patch),
     meta: { toast: "Strategic set updated" },
     onSuccess: (_d, { id }) => {

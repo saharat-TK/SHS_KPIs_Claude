@@ -12,7 +12,12 @@ const SELECT_FIELDS = `
   s.start_year AS startYear, s.end_year AS endYear, s.status,
   s.cloned_from_set_id AS clonedFromSetId, s.created_by AS createdBy,
   s.created_at AS createdAt, s.updated_at AS updatedAt,
-  (SELECT COUNT(*) FROM library_kpi k WHERE k.set_id = s.id) AS kpiCount
+  (SELECT COUNT(*) FROM library_kpi k WHERE k.set_id = s.id) AS kpiCount,
+  (SELECT COUNT(*) FROM library_metric m
+     JOIN library_kpi mk ON mk.id = m.kpi_id
+    WHERE mk.set_id = s.id) AS metricCount,
+  (SELECT COUNT(*) FROM performance_record r
+    WHERE r.source_set_id = s.id) AS performanceRecordCount
 `;
 
 export async function GET() {
