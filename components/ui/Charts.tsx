@@ -289,7 +289,7 @@ export function AchievementTrendChart({
       <ResponsiveContainer width="100%" height={height}>
         <AreaChart
           data={data}
-          margin={{ top: 8, right: 12, bottom: 0, left: -14 }}
+          margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
         >
           <defs>
             <pattern
@@ -518,7 +518,7 @@ export function TargetVsActualChart({
       <ResponsiveContainer width="100%" height={height}>
         <ComposedChart
           data={data}
-          margin={{ top: 8, right: 12, bottom: 0, left: -14 }}
+          margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
         >
           <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
           <XAxis

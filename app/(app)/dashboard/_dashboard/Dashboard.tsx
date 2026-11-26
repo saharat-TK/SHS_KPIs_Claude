@@ -138,9 +138,9 @@ export function Dashboard() {
   const currentQuarterAchievement = trend.rows.find((r) => r.quarter === `Q${quarter}`)?.overall;
   const achievementDelta = quarterOverQuarterDelta(trend.rows, quarter);
   const achievementByQuarterCard = (
-    <Card className="animate-fade-up shadow-chrome !border-0">
+    <Card className="flex flex-col animate-fade-up shadow-chrome !border-0">
       <CardHeader title="Achievement by Quarter" />
-      <CardBody className="pt-0">
+      <CardBody className="flex flex-1 flex-col pt-0">
         <div className="mb-md flex flex-wrap items-end gap-sm">
           <span className="text-display-lg font-bold leading-none text-on-surface tabular-nums">
             {typeof currentQuarterAchievement === "number" ? (
@@ -150,14 +150,27 @@ export function Dashboard() {
             )}
           </span>
           {achievementDelta != null && (
-            <span className="inline-flex items-center gap-xs rounded-full bg-on-surface px-sm py-tiny text-caption-sm font-medium">
+            <span
+              className={`inline-flex items-center gap-xs rounded-full px-sm py-tiny text-caption-sm font-medium ${
+                achievementDelta > 0
+                  ? "bg-success/10 text-success"
+                  : achievementDelta < 0
+                    ? "bg-error-container text-on-error-container"
+                    : "bg-surface-container text-mute"
+              }`}
+            >
               <Icon
-                name={achievementDelta >= 0 ? "trending_up" : "trending_down"}
+                name={
+                  achievementDelta > 0
+                    ? "trending_up"
+                    : achievementDelta < 0
+                      ? "trending_down"
+                      : "trending_flat"
+                }
                 size={14}
-                className={achievementDelta >= 0 ? "text-success" : "text-error"}
               />
-              <span className={achievementDelta >= 0 ? "text-success" : "text-error"}>
-                {achievementDelta >= 0 ? "+" : ""}
+              <span>
+                {achievementDelta > 0 ? "+" : ""}
                 {achievementDelta}%
               </span>
             </span>
@@ -170,12 +183,16 @@ export function Dashboard() {
                 : "No prior data to compare"}
           </span>
         </div>
-        <AchievementTrendChart
-          data={trend.rows}
-          xKey="quarter"
-          lines={trend.lines}
-          activeKey={`Q${quarter}`}
-        />
+        {/* mt-auto pins this chart and the Five-Year one to the bottom of their
+            equal-height cards, so their first and last gridlines line up. */}
+        <div className="mt-auto">
+          <AchievementTrendChart
+            data={trend.rows}
+            xKey="quarter"
+            lines={trend.lines}
+            activeKey={`Q${quarter}`}
+          />
+        </div>
       </CardBody>
     </Card>
   );
@@ -206,13 +223,15 @@ export function Dashboard() {
   );
 
   const fiveYearTrajectoryCard = (
-    <Card className="animate-fade-up shadow-chrome !border-0 [animation-delay:60ms]">
+    <Card className="flex flex-col animate-fade-up shadow-chrome !border-0 [animation-delay:60ms]">
       <CardHeader
         title="Five-Year Trajectory"
         subtitle={`Achievement at Q${quarter} of each year, against the 100% target line`}
       />
-      <CardBody className="pt-0">
-        <TargetVsActualChart data={byYear} />
+      <CardBody className="flex flex-1 flex-col pt-0">
+        <div className="mt-auto">
+          <TargetVsActualChart data={byYear} />
+        </div>
       </CardBody>
     </Card>
   );

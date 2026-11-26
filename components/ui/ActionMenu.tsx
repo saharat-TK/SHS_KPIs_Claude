@@ -13,7 +13,8 @@ const MIN_WIDTH_PX = 180;
 
 export interface ActionMenuItem {
   label: string;
-  onSelect: () => void;
+  /** Not used by a group row (one with `submenu`) — it expands instead. */
+  onSelect?: () => void;
   /** Material symbol name, rendered leading. */
   icon?: string;
   /** "danger" paints the row red — for destructive actions. */
@@ -21,6 +22,22 @@ export interface ActionMenuItem {
   disabled?: boolean;
   /** Tooltip, e.g. the reason an item is disabled. */
   title?: string;
+  /** Makes this row a group header: choosing it expands these items in place
+   *  without closing the menu. One level only. */
+  submenu?: ActionMenuItem[];
+  /** Marks the current choice with a check mark — pair with `disabled` to make
+   *  it inert, as for "the status it already has". */
+  selected?: boolean;
+  /** Draws a divider above this row. */
+  separatorBefore?: boolean;
+}
+
+/** One rendered row: a top-level item, or an item of the expanded group. */
+interface Row {
+  item: ActionMenuItem;
+  key: string;
+  /** Label of the group this row belongs to; absent for top-level rows. */
+  parent?: string;
 }
 
 /**
@@ -52,12 +69,28 @@ export function ActionMenu({
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const [highlighted, setHighlighted] = useState(0);
+  // Label of the group currently expanded, if any.
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
-  const enabledIndexes = items.flatMap((item, i) => (item.disabled ? [] : [i]));
+  // What is actually on screen: every top-level item, plus the expanded group's
+  // items right after their header. Highlight and arrow keys index into this.
+  const rows: Row[] = items.flatMap((item) => {
+    const own: Row = { item, key: item.label };
+    if (!item.submenu || expanded !== item.label) return [own];
+    return [
+      own,
+      ...item.submenu.map((sub) => ({
+        item: sub,
+        key: `${item.label}/${sub.label}`,
+        parent: item.label,
+      })),
+    ];
+  });
+  const enabledIndexes = rows.flatMap((row, i) => (row.item.disabled ? [] : [i]));
 
   const close = useCallback((restoreFocus = true) => {
     setOpen(false);
@@ -72,7 +105,9 @@ export function ActionMenu({
     }
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const height = items.length * ITEM_HEIGHT_PX + PANEL_PADDING_PX;
+    // The panel is already in the DOM (hidden) when this runs, so use its real
+    // height — expanding a group changes it. The estimate covers the first pass.
+    const height = panelRef.current?.offsetHeight || rows.length * ITEM_HEIGHT_PX + PANEL_PADDING_PX;
     const width = Math.max(MIN_WIDTH_PX, panelRef.current?.offsetWidth ?? MIN_WIDTH_PX);
     // Flip above the trigger when the panel would run off the bottom.
     const below = rect.bottom + GAP_PX;
@@ -82,10 +117,13 @@ export function ActionMenu({
       top: Math.max(GAP_PX, top),
       left: Math.max(GAP_PX, Math.min(left, window.innerWidth - width - GAP_PX)),
     });
-  }, [open, items.length, align]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, rows.length, align]);
 
-  // Start the highlight on the first item that can actually be chosen.
+  // Start the highlight on the first item that can actually be chosen, and
+  // always reopen with every group collapsed.
   useEffect(() => {
+    if (!open) setExpanded(null);
     if (open) setHighlighted(enabledIndexes[0] ?? 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -139,10 +177,15 @@ export function ActionMenu({
 
   const choose = (item: ActionMenuItem) => {
     if (item.disabled) return;
+    // A group header only expands or collapses — the menu stays open.
+    if (item.submenu) {
+      setExpanded((current) => (current === item.label ? null : item.label));
+      return;
+    }
     // Close first: onSelect often navigates or opens a dialog, and the menu
     // should not still be sitting there underneath it.
     close(false);
-    item.onSelect();
+    item.onSelect?.();
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -171,10 +214,32 @@ export function ActionMenu({
         e.preventDefault();
         setHighlighted(enabledIndexes[enabledIndexes.length - 1] ?? 0);
         break;
+      case "ArrowRight": {
+        const row = rows[highlighted];
+        if (row?.item.submenu && !row.item.disabled) {
+          e.preventDefault();
+          setExpanded(row.item.label);
+        }
+        break;
+      }
+      case "ArrowLeft": {
+        const row = rows[highlighted];
+        if (!row) break;
+        if (row.parent) {
+          // Inside a group: collapse it and land back on its header.
+          e.preventDefault();
+          setHighlighted(rows.findIndex((r) => r.key === row.parent));
+          setExpanded(null);
+        } else if (row.item.submenu && expanded === row.item.label) {
+          e.preventDefault();
+          setExpanded(null);
+        }
+        break;
+      }
       case "Enter":
       case " ":
         e.preventDefault();
-        if (items[highlighted]) choose(items[highlighted]);
+        if (rows[highlighted]) choose(rows[highlighted].item);
         break;
       case "Tab":
         close(false);
@@ -233,35 +298,55 @@ export function ActionMenu({
               "focus:outline-none",
             )}
           >
-            {items.map((item, i) => (
-              <button
-                key={item.label}
-                type="button"
-                role="menuitem"
-                disabled={item.disabled}
-                title={item.title}
-                tabIndex={-1}
-                onMouseEnter={() => !item.disabled && setHighlighted(i)}
-                // onMouseDown fires before the document mousedown listener
-                // resolves focus, which keeps the close and the select from
-                // racing — the same rule Combobox's rows follow.
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  choose(item);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-sm px-md py-sm text-left text-body-sm transition-colors",
-                  "disabled:cursor-not-allowed disabled:opacity-40",
-                  item.tone === "danger" ? "text-error" : "text-on-surface",
-                  !item.disabled &&
-                    highlighted === i &&
-                    (item.tone === "danger" ? "bg-error/10" : "bg-surface-soft"),
-                )}
-              >
-                {item.icon && <Icon name={item.icon} size={18} />}
-                {item.label}
-              </button>
-            ))}
+            {rows.map(({ item, key, parent }, i) => {
+              const isGroup = !!item.submenu;
+              const isFirstOfGroup = !!parent && rows[i - 1]?.key === parent;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role={item.selected !== undefined ? "menuitemradio" : "menuitem"}
+                  aria-checked={item.selected !== undefined ? item.selected : undefined}
+                  aria-expanded={isGroup ? expanded === item.label : undefined}
+                  disabled={item.disabled}
+                  title={item.title}
+                  tabIndex={-1}
+                  onMouseEnter={() => !item.disabled && setHighlighted(i)}
+                  // onMouseDown fires before the document mousedown listener
+                  // resolves focus, which keeps the close and the select from
+                  // racing — the same rule Combobox's rows follow.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    choose(item);
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-sm px-md py-sm text-left text-body-sm transition-colors",
+                    // A selected row is the current value, not an action: the
+                    // caller disables it, but it should read as plain muted text
+                    // rather than a greyed-out, forbidden control.
+                    item.selected
+                      ? "disabled:cursor-default disabled:text-mute"
+                      : "disabled:cursor-not-allowed disabled:opacity-40",
+                    item.tone === "danger" ? "text-error" : "text-on-surface",
+                    item.separatorBefore && i > 0 && "border-t border-hairline",
+                    parent && "bg-surface-soft pl-lg",
+                    isFirstOfGroup && "border-t border-hairline",
+                    !item.disabled &&
+                      highlighted === i &&
+                      (item.tone === "danger"
+                        ? "bg-error/10"
+                        : parent
+                          ? "bg-surface-container-high"
+                          : "bg-surface-soft"),
+                  )}
+                >
+                  {item.icon && <Icon name={item.icon} size={18} />}
+                  <span className="flex-1 truncate">{item.label}</span>
+                  {isGroup && <Icon name={expanded === item.label ? "expand_less" : "expand_more"} size={18} />}
+                  {item.selected && <Icon name="check" size={18} />}
+                </button>
+              );
+            })}
           </div>,
           document.body,
         )}

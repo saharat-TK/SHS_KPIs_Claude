@@ -37,19 +37,27 @@ function FullTile({
       title={status.name}
       className={cn(
         "animate-fade-up rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-        row && "w-[calc(50%-0.1875rem)] sm:w-[176px] lg:h-[256px]",
+        row && "h-[256px] w-[calc(50%-0.1875rem)] sm:w-[176px]",
       )}
       style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
     >
       <Card className="flex h-full flex-col gap-xs p-md !border-0 shadow-md transition-shadow hover:shadow-lg">
         <span className="text-utility-xs uppercase text-mute">K{index + 1}</span>
-        <span className={cn(row ? "line-clamp-5 text-[16px] leading-tight" : "line-clamp-2 text-caption-sm", "text-on-surface")}>
+        <span
+          className={cn(
+            row
+              ? // Reserve all five lines so ผล/เป้า start at the same height on every tile.
+                "line-clamp-5 min-h-[6.25em] text-[16px] leading-tight"
+              : "line-clamp-2 text-caption-sm",
+            "text-on-surface",
+          )}
+        >
           {status.name}
         </span>
         {row ? (
           <>
             <div
-              className="flex flex-col gap-tiny pt-xs text-utility-xs tabular-nums text-[#424242] lg:min-h-0 lg:flex-1 lg:justify-center"
+              className="mt-auto flex flex-col gap-tiny pt-xs text-utility-xs tabular-nums text-[#424242]"
               title={`Recorded ${fmt(status.value)} against a Q target of ${fmt(status.quarterTarget)}${status.unit ? ` ${status.unit}` : ""}`}
             >
               <span>
