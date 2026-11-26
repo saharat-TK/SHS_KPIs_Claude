@@ -62,3 +62,27 @@ export function describeSetDeletion(
 export function deletionConfirmed(typed: string, name: string): boolean {
   return typed.trim() === name.trim() && name.trim().length > 0;
 }
+
+// ── Cloning a new set from an existing one ─────────────────────────────────
+
+/** How a new set is seeded: default categories, a source's categories, or a
+ *  full copy of the source (categories, KPIs, sub-KPIs and targets). */
+export type CloneMode = "empty" | "categories" | "all";
+
+/** What the user types to confirm a clone. Matched case-insensitively. */
+export const CLONE_CONFIRM_PHRASE = "Confirm clone";
+
+export function cloneConfirmed(typed: string): boolean {
+  return typed.trim().toLowerCase() === CLONE_CONFIRM_PHRASE.toLowerCase();
+}
+
+/** Summary shown above the confirmation field. */
+export function describeClone(mode: CloneMode, sourceName: string): string {
+  if (mode === "categories") {
+    return `Copies the categories of "${sourceName}". Its KPIs, sub-KPIs and targets are not copied.`;
+  }
+  if (mode === "all") {
+    return `Copies every category, KPI, sub-KPI and annual target of "${sourceName}".`;
+  }
+  return "Starts with the default categories and no KPIs.";
+}

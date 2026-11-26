@@ -574,12 +574,20 @@ export function useCreateStrategicSet() {
       description?: string;
       startYear: number;
       cloneFromSetId?: number;
+      cloneMode?: "categories" | "all";
     }) => strategicSetsRepo.create(input),
     meta: {
-      toast: (d, v) =>
-        (v as { cloneFromSetId?: number }).cloneFromSetId
-          ? `Set "${(d as StrategicSet).name}" cloned`
-          : `Set "${(d as StrategicSet).name}" created`,
+      toast: (d, v) => {
+        const { cloneFromSetId, cloneMode } = v as {
+          cloneFromSetId?: number;
+          cloneMode?: "categories" | "all";
+        };
+        const name = (d as StrategicSet).name;
+        if (!cloneFromSetId) return `Set "${name}" created`;
+        return cloneMode === "categories"
+          ? `Set "${name}" cloned (categories only)`
+          : `Set "${name}" cloned`;
+      },
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.strategicSets }),
   });
