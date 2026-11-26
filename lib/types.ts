@@ -341,6 +341,9 @@ export interface StrategicSet {
   createdAt: string;
   updatedAt: string;
   kpiCount?: number; // populated in list views
+  metricCount?: number; // sub-KPIs across the set's KPIs
+  /** Performance records activated from this set (any status). */
+  performanceRecordCount?: number;
 }
 
 /** How a KPI's quarterly target is derived from its annual target.

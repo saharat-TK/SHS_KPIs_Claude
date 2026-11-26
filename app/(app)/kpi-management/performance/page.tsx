@@ -17,6 +17,8 @@ import {
   Field,
   Input,
   Select,
+  ActionMenu,
+  type ActionMenuItem,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -28,7 +30,6 @@ import {
   useStrategicSets,
   useUpdatePerformanceRecord,
 } from "@/lib/data/hooks";
-import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/utils";
 import type {
   PerformancePeriod,
@@ -42,6 +43,34 @@ const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> 
   inactive: "neutral",
   completed: "warning",
 };
+
+const RECORD_STATUSES: PerformanceStatus[] = ["active", "inactive", "completed"];
+
+function recordMenuItems(
+  record: PerformanceRecord,
+  isAdmin: boolean,
+  on: {
+    onOpen: () => void;
+    onPeriods: () => void;
+    onSetStatus: (status: PerformanceStatus) => void;
+  },
+): ActionMenuItem[] {
+  const items: ActionMenuItem[] = [
+    { icon: "open_in_new", label: "Open record", onSelect: on.onOpen },
+  ];
+  if (!isAdmin) return items;
+  items.push({ icon: "event_available", label: "Recording periods", onSelect: on.onPeriods });
+  for (const status of RECORD_STATUSES) {
+    items.push({
+      icon: status === record.status ? "check" : "change_circle",
+      label: `Mark as ${status}`,
+      disabled: status === record.status,
+      title: status === record.status ? "Current status" : undefined,
+      onSelect: () => on.onSetStatus(status),
+    });
+  }
+  return items;
+}
 
 export default function PerformancePage() {
   return (
@@ -132,13 +161,16 @@ function Performance() {
                     <Td align="center" className="text-mute">
                       {r.activatedAt ? formatDate(r.activatedAt) : "—"}
                     </Td>
-                    <Td align="right">
-                      <RecordActions
-                        record={r}
-                        isAdmin={isAdmin}
-                        onOpen={() => router.push(`/kpi-management/performance/${r.id}`)}
-                        onPeriods={() => setPeriodRecord(r)}
-                        onSetStatus={(status) => setStatusChange({ record: r, status })}
+                    {/* The whole cell stops propagation so the row's own
+                        navigate-on-click can't fire behind the menu. */}
+                    <Td align="right" onClick={(e) => e.stopPropagation()}>
+                      <ActionMenu
+                        label={`Actions for ${r.name}`}
+                        items={recordMenuItems(r, isAdmin, {
+                          onOpen: () => router.push(`/kpi-management/performance/${r.id}`),
+                          onPeriods: () => setPeriodRecord(r),
+                          onSetStatus: (status) => setStatusChange({ record: r, status }),
+                        })}
                       />
                     </Td>
                   </Tr>
@@ -186,127 +218,6 @@ function Performance() {
         />
       )}
     </>
-  );
-}
-
-function RecordActions({
-  record,
-  isAdmin,
-  onOpen,
-  onPeriods,
-  onSetStatus,
-}: {
-  record: PerformanceRecord;
-  isAdmin: boolean;
-  onOpen: () => void;
-  onPeriods: () => void;
-  onSetStatus: (status: PerformanceStatus) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [statusOpen, setStatusOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
-
-  const toggleMenu = () => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    // Reserve space for the expanded status choices so the fixed menu opens
-    // upward when it would otherwise run beyond the viewport.
-    const menuHeight = isAdmin ? 250 : 48;
-    const gap = 4;
-    const top =
-      rect.bottom + gap + menuHeight > window.innerHeight
-        ? Math.max(gap, rect.top - menuHeight - gap)
-        : rect.bottom + gap;
-    setMenuPosition({ top, right: window.innerWidth - rect.right });
-    setOpen((wasOpen) => {
-      if (wasOpen) setStatusOpen(false);
-      return !wasOpen;
-    });
-  };
-
-  return (
-    <div className="relative inline-flex" onClick={(e) => e.stopPropagation()}>
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={`Actions for ${record.name}`}
-        title="Actions"
-        className="rounded p-xs text-mute hover:bg-surface-soft hover:text-on-surface"
-        onClick={toggleMenu}
-      >
-        <Icon name="more_vert" size={20} />
-      </button>
-      {open && menuPosition && (
-        <div
-          className="fixed z-[200] min-w-[180px] overflow-hidden rounded border border-hairline bg-surface-lowest shadow-chrome"
-          style={{ top: menuPosition.top, right: menuPosition.right }}
-        >
-          <button
-            type="button"
-            className="flex w-full items-center gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
-            onClick={() => {
-              setOpen(false);
-              setStatusOpen(false);
-              onOpen();
-            }}
-          >
-            <Icon name="open_in_new" size={18} />
-            Open record
-          </button>
-          {isAdmin && (
-            <button
-              type="button"
-              className="flex w-full items-center gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
-              onClick={() => {
-              setOpen(false);
-              setStatusOpen(false);
-              onPeriods();
-              }}
-            >
-              <Icon name="event_available" size={18} />
-              Recording periods
-            </button>
-          )}
-          {isAdmin && (
-            <div className="border-t border-hairline">
-              <button
-                type="button"
-                aria-expanded={statusOpen}
-                className="flex w-full items-center justify-between gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
-                onClick={() => setStatusOpen((value) => !value)}
-              >
-                <span className="inline-flex items-center gap-sm">
-                  <Icon name="change_circle" size={18} />
-                  Set status
-                </span>
-                <Icon name={statusOpen ? "expand_less" : "expand_more"} size={18} />
-              </button>
-              {statusOpen && (
-                <div className="border-t border-hairline bg-surface-soft py-xs">
-                  {(["active", "inactive", "completed"] as const).map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      disabled={status === record.status}
-                      className="flex w-full items-center justify-between gap-sm px-lg py-sm text-left text-body-sm hover:bg-surface-container-high disabled:cursor-default disabled:text-mute"
-                      onClick={() => {
-                        setOpen(false);
-                        setStatusOpen(false);
-                        onSetStatus(status);
-                      }}
-                    >
-                      <span className="capitalize">{status}</span>
-                      {status === record.status && <Icon name="check" size={18} />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PageHeader,
@@ -17,16 +17,24 @@ import {
   Field,
   Input,
   Select,
+  ActionMenu,
+  type ActionMenuItem,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
 import {
   useStrategicSets,
   useCreateStrategicSet,
   useUpdateStrategicSet,
+  useDeleteStrategicSet,
 } from "@/lib/data/hooks";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { currentBEYear } from "@/lib/kpi/cellFormats";
-import { Icon } from "@/components/ui/Icon";
+import {
+  deleteBlockReason,
+  deletionConfirmed,
+  describeSetDeletion,
+  startYearLockReason,
+} from "@/lib/kpi/setRules";
 import type { StrategicSet, StrategicSetStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<StrategicSetStatus, "neutral" | "success" | "warning"> = {
@@ -34,6 +42,39 @@ const STATUS_TONE: Record<StrategicSetStatus, "neutral" | "success" | "warning">
   active: "success",
   archived: "warning",
 };
+
+const SET_STATUSES: StrategicSetStatus[] = ["draft", "active", "archived"];
+
+function setMenuItems(
+  set: StrategicSet,
+  on: {
+    onOpen: () => void;
+    onConfigure: () => void;
+    onSetStatus: (status: StrategicSetStatus) => void;
+    onDelete: () => void;
+  },
+): ActionMenuItem[] {
+  const blockReason = deleteBlockReason(set);
+  return [
+    { icon: "open_in_new", label: "Open set", onSelect: on.onOpen },
+    { icon: "tune", label: "Configure set", onSelect: on.onConfigure },
+    ...SET_STATUSES.map((status) => ({
+      icon: status === set.status ? "check" : "change_circle",
+      label: `Mark as ${status}`,
+      disabled: status === set.status,
+      title: status === set.status ? "Current status" : undefined,
+      onSelect: () => on.onSetStatus(status),
+    })),
+    {
+      icon: "delete",
+      label: "Delete set",
+      tone: "danger" as const,
+      disabled: blockReason !== null,
+      title: blockReason ?? undefined,
+      onSelect: on.onDelete,
+    },
+  ];
+}
 
 export default function LibraryPage() {
   return (
@@ -48,6 +89,9 @@ function Library() {
   const setsQ = useStrategicSets();
   const create = useCreateStrategicSet();
   const updateSet = useUpdateStrategicSet();
+  const deleteSet = useDeleteStrategicSet();
+  const [configureTarget, setConfigureTarget] = useState<StrategicSet | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StrategicSet | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [statusChange, setStatusChange] = useState<{
     set: StrategicSet;
@@ -110,11 +154,17 @@ function Library() {
                       <Badge tone={STATUS_TONE[s.status]}>{s.status}</Badge>
                     </Td>
                     <Td align="center">{s.kpiCount ?? 0}</Td>
-                    <Td align="right">
-                      <SetActions
-                        set={s}
-                        onOpen={() => router.push(`/kpi-management/library/${s.id}`)}
-                        onSetStatus={(status) => setStatusChange({ set: s, status })}
+                    {/* The whole cell stops propagation so the row's own
+                        navigate-on-click can't fire behind the menu. */}
+                    <Td align="right" onClick={(e) => e.stopPropagation()}>
+                      <ActionMenu
+                        label={`Actions for ${s.name}`}
+                        items={setMenuItems(s, {
+                          onOpen: () => router.push(`/kpi-management/library/${s.id}`),
+                          onConfigure: () => setConfigureTarget(s),
+                          onSetStatus: (status) => setStatusChange({ set: s, status }),
+                          onDelete: () => setDeleteTarget(s),
+                        })}
                       />
                     </Td>
                   </Tr>
@@ -140,6 +190,33 @@ function Library() {
         }
       />
 
+      {configureTarget && (
+        <ConfigureSetModal
+          set={configureTarget}
+          submitting={updateSet.isPending}
+          onClose={() => setConfigureTarget(null)}
+          onSave={(patch) =>
+            updateSet.mutate(
+              { id: configureTarget.id, patch },
+              { onSuccess: () => setConfigureTarget(null) },
+            )
+          }
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteSetConfirmModal
+          set={deleteTarget}
+          submitting={deleteSet.isPending}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() =>
+            deleteSet.mutate(deleteTarget.id, {
+              onSuccess: () => setDeleteTarget(null),
+            })
+          }
+        />
+      )}
+
       {statusChange && (
         <SetStatusConfirmModal
           set={statusChange.set}
@@ -158,102 +235,136 @@ function Library() {
   );
 }
 
-function SetActions({
+function ConfigureSetModal({
   set,
-  onOpen,
-  onSetStatus,
+  submitting,
+  onClose,
+  onSave,
 }: {
   set: StrategicSet;
-  onOpen: () => void;
-  onSetStatus: (status: StrategicSetStatus) => void;
+  submitting: boolean;
+  onClose: () => void;
+  onSave: (patch: { name?: string; description?: string; startYear?: number }) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [statusOpen, setStatusOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
-
-  const toggleMenu = () => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const menuHeight = 210;
-    const gap = 4;
-    const top =
-      rect.bottom + gap + menuHeight > window.innerHeight
-        ? Math.max(gap, rect.top - menuHeight - gap)
-        : rect.bottom + gap;
-    setMenuPosition({ top, right: window.innerWidth - rect.right });
-    setOpen((wasOpen) => {
-      if (wasOpen) setStatusOpen(false);
-      return !wasOpen;
-    });
-  };
+  const [name, setName] = useState(set.name);
+  const [description, setDescription] = useState(set.description ?? "");
+  const [startYear, setStartYear] = useState(set.startYear);
+  const lockReason = startYearLockReason(set);
+  const validYear = Number.isInteger(startYear) && startYear >= 2400 && startYear <= 2700;
+  const changed =
+    name.trim() !== set.name ||
+    description.trim() !== (set.description ?? "") ||
+    startYear !== set.startYear;
+  const valid = name.trim().length > 1 && validYear;
 
   return (
-    <div className="relative inline-flex" onClick={(event) => event.stopPropagation()}>
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={`Actions for ${set.name}`}
-        title="Actions"
-        className="rounded p-xs text-mute hover:bg-surface-soft hover:text-on-surface"
-        onClick={toggleMenu}
-      >
-        <Icon name="more_vert" size={20} />
-      </button>
-      {open && menuPosition && (
-        <div
-          className="fixed z-[200] min-w-[180px] overflow-hidden rounded border border-hairline bg-surface-lowest shadow-chrome"
-          style={{ top: menuPosition.top, right: menuPosition.right }}
-        >
-          <button
-            type="button"
-            className="flex w-full items-center gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
-            onClick={() => {
-              setOpen(false);
-              setStatusOpen(false);
-              onOpen();
-            }}
+    <Modal
+      open
+      onClose={onClose}
+      title="Configure set"
+      subtitle={set.name}
+      footer={
+        <>
+          <Button variant="ghost" disabled={submitting} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!valid || !changed || submitting}
+            onClick={() =>
+              onSave({
+                name: name.trim(),
+                description: description.trim(),
+                ...(startYear !== set.startYear ? { startYear } : {}),
+              })
+            }
           >
-            <Icon name="open_in_new" size={18} />
-            Open set
-          </button>
-          <div className="border-t border-hairline">
-            <button
-              type="button"
-              aria-expanded={statusOpen}
-              className="flex w-full items-center justify-between gap-sm px-md py-sm text-left text-body-sm hover:bg-surface-soft"
-              onClick={() => setStatusOpen((value) => !value)}
-            >
-              <span className="inline-flex items-center gap-sm">
-                <Icon name="change_circle" size={18} />
-                Set status
-              </span>
-              <Icon name={statusOpen ? "expand_less" : "expand_more"} size={18} />
-            </button>
-            {statusOpen && (
-              <div className="border-t border-hairline bg-surface-soft py-xs">
-                {(["draft", "active", "archived"] as const).map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    disabled={status === set.status}
-                    className="flex w-full items-center justify-between gap-sm px-lg py-sm text-left text-body-sm hover:bg-surface-container-high disabled:cursor-default disabled:text-mute"
-                    onClick={() => {
-                      setOpen(false);
-                      setStatusOpen(false);
-                      onSetStatus(status);
-                    }}
-                  >
-                    <span className="capitalize">{status}</span>
-                    {status === set.status && <Icon name="check" size={18} />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+            {submitting ? "Saving…" : "Save changes"}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-lg">
+        <Field label="Set Name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Description" hint="Optional">
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+        </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
+          <Field
+            label="Start Year (B.E.)"
+            hint={lockReason ? `Locked — ${lockReason.toLowerCase()}` : "Only while draft and not yet activated"}
+          >
+            <Input
+              type="number"
+              min={2400}
+              max={2700}
+              value={startYear}
+              disabled={lockReason !== null}
+              onChange={(e) => setStartYear(Number(e.target.value))}
+            />
+          </Field>
+          <Field label="End Year" hint="Auto-calculated (start + 4)">
+            <Input value={String(startYear + 4)} readOnly disabled />
+          </Field>
         </div>
-      )}
-    </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DeleteSetConfirmModal({
+  set,
+  submitting,
+  onClose,
+  onConfirm,
+}: {
+  set: StrategicSet;
+  submitting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const confirmed = deletionConfirmed(typed, set.name);
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Delete strategic set"
+      subtitle={set.name}
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" disabled={submitting} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            icon="delete"
+            className="disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-mute disabled:shadow-none"
+            disabled={!confirmed || submitting}
+            onClick={onConfirm}
+          >
+            {submitting ? "Deleting…" : "Delete set"}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-lg">
+        <p className="text-body-sm text-mute">
+          {describeSetDeletion(set.name, set.kpiCount ?? 0, set.metricCount ?? 0)}
+        </p>
+        <Field label="Type the set name to confirm">
+          <Input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={set.name}
+            autoFocus
+          />
+        </Field>
+      </div>
+    </Modal>
   );
 }
 
