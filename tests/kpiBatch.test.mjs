@@ -3,6 +3,9 @@ import test from "node:test";
 import {
   buildKpiTemplateCsv,
   checkKpiBatch,
+  isKpiTemplateExample,
+  kpiBatchRowFromCells,
+  kpiTemplateExampleRows,
   emptyKpiBatchRow,
   kpiBatchRowError,
   normalizeKpiBatchRow,
@@ -260,17 +263,20 @@ test("the template explains every column and lists the allowed values", () => {
     "Topic 7.2:",
     "7.2ก = ผลลัพธ์ด้านการมุ่งเน้นผู้เรียนและลูกค้ากลุ่มอื่น",
     "EdPEx Indicator — optional",
-    "Example row: My KPI name,strategic,,C01,Short description,7.1,7.1ก,7.1ก-1",
+    "Name starts with [Example] are completed examples",
+    "They are skipped on upload",
   ]) {
     assert.ok(template.includes(expected), `template should mention ${expected}`);
   }
-  // Every non-header line is an instruction, so the file reads back empty…
+  // Instructions, then the header, then only [Example] rows — so the file
+  // reads back empty…
   const lines = template.replace(/^\uFEFF/, "").trimEnd().split("\n");
-  assert.equal(
-    lines.at(-1),
+  const headerAt = lines.indexOf(
     "Name,Type,Category,Committee,Description,EdPEx Topic,EdPEx Area,EdPEx Indicator",
   );
-  assert.ok(lines.slice(0, -1).every((l) => l.startsWith("#") || l.startsWith('"#')));
+  assert.ok(headerAt > 0);
+  assert.ok(lines.slice(0, headerAt).every((l) => l.startsWith("#") || l.startsWith('"#')));
+  assert.ok(lines.slice(headerAt + 1).every((l) => l.startsWith("[Example]")));
   assert.deepEqual(readKpiTemplateCsv(template, LOOKUPS), []);
 
   // …and fills in as downloaded.
@@ -348,4 +354,36 @@ test("the indicator code is the last pasted / CSV column, and older files still 
   const [old] = readKpiTemplateCsv(preIndicator, LOOKUPS);
   assert.equal(old.edpexAreaId, "7.1ก");
   assert.equal(old.edpexIndicatorCode, "");
+});
+
+test("the template carries completed example rows that are valid but never imported", () => {
+  const examples = kpiTemplateExampleRows(LOOKUPS);
+  assert.equal(examples.length, 3);
+  assert.deepEqual(
+    examples.map((r) => r[1]),
+    ["Strategic", "Operational", "Routine"],
+  );
+  // Each example's category belongs to its own type's taxonomy.
+  assert.equal(examples[0][2], "Student Success");
+  assert.equal(examples[2][2], "ด้านที่ 1-การผลิตบัณฑิต");
+  // The first shows the optional EdPEx columns filled in.
+  assert.deepEqual(examples[0].slice(5), ["7.1", "7.1ก", "7.1ก-1"]);
+
+  // Read as ordinary cells, every example is a row with no error…
+  for (const cells of examples) {
+    const row = kpiBatchRowFromCells(
+      [cells[0].replace("[Example] ", ""), ...cells.slice(1)],
+      LOOKUPS,
+    );
+    assert.equal(kpiBatchRowError(row, LOOKUPS), null, cells[0]);
+  }
+
+  // …but the marker keeps them out of an upload and a paste.
+  const template = buildKpiTemplateCsv(LOOKUPS);
+  assert.deepEqual(readKpiTemplateCsv(template, LOOKUPS), []);
+  const kept = readKpiTemplateCsv(template + "Real KPI,Strategic\n", LOOKUPS);
+  assert.deepEqual(kept.map((r) => r.name), ["Real KPI"]);
+  assert.deepEqual(parseKpiPaste(examples.map((r) => r.join("\t")).join("\n"), LOOKUPS), []);
+  assert.equal(isKpiTemplateExample("  [example] lower case"), true);
+  assert.equal(isKpiTemplateExample("Example without brackets"), false);
 });
