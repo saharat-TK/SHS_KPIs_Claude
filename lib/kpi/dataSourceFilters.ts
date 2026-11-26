@@ -17,6 +17,7 @@ import {
   parseStoredDate,
   parseYearBE,
 } from "./cellFormats.ts";
+import { englishT, type Translator } from "../i18n/dictionaries.ts";
 
 // Which rows of a data source count toward a KPI, and how they become a number.
 //
@@ -689,6 +690,7 @@ export function describeFilter(
   filter: DataSourceFilter,
   columns: FilterColumnSpec[],
   labels?: Record<string, string>,
+  t: Translator = englishT,
 ): string {
   const column = columns.find((c) => c.colKey === filter.field);
   // Stored dates are CE; people read the Buddhist era.
@@ -699,18 +701,31 @@ export function describeFilter(
   };
 
   if (filter.field === PERIOD_FIELD) {
-    return `Period is ${show(filter.value)} → ${show(filter.valueTo)}`;
+    return t("dataSources.describe.periodIs", {
+      from: show(filter.value),
+      to: show(filter.valueTo),
+    });
   }
   const name = column?.label ?? filter.field;
-  const op = OPERATOR_LABELS[filter.operator] ?? filter.operator;
 
   if (filter.operator === "between") {
-    return `${name} ${op} ${show(filter.value)} → ${show(filter.valueTo)}`;
+    return t("dataSources.describe.between", {
+      name,
+      from: show(filter.value),
+      to: show(filter.valueTo),
+    });
   }
   if (filter.operator === "in") {
-    return `${name} ${op} ${(filter.values ?? []).map(show).join(", ")}`;
+    return t("dataSources.describe.anyOf", {
+      name,
+      values: (filter.values ?? []).map(show).join(", "),
+    });
   }
-  return `${name} ${op} ${show(filter.value)}`;
+  if (filter.operator === "eq" || filter.operator === "gte" || filter.operator === "lte") {
+    return t(`dataSources.describe.${filter.operator}`, { name, value: show(filter.value) });
+  }
+  // An operator this build does not know: show it as stored rather than hide it.
+  return `${name} ${OPERATOR_LABELS[filter.operator] ?? filter.operator} ${show(filter.value)}`;
 }
 
 /** Human summary of a whole mapping, for the Linked KPIs table. */
@@ -718,24 +733,33 @@ export function describeMapping(
   mapping: DataSourceLinkMapping,
   columns: FilterColumnSpec[],
   labels?: Record<string, string>,
+  t: Translator = englishT,
 ): string {
   const labelOf = (key: string | null | undefined) =>
     columns.find((c) => c.colKey === key)?.label ?? key ?? "";
   const list = (fs: DataSourceFilter[]) =>
-    fs.map((f) => describeFilter(f, columns, labels)).join(" and ");
+    fs.map((f) => describeFilter(f, columns, labels, t)).join(t("dataSources.describe.joinAnd"));
+  const agg = t(`dataSources.aggregation.${mapping.aggregation}`);
   // No column to name → the kind is measuring rows themselves. Two columns name
   // both sides, or the fraction would read as one column's share of itself.
   const head = mapping.distinctColumnKey
-    ? `${AGGREGATION_LABELS[mapping.aggregation]} distinct ${labelOf(mapping.distinctColumnKey)}`
+    ? t("dataSources.describe.headDistinct", { agg, column: labelOf(mapping.distinctColumnKey) })
     : mapping.numeratorColumnKey
-    ? `${AGGREGATION_LABELS[mapping.aggregation]} ${labelOf(mapping.numeratorColumnKey)} out of ${labelOf(mapping.columnKey)}`
+    ? t("dataSources.describe.headOutOf", {
+        agg,
+        numerator: labelOf(mapping.numeratorColumnKey),
+        column: labelOf(mapping.columnKey),
+      })
     : mapping.columnKey
-      ? `${AGGREGATION_LABELS[mapping.aggregation]} ${labelOf(mapping.columnKey)}`
+      ? t("dataSources.describe.headColumn", { agg, column: labelOf(mapping.columnKey) })
       : mapping.aggregation === "count"
-        ? AGGREGATION_LABELS.count
-        : `${AGGREGATION_LABELS[mapping.aggregation]} rows`;
+        ? agg
+        : t("dataSources.describe.headRows", { agg });
 
-  const scoped = mapping.filters.length === 0 ? head : `${head} where ${list(mapping.filters)}`;
+  const scoped =
+    mapping.filters.length === 0
+      ? head
+      : t("dataSources.describe.where", { head, list: list(mapping.filters) });
 
   if (mapping.denominatorSource === "faculty") {
     const ranks = mapping.facultyRanks ?? [];
@@ -745,14 +769,14 @@ export function describeMapping(
       excluded.length === 0
         ? ""
         : excluded.length < ranks.length
-          ? ` (excluding ${excluded.join(", ")})`
-          : ` (${ranks.join(", ")} only)`;
+          ? t("dataSources.describe.excluding", { ranks: excluded.join(", ") })
+          : t("dataSources.describe.only", { ranks: ranks.join(", ") });
     // "current" is load-bearing: the roster has no history, so every period is
     // divided by today's headcount.
-    return `${scoped} · per current active faculty member${who}`;
+    return t("dataSources.describe.perFaculty", { scoped, who });
   }
 
   const numerator = mapping.numeratorFilters ?? [];
   if (numerator.length === 0) return scoped;
-  return `${scoped} · counting ${list(numerator)}`;
+  return t("dataSources.describe.counting", { scoped, list: list(numerator) });
 }

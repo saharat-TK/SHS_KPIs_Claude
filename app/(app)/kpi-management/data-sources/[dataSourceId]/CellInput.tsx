@@ -2,6 +2,7 @@
 
 import { Input, Select } from "@/components/ui";
 import { catalogOptionLabel, curriculaForProgram } from "@/lib/kpi/academicCatalog";
+import { useT } from "@/lib/i18n/useT";
 import { FORMAT_EXAMPLE, MONTHS, monthLabel } from "@/lib/kpi/cellFormats";
 import type { AcademicCatalog, DataSourceColumn, FacultyRecord } from "@/lib/types";
 import { DateInput } from "./DateInput";
@@ -10,8 +11,9 @@ import { DateInput } from "./DateInput";
  *  than letting the Select silently blank it. Covers values typed in before the
  *  field became a dropdown, and a curriculum hidden by the program cascade. */
 function UnrecognisedOption({ value, known }: { value: string; known: string[] }) {
+  const t = useT();
   if (!value || known.includes(value)) return null;
-  return <option value={value}>{value} — not in the catalog</option>;
+  return <option value={value}>{t("dataSources.cell.notInCatalog", { value })}</option>;
 }
 
 /** The control for one data-source cell, picked from the column's type.
@@ -41,6 +43,7 @@ export function CellInput({
   allowedOptions?: string[] | null;
   disabled?: boolean;
 }) {
+  const t = useT();
   const allow = <T,>(items: T[], code: (t: T) => string) =>
     allowedOptions ? items.filter((t) => allowedOptions.includes(code(t))) : items;
 
@@ -76,7 +79,9 @@ export function CellInput({
               have since left the roster, rather than silently blanking it. */}
           {value && !shown.some((f) => f.id === value) && (
             <option value={value}>
-              {current ? `${current.name} — ${current.program}` : `${value} — no longer on the roster`}
+              {current
+                ? `${current.name} — ${current.program}`
+                : t("dataSources.cell.notOnRoster", { value })}
             </option>
           )}
         </Select>
@@ -119,8 +124,8 @@ export function CellInput({
       return (
         <Select value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">—</option>
-          <option value="true">Yes</option>
-          <option value="false">No</option>
+          <option value="true">{t("dataSources.cell.yes")}</option>
+          <option value="false">{t("dataSources.cell.no")}</option>
         </Select>
       );
     case "date":

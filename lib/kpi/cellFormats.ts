@@ -11,7 +11,9 @@
 // filter operands, and the examples shown next to every input — so the form,
 // the grid, the file import and the API can never disagree.
 //
-// Pure, no runtime imports, so tests load it directly.
+// Pure, so tests load it directly. Its one runtime import is the dictionary, used
+// only to word errors in the caller's language (English by default).
+import { englishT, type Translator } from "../i18n/dictionaries.ts";
 
 /** Thrown with a message that reads after the column's label, e.g.
  *  `"Publication year (BE)" must be a 4-digit BE year, e.g. 2569`. */
@@ -70,15 +72,17 @@ const text = (raw: unknown) => String(raw ?? "").trim();
 /** A Buddhist-era year as a number — Year (BE) cells and every entry's period
  *  year. A CE year is rejected with its BE equivalent rather than converted:
  *  silently moving a value by 543 years is worse than asking. */
-export function parseYearBE(raw: unknown): number {
+export function parseYearBE(raw: unknown, t: Translator = englishT): number {
   const s = text(raw);
-  if (!/^\d{4}$/.test(s)) fail(`must be a 4-digit BE year, ${FORMAT_EXAMPLE.year_be}`);
+  const badYear = () =>
+    t("dataSources.format.yearInvalid", { example: FORMAT_EXAMPLE.year_be });
+  if (!/^\d{4}$/.test(s)) fail(badYear());
   const year = Number(s);
   if (year >= MIN_CE_YEAR && year < BE_YEAR_FROM) {
-    fail(`is ${year}, which looks like a CE year — the BE year is ${year + BE_OFFSET}`);
+    fail(t("dataSources.format.yearLooksCe", { year, be: year + BE_OFFSET }));
   }
   if (year < MIN_CE_YEAR || year > MAX_BE_YEAR) {
-    fail(`must be a 4-digit BE year, ${FORMAT_EXAMPLE.year_be}`);
+    fail(badYear());
   }
   return year;
 }
@@ -97,7 +101,7 @@ const MONTH_BY_NAME = new Map<string, number>(
 MONTH_BY_NAME.set("sept", 9);
 
 /** A month 1-12 from a number or an English/Thai name or abbreviation. */
-export function parseMonth(raw: unknown): number {
+export function parseMonth(raw: unknown, t: Translator = englishT): number {
   const s = text(raw);
   if (/^\d{1,2}(\.0+)?$/.test(s)) {
     const n = Number(s);
@@ -106,7 +110,7 @@ export function parseMonth(raw: unknown): number {
     const n = MONTH_BY_NAME.get(fold(s));
     if (n) return n;
   }
-  return fail(`must be a month ${FORMAT_EXAMPLE.month}`);
+  return fail(t("dataSources.format.monthInvalid", { example: FORMAT_EXAMPLE.month }));
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -126,7 +130,7 @@ const EXCEL_EPOCH_MS = Date.UTC(1899, 11, 30);
  *  BBBB-MM-DD, and an Excel date serial from a paste. A CE year is rejected with
  *  its BE spelling rather than converted: like Year (BE), silently moving a date
  *  by 543 years is worse than asking. */
-export function parseDate(raw: unknown): string {
+export function parseDate(raw: unknown, t: Translator = englishT): string {
   const s = text(raw);
   let y: number, m: number, d: number;
 
@@ -139,15 +143,24 @@ export function parseDate(raw: unknown): string {
     const date = new Date(EXCEL_EPOCH_MS + Number(s) * 86_400_000);
     return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
   } else {
-    return fail(`must be a date ${FORMAT_EXAMPLE.date.replace("e.g.", "like")}`);
+    return fail(
+      t("dataSources.format.dateInvalid", {
+        example: FORMAT_EXAMPLE.date.replace("e.g.", "like"),
+      }),
+    );
   }
 
   if (y >= MIN_CE_YEAR && y < BE_YEAR_FROM) {
-    fail(`is ${s}, which looks like a CE year — write ${pad(d)}/${pad(m)}/${y + BE_OFFSET}`);
+    fail(
+      t("dataSources.format.dateLooksCe", {
+        s,
+        write: `${pad(d)}/${pad(m)}/${y + BE_OFFSET}`,
+      }),
+    );
   }
   const ce = y - BE_OFFSET;
   if (y > MAX_BE_YEAR || ce < MIN_CE_YEAR || !isRealDate(ce, m, d)) {
-    fail(`is ${s}, which is not a real date (${FORMAT_EXAMPLE.date})`);
+    fail(t("dataSources.format.dateNotReal", { s, example: FORMAT_EXAMPLE.date }));
   }
   return `${ce}-${pad(m)}-${pad(d)}`;
 }
@@ -155,7 +168,7 @@ export function parseDate(raw: unknown): string {
 /** An already-stored date: canonical CE "YYYY-MM-DD", checked and returned as
  *  is. Stored cells and saved link-filter operands go through this, never
  *  parseDate, which reads BE. */
-export function parseStoredDate(raw: unknown): string {
+export function parseStoredDate(raw: unknown, t: Translator = englishT): string {
   const s = text(raw);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   if (
@@ -164,7 +177,7 @@ export function parseStoredDate(raw: unknown): string {
     Number(match[1]) >= BE_YEAR_FROM ||
     !isRealDate(Number(match[1]), Number(match[2]), Number(match[3]))
   ) {
-    return fail(`is ${s}, which is not a stored CE date (YYYY-MM-DD)`);
+    return fail(t("dataSources.format.storedDateInvalid", { s }));
   }
   return s;
 }

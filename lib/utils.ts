@@ -9,6 +9,7 @@ export function formatNumber(n: number, digits = 0): string {
   });
 }
 
+import type { Locale } from "./i18n/config";
 import type { KpiCalculationType, Metric } from "./types";
 
 // Pooled ratio over sub-KPIs: both sides totalled, so a sub-KPI without a usable
@@ -68,6 +69,17 @@ export function computeKpiValue(
 
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Locale-aware sibling of formatDate: Thai shows the Buddhist-era year
+ *  ("24 พ.ย. 2569"), English keeps formatDate's output unchanged. */
+export function formatDateLocalized(iso: string, locale: Locale): string {
+  if (locale !== "th") return formatDate(iso);
+  return new Date(iso).toLocaleDateString("th-TH-u-ca-buddhist", {
     year: "numeric",
     month: "short",
     day: "numeric",

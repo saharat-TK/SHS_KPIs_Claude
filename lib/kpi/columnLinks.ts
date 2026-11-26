@@ -2,7 +2,9 @@
 // 1/n share auto-fill. Shared by the columns editor, the entry form and the
 // entry write routes, so the three can never disagree about what is allowed.
 //
-// Pure, no runtime imports (type imports are erased), so tests load it directly.
+// Pure, so tests load it directly. Its one runtime import is the dictionary, used
+// only to word problems in the caller's language (English by default).
+import { englishT, type Translator } from "../i18n/dictionaries.ts";
 import type {
   AcademicCatalog,
   ColumnAutoFill,
@@ -71,7 +73,10 @@ const isBlank = (v: DataSourceCellValue | undefined) =>
   v === null || v === undefined || v === "";
 
 /** Every problem with a column set's link settings. Empty means it can be saved. */
-export function validateColumnConfig(columns: LinkColumn[]): string[] {
+export function validateColumnConfig(
+  columns: LinkColumn[],
+  t: Translator = englishT,
+): string[] {
   const problems: string[] = [];
   const byKey = new Map(columns.map((c) => [c.colKey, c]));
   const name = (c: LinkColumn) => `"${c.label.trim() || c.colKey}"`;
@@ -81,25 +86,28 @@ export function validateColumnConfig(columns: LinkColumn[]): string[] {
     if (!c.refColKey) continue;
     const target = byKey.get(c.refColKey);
     if (!target) {
-      problems.push(`${name(c)} is ref by a column that no longer exists`);
+      problems.push(t("dataSources.validation.refMissing", { name: name(c) }));
       continue;
     }
     if (target.colKey === c.colKey) {
-      problems.push(`${name(c)} cannot be ref by itself`);
+      problems.push(t("dataSources.validation.refSelf", { name: name(c) }));
       continue;
     }
     if (!canRefBy(c.dataType, target.dataType)) {
       const want = REF_TARGET_TYPE[c.dataType];
       problems.push(
         want
-          ? `${name(c)} can only be ref by a Programs column, not ${name(target)}`
-          : `${name(c)} cannot be ref by another column (only Faculties and Curriculums columns can)`,
+          ? t("dataSources.validation.refWrongType", { name: name(c), target: name(target) })
+          : t("dataSources.validation.refNotAllowed", { name: name(c) }),
       );
       continue;
     }
     if (target.isMultiple) {
       problems.push(
-        `${name(target)} follows each value of ${name(c)}, so it cannot be multiple itself`,
+        t("dataSources.validation.refTargetMultiple", {
+          target: name(target),
+          name: name(c),
+        }),
       );
     }
     dependentsOf.set(target.colKey, [...(dependentsOf.get(target.colKey) ?? []), c]);
@@ -107,7 +115,10 @@ export function validateColumnConfig(columns: LinkColumn[]): string[] {
   for (const [targetKey, deps] of dependentsOf) {
     if (deps.length > 1) {
       problems.push(
-        `${name(byKey.get(targetKey)!)} is ref by ${deps.map(name).join(" and ")}; only one column can be ref by it`,
+        t("dataSources.validation.refTooMany", {
+          target: name(byKey.get(targetKey)!),
+          names: deps.map(name).join(t("dataSources.describe.joinAnd")),
+        }),
       );
     }
   }
@@ -115,22 +126,24 @@ export function validateColumnConfig(columns: LinkColumn[]): string[] {
   const multiples = columns.filter((c) => c.isMultiple);
   if (multiples.length > 1) {
     problems.push(
-      `Only one column can take multiple values (${multiples.map(name).join(", ")} are set)`,
+      t("dataSources.validation.onlyOneMultiple", { names: multiples.map(name).join(", ") }),
     );
   }
   for (const c of multiples) {
     if (!MULTIPLE_TYPES.includes(c.dataType)) {
-      problems.push(`${name(c)} is a ${c.dataType} column, which cannot take multiple values`);
+      problems.push(
+        t("dataSources.validation.multipleWrongType", { name: name(c), type: c.dataType }),
+      );
     }
   }
 
   for (const c of columns) {
     if (c.autoFill !== "share") continue;
     if (c.dataType !== "number") {
-      problems.push(`${name(c)} can only be filled with a share if it is a number column`);
+      problems.push(t("dataSources.validation.shareNeedsNumber", { name: name(c) }));
     } else if (multiples.length === 0) {
       problems.push(
-        `${name(c)} is filled with a share of the multiple values, but no column takes multiple values`,
+        t("dataSources.validation.shareNeedsMultiple", { name: name(c) }),
       );
     }
   }

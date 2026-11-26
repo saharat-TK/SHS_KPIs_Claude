@@ -50,6 +50,7 @@ import { downloadEntryTemplate } from "./entryTemplate";
 import { LinkKpiModal } from "./LinkKpiModal";
 import { ManageColumnsModal } from "./ManageColumnsModal";
 import { EntriesTable, formatEntryCreatedAt } from "./EntriesTable";
+import { useT } from "@/lib/i18n/useT";
 import { cn } from "@/lib/utils";
 
 // The Columns and Linked KPIs tables each scroll in one box, both ways, so the
@@ -76,6 +77,7 @@ export default function DataSourceDetailPage({
 function DataSourceDetail({ id }: { id: number }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const t = useT();
   const { can, user } = useAuth();
   const sourceQ = useDataSource(id);
   const membershipsQ = useCommitteeMemberships();
@@ -180,7 +182,9 @@ function DataSourceDetail({ id }: { id: number }) {
             title={source.name}
             description={
               source.description ??
-              `Raw data owned by ${source.committeeName ?? source.committeeId}.`
+              t("dataSources.detail.fallbackDescription", {
+                committee: source.committeeName ?? source.committeeId,
+              })
             }
             actions={
               <div className="flex flex-wrap items-center gap-sm">
@@ -189,7 +193,7 @@ function DataSourceDetail({ id }: { id: number }) {
                   icon="arrow_back"
                   onClick={() => router.push("/kpi-management/data-sources")}
                 >
-                  All Data Sources
+                  {t("dataSources.detail.backToList")}
                 </Button>
                 {isAdmin && (
                   <>
@@ -199,7 +203,7 @@ function DataSourceDetail({ id }: { id: number }) {
                       icon="edit"
                       onClick={() => setEditingSource(true)}
                     >
-                      Edit details
+                      {t("dataSources.detail.editDetails")}
                     </Button>
                     <ActionDivider />
                     <Button
@@ -208,18 +212,21 @@ function DataSourceDetail({ id }: { id: number }) {
                       className="text-error hover:text-error"
                       onClick={async () => {
                         const ok = await confirm({
-                          title: "Delete this data source?",
+                          title: t("dataSources.detail.deleteConfirmTitle"),
                           message: (
                             <>
-                              Deleting <strong>{source.name}</strong> also removes
-                              its columns, all {source.entryCount ?? entries.length}{" "}
-                              recorded entries, and any {links.length} KPI links.
-                              This cannot be undone. Type{" "}
-                              <strong>DELETE THIS DS</strong> to proceed.
+                              {t("dataSources.detail.deleteMessageLead")}{" "}
+                              <strong>{source.name}</strong>{" "}
+                              {t("dataSources.detail.deleteMessageBody", {
+                                entries: source.entryCount ?? entries.length,
+                                links: links.length,
+                              })}{" "}
+                              <strong>DELETE THIS DS</strong>{" "}
+                              {t("dataSources.detail.deleteMessageTail")}
                             </>
                           ),
                           tone: "danger",
-                          confirmLabel: "Delete data source",
+                          confirmLabel: t("dataSources.detail.deleteConfirmLabel"),
                           confirmPhrase: "DELETE THIS DS",
                         });
                         if (ok) {
@@ -230,7 +237,7 @@ function DataSourceDetail({ id }: { id: number }) {
                         }
                       }}
                     >
-                      Delete
+                      {t("dataSources.detail.delete")}
                     </Button>
                   </>
                 )}
@@ -238,7 +245,7 @@ function DataSourceDetail({ id }: { id: number }) {
                   <>
                     <ActionDivider />
                     <Button variant="ghost" icon="download" onClick={exportCsv}>
-                      Export CSV
+                      {t("dataSources.detail.exportCsv")}
                     </Button>
                   </>
                 )}
@@ -246,7 +253,7 @@ function DataSourceDetail({ id }: { id: number }) {
                   <>
                     <ActionDivider />
                     <Button variant="ghost" icon="description" onClick={downloadTemplate}>
-                      Template
+                      {t("dataSources.detail.template")}
                     </Button>
                     <ActionDivider />
                     <Button
@@ -254,21 +261,21 @@ function DataSourceDetail({ id }: { id: number }) {
                       icon="upload_file"
                       onClick={() => setImporting(true)}
                     >
-                      Upload CSV
+                      {t("dataSources.detail.uploadCsv")}
                     </Button>
                     <Button icon="add" onClick={() => setAdding(true)}>
-                      Add Entry
+                      {t("dataSources.detail.addEntry")}
                     </Button>
                   </>
                 )}
                 {tab === "columns" && canManageSource && (
                   <Button icon="edit" onClick={() => setShowColumns(true)}>
-                    Manage Columns
+                    {t("dataSources.detail.manageColumns")}
                   </Button>
                 )}
                 {tab === "links" && canManageSource && (
                   <Button icon="add_link" onClick={() => setShowLink(true)}>
-                    Link KPI
+                    {t("dataSources.detail.linkKpi")}
                   </Button>
                 )}
               </div>
@@ -278,17 +285,19 @@ function DataSourceDetail({ id }: { id: number }) {
           <div className="mb-md flex flex-col gap-sm sm:flex-row sm:items-center">
             <div className="flex min-w-0 flex-wrap items-center gap-sm text-body-sm text-mute sm:flex-1 sm:flex-nowrap">
               <Badge className="shrink-0" tone={source.status === "active" ? "success" : "neutral"}>
-                {source.status}
+                {t(`dataSources.status.${source.status}`)}
               </Badge>
               <span className="min-w-0 truncate">{source.committeeName ?? source.committeeId}</span>
               <span className="shrink-0">·</span>
-              <span className="shrink-0">{source.periodGrain} entries</span>
+              <span className="shrink-0">
+                {t(`dataSources.detail.grainEntries.${source.periodGrain}`)}
+              </span>
             </div>
             {tab === "data" && incompleteCount > 0 && (
               <button
                 type="button"
                 aria-pressed={onlyIncomplete}
-                title="Rows missing a required value are not counted in any KPI until completed"
+                title={t("dataSources.detail.incompleteHint")}
                 onClick={() => setOnlyIncomplete((v) => !v)}
                 className={`inline-flex shrink-0 items-center gap-xs rounded-full border px-md py-xs text-caption-sm font-medium ${
                   // Always orange, since it flags rows that no KPI counts yet;
@@ -299,14 +308,14 @@ function DataSourceDetail({ id }: { id: number }) {
                 }`}
               >
                 <Icon name="warning" className="text-[16px]" />
-                Incomplete ({incompleteCount})
+                {t("dataSources.detail.incompleteChip", { count: incompleteCount })}
               </button>
             )}
             {tab === "data" && columns.length > 0 && (
               <div className="w-full sm:ml-md sm:w-80 sm:shrink-0">
                 <SearchInput
-                  aria-label="Find data"
-                  placeholder="Find data"
+                  aria-label={t("dataSources.detail.findData")}
+                  placeholder={t("dataSources.detail.findData")}
                   value={findData}
                   onChange={(event) => setFindData(event.target.value)}
                 />
@@ -319,9 +328,9 @@ function DataSourceDetail({ id }: { id: number }) {
             active={tab}
             onChange={setTab}
             items={[
-              { id: "data", label: "Data", count: entries.length },
-              { id: "columns", label: "Columns", count: columns.length },
-              { id: "links", label: "Linked KPIs", count: links.length },
+              { id: "data", label: t("dataSources.detail.tabData"), count: entries.length },
+              { id: "columns", label: t("dataSources.detail.tabColumns"), count: columns.length },
+              { id: "links", label: t("dataSources.detail.tabLinks"), count: links.length },
             ]}
           />
 
@@ -331,12 +340,12 @@ function DataSourceDetail({ id }: { id: number }) {
                 {columns.length === 0 ? (
                   <EmptyState
                     icon="view_column"
-                    title="No columns defined yet"
-                    message="This data source needs columns before anyone can record data against it."
+                    title={t("dataSources.detail.noColumnsTitle")}
+                    message={t("dataSources.detail.noColumnsDataMessage")}
                     action={
                       canManageSource ? (
                         <Button icon="edit" onClick={() => setShowColumns(true)}>
-                          Manage Columns
+                          {t("dataSources.detail.manageColumns")}
                         </Button>
                       ) : undefined
                     }
@@ -344,16 +353,16 @@ function DataSourceDetail({ id }: { id: number }) {
                 ) : entries.length === 0 ? (
                   <EmptyState
                     icon="table_rows"
-                    title="No data recorded yet"
+                    title={t("dataSources.detail.noDataTitle")}
                     message={
                       canRecord
-                        ? "Add the first entry for this data source."
-                        : "Only this data source's committee can record entries."
+                        ? t("dataSources.detail.noDataCanRecord")
+                        : t("dataSources.detail.noDataCannotRecord")
                     }
                     action={
                       canRecord ? (
                         <Button icon="add" onClick={() => setAdding(true)}>
-                          Add Entry
+                          {t("dataSources.detail.addEntry")}
                         </Button>
                       ) : undefined
                     }
@@ -379,12 +388,12 @@ function DataSourceDetail({ id }: { id: number }) {
               {columns.length === 0 ? (
                 <EmptyState
                   icon="view_column"
-                  title="No columns defined yet"
-                  message="Columns describe what this data source collects."
+                  title={t("dataSources.detail.noColumnsTitle")}
+                  message={t("dataSources.detail.noColumnsColumnsMessage")}
                   action={
                     canManageSource ? (
                       <Button icon="edit" onClick={() => setShowColumns(true)}>
-                        Manage Columns
+                        {t("dataSources.detail.manageColumns")}
                       </Button>
                     ) : undefined
                   }
@@ -393,15 +402,17 @@ function DataSourceDetail({ id }: { id: number }) {
                 <Table className={SCROLL_TABLE} scrollClassName={SCROLL_BOX}>
                   <thead>
                     <tr>
-                      <Th className={STICKY_TH}>Label</Th>
-                      <Th className={cn(STICKY_TH, "whitespace-nowrap")}>Stored as</Th>
-                      <Th align="center" className={STICKY_TH}>Type</Th>
-                      <Th align="center" className={STICKY_TH}>Unit</Th>
-                      <Th align="center" className={STICKY_TH}>Required</Th>
-                      <Th align="center" className={cn(STICKY_TH, "whitespace-nowrap")}>
-                        Multiple inputs
+                      <Th className={STICKY_TH}>{t("dataSources.detail.colLabel")}</Th>
+                      <Th className={cn(STICKY_TH, "whitespace-nowrap")}>
+                        {t("dataSources.detail.colStoredAs")}
                       </Th>
-                      <Th className={STICKY_TH}>Options</Th>
+                      <Th align="center" className={STICKY_TH}>{t("dataSources.detail.colType")}</Th>
+                      <Th align="center" className={STICKY_TH}>{t("dataSources.detail.colUnit")}</Th>
+                      <Th align="center" className={STICKY_TH}>{t("dataSources.detail.colRequired")}</Th>
+                      <Th align="center" className={cn(STICKY_TH, "whitespace-nowrap")}>
+                        {t("dataSources.detail.colMultiple")}
+                      </Th>
+                      <Th className={STICKY_TH}>{t("dataSources.detail.colOptions")}</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -411,12 +422,18 @@ function DataSourceDetail({ id }: { id: number }) {
                         <Td className="whitespace-nowrap text-mute">
                           <code>{c.colKey}</code>
                         </Td>
-                        <Td align="center" className="whitespace-nowrap">{c.dataType}</Td>
+                        <Td align="center" className="whitespace-nowrap">
+                          {t(`dataSources.columnType.${c.dataType}`)}
+                        </Td>
                         <Td align="center" className="whitespace-nowrap text-mute">
                           {c.unit ?? "—"}
                         </Td>
-                        <Td align="center" className="whitespace-nowrap">{c.isRequired ? "Yes" : "—"}</Td>
-                        <Td align="center" className="whitespace-nowrap">{c.isMultiple ? "Yes" : "—"}</Td>
+                        <Td align="center" className="whitespace-nowrap">
+                          {c.isRequired ? t("dataSources.detail.yes") : "—"}
+                        </Td>
+                        <Td align="center" className="whitespace-nowrap">
+                          {c.isMultiple ? t("dataSources.detail.yes") : "—"}
+                        </Td>
                         <Td className="min-w-[16rem] text-mute">{c.options?.join(", ") ?? "—"}</Td>
                       </tr>
                     ))}
@@ -432,12 +449,12 @@ function DataSourceDetail({ id }: { id: number }) {
                 {links.length === 0 ? (
                   <EmptyState
                     icon="add_link"
-                    title="Not linked to any KPI yet"
-                    message="Linking records that this data source is the evidence behind a KPI or metric. It does not feed values into progress — that stays manual."
+                    title={t("dataSources.detail.noLinksTitle")}
+                    message={t("dataSources.detail.noLinksMessage")}
                     action={
                       canManageSource ? (
                         <Button icon="add_link" onClick={() => setShowLink(true)}>
-                          Link KPI
+                          {t("dataSources.detail.linkKpi")}
                         </Button>
                       ) : undefined
                     }
@@ -547,18 +564,23 @@ function LinksTable({
   onEdit: (link: DataSourceLink) => void;
 }) {
   const confirm = useConfirm();
+  const t = useT();
   const remove = useDeleteDataSourceLink();
 
   return (
     <Table className={SCROLL_TABLE} scrollClassName={SCROLL_BOX}>
       <thead>
         <tr>
-          <Th className={cn(STICKY_TH, "whitespace-nowrap")}>Strategic Set</Th>
-          <Th className={STICKY_TH}>KPI</Th>
-          <Th className={STICKY_TH}>Metric</Th>
-          <Th className={STICKY_TH}>Feeds</Th>
-          <Th className={STICKY_TH}>Note</Th>
-          {canManage && <Th align="right" className={STICKY_TH}>Actions</Th>}
+          <Th className={cn(STICKY_TH, "whitespace-nowrap")}>{t("dataSources.detail.linkColSet")}</Th>
+          <Th className={STICKY_TH}>{t("dataSources.detail.linkColKpi")}</Th>
+          <Th className={STICKY_TH}>{t("dataSources.detail.linkColMetric")}</Th>
+          <Th className={STICKY_TH}>{t("dataSources.detail.linkColFeeds")}</Th>
+          <Th className={STICKY_TH}>{t("dataSources.detail.linkColNote")}</Th>
+          {canManage && (
+            <Th align="right" className={STICKY_TH}>
+              {t("dataSources.detail.linkColActions")}
+            </Th>
+          )}
         </tr>
       </thead>
       <tbody>
@@ -569,12 +591,14 @@ function LinksTable({
             <Td className="min-w-[14rem]">{l.metricName ?? "—"}</Td>
             <Td className="min-w-[16rem]">
               {l.mappings.length === 0 ? (
-                <span className="text-caption-sm text-mute">evidence only</span>
+                <span className="text-caption-sm text-mute">
+                  {t("dataSources.detail.evidenceOnly")}
+                </span>
               ) : (
                 <div className="flex flex-col gap-xxs">
                   {l.mappings.map((m, i) => (
                     <span key={i} className="text-caption-sm">
-                      {describeMapping(m, columns, cellLabels)}
+                      {describeMapping(m, columns, cellLabels, t)}
                     </span>
                   ))}
                 </div>
@@ -586,8 +610,8 @@ function LinksTable({
                 <div className="inline-flex items-center gap-xxs">
                   <button
                     type="button"
-                    aria-label="Edit link"
-                    title="Edit link"
+                    aria-label={t("dataSources.detail.editLink")}
+                    title={t("dataSources.detail.editLink")}
                     onClick={() => onEdit(l)}
                     className="grid h-8 w-8 place-items-center rounded-md text-mute hover:bg-surface-container-high hover:text-on-surface"
                   >
@@ -595,15 +619,14 @@ function LinksTable({
                   </button>
                   <button
                     type="button"
-                    aria-label="Remove link"
-                    title="Remove link"
+                    aria-label={t("dataSources.detail.removeLink")}
+                    title={t("dataSources.detail.removeLink")}
                     onClick={async () => {
                       const ok = await confirm({
-                        title: "Remove this link?",
-                        message:
-                          "The raw data stays; only the link to the KPI is removed. Values it already fed keep their last computed number.",
+                        title: t("dataSources.detail.removeLinkTitle"),
+                        message: t("dataSources.detail.removeLinkMessage"),
                         tone: "danger",
-                        confirmLabel: "Remove",
+                        confirmLabel: t("dataSources.detail.removeLinkConfirm"),
                       });
                       if (ok) remove.mutate({ dataSourceId, linkId: l.id });
                     }}

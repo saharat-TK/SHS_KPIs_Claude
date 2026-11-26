@@ -58,16 +58,21 @@ function setMenuItems(
   return [
     { icon: "open_in_new", label: "Open set", onSelect: on.onOpen },
     { icon: "tune", label: "Configure set", onSelect: on.onConfigure },
-    ...SET_STATUSES.map((status) => ({
-      icon: status === set.status ? "check" : "change_circle",
-      label: `Mark as ${status}`,
-      disabled: status === set.status,
-      title: status === set.status ? "Current status" : undefined,
-      onSelect: () => on.onSetStatus(status),
-    })),
+    {
+      icon: "change_circle",
+      label: "Set status",
+      separatorBefore: true,
+      submenu: SET_STATUSES.map((status) => ({
+        label: status.charAt(0).toUpperCase() + status.slice(1),
+        selected: status === set.status,
+        disabled: status === set.status,
+        onSelect: () => on.onSetStatus(status),
+      })),
+    },
     {
       icon: "delete",
       label: "Delete set",
+      separatorBefore: true,
       tone: "danger" as const,
       disabled: blockReason !== null,
       title: blockReason ?? undefined,

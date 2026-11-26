@@ -18,7 +18,6 @@ import {
   Input,
   Select,
   ActionMenu,
-  type ActionMenuItem,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -43,34 +42,6 @@ const STATUS_TONE: Record<PerformanceStatus, "success" | "neutral" | "warning"> 
   inactive: "neutral",
   completed: "warning",
 };
-
-const RECORD_STATUSES: PerformanceStatus[] = ["active", "inactive", "completed"];
-
-function recordMenuItems(
-  record: PerformanceRecord,
-  isAdmin: boolean,
-  on: {
-    onOpen: () => void;
-    onPeriods: () => void;
-    onSetStatus: (status: PerformanceStatus) => void;
-  },
-): ActionMenuItem[] {
-  const items: ActionMenuItem[] = [
-    { icon: "open_in_new", label: "Open record", onSelect: on.onOpen },
-  ];
-  if (!isAdmin) return items;
-  items.push({ icon: "event_available", label: "Recording periods", onSelect: on.onPeriods });
-  for (const status of RECORD_STATUSES) {
-    items.push({
-      icon: status === record.status ? "check" : "change_circle",
-      label: `Mark as ${status}`,
-      disabled: status === record.status,
-      title: status === record.status ? "Current status" : undefined,
-      onSelect: () => on.onSetStatus(status),
-    });
-  }
-  return items;
-}
 
 export default function PerformancePage() {
   return (
@@ -161,16 +132,13 @@ function Performance() {
                     <Td align="center" className="text-mute">
                       {r.activatedAt ? formatDate(r.activatedAt) : "—"}
                     </Td>
-                    {/* The whole cell stops propagation so the row's own
-                        navigate-on-click can't fire behind the menu. */}
-                    <Td align="right" onClick={(e) => e.stopPropagation()}>
-                      <ActionMenu
-                        label={`Actions for ${r.name}`}
-                        items={recordMenuItems(r, isAdmin, {
-                          onOpen: () => router.push(`/kpi-management/performance/${r.id}`),
-                          onPeriods: () => setPeriodRecord(r),
-                          onSetStatus: (status) => setStatusChange({ record: r, status }),
-                        })}
+                    <Td align="right">
+                      <RecordActions
+                        record={r}
+                        isAdmin={isAdmin}
+                        onOpen={() => router.push(`/kpi-management/performance/${r.id}`)}
+                        onPeriods={() => setPeriodRecord(r)}
+                        onSetStatus={(status) => setStatusChange({ record: r, status })}
                       />
                     </Td>
                   </Tr>
@@ -218,6 +186,49 @@ function Performance() {
         />
       )}
     </>
+  );
+}
+
+function RecordActions({
+  record,
+  isAdmin,
+  onOpen,
+  onPeriods,
+  onSetStatus,
+}: {
+  record: PerformanceRecord;
+  isAdmin: boolean;
+  onOpen: () => void;
+  onPeriods: () => void;
+  onSetStatus: (status: PerformanceStatus) => void;
+}) {
+  return (
+    // The panel is portaled, but React still bubbles its clicks through here to
+    // the row's own navigate-on-click, so this wrapper has to stop them.
+    <div className="inline-flex" onClick={(e) => e.stopPropagation()}>
+      <ActionMenu
+        label={`Actions for ${record.name}`}
+        items={[
+          { icon: "open_in_new", label: "Open record", onSelect: onOpen },
+          ...(isAdmin
+            ? [
+                { icon: "event_available", label: "Recording periods", onSelect: onPeriods },
+                {
+                  icon: "change_circle",
+                  label: "Set status",
+                  separatorBefore: true,
+                  submenu: (["active", "inactive", "completed"] as const).map((status) => ({
+                    label: status.charAt(0).toUpperCase() + status.slice(1),
+                    selected: status === record.status,
+                    disabled: status === record.status,
+                    onSelect: () => onSetStatus(status),
+                  })),
+                },
+              ]
+            : []),
+        ]}
+      />
+    </div>
   );
 }
 
