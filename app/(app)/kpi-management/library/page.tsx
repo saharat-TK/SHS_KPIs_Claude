@@ -18,7 +18,9 @@ import {
   Input,
   Select,
   ActionMenu,
+  RadioGroup,
   type ActionMenuItem,
+  type RadioOption,
 } from "@/components/ui";
 import { RequirePermission } from "@/components/shell/Guard";
 import {
@@ -34,6 +36,10 @@ import {
   deletionConfirmed,
   describeSetDeletion,
   startYearLockReason,
+  cloneConfirmed,
+  describeClone,
+  CLONE_CONFIRM_PHRASE,
+  type CloneMode,
 } from "@/lib/kpi/setRules";
 import type { StrategicSet, StrategicSetStatus } from "@/lib/types";
 
@@ -425,6 +431,7 @@ function CreateSetModal({
     description?: string;
     startYear: number;
     cloneFromSetId?: number;
+    cloneMode?: "categories" | "all";
     createdBy?: string;
   }) => void;
   sets: StrategicSet[];
@@ -435,27 +442,59 @@ function CreateSetModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [startYear, setStartYear] = useState(thisBEYear);
+  const [cloneMode, setCloneMode] = useState<CloneMode>("empty");
   const [cloneFromSetId, setCloneFromSetId] = useState<string>("");
+  const [typedPhrase, setTypedPhrase] = useState("");
+
+  const canClone = sets.length > 0;
 
   useEffect(() => {
     if (open) {
       setName("");
       setDescription("");
       setStartYear(thisBEYear);
+      // Categories-only is the default whenever there is a set to clone from.
+      setCloneMode(canClone ? "categories" : "empty");
       setCloneFromSetId("");
+      setTypedPhrase("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const endYear = useMemo(() => startYear + 4, [startYear]);
-  const valid = name.trim().length > 1 && Number.isInteger(startYear);
+  const cloning = cloneMode !== "empty";
+  const source = sets.find((s) => String(s.id) === cloneFromSetId);
+  const cloneReady = !cloning || (source !== undefined && cloneConfirmed(typedPhrase));
+  const valid = name.trim().length > 1 && Number.isInteger(startYear) && cloneReady;
+
+  const modeOptions: RadioOption<CloneMode>[] = [
+    {
+      value: "empty",
+      label: "Start empty",
+      hint: "Seeds the default categories, no KPIs",
+    },
+    ...(canClone
+      ? [
+          {
+            value: "categories" as const,
+            label: "Clone categories only",
+            hint: "Copies a set's categories, no KPIs",
+          },
+          {
+            value: "all" as const,
+            label: "Clone everything",
+            hint: "Categories, KPIs, sub-KPIs and targets",
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="New Strategic Set"
-      subtitle="A 5-year template. Clone a previous set to carry over its KPIs and targets."
+      subtitle="A 5-year template. Clone a previous set to carry over its categories, or everything."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -468,7 +507,9 @@ function CreateSetModal({
                 name: name.trim(),
                 description: description.trim() || undefined,
                 startYear,
-                cloneFromSetId: cloneFromSetId ? Number(cloneFromSetId) : undefined,
+                ...(cloning && source
+                  ? { cloneFromSetId: source.id, cloneMode }
+                  : {}),
                 createdBy: user?.email,
               })
             }
@@ -507,16 +548,33 @@ function CreateSetModal({
             <Input value={String(endYear)} readOnly disabled />
           </Field>
         </div>
-        {sets.length > 0 && (
-          <Field
-            label="Clone from existing set"
-            hint="Copies all KPIs, sub-KPIs and targets from the chosen set"
-          >
+
+        <div className="flex flex-col gap-xs">
+          <span className="text-label-md text-on-surface">Starting content</span>
+          <RadioGroup
+            name="clone-mode"
+            value={cloneMode}
+            options={modeOptions}
+            onChange={(mode) => {
+              setCloneMode(mode);
+              // A new choice needs a fresh confirmation.
+              setTypedPhrase("");
+            }}
+          />
+        </div>
+
+        {cloning && (
+          <Field label="Clone from">
             <Select
               value={cloneFromSetId}
-              onChange={(e) => setCloneFromSetId(e.target.value)}
+              onChange={(e) => {
+                setCloneFromSetId(e.target.value);
+                setTypedPhrase("");
+              }}
             >
-              <option value="">Start empty</option>
+              <option value="" disabled>
+                Choose a set…
+              </option>
               {sets.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} ({s.startYear}–{s.endYear})
@@ -524,6 +582,19 @@ function CreateSetModal({
               ))}
             </Select>
           </Field>
+        )}
+
+        {cloning && source && (
+          <div className="flex flex-col gap-md rounded border border-hairline bg-surface-soft p-md">
+            <p className="text-body-sm text-mute">{describeClone(cloneMode, source.name)}</p>
+            <Field label={`Type "${CLONE_CONFIRM_PHRASE}" to continue`}>
+              <Input
+                value={typedPhrase}
+                onChange={(e) => setTypedPhrase(e.target.value)}
+                placeholder={CLONE_CONFIRM_PHRASE}
+              />
+            </Field>
+          </div>
         )}
       </div>
     </Modal>

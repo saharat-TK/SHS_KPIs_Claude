@@ -8,6 +8,9 @@ import {
   deletionConfirmed,
   describeSetDeletion,
   startYearLockReason,
+  cloneConfirmed,
+  describeClone,
+  CLONE_CONFIRM_PHRASE,
 } from "../lib/kpi/setRules.ts";
 
 test("a draft set with no performance record can be deleted and re-dated", () => {
@@ -80,4 +83,38 @@ test("PATCH guards the start year and reports a duplicate year as 409", () => {
   assert.match(patch, /startYearLockReason/);
   assert.match(patch, /ER_DUP_ENTRY/);
   assert.match(patch, /NOT EXISTS \(SELECT 1 FROM performance_record/);
+});
+
+test("the clone phrase matches case-insensitively and ignores outer spaces", () => {
+  assert.equal(CLONE_CONFIRM_PHRASE, "Confirm clone");
+  for (const ok of ["Confirm clone", "confirm clone", "CONFIRM CLONE", "  Confirm clone  "]) {
+    assert.equal(cloneConfirmed(ok), true, ok);
+  }
+  for (const bad of ["", "Confirm", "confirmclone", "Confirm  clone", "Confirm clone!"]) {
+    assert.equal(cloneConfirmed(bad), false, bad);
+  }
+});
+
+test("clone copy says what is and is not copied", () => {
+  assert.match(describeClone("categories", "Set A"), /categories of "Set A"/);
+  assert.match(describeClone("categories", "Set A"), /not copied/);
+  assert.match(describeClone("all", "Set A"), /every category, KPI, sub-KPI and annual target/);
+});
+
+const createRoute = readFileSync(
+  new URL("../app/api/strategic-sets/route.ts", import.meta.url),
+  "utf8",
+);
+
+test("POST validates cloneMode and the source set when cloning", () => {
+  const post = createRoute.slice(createRoute.indexOf("export async function POST"));
+  assert.match(post, /cloneMode !== "categories" && cloneMode !== "all"/);
+  assert.match(post, /Source strategic set not found/);
+});
+
+test("a categories-only clone never copies KPIs", () => {
+  const post = createRoute.slice(createRoute.indexOf("export async function POST"));
+  // cloneKpis runs only under the "all" branch.
+  assert.match(post, /if \(cloneMode === "all"\) \{\s*await cloneKpis\(/);
+  assert.equal((post.match(/cloneKpis\(/g) ?? []).length, 1);
 });

@@ -493,6 +493,7 @@ export const strategicSetsRepo = {
     description?: string;
     startYear: number;
     cloneFromSetId?: number;
+    cloneMode?: "categories" | "all";
   }): Promise<StrategicSet> =>
     jsonOrThrow(
       await fetch("/api/strategic-sets", {

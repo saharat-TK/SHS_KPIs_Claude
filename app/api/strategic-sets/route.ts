@@ -80,16 +80,13 @@ async function seedDefaultCategories(conn: PoolConnection, setId: number) {
   }
 }
 
-// Deep-copy every library KPI/metric (and their annual targets) from a source
-// set into the newly created set. formula_id is preserved as-is (formulas are
-// global/reusable across sets). The source set's categories are cloned first
-// and KPI/metric category_id values are remapped to the new copies.
-async function cloneSetContents(
+// Copy a source set's categories into the new set. Returns the old id → new id
+// map that cloneKpis uses to remap category references.
+async function cloneCategories(
   conn: PoolConnection,
   sourceSetId: number,
   newSetId: number,
-) {
-  // Clone categories, building an old id → new id map for the remap below.
+): Promise<Map<string, string>> {
   const [srcCats] = await conn.query<RowDataPacket[]>(
     "SELECT id, kpi_type, name, description, sort_order FROM kpi_categories WHERE set_id = ? ORDER BY sort_order, id",
     [sourceSetId],
@@ -103,6 +100,19 @@ async function cloneSetContents(
     );
     catIdMap.set(c.id, newId);
   }
+  return catIdMap;
+}
+
+// Deep-copy every library KPI/metric (and their annual targets) from a source
+// set into the new set. formula_id is preserved as-is (formulas are global and
+// reusable across sets). Categories must already be cloned: KPI/metric
+// category_id values are remapped through catIdMap.
+async function cloneKpis(
+  conn: PoolConnection,
+  sourceSetId: number,
+  newSetId: number,
+  catIdMap: Map<string, string>,
+) {
   const mapCat = (oldId: string | null) => (oldId == null ? null : catIdMap.get(oldId) ?? null);
 
   const [srcKpis] = await conn.query<RowDataPacket[]>(
@@ -171,7 +181,7 @@ export async function POST(req: NextRequest) {
   try {
     const actor = await requirePermission("configure_kpis");
     const body = await req.json();
-    const { name, description, startYear, cloneFromSetId } = body;
+    const { name, description, startYear, cloneFromSetId, cloneMode } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
@@ -182,6 +192,22 @@ export async function POST(req: NextRequest) {
         { error: "startYear must be a valid Buddhist-era year" },
         { status: 400 },
       );
+    }
+
+    if (cloneFromSetId != null) {
+      if (cloneMode !== "categories" && cloneMode !== "all") {
+        return NextResponse.json(
+          { error: 'cloneMode must be "categories" or "all" when cloning' },
+          { status: 400 },
+        );
+      }
+      const [src] = await pool.query<RowDataPacket[]>(
+        "SELECT id FROM strategic_set WHERE id = ?",
+        [cloneFromSetId],
+      );
+      if (src.length === 0) {
+        return NextResponse.json({ error: "Source strategic set not found" }, { status: 404 });
+      }
     }
 
     const conn = await pool.getConnection();
@@ -207,8 +233,13 @@ export async function POST(req: NextRequest) {
         throw err;
       }
 
-      if (cloneFromSetId) {
-        await cloneSetContents(conn, Number(cloneFromSetId), insertId);
+      if (cloneFromSetId != null) {
+        const catIdMap = await cloneCategories(conn, Number(cloneFromSetId), insertId);
+        // "categories" stops here: the new set starts with the source's
+        // taxonomy but no KPIs.
+        if (cloneMode === "all") {
+          await cloneKpis(conn, Number(cloneFromSetId), insertId, catIdMap);
+        }
       } else {
         await seedDefaultCategories(conn, insertId);
       }
