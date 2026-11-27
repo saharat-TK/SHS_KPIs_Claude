@@ -31,7 +31,13 @@ export function Tabs({
     <div
       className={cn(
         "flex gap-xs",
-        variant === "filled" ? "items-stretch" : "items-center border-b border-hairline",
+        // Filled tabs scroll sideways when they don't fit (a long Thai label
+        // has no spaces to wrap at), so they never widen the page. Not the
+        // underline variant: its tabs overlap the row's own bottom border,
+        // which a scroll container would clip.
+        variant === "filled"
+          ? "items-stretch overflow-x-auto scroll-thin"
+          : "items-center border-b border-hairline",
         className,
       )}
       role="tablist"

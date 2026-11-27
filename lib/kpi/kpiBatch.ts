@@ -3,9 +3,9 @@
 //
 // A batch row carries just enough to place a KPI in the set: its name, type,
 // one category, owning committee, a description and its optional EdPEx topic /
-// area / indicator code. Everything else (targets,
-// calculation, thresholds, variables) is configured afterwards in the KPI
-// editor, so rows land with the same defaults as the single-create POST plus
+// area / indicator code, and optionally its 5-year and Year 1–5 targets.
+// Everything else (calculation, thresholds, variables) is configured afterwards
+// in the KPI editor, so rows land with the same defaults as the single-create POST plus
 // the weight/unit below.
 //
 // No runtime imports beyond sibling modules: tests load this file directly
@@ -21,6 +21,7 @@ import {
   type EdpexCatalog,
 } from "./edpex.ts";
 import { parseCsv, toCsv, UTF8_BOM } from "../csv.ts";
+import { validateAnnualTargets } from "./targets.ts";
 
 /** Ceiling on one batch: the bulk POST builds a single multi-row INSERT. */
 export const KPI_BATCH_MAX_ROWS = 500;
@@ -45,7 +46,26 @@ export interface KpiBatchRow {
   /** The KPI's row in the EdPEx SAR ("7.1ข-4"); optional free text that must
    *  start with the area when one is set. */
   edpexIndicatorCode: string;
+  /** Optional targets, as typed. The cap rule applies: each year's target must
+   *  not exceed the 5-year target (lib/kpi/targets.ts). */
+  fiveYearTarget: string;
+  targetY1: string;
+  targetY2: string;
+  targetY3: string;
+  targetY4: string;
+  targetY5: string;
 }
+
+/** The five annual-target fields, in year order. */
+export const KPI_BATCH_YEAR_KEYS = [
+  "targetY1",
+  "targetY2",
+  "targetY3",
+  "targetY4",
+  "targetY5",
+] as const;
+
+const TARGET_KEYS = ["fiveYearTarget", ...KPI_BATCH_YEAR_KEYS] as const;
 
 export interface KpiBatchLookups {
   kpiTypes: { id: string; label: string }[];
@@ -86,11 +106,32 @@ export const KPI_BATCH_COLUMNS = [
     label: "EdPEx Indicator",
     aliases: ["EdPEx Indicator Code", "EdPEx Code", "Indicator Code"],
   },
+  {
+    key: "fiveYearTarget",
+    label: "5-Year Target",
+    aliases: ["5-Yr", "5 Yr Target", "Five-Year Target", "5-Year"],
+  },
+  { key: "targetY1", label: "Target Y1", aliases: ["Y1", "Year 1", "Year 1 Target"] },
+  { key: "targetY2", label: "Target Y2", aliases: ["Y2", "Year 2", "Year 2 Target"] },
+  { key: "targetY3", label: "Target Y3", aliases: ["Y3", "Year 3", "Year 3 Target"] },
+  { key: "targetY4", label: "Target Y4", aliases: ["Y4", "Year 4", "Year 4 Target"] },
+  { key: "targetY5", label: "Target Y5", aliases: ["Y5", "Year 5", "Year 5 Target"] },
 ] as const satisfies readonly {
   key: keyof KpiBatchRow;
   label: string;
   aliases: readonly string[];
 }[];
+
+/** A column's header, with the set's B.E. year on each annual-target column
+ *  ("Target Y1 (2565)") when the start year is known. The reader ignores a
+ *  trailing "(…)", so either form imports. */
+export function kpiBatchColumnLabel(
+  column: (typeof KPI_BATCH_COLUMNS)[number],
+  startYear?: number,
+): string {
+  const yearNo = (KPI_BATCH_YEAR_KEYS as readonly string[]).indexOf(column.key) + 1;
+  return yearNo > 0 && startYear ? `${column.label} (${startYear + yearNo - 1})` : column.label;
+}
 
 export function emptyKpiBatchRow(defaults: Partial<KpiBatchRow> = {}): KpiBatchRow {
   return {
@@ -102,6 +143,12 @@ export function emptyKpiBatchRow(defaults: Partial<KpiBatchRow> = {}): KpiBatchR
     edpexTopicId: "",
     edpexAreaId: "",
     edpexIndicatorCode: "",
+    fiveYearTarget: "",
+    targetY1: "",
+    targetY2: "",
+    targetY3: "",
+    targetY4: "",
+    targetY5: "",
     ...defaults,
   };
 }
@@ -119,6 +166,12 @@ export function normalizeKpiBatchRow(raw: unknown): KpiBatchRow {
     edpexTopicId: str(r.edpexTopicId),
     edpexAreaId: str(r.edpexAreaId),
     edpexIndicatorCode: str(r.edpexIndicatorCode),
+    fiveYearTarget: str(r.fiveYearTarget),
+    targetY1: str(r.targetY1),
+    targetY2: str(r.targetY2),
+    targetY3: str(r.targetY3),
+    targetY4: str(r.targetY4),
+    targetY5: str(r.targetY5),
   };
 }
 
@@ -130,8 +183,34 @@ export function isBlankKpiBatchRow(row: KpiBatchRow): boolean {
     !row.name.trim() &&
     !row.description.trim() &&
     !row.categoryId.trim() &&
-    !row.edpexIndicatorCode.trim()
+    !row.edpexIndicatorCode.trim() &&
+    TARGET_KEYS.every((k) => !row[k].trim())
   );
+}
+
+/** A typed target as a number: "" is null, NaN means it isn't a number.
+ *  Thousands separators ("1,250") and spaces are allowed. */
+export function parseKpiTarget(text: string): number | null {
+  const t = text.trim().replace(/[,\s]/g, "");
+  if (!t) return null;
+  return /^[+-]?(\d+\.?\d*|\.\d+)$/.test(t) ? Number(t) : NaN;
+}
+
+/** The row's targets, or the first one that is not a number. */
+function rowTargets(row: KpiBatchRow):
+  | { ok: true; fiveYearTarget: number | null; years: { yearNo: number; targetValue: number | null }[] }
+  | { ok: false; error: string } {
+  const fiveYearTarget = parseKpiTarget(row.fiveYearTarget);
+  if (Number.isNaN(fiveYearTarget)) return { ok: false, error: "5-Year Target must be a number" };
+  const years = [];
+  for (const [i, key] of KPI_BATCH_YEAR_KEYS.entries()) {
+    const targetValue = parseKpiTarget(row[key]);
+    if (Number.isNaN(targetValue)) {
+      return { ok: false, error: `Year ${i + 1} target must be a number` };
+    }
+    years.push({ yearNo: i + 1, targetValue });
+  }
+  return { ok: true, fiveYearTarget, years };
 }
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLocaleLowerCase();
@@ -177,6 +256,14 @@ export function kpiBatchRowError(
 
   const edpex = normaliseEdpex(row, lookups.edpex);
   if (!edpex.ok) return edpex.error;
+
+  const targets = rowTargets(row);
+  if (!targets.ok) return targets.error;
+  if (targets.fiveYearTarget != null && targets.fiveYearTarget < 0) {
+    return "5-Year Target cannot be negative";
+  }
+  const cap = validateAnnualTargets(targets.fiveYearTarget, targets.years);
+  if (!cap.ok) return cap.error;
   return null;
 }
 
@@ -226,6 +313,12 @@ export function toKpiCreateInput(row: KpiBatchRow, lookups?: Pick<KpiBatchLookup
     edpexIndicatorCode: row.edpexIndicatorCode.trim() || null,
   };
   const edpex = lookups ? normaliseEdpex(raw, lookups.edpex) : null;
+  // Callers validate first (kpiBatchRowError); a non-number here is dropped.
+  const targets = rowTargets(row);
+  const fiveYearTarget = targets.ok ? targets.fiveYearTarget : null;
+  const annualTargets = targets.ok
+    ? targets.years.filter((t): t is { yearNo: number; targetValue: number } => t.targetValue != null)
+    : [];
   return {
     ...(edpex?.ok ? edpex.value : raw),
     name: row.name.trim(),
@@ -236,6 +329,9 @@ export function toKpiCreateInput(row: KpiBatchRow, lookups?: Pick<KpiBatchLookup
     committeeId: row.committeeId.trim() || null,
     weight: KPI_BATCH_DEFAULTS.weight,
     unit: KPI_BATCH_DEFAULTS.unit,
+    fiveYearTarget,
+    /** Only the years that were filled. */
+    annualTargets,
   };
 }
 
@@ -296,6 +392,7 @@ export function kpiBatchRowFromCells(
     topic = "",
     area = "",
     indicatorCode = "",
+    ...targetCells
   ] = cells;
   const kpiType = resolveKpiTypeText(type, lookups) || defaults.kpiType || "";
   let edpexTopicId = resolveEdpexTopicText(topic, lookups.edpex);
@@ -310,6 +407,12 @@ export function kpiBatchRowFromCells(
     edpexTopicId,
     edpexAreaId,
     edpexIndicatorCode: indicatorCode.trim(),
+    fiveYearTarget: (targetCells[0] ?? "").trim(),
+    targetY1: (targetCells[1] ?? "").trim(),
+    targetY2: (targetCells[2] ?? "").trim(),
+    targetY3: (targetCells[3] ?? "").trim(),
+    targetY4: (targetCells[4] ?? "").trim(),
+    targetY5: (targetCells[5] ?? "").trim(),
   };
 }
 
@@ -332,8 +435,10 @@ const isCommentLine = (cells: string[]) =>
   (cells[0] ?? "").trimStart().startsWith(KPI_TEMPLATE_COMMENT);
 
 /** Header matching ignores case, spaces, hyphens and underscores, and accepts
- *  a column's label, key or any alias — "EdPEx-topic", "edpex_topic_id"… */
-const headerKey = (s: string) => norm(s).replace(/[\s_-]+/g, "");
+ *  a column's label, key or any alias — "EdPEx-topic", "edpex_topic_id"… A
+ *  trailing "(…)" is ignored too, so "Target Y1 (2565)" matches "Target Y1". */
+const headerKey = (s: string) =>
+  norm(s.replace(/\([^)]*\)\s*$/, "")).replace(/[\s_-]+/g, "");
 const columnHeaders = (c: (typeof KPI_BATCH_COLUMNS)[number]) =>
   [c.label, c.key, ...c.aliases].map(headerKey);
 
@@ -363,14 +468,18 @@ export function parseKpiPaste(
  * so the file goes back in exactly as downloaded. Each instruction line is one
  * quoted cell, so commas in a name never spill it across columns in Excel.
  */
-export function buildKpiTemplateCsv(lookups: KpiBatchLookups, setName?: string): string {
+export function buildKpiTemplateCsv(
+  lookups: KpiBatchLookups,
+  setName?: string,
+  startYear?: number,
+): string {
   const lines: string[] = [];
   const note = (text = "") => lines.push(toCsv([`${KPI_TEMPLATE_COMMENT} ${text}`.trimEnd()], []));
 
   note(`SHS Batch Add KPIs template${setName ? ` — ${setName}` : ""}`);
   note("Lines starting with # are instructions and are ignored on upload. Keep the header row.");
   note("One KPI per row. Each value may be typed as its code or its full name.");
-  note("Every KPI is created as a draft; configure targets and calculation afterwards in the KPI editor.");
+  note("Every KPI is created as a draft; configure calculation and sub-KPIs afterwards in the KPI editor.");
   note();
   note("Columns:");
 
@@ -412,6 +521,12 @@ export function buildKpiTemplateCsv(lookups: KpiBatchLookups, setName?: string):
   note("  EdPEx Indicator — optional. The KPI's numbered row in the EdPEx SAR, e.g. 7.1ข-4.");
   note(`    Free text, up to ${EDPEX_INDICATOR_CODE_MAX} characters. When EdPEx Area is filled it must start with that area (7.1ข-…).`);
 
+  note("  5-Year Target — optional. A number.");
+  note(
+    `  Target Y1 … Target Y5 — optional. A number for each year of the set${startYear ? ` (Y1 = ${startYear} … Y5 = ${startYear + 4})` : ""}.`,
+  );
+  note("    Targets are optional; each year's target must not exceed the 5-Year Target.");
+
   note();
   note(
     `The rows under the header whose Name starts with ${KPI_TEMPLATE_EXAMPLE_PREFIX} are completed examples.`,
@@ -419,7 +534,7 @@ export function buildKpiTemplateCsv(lookups: KpiBatchLookups, setName?: string):
   note("They are skipped on upload, so you can leave them, overwrite them, or delete them.");
   note();
 
-  lines.push(toCsv(KPI_BATCH_COLUMNS.map((c) => c.label), []));
+  lines.push(toCsv(KPI_BATCH_COLUMNS.map((c) => kpiBatchColumnLabel(c, startYear)), []));
   for (const row of kpiTemplateExampleRows(lookups)) lines.push(toCsv(row, []));
   return UTF8_BOM + lines.join("\n") + "\n";
 }
@@ -442,6 +557,12 @@ export function kpiTemplateExampleRows(lookups: KpiBatchLookups): string[][] {
     "Academic service projects",
   ];
   const area = lookups.edpex.find((t) => t.areas.length > 0)?.areas[0];
+  // 5-Year Target, then Y1–Y5. The last example leaves them blank: optional.
+  const targets = [
+    ["90", "70", "75", "80", "85", "90"],
+    ["10", "2", "4", "6", "8", "10"],
+    ["", "", "", "", "", ""],
+  ];
 
   return lookups.kpiTypes.slice(0, 3).map((type, i) => {
     const taxonomy = categoryTaxonomyForKpiType(type.id);
@@ -458,6 +579,7 @@ export function kpiTemplateExampleRows(lookups: KpiBatchLookups): string[][] {
       withEdpex ? area.topicId : "",
       withEdpex ? area.id : "",
       withEdpex ? `${area.id}-1` : "",
+      ...targets[i],
     ];
   });
 }

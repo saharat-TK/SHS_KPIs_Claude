@@ -50,7 +50,8 @@ import {
   categoryTaxonomyForKpiType,
 } from "@/lib/kpi/categories";
 import { describeKpiDeletion } from "@/lib/kpi/deletion";
-import { categoriesForKpiType } from "@/lib/kpi/kpiBatch";
+import { categoriesForKpiType, parseKpiTarget } from "@/lib/kpi/kpiBatch";
+import { validateAnnualTargets } from "@/lib/kpi/targets";
 import { ManageCategoriesModal } from "./ManageCategoriesModal";
 import { BatchAddKpisModal } from "./BatchAddKpisModal";
 import { DraftBadge } from "../DraftBadge";
@@ -229,7 +230,7 @@ function SetDetail() {
     if (!set) return;
     downloadCsv(
       `kpi-template-${set.startYear}-${set.endYear}.csv`,
-      buildKpiTemplateCsv(csvLookups, set.name),
+      buildKpiTemplateCsv(csvLookups, set.name, set.startYear),
     );
   };
 
@@ -480,6 +481,7 @@ function SetDetail() {
         submitting={create.isPending}
         categories={categories}
         kpiTypes={kpiTypes.map((t) => ({ id: t.id, label: t.kpiTypeName }))}
+        startYear={set?.startYear}
         onClose={() => setShowCreate(false)}
         onCreate={(input) =>
           create.mutate(
@@ -507,6 +509,7 @@ function SetDetail() {
         defaultKpiType={activeKpiType}
         defaultCommitteeId={committeeFilter === "all" ? "" : committeeFilter}
         setName={set?.name}
+        startYear={set?.startYear}
         importFile={importFile}
         onImportConsumed={() => setImportFile(null)}
       />
@@ -535,6 +538,7 @@ function CreateKpiModal({
   categories,
   kpiTypes,
   submitting,
+  startYear,
 }: {
   open: boolean;
   onClose: () => void;
@@ -548,10 +552,14 @@ function CreateKpiModal({
     edpexTopicId: string | null;
     edpexAreaId: string | null;
     edpexIndicatorCode: string | null;
+    fiveYearTarget: number | null;
+    annualTargets: { yearNo: number; targetValue: number }[];
   }) => void;
   categories: KpiCategoryRecord[];
   kpiTypes: { id: string; label: string }[];
   submitting: boolean;
+  /** The set's first B.E. year, to label Y1–Y5. */
+  startYear?: number;
 }) {
   const edpexCatalog = useEdpexCatalog();
   const [name, setName] = useState("");
@@ -560,6 +568,9 @@ function CreateKpiModal({
   const [kpiType, setKpiType] = useState<KpiType>("operational");
   const [weight, setWeight] = useState(10);
   const [unit, setUnit] = useState("Item");
+  // Typed text; "" is blank. Year 1–5 in order.
+  const [fiveYear, setFiveYear] = useState("");
+  const [years, setYears] = useState<string[]>(["", "", "", "", ""]);
 
   useEffect(() => {
     if (open) {
@@ -569,11 +580,28 @@ function CreateKpiModal({
       setWeight(10);
       setUnit("Item");
       setEdpex(EMPTY_EDPEX);
+      setFiveYear("");
+      setYears(["", "", "", "", ""]);
     }
   }, [open]);
 
+  // Targets are optional; the editor's cap rule applies (lib/kpi/targets.ts).
+  const fiveYearTarget = parseKpiTarget(fiveYear);
+  const yearTargets = years.map((v, i) => ({ yearNo: i + 1, targetValue: parseKpiTarget(v) }));
+  const targetError = Number.isNaN(fiveYearTarget)
+    ? "5-Year Target must be a number"
+    : fiveYearTarget != null && fiveYearTarget < 0
+      ? "5-Year Target cannot be negative"
+      : (() => {
+          const bad = yearTargets.find((t) => Number.isNaN(t.targetValue));
+          if (bad) return `Year ${bad.yearNo} target must be a number`;
+          const cap = validateAnnualTargets(fiveYearTarget, yearTargets);
+          return cap.ok ? null : cap.error;
+        })();
+
   const valid =
     name.trim().length > 1 &&
+    !targetError &&
     !edpexIndicatorCodeError(edpex.edpexIndicatorCode, edpex.edpexAreaId);
   // Routine KPIs group by the ด้านที่ taxonomy (routine_category_id); every
   // other type by the Strategic one (category_id).
@@ -585,7 +613,9 @@ function CreateKpiModal({
       open={open}
       onClose={onClose}
       title="Add KPI"
-      subtitle="Define the indicator; configure targets, calculation logic and sub-KPIs next."
+      size="lg"
+      gutter="roomy"
+      subtitle="Define the indicator and, optionally, its targets; configure calculation logic and sub-KPIs next."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -604,6 +634,10 @@ function CreateKpiModal({
                 edpexTopicId: edpex.edpexTopicId || null,
                 edpexAreaId: edpex.edpexAreaId || null,
                 edpexIndicatorCode: edpex.edpexIndicatorCode.trim() || null,
+                fiveYearTarget,
+                annualTargets: yearTargets.filter(
+                  (t): t is { yearNo: number; targetValue: number } => t.targetValue != null,
+                ),
               })
             }
           >
@@ -620,7 +654,7 @@ function CreateKpiModal({
             placeholder="e.g. Clinical Placement Rate"
           />
         </Field>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-lg">
+        <div className="grid grid-cols-1 items-start gap-lg sm:grid-cols-2 md:grid-cols-3">
           <Field label="Category">
             <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">Uncategorised</option>
@@ -667,6 +701,42 @@ function CreateKpiModal({
             onChange={setEdpex}
           />
         </div>
+        <fieldset className="flex flex-col gap-sm">
+          <legend className="text-label-md mb-sm">
+            Targets <span className="text-mute">(optional)</span>
+          </legend>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-sm">
+            <Field label="5-Yr">
+              <Input
+                inputMode="decimal"
+                aria-label="5-Year Target"
+                value={fiveYear}
+                onChange={(e) => setFiveYear(e.target.value)}
+              />
+            </Field>
+            {years.map((v, i) => (
+              <Field key={i} label={`Y${i + 1}${startYear ? ` (${startYear + i})` : ""}`}>
+                <Input
+                  inputMode="decimal"
+                  aria-label={`Year ${i + 1} target`}
+                  value={v}
+                  onChange={(e) =>
+                    setYears((prev) => prev.map((p, j) => (j === i ? e.target.value : p)))
+                  }
+                />
+              </Field>
+            ))}
+          </div>
+          {targetError ? (
+            <p role="alert" className="text-caption-sm text-error">
+              {targetError}
+            </p>
+          ) : (
+            <p className="text-caption-sm text-mute">
+              Each year&apos;s target must not exceed the 5-Year Target.
+            </p>
+          )}
+        </fieldset>
       </div>
     </Modal>
   );

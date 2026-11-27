@@ -7,6 +7,7 @@ import { useBulkCreateLibraryKpis, useEdpexCatalog } from "@/lib/data/hooks";
 import { downloadCsv } from "@/lib/csv";
 import {
   KPI_BATCH_MAX_ROWS,
+  KPI_BATCH_YEAR_KEYS,
   buildKpiTemplateCsv,
   categoriesForKpiType,
   checkKpiBatch,
@@ -54,6 +55,7 @@ export function BatchAddKpisModal({
   defaultKpiType,
   defaultCommitteeId,
   setName,
+  startYear,
   importFile,
   onImportConsumed,
 }: {
@@ -70,6 +72,8 @@ export function BatchAddKpisModal({
   defaultCommitteeId: string;
   /** Named in the downloaded template's first line. */
   setName?: string;
+  /** The set's first B.E. year, to label the Y1–Y5 target columns. */
+  startYear?: number;
   /** A CSV picked from the set page's "Import CSV…" shortcut. Loaded into the
    *  grid once the modal is open, exactly as the in-modal Import CSV would. */
   importFile?: File | null;
@@ -251,9 +255,10 @@ export function BatchAddKpisModal({
     <Modal
       open={open}
       onClose={onClose}
-      size="xl"
+      size="full"
+      gutter="roomy"
       title="Batch Add KPIs"
-      subtitle="Create draft KPIs in one go, then configure targets, calculation and sub-KPIs in each KPI's editor."
+      subtitle="Create draft KPIs in one go, with optional targets; configure calculation and sub-KPIs in each KPI's editor."
       footer={
         <>
           <div className="mr-auto flex flex-wrap items-center gap-sm">
@@ -308,7 +313,7 @@ export function BatchAddKpisModal({
             size="sm"
             variant="ghost"
             icon="download"
-            onClick={() => downloadCsv("kpi-batch-template.csv", buildKpiTemplateCsv(lookups, setName))}
+            onClick={() => downloadCsv("kpi-batch-template.csv", buildKpiTemplateCsv(lookups, setName, startYear))}
           >
             Template
           </Button>
@@ -337,7 +342,8 @@ export function BatchAddKpisModal({
           <span className="ml-auto inline-flex items-center gap-xs text-caption-sm text-mute">
             <Icon name="content_paste" size={16} />
             Paste rows from Excel into any Name cell — columns: Name, Type, Category,
-            Committee, Description, EdPEx Topic, EdPEx Area, EdPEx Indicator.
+            Committee, Description, EdPEx Topic, EdPEx Area, EdPEx Indicator, 5-Year
+            Target, Target Y1–Y5.
           </span>
         </div>
 
@@ -351,16 +357,29 @@ export function BatchAddKpisModal({
           <Table>
             <thead>
               <tr>
-                <Th className="px-md">KPI Name *</Th>
+                <Th className="bg-surface-lowest sm:sticky sm:left-0 sm:z-10 sm:shadow-[1px_0_0_theme(colors.hairline),4px_0_6px_-4px_rgba(0,0,0,0.12)] px-sm">KPI Name *</Th>
                 <FillTh label="Type" onFill={() => fillDown("kpiType")} />
                 <FillTh label="Category" onFill={() => fillDown("categoryId")} />
                 <FillTh label="Committee" onFill={() => fillDown("committeeId")} />
-                <Th className="px-md">Description</Th>
+                <Th className="px-sm">Description</Th>
                 <FillTh label="EdPEx Topic" onFill={() => fillDown("edpexTopicId")} />
                 <FillTh label="EdPEx Area" onFill={() => fillDown("edpexAreaId")} />
-                <Th className="px-md">EdPEx Indicator</Th>
-                <Th className="px-md">Status</Th>
-                <Th className="px-md">
+                <Th className="px-sm">EdPEx Indicator</Th>
+                <Th className="px-xs whitespace-nowrap" align="right">
+                  <span title="5-Year Target">5-Yr</span>
+                </Th>
+                {KPI_BATCH_YEAR_KEYS.map((key, y) => (
+                  <Th key={key} className="px-xs whitespace-nowrap" align="right">
+                    <span title={`Year ${y + 1} target`}>
+                      Y{y + 1}
+                      {startYear ? (
+                        <span className="block text-caption-sm text-mute">{startYear + y}</span>
+                      ) : null}
+                    </span>
+                  </Th>
+                ))}
+                <Th className="px-sm">Status</Th>
+                <Th className="px-sm">
                   <span className="sr-only">Remove</span>
                 </Th>
               </tr>
@@ -372,20 +391,20 @@ export function BatchAddKpisModal({
                 const rowAreas = areasForTopic(edpex, row.edpexTopicId);
                 return (
                   <tr key={row.key} className="border-t border-hairline align-top">
-                    <Td className="px-md py-xs">
+                    <Td className="bg-surface-lowest sm:sticky sm:left-0 sm:z-10 sm:shadow-[1px_0_0_theme(colors.hairline),4px_0_6px_-4px_rgba(0,0,0,0.12)] px-sm py-xs">
                       <Input
                         aria-label={`KPI name, row ${i + 1}`}
-                        className="min-w-[16rem]"
+                        className="min-w-[14rem]"
                         value={row.name}
                         placeholder={i === 0 ? "e.g. Clinical Placement Rate" : undefined}
                         onChange={(e) => update(row.key, { name: e.target.value })}
                         onPaste={(e) => onPasteName(row.key, e)}
                       />
                     </Td>
-                    <Td className="px-md py-xs">
+                    <Td className="px-sm py-xs">
                       <Select
                         aria-label={`KPI type, row ${i + 1}`}
-                        className="min-w-[9rem]"
+                        className="min-w-[8rem]"
                         value={row.kpiType}
                         onChange={(e) => update(row.key, { kpiType: e.target.value })}
                       >
@@ -398,10 +417,10 @@ export function BatchAddKpisModal({
                         <UnknownOption value={row.kpiType} known={kpiTypes} />
                       </Select>
                     </Td>
-                    <Td className="px-md py-xs">
+                    <Td className="px-sm py-xs">
                       <Select
                         aria-label={`Category, row ${i + 1}`}
-                        className="min-w-[11rem]"
+                        className="min-w-[10rem]"
                         value={row.categoryId}
                         onChange={(e) => update(row.key, { categoryId: e.target.value })}
                       >
@@ -418,10 +437,10 @@ export function BatchAddKpisModal({
                         />
                       </Select>
                     </Td>
-                    <Td className="px-md py-xs">
+                    <Td className="px-sm py-xs">
                       <Select
                         aria-label={`Committee, row ${i + 1}`}
-                        className="min-w-[11rem]"
+                        className="min-w-[10rem]"
                         value={row.committeeId}
                         onChange={(e) => update(row.key, { committeeId: e.target.value })}
                       >
@@ -434,18 +453,18 @@ export function BatchAddKpisModal({
                         <UnknownOption value={row.committeeId} known={committees} />
                       </Select>
                     </Td>
-                    <Td className="px-md py-xs">
+                    <Td className="px-sm py-xs">
                       <Input
                         aria-label={`Description, row ${i + 1}`}
-                        className="min-w-[12rem]"
+                        className="min-w-[10rem]"
                         value={row.description}
                         onChange={(e) => update(row.key, { description: e.target.value })}
                       />
                     </Td>
-                    <Td className="px-md py-xs">
+                    <Td className="px-sm py-xs">
                       <Select
                         aria-label={`EdPEx topic, row ${i + 1}`}
-                        className="w-[9rem]"
+                        className="w-[8rem]"
                         value={row.edpexTopicId}
                         onChange={(e) => update(row.key, { edpexTopicId: e.target.value })}
                       >
@@ -458,10 +477,10 @@ export function BatchAddKpisModal({
                         <UnknownOption value={row.edpexTopicId} known={edpex} />
                       </Select>
                     </Td>
-                    <Td className="px-md py-xs">
+                    <Td className="px-sm py-xs">
                       <Select
                         aria-label={`EdPEx area, row ${i + 1}`}
-                        className="w-[9rem]"
+                        className="w-[8rem]"
                         value={row.edpexAreaId}
                         disabled={!row.edpexTopicId && !row.edpexAreaId}
                         onChange={(e) => update(row.key, { edpexAreaId: e.target.value })}
@@ -480,18 +499,29 @@ export function BatchAddKpisModal({
                         />
                       </Select>
                     </Td>
-                    <Td className="px-md py-xs">
+                    <Td className="px-sm py-xs">
                       <Input
                         aria-label={`EdPEx indicator code, row ${i + 1}`}
-                        className="w-[8rem]"
+                        className="w-[7rem]"
                         maxLength={EDPEX_INDICATOR_CODE_MAX}
                         placeholder={row.edpexAreaId ? `${row.edpexAreaId}-1` : "7.1ข-4"}
                         value={row.edpexIndicatorCode}
                         onChange={(e) => update(row.key, { edpexIndicatorCode: e.target.value })}
                       />
                     </Td>
-                    <Td className="px-md py-xs">
-                      <div className="flex min-h-[36px] w-[12rem] items-center">
+                    {(["fiveYearTarget", ...KPI_BATCH_YEAR_KEYS] as const).map((key, t) => (
+                      <Td key={key} className="px-xs py-xs">
+                        <Input
+                          aria-label={`${t === 0 ? "5-Year Target" : `Year ${t} target`}, row ${i + 1}`}
+                          inputMode="decimal"
+                          className="w-[4.5rem] text-right"
+                          value={row[key]}
+                          onChange={(e) => update(row.key, { [key]: e.target.value })}
+                        />
+                      </Td>
+                    ))}
+                    <Td className="px-sm py-xs">
+                      <div className="flex min-h-[36px] w-[10rem] items-center">
                         <RowStatus
                           blank={rowCheck?.blank ?? true}
                           error={rowCheck?.error ?? null}
@@ -500,7 +530,7 @@ export function BatchAddKpisModal({
                         />
                       </div>
                     </Td>
-                    <Td className="px-md py-xs">
+                    <Td className="px-sm py-xs">
                       <button
                         type="button"
                         aria-label={`Remove row ${i + 1}`}
@@ -526,7 +556,8 @@ export function BatchAddKpisModal({
           EdPEx Indicator (the SAR row, e.g. 7.1ข-4) must start with the row&apos;s area. The
           CSV template lists every allowed value in its # instruction lines; Type,
           Category, Committee and the EdPEx columns accept either the name shown
-          here or its code.
+          here or its code. Targets are optional numbers; each year&apos;s target must
+          not exceed the 5-Year Target.
         </p>
       </div>
     </Modal>
@@ -535,7 +566,7 @@ export function BatchAddKpisModal({
 
 function FillTh({ label, onFill }: { label: string; onFill: () => void }) {
   return (
-    <Th className="px-md">
+    <Th className="px-sm">
       <span className="inline-flex items-center gap-xs whitespace-nowrap">
         {label}
         <button
@@ -590,7 +621,7 @@ function RowStatus({
   if (blank) return <span className="text-caption-sm text-mute">empty, skipped</span>;
   if (error) {
     return (
-      <span className="text-caption-sm text-error" title={error}>
+      <span className="line-clamp-2 text-caption-sm leading-tight text-error" title={error}>
         {error}
       </span>
     );

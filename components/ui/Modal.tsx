@@ -13,6 +13,7 @@ export function Modal({
   footer,
   size = "md",
   fitViewport = false,
+  gutter = "default",
 }: {
   open: boolean;
   onClose: () => void;
@@ -20,11 +21,14 @@ export function Modal({
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: "md" | "mdWide" | "lg" | "xl" | "batch";
+  size?: "md" | "mdWide" | "lg" | "xl" | "batch" | "full";
   /** Never grow taller than the screen: the header and footer stay put and the
    *  body scrolls instead. Opt-in, because a scrolling body clips dropdowns that
    *  are not portaled (Combobox) — only use it where none sit in the body. */
   fitViewport?: boolean;
+  /** Left/right padding of the header, body and footer: 14px by default,
+   *  28px for "roomy" — for a form that wants more air at the edges. */
+  gutter?: "default" | "roomy";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -34,6 +38,8 @@ export function Modal({
   }, [open, onClose]);
 
   if (!open) return null;
+
+  const px = gutter === "roomy" ? "px-xxl" : "px-lg";
 
   return (
     <div
@@ -50,6 +56,9 @@ export function Modal({
           fitViewport &&
             "flex max-h-[calc(100dvh-28px)] flex-col sm:max-h-[calc(100dvh-56px)]",
           // The data-entry batch modes: Multiple rows' former 1120px plus 10%.
+          // Nearly the whole window — the overlay's padding keeps it off the
+          // edges — for a wide data-entry grid (Batch Add KPIs).
+          size === "full" && "max-w-[1600px]",
           size === "batch" && "max-w-[1232px]",
           size === "xl" && "max-w-[1120px]",
           size === "lg" && "max-w-[860px]",
@@ -58,7 +67,7 @@ export function Modal({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-md border-b border-hairline px-lg py-md">
+        <div className={cn("flex shrink-0 items-start justify-between gap-md border-b border-hairline py-md", px)}>
           <div>
             <h2 className="text-heading-md text-on-surface">{title}</h2>
             {subtitle && <p className="text-caption-sm text-mute mt-tiny">{subtitle}</p>}
@@ -71,11 +80,16 @@ export function Modal({
             <Icon name="close" size={20} />
           </button>
         </div>
-        <div className={cn("px-lg py-md", fitViewport && "min-h-0 overflow-y-auto")}>
+        <div className={cn("py-md", px, fitViewport && "min-h-0 overflow-y-auto")}>
           {children}
         </div>
         {footer && (
-          <div className="flex shrink-0 items-center justify-end gap-sm border-t border-hairline px-lg py-md">
+          <div
+            className={cn(
+              "flex shrink-0 items-center justify-end gap-sm border-t border-hairline py-md",
+              px,
+            )}
+          >
             {footer}
           </div>
         )}

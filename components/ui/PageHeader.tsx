@@ -23,7 +23,8 @@ export function PageHeader({
           <p className="text-body-sm text-mute mt-xs max-w-[640px]">{description}</p>
         )}
       </div>
-      {actions && <div className="flex items-center gap-sm">{actions}</div>}
+      {/* Wraps on a narrow screen instead of pushing the page wider than it. */}
+      {actions && <div className="flex flex-wrap items-center gap-sm">{actions}</div>}
     </div>
   );
 }

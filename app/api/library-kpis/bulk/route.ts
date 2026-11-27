@@ -93,14 +93,38 @@ export async function POST(req: NextRequest) {
         [setId],
       );
       const firstSort = Number(maxRow[0]?.next ?? 1);
-      const values = rows.map((row, i) =>
-        libraryKpiInsertValues(setId, toKpiCreateInput(row, lookups), firstSort + i),
+      const inputs = rows.map((row) => toKpiCreateInput(row, lookups));
+      const values = inputs.map((input, i) =>
+        libraryKpiInsertValues(setId, input, firstSort + i),
       );
 
       const [ins] = await conn.query<ResultSetHeader>(
         `INSERT INTO library_kpi (${LIBRARY_KPI_INSERT_COLUMNS}) VALUES ?`,
         [values],
       );
+
+      // Annual targets need the new ids. Read them back by the sort_order each
+      // row was given — unique within this transaction's range — rather than
+      // trusting insertId to be the first of a consecutive block.
+      if (inputs.some((input) => input.annualTargets.length > 0)) {
+        const [created] = await conn.query<RowDataPacket[]>(
+          "SELECT id, sort_order AS sortOrder FROM library_kpi WHERE set_id = ? AND sort_order BETWEEN ? AND ?",
+          [setId, firstSort, firstSort + inputs.length - 1],
+        );
+        const idBySort = new Map(created.map((r) => [Number(r.sortOrder), Number(r.id)]));
+        const targetValues = inputs.flatMap((input, i) => {
+          const kpiId = idBySort.get(firstSort + i);
+          return kpiId == null
+            ? []
+            : input.annualTargets.map((t) => [kpiId, t.yearNo, t.targetValue]);
+        });
+        if (targetValues.length > 0) {
+          await conn.query(
+            "INSERT INTO library_kpi_annual_target (kpi_id, year_no, target_value) VALUES ?",
+            [targetValues],
+          );
+        }
+      }
       await conn.commit();
       return NextResponse.json(
         { inserted: ins.affectedRows ?? values.length },

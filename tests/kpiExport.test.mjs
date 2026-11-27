@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseCsv } from "../lib/csv.ts";
-import { KPI_BATCH_COLUMNS, readKpiTemplateCsv } from "../lib/kpi/kpiBatch.ts";
+import {
+  KPI_BATCH_COLUMNS,
+  kpiBatchColumnLabel,
+  readKpiTemplateCsv,
+} from "../lib/kpi/kpiBatch.ts";
 import {
   buildKpiExportCsv,
   buildKpiExportFilename,
@@ -67,15 +71,17 @@ const cells = (csv) => parseCsv(csv).filter((r) => r.some((c) => c !== ""));
 
 test("the header starts with the template columns, then the details", () => {
   const [header] = cells(buildKpiExportCsv([kpi()], LOOKUPS, SET));
-  const templateLabels = KPI_BATCH_COLUMNS.map((c) => c.label);
+  const templateLabels = KPI_BATCH_COLUMNS.map((c) => kpiBatchColumnLabel(c, SET.startYear));
   assert.deepEqual(header.slice(0, templateLabels.length), templateLabels);
-  assert.deepEqual(header.slice(templateLabels.length), kpiExportDetailHeaders(SET));
+  assert.deepEqual(header.slice(templateLabels.length), kpiExportDetailHeaders());
 });
 
-test("target columns name the set's B.E. years", () => {
-  const headers = kpiExportDetailHeaders(SET);
-  assert.ok(headers.includes("Target Y1 (2565)"));
-  assert.ok(headers.includes("Target Y5 (2569)"));
+test("target columns name the set's B.E. years, and are not repeated as details", () => {
+  const [header] = cells(buildKpiExportCsv([kpi()], LOOKUPS, SET));
+  assert.ok(header.includes("Target Y1 (2565)"));
+  assert.ok(header.includes("Target Y5 (2569)"));
+  assert.equal(header.filter((h) => h === "5-Year Target").length, 1);
+  assert.ok(!kpiExportDetailHeaders().some((h) => /Target/.test(h) && !/Threshold/.test(h)));
 });
 
 test("a row writes readable labels and every detail", () => {
@@ -136,6 +142,13 @@ test("an export re-imports through the template reader", () => {
       edpexTopicId: "7.1",
       edpexAreaId: "7.1ข",
       edpexIndicatorCode: "7.1ข-4",
+      // Targets are template columns now, so they come back too.
+      fiveYearTarget: "90",
+      targetY1: "70",
+      targetY2: "75",
+      targetY3: "",
+      targetY4: "",
+      targetY5: "90",
     },
     {
       name: "Research grants",
@@ -147,6 +160,12 @@ test("an export re-imports through the template reader", () => {
       edpexTopicId: "",
       edpexAreaId: "",
       edpexIndicatorCode: "",
+      fiveYearTarget: "90",
+      targetY1: "70",
+      targetY2: "75",
+      targetY3: "",
+      targetY4: "",
+      targetY5: "90",
     },
   ]);
 });
