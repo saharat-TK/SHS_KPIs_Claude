@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import {
   buildKpiTemplateCsv,
   checkKpiBatch,
@@ -12,6 +13,9 @@ import {
   parseKpiPaste,
   readKpiTemplateCsv,
   toKpiCreateInput,
+  kpiBatchColumnLabel,
+  parseKpiTarget,
+  KPI_BATCH_COLUMNS,
 } from "../lib/kpi/kpiBatch.ts";
 
 const LOOKUPS = {
@@ -48,6 +52,16 @@ const LOOKUPS = {
       ],
     },
   ],
+};
+
+/** The six target fields, all blank. */
+const NO_TARGETS = {
+  fiveYearTarget: "",
+  targetY1: "",
+  targetY2: "",
+  targetY3: "",
+  targetY4: "",
+  targetY5: "",
 };
 
 const row = (over = {}) =>
@@ -139,6 +153,7 @@ test("pasted Excel rows resolve labels and fall back to defaults", () => {
     edpexTopicId: "",
     edpexAreaId: "",
     edpexIndicatorCode: "",
+    ...NO_TARGETS,
   });
   // Same label in both taxonomies → the Routine one, matching the row's type.
   assert.equal(rows[1].categoryId, "routine_research");
@@ -172,6 +187,7 @@ test("the CSV template round-trips, with columns matched by header", () => {
       edpexTopicId: "",
       edpexAreaId: "",
       edpexIndicatorCode: "",
+      ...NO_TARGETS,
     },
   ]);
 
@@ -194,6 +210,7 @@ test("normalizeKpiBatchRow coerces a JSON body to strings", () => {
     edpexTopicId: "",
     edpexAreaId: "",
     edpexIndicatorCode: "",
+    ...NO_TARGETS,
   });
   assert.deepEqual(normalizeKpiBatchRow(null), emptyKpiBatchRow());
 });
@@ -272,7 +289,8 @@ test("the template explains every column and lists the allowed values", () => {
   // reads back empty…
   const lines = template.replace(/^\uFEFF/, "").trimEnd().split("\n");
   const headerAt = lines.indexOf(
-    "Name,Type,Category,Committee,Description,EdPEx Topic,EdPEx Area,EdPEx Indicator",
+    "Name,Type,Category,Committee,Description,EdPEx Topic,EdPEx Area,EdPEx Indicator," +
+      "5-Year Target,Target Y1,Target Y2,Target Y3,Target Y4,Target Y5",
   );
   assert.ok(headerAt > 0);
   assert.ok(lines.slice(0, headerAt).every((l) => l.startsWith("#") || l.startsWith('"#')));
@@ -291,6 +309,7 @@ test("the template explains every column and lists the allowed values", () => {
       edpexTopicId: "7.1",
       edpexAreaId: "7.1ข",
       edpexIndicatorCode: "",
+      ...NO_TARGETS,
     },
   ]);
 });
@@ -367,7 +386,10 @@ test("the template carries completed example rows that are valid but never impor
   assert.equal(examples[0][2], "Student Success");
   assert.equal(examples[2][2], "ด้านที่ 1-การผลิตบัณฑิต");
   // The first shows the optional EdPEx columns filled in.
-  assert.deepEqual(examples[0].slice(5), ["7.1", "7.1ก", "7.1ก-1"]);
+  assert.deepEqual(examples[0].slice(5, 8), ["7.1", "7.1ก", "7.1ก-1"]);
+  // Targets: filled on the first two, blank on the last (they are optional).
+  assert.deepEqual(examples[0].slice(8), ["90", "70", "75", "80", "85", "90"]);
+  assert.deepEqual(examples[2].slice(8), ["", "", "", "", "", ""]);
 
   // Read as ordinary cells, every example is a row with no error…
   for (const cells of examples) {
@@ -386,4 +408,108 @@ test("the template carries completed example rows that are valid but never impor
   assert.deepEqual(parseKpiPaste(examples.map((r) => r.join("\t")).join("\n"), LOOKUPS), []);
   assert.equal(isKpiTemplateExample("  [example] lower case"), true);
   assert.equal(isKpiTemplateExample("Example without brackets"), false);
+});
+
+// ── Targets ─────────────────────────────────────────────────────────────────
+
+test("targets are optional numbers; thousands separators are allowed", () => {
+  assert.equal(parseKpiTarget(""), null);
+  assert.equal(parseKpiTarget("  "), null);
+  assert.equal(parseKpiTarget("90"), 90);
+  assert.equal(parseKpiTarget(" 1,250.5 "), 1250.5);
+  assert.equal(parseKpiTarget(".5"), 0.5);
+  assert.ok(Number.isNaN(parseKpiTarget("90%")));
+  assert.ok(Number.isNaN(parseKpiTarget("abc")));
+  assert.equal(kpiBatchRowError(row(), LOOKUPS), null);
+});
+
+test("a target that is not a number, or negative, is an error", () => {
+  assert.match(kpiBatchRowError(row({ fiveYearTarget: "lots" }), LOOKUPS), /5-Year Target must be a number/);
+  assert.match(kpiBatchRowError(row({ targetY2: "x" }), LOOKUPS), /Year 2 target must be a number/);
+  assert.match(kpiBatchRowError(row({ fiveYearTarget: "-1" }), LOOKUPS), /cannot be negative/);
+  assert.match(kpiBatchRowError(row({ targetY3: "-5" }), LOOKUPS), /Year 3 target cannot be negative/);
+});
+
+test("each year's target must not exceed the 5-year target (the editor's cap rule)", () => {
+  assert.equal(
+    kpiBatchRowError(row({ fiveYearTarget: "90", targetY1: "70", targetY5: "90" }), LOOKUPS),
+    null,
+  );
+  assert.match(
+    kpiBatchRowError(row({ fiveYearTarget: "90", targetY1: "95" }), LOOKUPS),
+    /Year 1 target \(95\) must not exceed the 5-year target \(90\)/,
+  );
+  // No 5-year target: no cap.
+  assert.equal(kpiBatchRowError(row({ targetY1: "500" }), LOOKUPS), null);
+});
+
+test("toKpiCreateInput writes the 5-year target and only the filled years", () => {
+  const input = toKpiCreateInput(
+    row({ fiveYearTarget: "90", targetY1: "70", targetY3: "1,80" }),
+    LOOKUPS,
+  );
+  assert.equal(input.fiveYearTarget, 90);
+  assert.deepEqual(input.annualTargets, [
+    { yearNo: 1, targetValue: 70 },
+    { yearNo: 3, targetValue: 180 },
+  ]);
+  const blank = toKpiCreateInput(row(), LOOKUPS);
+  assert.equal(blank.fiveYearTarget, null);
+  assert.deepEqual(blank.annualTargets, []);
+});
+
+test("typing a target makes a row touched", () => {
+  assert.equal(checkKpiBatch([emptyKpiBatchRow({ targetY4: "3" })], LOOKUPS).rows[0].blank, false);
+});
+
+test("targets are the last pasted columns: 5-year, then Y1–Y5", () => {
+  const [pasted] = parseKpiPaste(
+    "A KPI\tstrategic\t\t\t\t\t\t\t90\t70\t75\t80\t85\t90",
+    LOOKUPS,
+  );
+  assert.deepEqual(
+    [pasted.fiveYearTarget, pasted.targetY1, pasted.targetY5],
+    ["90", "70", "90"],
+  );
+  // A paste from before the target columns still lines up.
+  const [old] = parseKpiPaste("B KPI\tstrategic", LOOKUPS);
+  assert.equal(old.fiveYearTarget, "");
+});
+
+test("target headers carry the B.E. year, and either form imports", () => {
+  const y1 = KPI_BATCH_COLUMNS.find((c) => c.key === "targetY1");
+  assert.equal(kpiBatchColumnLabel(y1, 2565), "Target Y1 (2565)");
+  assert.equal(kpiBatchColumnLabel(y1), "Target Y1");
+  const name = KPI_BATCH_COLUMNS[0];
+  assert.equal(kpiBatchColumnLabel(name, 2565), "Name");
+
+  const template = buildKpiTemplateCsv(LOOKUPS, "Set", 2565);
+  assert.ok(template.includes("Target Y1 (2565),Target Y2 (2566),Target Y3 (2567),Target Y4 (2568),Target Y5 (2569)"));
+  assert.ok(template.includes("each year's target must not exceed the 5-Year Target"));
+  const [filled] = readKpiTemplateCsv(
+    template + "Grad rate,Strategic,,,,,,,90,70,,,,90\n",
+    LOOKUPS,
+  );
+  assert.deepEqual(
+    [filled.fiveYearTarget, filled.targetY1, filled.targetY2, filled.targetY5],
+    ["90", "70", "", "90"],
+  );
+
+  const aliased = "Name,5-Yr,Y1,Year 2\nX,10,2,4\n";
+  const [x] = readKpiTemplateCsv(aliased, LOOKUPS);
+  assert.deepEqual([x.fiveYearTarget, x.targetY1, x.targetY2], ["10", "2", "4"]);
+});
+
+test("bulk and single create store the annual targets in the same transaction", () => {
+  for (const file of ["../app/api/library-kpis/bulk/route.ts", "../app/api/library-kpis/route.ts"]) {
+    const src = readFileSync(new URL(file, import.meta.url), "utf8");
+    const post = src.slice(src.indexOf("export async function POST"));
+    assert.match(post, /INSERT INTO library_kpi_annual_target/, file);
+    assert.ok(
+      post.indexOf("library_kpi_annual_target") < post.indexOf("conn.commit()"),
+      `${file}: targets are written before commit`,
+    );
+  }
+  const single = readFileSync(new URL("../app/api/library-kpis/route.ts", import.meta.url), "utf8");
+  assert.match(single, /validateAnnualTargets\(fiveYearTarget, annualTargets\)/);
 });

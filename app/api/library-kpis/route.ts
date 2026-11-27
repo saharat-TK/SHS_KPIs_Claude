@@ -8,6 +8,7 @@ import {
 } from "@/lib/kpi/libraryKpiInsert";
 import { isCalculationType } from "@/lib/types";
 import { normaliseEdpex } from "@/lib/kpi/edpex";
+import { validateAnnualTargets, type TargetInput } from "@/lib/kpi/targets";
 import { loadEdpexCatalog } from "@/lib/kpi/edpexServer";
 import { requirePermission, actorErrorResponse, requireActor } from "@/lib/auth/session";
 
@@ -85,6 +86,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: edpex.error }, { status: 400 });
     }
 
+    // Optional targets: the same checks as the KPI editor's targets PUT.
+    const fiveYearTarget = b.fiveYearTarget == null ? null : Number(b.fiveYearTarget);
+    if (fiveYearTarget != null && (Number.isNaN(fiveYearTarget) || fiveYearTarget < 0)) {
+      return NextResponse.json(
+        { error: "5-Year Target must be a non-negative number" },
+        { status: 400 },
+      );
+    }
+    // One row per year (the last one given wins); blank years are not stored.
+    const annualTargets: TargetInput[] = [
+      ...new Map<number, TargetInput>(
+        (Array.isArray(b.annualTargets) ? b.annualTargets : [])
+          .filter((t: TargetInput) => t?.targetValue != null)
+          .map((t: TargetInput) => [t.yearNo, t]),
+      ).values(),
+    ];
+    const targetCheck = validateAnnualTargets(fiveYearTarget, annualTargets);
+    if (!targetCheck.ok) {
+      return NextResponse.json({ error: targetCheck.error }, { status: 400 });
+    }
+
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -97,8 +119,18 @@ export async function POST(req: NextRequest) {
       const [ins] = await conn.query<ResultSetHeader>(
         `INSERT INTO library_kpi (${LIBRARY_KPI_INSERT_COLUMNS})
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        libraryKpiInsertValues(Number(b.setId), { ...b, ...edpex.value }, sortOrder),
+        libraryKpiInsertValues(
+          Number(b.setId),
+          { ...b, ...edpex.value, fiveYearTarget },
+          sortOrder,
+        ),
       );
+      if (annualTargets.length > 0) {
+        await conn.query(
+          "INSERT INTO library_kpi_annual_target (kpi_id, year_no, target_value) VALUES ?",
+          [annualTargets.map((t) => [ins.insertId, t.yearNo, t.targetValue])],
+        );
+      }
       // No sync to active performance records: a new KPI is a draft, and drafts
       // join them on their first save in the KPI editor.
       await conn.commit();

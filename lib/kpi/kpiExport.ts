@@ -10,7 +10,7 @@
 // under node's type-stripping.
 import type { LibraryKpi } from "@/lib/types";
 import { categoryTaxonomyForKpiType } from "./categories.ts";
-import { KPI_BATCH_COLUMNS, type KpiBatchLookups } from "./kpiBatch.ts";
+import { KPI_BATCH_COLUMNS, kpiBatchColumnLabel, type KpiBatchLookups } from "./kpiBatch.ts";
 import { toCsv, UTF8_BOM } from "../csv.ts";
 
 export type ExportKpi = Pick<
@@ -61,13 +61,12 @@ const COLLECTION_LABELS: Record<string, string> = {
 
 const YEARS = [1, 2, 3, 4, 5] as const;
 
-/** The detail headers, with each target column naming its B.E. year. */
-export function kpiExportDetailHeaders(set: ExportSet): string[] {
+/** The read-only detail headers after the template columns. The targets are
+ *  template columns (they re-import), so they are not repeated here. */
+export function kpiExportDetailHeaders(): string[] {
   return [
     "Weight (%)",
     "Unit",
-    ...YEARS.map((y) => `Target Y${y} (${set.startYear + y - 1})`),
-    "5-Year Target",
     "Calculation",
     "Green Threshold",
     "Amber Threshold",
@@ -88,7 +87,10 @@ export function buildKpiExportCsv(
   const categoryLabel = new Map(lookups.categories.map((c) => [c.id, c.label]));
   const committeeName = new Map(lookups.committees.map((c) => [c.id, c.name]));
 
-  const headers = [...KPI_BATCH_COLUMNS.map((c) => c.label), ...kpiExportDetailHeaders(set)];
+  const headers = [
+    ...KPI_BATCH_COLUMNS.map((c) => kpiBatchColumnLabel(c, set.startYear)),
+    ...kpiExportDetailHeaders(),
+  ];
 
   const rows = kpis.map((k) => {
     // A KPI's one category lives in the column its type groups by — the same
@@ -107,10 +109,10 @@ export function buildKpiExportCsv(
       k.edpexTopicId ?? "",
       k.edpexAreaId ?? "",
       k.edpexIndicatorCode ?? "",
+      num(k.fiveYearTarget),
+      ...YEARS.map(target),
       num(k.weight),
       k.unit ?? "",
-      ...YEARS.map(target),
-      num(k.fiveYearTarget),
       CALCULATION_LABELS[k.calculationType] ?? k.calculationType,
       num(k.thresholdGreen),
       num(k.thresholdAmber),
