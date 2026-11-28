@@ -99,7 +99,15 @@ export function Drawer({
 
   useEffect(() => {
     if (!open || !closeOnEscape) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // A Modal opened from inside the drawer (a sub-KPI form, a confirm)
+      // listens on window too. Escape belongs to that topmost dialog alone.
+      const otherDialogOpen = Array.from(
+        document.querySelectorAll('[role="dialog"][aria-modal="true"]'),
+      ).some((el) => el !== panelRef.current);
+      if (!otherDialogOpen) onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, closeOnEscape, onClose]);

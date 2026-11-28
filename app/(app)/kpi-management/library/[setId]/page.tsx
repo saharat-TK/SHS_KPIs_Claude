@@ -54,6 +54,7 @@ import { categoriesForKpiType, parseKpiTarget } from "@/lib/kpi/kpiBatch";
 import { validateAnnualTargets } from "@/lib/kpi/targets";
 import { ManageCategoriesModal } from "./ManageCategoriesModal";
 import { BatchAddKpisModal } from "./BatchAddKpisModal";
+import { KpiDetailDrawer } from "./kpis/[kpiId]/KpiDetail";
 import { DraftBadge } from "../DraftBadge";
 import { downloadCsv } from "@/lib/csv";
 import { buildKpiTemplateCsv, type KpiBatchLookups } from "@/lib/kpi/kpiBatch";
@@ -103,6 +104,9 @@ function SetDetail() {
   const [committeeFilter, setCommitteeFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortState | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  // Clicking a KPI row opens its editor in a right-side drawer, the same way
+  // the performance record page opens its KPIs.
+  const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null);
   const [showBatch, setShowBatch] = useState(false);
   const [showManageCats, setShowManageCats] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -428,12 +432,7 @@ function SetDetail() {
               </thead>
               <tbody>
                 {sortedRows.map((k) => (
-                  <Tr
-                    key={k.id}
-                    onClick={() =>
-                      router.push(`/kpi-management/library/${setId}/kpis/${k.id}`)
-                    }
-                  >
+                  <Tr key={k.id} onClick={() => setSelectedKpiId(k.id)}>
                     <Td className="font-medium">
                       <span className="inline-flex items-center gap-xs">
                         {k.name}
@@ -456,8 +455,7 @@ function SetDetail() {
                           {
                             icon: "tune",
                             label: "Configure",
-                            onSelect: () =>
-                              router.push(`/kpi-management/library/${setId}/kpis/${k.id}`),
+                            onSelect: () => setSelectedKpiId(k.id),
                           },
                           {
                             icon: "delete",
@@ -489,9 +487,7 @@ function SetDetail() {
             {
               onSuccess: (created) => {
                 setShowCreate(false);
-                router.push(
-                  `/kpi-management/library/${setId}/kpis/${(created as LibraryKpi).id}`,
-                );
+                setSelectedKpiId((created as LibraryKpi).id);
               },
             },
           )
@@ -512,6 +508,13 @@ function SetDetail() {
         startYear={set?.startYear}
         importFile={importFile}
         onImportConsumed={() => setImportFile(null)}
+      />
+
+      <KpiDetailDrawer
+        setId={setId}
+        kpiId={selectedKpiId ?? 0}
+        open={selectedKpiId != null}
+        onClose={() => setSelectedKpiId(null)}
       />
 
       <ManageCategoriesModal
