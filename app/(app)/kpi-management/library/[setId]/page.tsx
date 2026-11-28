@@ -566,7 +566,7 @@ function CreateKpiModal({
   const [edpex, setEdpex] = useState<EdpexValue>(EMPTY_EDPEX);
   const [categoryId, setCategoryId] = useState("");
   const [kpiType, setKpiType] = useState<KpiType>("operational");
-  const [weight, setWeight] = useState(10);
+  const [weight, setWeight] = useState(100);
   const [unit, setUnit] = useState("Item");
   // Typed text; "" is blank. Year 1–5 in order.
   const [fiveYear, setFiveYear] = useState("");
@@ -577,7 +577,7 @@ function CreateKpiModal({
       setName("");
       setCategoryId("");
       setKpiType("operational");
-      setWeight(10);
+      setWeight(100);
       setUnit("Item");
       setEdpex(EMPTY_EDPEX);
       setFiveYear("");

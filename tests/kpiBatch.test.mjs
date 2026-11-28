@@ -104,7 +104,7 @@ test("Routine rows store their category as routineCategoryId", () => {
   assert.equal(strategic.categoryId, "student_success");
   assert.equal(strategic.routineCategoryId, null);
   assert.equal(strategic.description, null);
-  assert.equal(strategic.weight, 0);
+  assert.equal(strategic.weight, 100);
   assert.equal(strategic.unit, "Item");
 });
 
