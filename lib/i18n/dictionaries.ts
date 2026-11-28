@@ -143,6 +143,12 @@ const en = {
     headerDescription:
       "Configure this KPI's core details, 5-year targets, calculation logic and sub-KPIs.",
     backToSet: "Back to Set",
+    unsavedChanges: "You have unsaved changes.",
+    openFullPage: "Open the full KPI editor",
+    discardTitle: "Discard unsaved changes?",
+    discardMessage: "Your edits to this KPI have not been saved. Close it anyway and lose them?",
+    discardConfirm: "Discard",
+    close: "Close",
     saveChanges: "Save Changes",
     saving: "Saving…",
     draftBadgeTitle:
@@ -432,6 +438,12 @@ const th: Dictionary = {
     headerDescription:
       "กำหนดรายละเอียดหลักของ KPI นี้ เป้าหมาย 5 ปี ตรรกะการคำนวณ และ KPI ย่อย",
     backToSet: "กลับไปยังชุด",
+    unsavedChanges: "มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก",
+    openFullPage: "เปิดหน้าแก้ไข KPI แบบเต็ม",
+    discardTitle: "ละทิ้งการเปลี่ยนแปลงที่ยังไม่ได้บันทึก?",
+    discardMessage: "การแก้ไข KPI นี้ยังไม่ได้บันทึก ต้องการปิดและละทิ้งการแก้ไขหรือไม่",
+    discardConfirm: "ละทิ้ง",
+    close: "ปิด",
     saveChanges: "บันทึกการเปลี่ยนแปลง",
     saving: "กำลังบันทึก…",
     draftBadgeTitle:
