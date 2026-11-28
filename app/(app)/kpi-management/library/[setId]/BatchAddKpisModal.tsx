@@ -549,7 +549,7 @@ export function BatchAddKpisModal({
         </div>
 
         <p className="text-caption-sm text-mute">
-          New KPIs start as drafts (marked D) with weight 0% and unit Item, and stay
+          New KPIs start as drafts (marked D) with weight 100% and unit Item, and stay
           out of performance records until first saved in the KPI editor. Routine
           KPIs use the ด้านที่ categories; every other type uses the Strategic
           categories. EdPEx Area lists only the areas of the row&apos;s EdPEx Topic, and an

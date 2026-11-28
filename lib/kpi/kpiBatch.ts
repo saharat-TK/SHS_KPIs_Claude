@@ -26,9 +26,9 @@ import { validateAnnualTargets } from "./targets.ts";
 /** Ceiling on one batch: the bulk POST builds a single multi-row INSERT. */
 export const KPI_BATCH_MAX_ROWS = 500;
 
-/** Weight starts at 0 so a batch of skeletons cannot inflate a total before
- *  anyone has decided the real split; the unit matches the single-create form. */
-export const KPI_BATCH_DEFAULTS = { weight: 0, unit: "Item" } as const;
+/** Same defaults as the single-create form: weight 100% (matching sub-KPIs)
+ *  and unit Item. */
+export const KPI_BATCH_DEFAULTS = { weight: 100, unit: "Item" } as const;
 
 /** One grid row while editing. Every field is a string; "" means unset.
  *  `categoryId` is a single category whose taxonomy follows `kpiType` — it is

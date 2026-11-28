@@ -63,7 +63,7 @@ export function libraryKpiInsertValues(
     b.dataSourceUrl?.trim() || null,
     b.committeeId || null,
     b.personInChargeId || null,
-    b.weight ?? 0,
+    b.weight ?? 100,
     b.unit?.trim() || null,
     b.fiveYearTarget ?? null,
     b.calculationType || "weighted_sum",
